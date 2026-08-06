@@ -1,0 +1,22 @@
+
+### W4A16 packed — weights 6.62 GB, B=64 ###
+    ctx    KV GB   step ms   marginal GB/s   % peak
+    512     0.60      7.43
+   1024     1.21      9.01          382.8    23.3%
+   2048     2.42     14.35          226.3    13.8%
+   4096     4.83     21.12          357.1    21.8%
+   8192     9.66     39.44          263.7    16.1%
+  fixed cost extrapolated to zero KV: 5.97 ms
+  weight read at peak bandwidth:      4.04 ms   -> fixed-path efficiency 67.6%
+
+### dense bf16 (dequant at load) — weights 9.26 GB, B=64 ###
+    ctx    KV GB   step ms   marginal GB/s   % peak
+    512     0.60      5.51
+   1024     1.21      7.75          269.8    16.4%
+   2048     2.42     12.64          247.2    15.1%
+   4096     4.83     22.45          246.2    15.0%
+   8192     9.66     40.56          266.8    16.3%
+  fixed cost extrapolated to zero KV: 3.61 ms
+  weight read at peak bandwidth:      5.64 ms   -> fixed-path efficiency 156.3%
+
+KERNEL_GAP_DONE

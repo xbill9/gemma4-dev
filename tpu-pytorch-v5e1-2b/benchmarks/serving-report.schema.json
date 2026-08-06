@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/xbill9/tpu-skill-claude/main/benchmarks/serving-report.schema.json",
+  "title": "LLM Serving Benchmark Report",
+  "description": "One report per (model, hardware, engine config) deployment: identity of the stack, throughput sweep, capability probes, memory anatomy, startup, and cost. Unknown extra fields are allowed everywhere so the schema can evolve without breaking old reports.",
+  "type": "object",
+  "required": ["schema_version", "run", "hardware", "model", "software"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "run": {
+      "type": "object",
+      "required": ["id", "date"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique slug, convention: <date>-<model-short>-<hw-short>, e.g. 2026-07-21-gemma4-e2b-v6e1",
+          "pattern": "^[a-z0-9][a-z0-9.-]*$"
+        },
+        "date": { "type": "string", "format": "date" },
+        "operator": { "type": "string" },
+        "source": { "type": "string", "description": "Where the numbers were published or logged (URL or repo path)" },
+        "notes": { "type": "string" }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "required": ["accelerator", "chips"],
+      "properties": {
+        "accelerator": {
+          "type": "string",
+          "description": "Accelerator model, kebab-case, e.g. tpu-v6e, tpu-v5p, nvidia-l4, nvidia-h100"
+        },
+        "chips": { "type": "integer", "minimum": 1 },
+        "topology": { "type": "string", "description": "Interconnect topology if applicable, e.g. 2x4" },
+        "hbm_gb_per_chip": { "type": "number", "exclusiveMinimum": 0 },
+        "machine_type": { "type": "string", "description": "Cloud machine type, e.g. ct6e-standard-1t" },
+        "host": {
+          "type": "object",
+          "properties": {
+            "cloud": { "type": "string", "description": "gcp, aws, azure, on-prem, ..." },
+            "zone": { "type": "string" },
+            "provisioning": {
+              "type": "string",
+              "enum": ["flex-start", "queued-resource", "on-demand", "spot", "reserved", "local"]
+            },
+            "instance_name": { "type": "string" },
+            "max_run_duration_hours": { "type": "number" }
+          }
+        },
+        "pricing": {
+          "type": "object",
+          "required": ["rate_per_chip_hour"],
+          "properties": {
+            "currency": { "type": "string", "default": "USD" },
+            "rate_per_chip_hour": { "type": "number", "minimum": 0 },
+            "source": { "type": "string", "description": "URL of the published rate the number was verified against" }
+          }
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "description": "Hugging Face repo id or equivalent canonical name" },
+        "family": { "type": "string", "description": "e.g. gemma-4" },
+        "parameters_b": { "type": "number", "description": "Parameter count in billions" },
+        "revision": { "type": "string", "description": "HF revision / commit if pinned" },
+        "weights_dtype": { "type": "string", "description": "bfloat16, float16, int4, ..." },
+        "quantization": { "type": "string", "description": "none, qat-w4a16-compressed-tensors, gguf-q4_0, ..." },
+        "kv_cache_dtype": { "type": "string", "description": "e.g. fp8_e5m2, bfloat16" },
+        "max_model_len": { "type": "integer", "description": "Context length the server was configured with" },
+        "architecture_notes": { "type": "string", "description": "Load-bearing architecture facts, e.g. KV sharing layout" }
+      }
+    },
+    "software": {
+      "type": "object",
+      "required": ["engine", "version"],
+      "properties": {
+        "engine": { "type": "string", "description": "vllm, sglang, tgi, ..." },
+        "version": { "type": "string", "description": "Exact engine version string, including dev suffix" },
+        "container_image": { "type": "string" },
+        "backend": { "type": "string", "description": "Engine backend/impl, e.g. tpu-inference (JAX), torchax, cuda" },
+        "tensor_parallel_size": { "type": "integer", "minimum": 1 },
+        "serve_args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Full flag list passed to the serve command, one flag(=value) per entry"
+        }
+      }
+    },
+    "load_matrix": {
+      "type": "array",
+      "description": "Which model variants / backend combinations load at all on this hardware+engine. One row per attempt.",
+      "items": {
+        "type": "object",
+        "required": ["model_id", "verdict"],
+        "properties": {
+          "model_id": { "type": "string" },
+          "backend": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["loads", "fails"] },
+          "error": { "type": "string", "description": "Failure signature if verdict=fails" },
+          "issue": { "type": "string", "description": "Upstream issue URL if filed" }
+        }
+      }
+    },
+    "throughput": {
+      "type": "object",
+      "required": ["workload", "sweep"],
+      "properties": {
+        "workload": {
+          "type": "object",
+          "properties": {
+            "tool": { "type": "string", "description": "e.g. vllm bench serve" },
+            "dataset": { "type": "string" },
+            "input_len": { "type": "integer" },
+            "output_len": { "type": "integer" },
+            "num_prompts": { "type": "integer" },
+            "runs_per_point": { "type": "integer", "default": 1 },
+            "noise_floor_pct": { "type": "number", "description": "Treat deltas below this percentage as noise" }
+          }
+        },
+        "sweep": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["concurrency"],
+            "properties": {
+              "concurrency": { "type": "integer", "minimum": 1 },
+              "request_rate_rps": { "type": "number", "description": "vllm: request_throughput" },
+              "output_tok_per_s": { "type": "number", "description": "vllm: output_throughput" },
+              "total_tok_per_s": { "type": "number", "description": "vllm: total_token_throughput" },
+              "per_stream_tok_per_s": { "type": "number", "description": "What one user sees at this level (~1000 / median TPOT)" },
+              "ttft_ms": { "$ref": "#/$defs/latency_ms" },
+              "tpot_ms": { "$ref": "#/$defs/latency_ms" },
+              "itl_ms": { "$ref": "#/$defs/latency_ms" },
+              "raw": {
+                "type": "object",
+                "description": "Verbatim `vllm bench serve --save-result` JSON for this point, embedded untouched"
+              }
+            }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "One entry per capability domain, each with individual probes.",
+      "items": {
+        "type": "object",
+        "required": ["domain", "verdict"],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "enum": ["tool_calling", "structured_output", "reasoning", "vision", "audio", "long_context", "other"]
+          },
+          "verdict": { "$ref": "#/$defs/verdict" },
+          "conditions": {
+            "type": "object",
+            "description": "Server or request config the verdict depends on, e.g. {\"enable_thinking\": true}"
+          },
+          "probes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "verdict"],
+              "properties": {
+                "name": { "type": "string" },
+                "verdict": { "$ref": "#/$defs/verdict" },
+                "latency_ms": { "type": "number" },
+                "observed": { "type": "string", "description": "What actually happened, one line" }
+              }
+            }
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "description": "HBM anatomy at steady state.",
+      "properties": {
+        "usable_hbm_gib": { "type": "number" },
+        "weights_gib": { "type": "number" },
+        "kv_cache_gib": { "type": "number" },
+        "workspace_gib": { "type": "number" },
+        "kv_bytes_per_token": { "type": "number" },
+        "resident_kv_tokens": { "type": "number" },
+        "notes": { "type": "string" }
+      }
+    },
+    "startup": {
+      "type": "object",
+      "description": "Cold-start timeline in seconds from instance RUNNING.",
+      "properties": {
+        "time_to_healthy_s": { "type": "number" },
+        "engine_init_s": { "type": "number" },
+        "compile_s": { "type": "number", "description": "XLA / graph compilation share of engine init" },
+        "notes": { "type": "string" }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "properties": {
+        "per_m_output_tokens": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["operating_point", "usd"],
+            "properties": {
+              "operating_point": { "type": "string", "description": "e.g. saturation, c=64, c=8, single-stream" },
+              "output_tok_per_s": { "type": "number" },
+              "usd": { "type": "number" }
+            }
+          }
+        },
+        "cold_start_usd": { "type": "number" },
+        "comparisons": {
+          "type": "array",
+          "description": "Managed-API price anchors.",
+          "items": {
+            "type": "object",
+            "required": ["name", "usd_per_m_output_tokens"],
+            "properties": {
+              "name": { "type": "string" },
+              "usd_per_m_output_tokens": { "type": "number" },
+              "source": { "type": "string" }
+            }
+          }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["summary"],
+        "properties": {
+          "url": { "type": "string" },
+          "summary": { "type": "string" },
+          "status": { "type": "string", "enum": ["open", "fixed", "wontfix", "workaround"] }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Environment quirks and operational gotchas worth carrying forward"
+    }
+  },
+  "$defs": {
+    "latency_ms": {
+      "type": "object",
+      "description": "Latency statistics in milliseconds.",
+      "properties": {
+        "mean": { "type": "number", "minimum": 0 },
+        "median": { "type": "number", "minimum": 0 },
+        "p90": { "type": "number", "minimum": 0 },
+        "p99": { "type": "number", "minimum": 0 }
+      }
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "partial", "fail", "blocked", "not_tested"],
+      "description": "pass = behaved as specified; partial = usable with caveats; fail = wrong behavior served successfully; blocked = could not be exercised at all; not_tested = out of scope for this run"
+    }
+  }
+}

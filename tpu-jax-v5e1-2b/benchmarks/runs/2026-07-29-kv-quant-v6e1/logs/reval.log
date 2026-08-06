@@ -1,0 +1,55 @@
+
+>>> ple-bf16/kv-bf16/nodonate
+      21.262 ms  +/- 0.69% IQR  |    1505.0 tok/s | weights 6.618 GB
+
+>>> ple-bf16/kv-bf16/donate
+      13.143 ms  +/- 0.37% IQR  |    2434.7 tok/s | weights 6.618 GB
+
+>>> ple-bf16/kv-int8/nodonate
+      13.537 ms  +/- 1.22% IQR  |    2363.9 tok/s | weights 6.618 GB
+
+>>> ple-bf16/kv-int8/donate
+      11.088 ms  +/- 0.65% IQR  |    2886.0 tok/s | weights 6.618 GB
+
+>>> ple-8/kv-bf16/nodonate
+      21.231 ms  +/- 0.53% IQR  |    1507.3 tok/s | weights 4.288 GB
+
+>>> ple-8/kv-bf16/donate
+      13.179 ms  +/- 1.32% IQR  |    2428.1 tok/s | weights 4.288 GB
+
+>>> ple-8/kv-int8/nodonate
+      13.420 ms  +/- 0.34% IQR  |    2384.4 tok/s | weights 4.288 GB
+
+>>> ple-8/kv-int8/donate
+      11.290 ms  +/- 0.44% IQR  |    2834.3 tok/s | weights 4.288 GB
+
+>>> ple-4/kv-bf16/nodonate
+      21.005 ms  +/- 0.53% IQR  |    1523.4 tok/s | weights 3.113 GB
+
+>>> ple-4/kv-bf16/donate
+      13.099 ms  +/- 0.95% IQR  |    2442.9 tok/s | weights 3.113 GB
+
+>>> ple-4/kv-int8/nodonate
+      13.576 ms  +/- 0.45% IQR  |    2357.2 tok/s | weights 3.113 GB
+
+>>> ple-4/kv-int8/donate
+      11.080 ms  +/- 0.36% IQR  |    2888.2 tok/s | weights 3.113 GB
+
+==============================================================================
+DONATION EFFECT (same ple/kv, donate vs nodonate)
+  ple-bf16  kv-bf16 :   21.262 ->   13.143 ms = 1.618x  [REAL]
+  ple-bf16  kv-int8 :   13.537 ->   11.088 ms = 1.221x  [REAL]
+  ple-8     kv-bf16 :   21.231 ->   13.179 ms = 1.611x  [REAL]
+  ple-8     kv-int8 :   13.420 ->   11.290 ms = 1.189x  [REAL]
+  ple-4     kv-bf16 :   21.005 ->   13.099 ms = 1.604x  [REAL]
+  ple-4     kv-int8 :   13.576 ->   11.080 ms = 1.225x  [REAL]
+
+int8 KV vs bf16 KV (same ple, same donation)
+  ple-bf16  nodonate :   21.262 ->   13.537 ms = 1.571x  [REAL]
+  ple-bf16  donate   :   13.143 ->   11.088 ms = 1.185x  [REAL]
+  ple-8     nodonate :   21.231 ->   13.420 ms = 1.582x  [REAL]
+  ple-8     donate   :   13.179 ->   11.290 ms = 1.167x  [REAL]
+  ple-4     nodonate :   21.005 ->   13.576 ms = 1.547x  [REAL]
+  ple-4     donate   :   13.099 ->   11.080 ms = 1.182x  [REAL]
+==============================================================================
+REVALIDATE_DONE

@@ -1,0 +1,66 @@
+# Top-level safety net for the monorepo.
+#
+# Each rig keeps its own .gitignore with rig-specific rules (private docs, benchmark
+# runs held back from publication). This file covers the patterns that must never be
+# committed from ANY rig, so a rig whose own .gitignore misses one is still protected.
+#
+# Note: `tpu.env` is deliberately NOT ignored — it is a rig's committed source of
+# truth for deployment parameters. Do not add `*.env` here, it would match it.
+
+# Secrets and machine-local config
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials*.json
+service-account*.json
+
+# Generated MCP registration — embeds the GCP project id, regenerate with project-setup.sh
+.mcp.json
+
+# Machine-specific Claude Code settings (.claude/settings.json IS committed and shared)
+.claude/settings.local.json
+
+# Private, not-for-publication docs
+tpu.md
+pytorch.md
+
+# Python
+__pycache__/
+*.py[cod]
+.Python
+env/
+venv/
+.venv/
+.tox/
+.coverage
+.coverage.*
+.cache
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Model weights and other large artifacts
+gemma-4-*/
+gemma-*/
+*.safetensors
+*.bin
+*.tar.gz
+*.pth
+*.onnx
+
+# Editor and OS noise.
+#
+# Deliberately NO blanket `*.log` rule here: benchmark runs under benchmarks/runs/**
+# commit their logs as the record of a measurement. tpu-vllm-v5e1-2b ignores `*.log`
+# in its own .gitignore, which is the right scope for it.
+*.swp
+*.bak
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

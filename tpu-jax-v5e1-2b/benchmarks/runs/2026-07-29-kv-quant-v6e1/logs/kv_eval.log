@@ -1,0 +1,46 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2128.19it/s]
+passages: [196, 178, 159, 178] tokens (583 forced decode steps each config)
+
+=== kv_cache_dtype=bf16 ===
+  passage 0: ppl  17.547  (164 steps)
+  passage 1: ppl  32.701  (146 steps)
+  passage 2: ppl  78.259  (127 steps)
+  passage 3: ppl  18.357  (146 steps)
+  OVERALL ppl 28.7251  nll 3.35777
+  by quarter of decode: ['17.709', '31.772', '68.326', '17.577']
+
+=== kv_cache_dtype=int8 ===
+  passage 0: ppl  17.184  (164 steps)
+  passage 1: ppl  32.234  (146 steps)
+  passage 2: ppl  78.247  (127 steps)
+  passage 3: ppl  18.251  (146 steps)
+  OVERALL ppl 28.4119  nll 3.34681
+  by quarter of decode: ['17.457', '31.207', '67.978', '17.437']
+
+=== kv_cache_dtype=fp8_e4m3 ===
+  passage 0: ppl  17.489  (164 steps)
+  passage 1: ppl  34.827  (146 steps)
+  passage 2: ppl  79.016  (127 steps)
+  passage 3: ppl  18.726  (146 steps)
+  OVERALL ppl 29.3620  nll 3.37970
+  by quarter of decode: ['17.586', '33.632', '69.537', '17.943']
+
+=== kv_cache_dtype=fp8_e5m2 ===
+  passage 0: ppl  17.228  (164 steps)
+  passage 1: ppl  31.963  (146 steps)
+  passage 2: ppl  78.772  (127 steps)
+  passage 3: ppl  18.235  (146 steps)
+  OVERALL ppl 28.4074  nll 3.34665
+  by quarter of decode: ['17.504', '30.677', '68.873', '17.445']
+
+========================================================================
+dtype              ppl   vs bf16   greedy match  drift q1->q4
+bf16           28.7251   1.0000x        100.00%       1.0000x
+int8           28.4119   0.9891x         97.08%       1.0064x
+fp8_e4m3       29.3620   1.0222x         96.74%       1.0280x
+fp8_e5m2       28.4074   0.9889x         92.62%       1.0041x
+========================================================================
+drift > 1.0 means the gap widens with decode depth (error compounding).
+
+KV_EVAL_DONE

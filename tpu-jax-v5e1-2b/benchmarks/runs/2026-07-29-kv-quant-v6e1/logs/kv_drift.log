@@ -1,0 +1,39 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2047.50it/s]
+single continuous run: 1000 tokens, 968 forced decode steps, 161 per bin
+
+=== bf16 ===
+  ppl 22.9879  (30s)
+
+=== int8 ===
+  ppl 23.2999  (31s)
+
+=== fp8_e4m3 ===
+  ppl 23.3922  (31s)
+
+=== fp8_e5m2 ===
+  ppl 23.3560  (31s)
+
+==============================================================================
+NLL GAP vs bf16, by decode depth (one continuous run, cache never resets)
+depth                      int8       fp8_e4m3       fp8_e5m2
+0-161                  +0.00652       +0.05241       +0.01375
+161-322                +0.01850       +0.01792       +0.00150
+322-483                +0.02795       +0.02124       -0.00098
+483-644                +0.00575       +0.01609       -0.00155
+644-805                +0.01736       +0.00534       +0.05007
+805-968                +0.00492       -0.00806       +0.03233
+
+GREEDY MATCH vs bf16, by decode depth
+depth                      int8       fp8_e4m3       fp8_e5m2
+0-161                    98.76%         96.27%         95.03%
+161-322                  99.38%         98.14%         96.27%
+322-483                  97.52%         95.65%         91.93%
+483-644                  98.76%         96.89%         93.17%
+644-805                  98.14%         99.38%         95.03%
+805-968                 100.00%         96.32%         91.41%
+==============================================================================
+A rising NLL gap or falling greedy match across rows = error compounding.
+Flat rows = the cache is stable at depth.
+
+KV_DRIFT_DONE
