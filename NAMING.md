@@ -125,9 +125,14 @@ flag.
 Because the name is a claim, **retargeting a rig's accelerator or model makes the name stale until it's
 renamed too**, and a rename is more than `mv`:
 
-- Rename the **GitHub repo**, not just the local directory. Several rigs have already drifted —
-  `~/gemma4-dev/tpu-pytorch-v5e1-2b` and `~/tpu-pytorch-v6e1-2b` both push to `xbill9/tpu-pytorch`, and
-  `~/tpu-pytorch-inf2-2b` pushes to `xbill9/tpu-pytorch-inf2`.
+- Rename the **GitHub repo**, not just the local directory. Rigs under `~/gemma4-dev` no longer have their own
+  repo — the whole tree is the `xbill9/gemma4-dev` monorepo, so for those a rename is just the directory plus
+  the sweep below. Rigs in the other two trees still push individually and several have drifted:
+  `~/tpu-pytorch-v6e1-2b` pushes to `xbill9/tpu-pytorch`, and `~/tpu-pytorch-inf2-2b` to
+  `xbill9/tpu-pytorch-inf2`.
+- In the monorepo, a rig's directory name is also its **plugin name** in the root
+  `.claude-plugin/marketplace.json` and in its own `.claude-plugin/plugin.json`. Renaming the directory means
+  renaming the plugin in both, or `/plugin marketplace add xbill9/gemma4-dev` serves a stale entry.
 - Sweep the old name out of the repo: `grep -rn <old-name> --exclude-dir=.git --exclude-dir=dist`. Each rig is
   an independent fork, so the name is duplicated in docs, `.claude-plugin/` manifests, JSON-schema `$id`s, and
   hardcoded absolute `/home/xbill/<repo>/...` paths in test files.

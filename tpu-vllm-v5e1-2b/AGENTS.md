@@ -100,9 +100,9 @@ offline and mock cloud, subprocess, and network boundaries.
 
 ## Repository hygiene
 
-- The Git root is the parent directory, `/home/xbill/gemma4-queens`; this project is a subdirectory alongside
-  other agent projects and a `gemma-skills` submodule. Run Git commands from the root when repository-wide scope
-  is intended.
+- The Git root is the parent directory, `/home/xbill/gemma4-dev` (`xbill9/gemma4-dev`); this rig is a
+  subdirectory of that monorepo alongside the other Gemma 4 serving rigs. Run Git commands from the root when
+  repository-wide scope is intended.
 - Preserve unrelated user changes and untracked files. Do not reset, overwrite, or clean them.
 - Generated benchmark JSON, CSV, Markdown, and PNG plots are committed artifacts in this project. Do not
   regenerate or delete them unless the task calls for it.

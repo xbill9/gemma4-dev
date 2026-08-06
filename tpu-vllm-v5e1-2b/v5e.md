@@ -71,7 +71,7 @@ The MCP config is correspondingly boring, which is the point:
 {
   "mcpServers": {
     "tpu-2B-v5e1-devops-agent": {
-      "command": "/home/xbill/gemma4-queens/tpu-2B-v5e1-devops-agent/mcp-run.sh",
+      "command": "./mcp-run.sh",
       "args": [],
       "env": {}
     }

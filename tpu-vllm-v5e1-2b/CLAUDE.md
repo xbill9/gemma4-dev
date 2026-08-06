@@ -146,9 +146,13 @@ tests offline: mock the cloud, subprocess, and network boundaries rather than re
 
 ## Git
 
-The git root is the **parent** directory, `/home/xbill/gemma4-queens` — this project is one subdirectory of
-it, alongside sibling agent projects and a `gemma-skills` submodule. `git add .` from here stages only this
-subdirectory; run git commands from the repo root when you mean the whole tree.
+The git root is the **parent** directory, `/home/xbill/gemma4-dev` (`xbill9/gemma4-dev`) — this rig is one
+subdirectory of that monorepo, alongside the `tpu-jax-*` and `tpu-pytorch-*` rigs. `git add .` from here
+stages only this subdirectory; run git commands from the repo root when you mean the whole tree.
+
+This rig was forked out of `/home/xbill/gemma4-queens`, which is still a separate repo with the older
+`-devops-agent` naming. Nothing here is shared with it any more — don't look for this project's history
+there.
 
 Committed benchmark artifacts (`*.png` plots, `benchmark_results.*`, `grid_benchmark_results.csv`) are
 intentionally tracked. Don't regenerate or delete them unless asked.

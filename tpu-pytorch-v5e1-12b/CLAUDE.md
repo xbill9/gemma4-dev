@@ -20,7 +20,7 @@ The repo-root files are authoritative; the skill is distributed as generated cop
   - `.claude/skills/tpu-management/references/tpu-guide.md` — `tpu.md` with base64 screenshots stripped
   - `skills/tpu-management/` — full copy of the skill in plugin layout (for the marketplace)
 - **Generated, gitignored:** `.mcp.json` (embeds the GCP project id) — created by `./init.sh` on first run, or regenerated with `./project-setup.sh . --project <id> [flags]`; never commit it or hand-edit it back into git.
-- **Plugin marketplace:** `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` make the repo installable via `/plugin marketplace add xbill9/tpu-pytorch-v5e1-12b`. Validate changes with `claude plugin validate .`
+- **Plugin marketplace:** `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` make this rig installable. It now ships from the monorepo — `/plugin marketplace add xbill9/gemma4-dev`, then install the `tpu-pytorch-v5e1-12b` plugin. The marketplace that `/plugin` actually reads is the one at the **monorepo root** (`../.claude-plugin/marketplace.json`), which lists all three rigs; the copy in this directory only matters if this rig is published standalone again. Keep the two in sync. Validate with `claude plugin validate .`
 - **Distribution zip:** `dist/tpu-management-skill.zip`, built by `make skill-package`; committed so the raw-GitHub-URL install works — rebuild it when the skill changes
 
 ## Naming Conventions

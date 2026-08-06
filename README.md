@@ -28,6 +28,18 @@ The name is documentation, not configuration. A rig's authoritative values live 
 (`MODEL_NAME`, `ACCELERATOR_TYPE`, `TENSOR_PARALLEL_SIZE`) and siblings spell them inconsistently — v5e is
 `v5litepod-1` to gcloud in one rig and `v5e-1` in another. **Never copy a slot value into a CLI flag.**
 
+## Installing a rig as a Claude Code plugin
+
+Three of the rigs ship their `tpu-management` skill and `tpu-devops` MCP server as an installable plugin:
+
+```
+/plugin marketplace add xbill9/gemma4-dev
+```
+
+then install `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-12b`, or `tpu-pytorch-v5e1-2b`. The plugin is named after
+the rig it comes from, since all three provide a skill called `tpu-management` and would otherwise collide.
+`tpu-vllm-v5e1-2b` is not packaged as a plugin — use it directly.
+
 ## Working in a rig
 
 Everything is per-rig; there is no top-level build. `cd` into a rig first — each one carries its own
