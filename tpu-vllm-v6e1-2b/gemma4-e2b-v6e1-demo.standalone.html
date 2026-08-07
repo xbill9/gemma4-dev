@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gemma 4 E2B on a single TPU v6e chip</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body,h1,h2,h3,h4,p,dl,dd,ol,ul,figure,blockquote{margin:0}
+ul,ol{padding:0}
+img,svg{max-width:100%;display:block}
+</style>
+</head>
+<body>
+
+<style>
+  :root {
+    --ground: #f3f6f7;
+    --surface: #ffffff;
+    --surface-2: #eef2f4;
+    --ink: #101619;
+    --ink-muted: #56676e;
+    --ink-faint: #84969c;
+    --hairline: #d6dee1;
+    --accent: #0e7a8a;
+    --accent-soft: #d8ecef;
+    --good: #1c6b4a;
+    --warn: #8a5a13;
+
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --step-0: 0.9375rem;
+    --step-1: 1.0625rem;
+    --step-2: 1.375rem;
+    --step-3: 1.875rem;
+    --step-4: 2.75rem;
+
+    --rail: 20.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0c1114;
+      --surface: #141b1f;
+      --surface-2: #192228;
+      --ink: #e7edef;
+      --ink-muted: #9aacb3;
+      --ink-faint: #6b7d85;
+      --hairline: #243138;
+      --accent: #45b9c8;
+      --accent-soft: #12333a;
+      --good: #5cc79a;
+      --warn: #d6a45c;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0c1114;
+    --surface: #141b1f;
+    --surface-2: #192228;
+    --ink: #e7edef;
+    --ink-muted: #9aacb3;
+    --ink-faint: #6b7d85;
+    --hairline: #243138;
+    --accent: #45b9c8;
+    --accent-soft: #12333a;
+    --good: #5cc79a;
+    --warn: #d6a45c;
+  }
+
+  :root[data-theme="light"] {
+    --ground: #f3f6f7;
+    --surface: #ffffff;
+    --surface-2: #eef2f4;
+    --ink: #101619;
+    --ink-muted: #56676e;
+    --ink-faint: #84969c;
+    --hairline: #d6dee1;
+    --accent: #0e7a8a;
+    --accent-soft: #d8ecef;
+    --good: #1c6b4a;
+    --warn: #8a5a13;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1.1rem, 4vw, 2.5rem) 5rem;
+  }
+
+  /* ---- masthead ---- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+    padding-bottom: 1.75rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .eyebrow .sep { color: var(--hairline); }
+  .eyebrow .dim { color: var(--ink-faint); }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(1.75rem, 5vw, var(--step-4));
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  h1 .qualifier { color: var(--ink-muted); }
+
+  .standfirst {
+    font-size: var(--step-1);
+    color: var(--ink-muted);
+    max-width: 58ch;
+    text-wrap: pretty;
+  }
+
+  /* ---- headline figures ---- */
+
+  .figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+    margin-top: 1.75rem;
+  }
+
+  .figure {
+    background: var(--surface);
+    padding: 1.05rem 1.15rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .figure dt {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .figure dd {
+    font-family: var(--mono);
+    font-size: var(--step-2);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .figure dd .unit {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    letter-spacing: 0;
+    margin-left: 0.15rem;
+  }
+
+  /* ---- two-column body ---- */
+
+  .columns {
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    gap: clamp(1.75rem, 4vw, 3.5rem);
+    margin-top: 3rem;
+    align-items: start;
+  }
+
+  @media (max-width: 62rem) {
+    .columns { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .rail {
+    position: sticky;
+    top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+
+  @media (max-width: 62rem) {
+    .rail { position: static; }
+  }
+
+  .panel {
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+
+  .panel > h2 {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface-2);
+  }
+
+  .spec {
+    margin: 0;
+    padding: 0.35rem 0;
+    font-family: var(--mono);
+    font-size: 0.78125rem;
+  }
+
+  .spec div {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 0.32rem 1rem;
+  }
+
+  .spec dt { color: var(--ink-faint); white-space: nowrap; }
+
+  .spec dd {
+    margin: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- HBM bar ---- */
+
+  .hbm { padding: 1rem; display: flex; flex-direction: column; gap: 0.7rem; }
+
+  .hbm-bar {
+    display: flex;
+    height: 2.25rem;
+    border: 1px solid var(--hairline);
+    overflow: hidden;
+  }
+
+  .hbm-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    color: var(--surface);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .hbm-weights { background: var(--accent); flex: 8.97; }
+  .hbm-kv { background: color-mix(in srgb, var(--accent) 45%, var(--surface)); color: var(--ink); flex: 19.79; }
+  .hbm-free { background: var(--surface-2); color: var(--ink-muted); flex: 2.48; }
+
+  .hbm-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--ink-muted);
+  }
+
+  .hbm-key span { display: flex; align-items: center; gap: 0.4rem; }
+
+  .swatch { width: 0.7rem; height: 0.7rem; border: 1px solid var(--hairline); }
+  .swatch.w { background: var(--accent); }
+  .swatch.k { background: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
+  .swatch.f { background: var(--surface-2); }
+
+  /* ---- transcript ---- */
+
+  .main { display: flex; flex-direction: column; gap: 2.5rem; }
+
+  .section-head {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: 1.5rem;
+  }
+
+  .exchange {
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    margin-bottom: 1.5rem;
+  }
+
+  .prompt {
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .prompt .caret {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 0.8125rem;
+  }
+
+  .prompt p {
+    margin: 0;
+    font-size: var(--step-1);
+    font-weight: 550;
+    text-wrap: balance;
+  }
+
+  /* latency strip */
+
+  .strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    gap: 1px;
+    background: var(--hairline);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .stat {
+    background: var(--surface-2);
+    padding: 0.7rem 1rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .stat .label {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .stat .value {
+    font-family: var(--mono);
+    font-size: 1.0625rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.015em;
+  }
+
+  .stat .value .unit {
+    font-size: 0.6875rem;
+    color: var(--ink-muted);
+    margin-left: 0.1rem;
+  }
+
+  .meter {
+    height: 3px;
+    background: var(--hairline);
+    margin-top: 0.35rem;
+  }
+
+  .meter span { display: block; height: 100%; background: var(--accent); }
+
+  .cold {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--warn);
+  }
+
+  .answer {
+    padding: 1.35rem 1.5rem 1.6rem;
+    max-width: 68ch;
+  }
+
+  .answer p { margin: 0 0 0.85rem; }
+  .answer p:last-child { margin-bottom: 0; }
+  .answer strong { font-weight: 650; }
+
+  .answer h4 {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    margin: 1.4rem 0 0.6rem;
+    color: var(--ink);
+  }
+
+  .answer ol, .answer ul { margin: 0 0 0.9rem; padding-left: 1.4rem; }
+  .answer li { margin-bottom: 0.35rem; }
+
+  .answer blockquote {
+    margin: 0 0 0.9rem;
+    padding: 0.65rem 1rem;
+    border-left: 2px solid var(--accent);
+    background: var(--accent-soft);
+    font-style: italic;
+  }
+
+  .verdict {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--hairline);
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--hairline);
+    background: var(--surface-2);
+    color: var(--ink-muted);
+  }
+
+  /* ---- architecture ---- */
+
+  .layers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 1rem 1.25rem;
+  }
+
+  .layer {
+    width: 0.85rem;
+    height: 1.5rem;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+  }
+
+  .layer.full { background: var(--accent); border-color: var(--accent); }
+  .layer.shared { opacity: 0.32; }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.84rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.55rem 1.25rem;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 400;
+  }
+
+  td.num {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  /* ---- notes ---- */
+
+  .notes { display: flex; flex-direction: column; gap: 1.1rem; padding: 1.15rem 1.25rem; }
+
+  .note { display: flex; flex-direction: column; gap: 0.3rem; }
+
+  .note .tag {
+    font-family: var(--mono);
+    font-size: 0.5625rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--warn);
+  }
+
+  .note p { margin: 0; color: var(--ink-muted); max-width: 66ch; }
+
+  .colophon {
+    margin-top: 3.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+    background: var(--surface-2);
+    padding: 0.05em 0.3em;
+    border: 1px solid var(--hairline);
+  }
+
+  *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .exchange { transition: border-color 0.2s ease; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">
+      <span>Gemma 4 E2B</span>
+      <span class="sep">/</span>
+      <span>TPU v6e &middot; 1 chip</span>
+      <span class="sep">/</span>
+      <span class="dim">vLLM 0.26.1rc1</span>
+      <span class="sep">/</span>
+      <span class="dim">europe-west4-a</span>
+    </div>
+    <h1>One TPU chip, <span class="qualifier">214 tokens a second</span></h1>
+    <p class="standfirst">
+      A flex-start <code>ct6e-standard-1t</code> instance running
+      <code>google/gemma-4-E2B-it</code> under vLLM — thirteen minutes from
+      <em>no infrastructure</em> to a served OpenAI-compatible endpoint. Below: what the
+      machine looks like, and what it actually said.
+    </p>
+
+    <dl class="figures">
+      <div class="figure">
+        <dt>Sustained</dt>
+        <dd>214<span class="unit">tok/s</span></dd>
+      </div>
+      <div class="figure">
+        <dt>Time to first token</dt>
+        <dd>0.21<span class="unit">s</span></dd>
+      </div>
+      <div class="figure">
+        <dt>KV cache</dt>
+        <dd>1.15<span class="unit">M tok</span></dd>
+      </div>
+      <div class="figure">
+        <dt>Max concurrency</dt>
+        <dd>17.6<span class="unit">&times;</span></dd>
+      </div>
+      <div class="figure">
+        <dt>Cold start</dt>
+        <dd>13<span class="unit">min</span></dd>
+      </div>
+    </dl>
+  </header>
+
+  <div class="columns">
+
+    <aside class="rail">
+
+      <section class="panel">
+        <h2>Deployment</h2>
+        <dl class="spec">
+          <div><dt>Instance</dt><dd>vllm-gemma4-2b-v5e1</dd></div>
+          <div><dt>Machine</dt><dd>ct6e-standard-1t</dd></div>
+          <div><dt>Accelerator</dt><dd>TPU v6e &times; 1</dd></div>
+          <div><dt>Zone</dt><dd>europe-west4-a</dd></div>
+          <div><dt>Provisioning</dt><dd>FLEX_START</dd></div>
+          <div><dt>Max run</dt><dd>4h</dd></div>
+          <div><dt>Model</dt><dd>gemma-4-E2B-it</dd></div>
+          <div><dt>Tensor parallel</dt><dd>1</dd></div>
+          <div><dt>Context</dt><dd>65,536</dd></div>
+          <div><dt>vLLM</dt><dd>0.26.1rc1</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <h2>HBM &mdash; 31.24 GiB</h2>
+        <div class="hbm">
+          <div class="hbm-bar" role="img" aria-label="HBM allocation: 8.97 GiB model weights, 19.79 GiB KV cache, 2.48 GiB reserved headroom">
+            <div class="hbm-seg hbm-weights">8.97</div>
+            <div class="hbm-seg hbm-kv">19.79</div>
+            <div class="hbm-seg hbm-free"></div>
+          </div>
+          <div class="hbm-key">
+            <span><i class="swatch w"></i>Weights</span>
+            <span><i class="swatch k"></i>KV cache</span>
+            <span><i class="swatch f"></i>Reserved</span>
+          </div>
+        </div>
+        <dl class="spec">
+          <div><dt>Usable cap</dt><dd>28.74 GiB</dd></div>
+          <div><dt>KV capacity</dt><dd>1,151,744 tok</dd></div>
+          <div><dt>Blocks</dt><dd>8,998 &times; 128</dd></div>
+          <div><dt>KV tensors</dt><dd>15</dd></div>
+          <div><dt>KV dtype</dt><dd>bfloat16</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <h2>Boot timeline</h2>
+        <dl class="spec">
+          <div><dt>Weight download</dt><dd>14.0 s</dd></div>
+          <div><dt>Weight load</dt><dd>50.5 s</dd></div>
+          <div><dt>XLA compilation</dt><dd>332.7 s</dd></div>
+          <div><dt>Engine init total</dt><dd>386.8 s</dd></div>
+          <div><dt>MM warmup</dt><dd>33.6 s</dd></div>
+        </dl>
+      </section>
+
+    </aside>
+
+    <main class="main">
+
+      <section>
+        <h2 class="section-head">Transcript &mdash; five requests, all 200 OK</h2>
+
+        <article class="exchange">
+          <div class="prompt">
+            <span class="caret">&rsaquo;</span>
+            <p>In one sentence, what is a TPU?</p>
+          </div>
+          <div class="strip">
+            <div class="stat">
+              <span class="label">TTFT</span>
+              <span class="value">0.798<span class="unit">s</span></span>
+              <span class="cold">cold &mdash; first request</span>
+            </div>
+            <div class="stat">
+              <span class="label">Throughput</span>
+              <span class="value">229.7<span class="unit">tok/s</span></span>
+              <div class="meter"><span style="width:92%"></span></div>
+            </div>
+            <div class="stat">
+              <span class="label">Tokens</span>
+              <span class="value">32</span>
+            </div>
+            <div class="stat">
+              <span class="label">Wall clock</span>
+              <span class="value">0.94<span class="unit">s</span></span>
+            </div>
+          </div>
+          <div class="answer">
+            <p>A TPU (Tensor Processing Unit) is a specialized integrated circuit designed to
+            accelerate machine learning workloads, particularly those involving large-scale matrix
+            multiplications common in deep learning.</p>
+          </div>
+        </article>
+
+        <article class="exchange">
+          <div class="prompt">
+            <span class="caret">&rsaquo;</span>
+            <p>Is a hotdog a sandwich?</p>
+          </div>
+          <div class="strip">
+            <div class="stat">
+              <span class="label">TTFT</span>
+              <span class="value">0.214<span class="unit">s</span></span>
+            </div>
+            <div class="stat">
+              <span class="label">Throughput</span>
+              <span class="value">213.9<span class="unit">tok/s</span></span>
+              <div class="meter"><span style="width:86%"></span></div>
+            </div>
+            <div class="stat">
+              <span class="label">Tokens</span>
+              <span class="value">478</span>
+            </div>
+            <div class="stat">
+              <span class="label">Wall clock</span>
+              <span class="value">2.45<span class="unit">s</span></span>
+            </div>
+          </div>
+          <div class="answer">
+            <p>This is one of the great, and surprisingly passionate, debates of the internet!</p>
+            <p><strong>There is no single, universally agreed-upon answer.</strong> Whether a hotdog
+            is a sandwich depends entirely on the <strong>definition</strong> you choose to use.</p>
+
+            <h4>Arguments for &ldquo;Yes, it is a sandwich&rdquo;</h4>
+            <ol>
+              <li><strong>The Basic Structure:</strong> A sandwich is generally defined as a filling
+              served between, or enclosed by, slices of bread or a split roll. A hotdog fits this
+              structure.</li>
+              <li><strong>Functional Equivalence:</strong> It serves the same purpose &mdash; a
+              portable, handheld meal combining protein and carbohydrates.</li>
+              <li><strong>The Open-Faced Precedent:</strong> If an open-faced sandwich counts, then a
+              hotdog qualifies.</li>
+            </ol>
+
+            <h4>Arguments for &ldquo;No, it is not&rdquo;</h4>
+            <ol>
+              <li><strong>The &ldquo;Two Separate Pieces&rdquo; Rule:</strong> Purists argue a true
+              sandwich requires two distinct slices of bread; a hotdog bun is one continuous
+              piece.</li>
+              <li><strong>The &ldquo;Casing&rdquo; Argument:</strong> The bread acts as a vessel for
+              the meat rather than two components holding a filling between them.</li>
+              <li><strong>Taxonomic Distinction:</strong> The specific nature of sausage and bun makes
+              it its own category.</li>
+            </ol>
+
+            <h4>Conclusion</h4>
+            <p>A hotdog is a type of food that occupies an ambiguous space, leading to endless,
+            enjoyable philosophical arguments.</p>
+
+            <div class="verdict">
+              <span class="chip">Refused to pick a side</span>
+              <span class="chip">Unprompted structure</span>
+              <span class="chip">Markdown formatting</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="exchange">
+          <div class="prompt">
+            <span class="caret">&rsaquo;</span>
+            <p>How much wood can a woodchuck chuck?</p>
+          </div>
+          <div class="strip">
+            <div class="stat">
+              <span class="label">TTFT</span>
+              <span class="value">0.206<span class="unit">s</span></span>
+            </div>
+            <div class="stat">
+              <span class="label">Throughput</span>
+              <span class="value">214.1<span class="unit">tok/s</span></span>
+              <div class="meter"><span style="width:86%"></span></div>
+            </div>
+            <div class="stat">
+              <span class="label">Tokens</span>
+              <span class="value">334</span>
+            </div>
+            <div class="stat">
+              <span class="label">Wall clock</span>
+              <span class="value">1.77<span class="unit">s</span></span>
+            </div>
+          </div>
+          <div class="answer">
+            <p>That&rsquo;s a classic tongue-twister! There&rsquo;s no single, scientifically proven
+            answer to how much wood a woodchuck can chuck.</p>
+            <p><strong>The literal answer:</strong> since woodchucks (groundhogs) are burrowing
+            animals, they don&rsquo;t &ldquo;chuck&rdquo; wood in any measurable way.</p>
+            <p><strong>The definitive (joke) answer:</strong></p>
+            <blockquote>A woodchuck would chuck as much wood as a woodchuck could chuck if a
+            woodchuck could chuck wood.</blockquote>
+            <p><strong>The actual woodchuck metric:</strong> in the 1980s a wildlife biologist tried
+            to calculate this, and estimated a woodchuck could move about <strong>700 pounds</strong>
+            of dirt when digging a burrow. But again &mdash; that&rsquo;s dirt, not wood.</p>
+
+            <div class="verdict">
+              <span class="chip">Folklore checks out</span>
+              <span class="chip">Caught the dirt/wood distinction</span>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section>
+        <h2 class="section-head">Why it fits &mdash; architecture of E2B</h2>
+
+        <div class="panel">
+          <h2>35 layers &middot; sliding vs full attention</h2>
+          <div class="layers" role="img" aria-label="35 transformer layers: every fifth layer is full attention, the rest sliding-window. Layers 15 to 34 share KV from earlier layers and are shown faded.">
+            <i class="layer"></i><i class="layer"></i><i class="layer"></i><i class="layer"></i><i class="layer full"></i>
+            <i class="layer"></i><i class="layer"></i><i class="layer"></i><i class="layer"></i><i class="layer full"></i>
+            <i class="layer"></i><i class="layer"></i><i class="layer"></i><i class="layer"></i><i class="layer full"></i>
+            <i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer full shared"></i>
+            <i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer full shared"></i>
+            <i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer full shared"></i>
+            <i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer shared"></i><i class="layer full shared"></i>
+          </div>
+          <div class="hbm-key" style="padding: 0 1.25rem 1rem;">
+            <span><i class="swatch f"></i>Sliding &mdash; 512-token window</span>
+            <span><i class="swatch w"></i>Full attention</span>
+            <span>Faded &mdash; KV shared from earlier layers</span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>Property</th><th>Value</th><th>Consequence</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Layer pattern</td>
+                  <td class="num">4 sliding : 1 full</td>
+                  <td>Only 7 of 35 layers ever see the whole context</td>
+                </tr>
+                <tr>
+                  <td>Sliding window</td>
+                  <td class="num">512</td>
+                  <td>Local layers attend to a short neighbourhood</td>
+                </tr>
+                <tr>
+                  <td>Query : KV heads</td>
+                  <td class="num">8 : 1</td>
+                  <td>Full multi-query attention, not mild GQA</td>
+                </tr>
+                <tr>
+                  <td>Head dim</td>
+                  <td class="num">256 / 512</td>
+                  <td>Global layers carry double-width heads</td>
+                </tr>
+                <tr>
+                  <td>KV-shared layers</td>
+                  <td class="num">20 of 35</td>
+                  <td>Only 15 layers materialize a KV cache</td>
+                </tr>
+                <tr>
+                  <td>Per-layer embeddings</td>
+                  <td class="num">262,144 &times; 256</td>
+                  <td>&asymp;4.4 GiB &mdash; about half the resident weights</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="section-head">Read the numbers carefully</h2>
+        <div class="panel notes">
+          <div class="note">
+            <span class="tag">Single stream</span>
+            <p>Every figure here is one request at a time. 214 tok/s is single-stream decode
+            throughput, not server capacity &mdash; concurrent throughput is far higher and needs a
+            proper benchmark sweep to state.</p>
+          </div>
+          <div class="note">
+            <span class="tag">The fp8 log line is misleading</span>
+            <p>vLLM logs <code>Automatically using fp8_e5m2 for FP8 KV cache</code>, but the actual
+            allocation reports <code>bfloat16</code>, and the arithmetic agrees: 15 KiB per token
+            across 15 layers over 1,151,744 tokens is 16.5 GiB. At fp8 the capacity would be roughly
+            double.</p>
+          </div>
+          <div class="note">
+            <span class="tag">Sliding layers are over-allocated</span>
+            <p>vLLM placed all 15 KV layers in a single cache group with identical block counts, so
+            the 12 sliding-window layers &mdash; which never need more than 512 tokens of history
+            &mdash; are each given the full 8,998 blocks. A window-aware allocator would free a large
+            share of that 16.5 GiB. Inferred from the logs, not measured.</p>
+          </div>
+          <div class="note">
+            <span class="tag">Ephemeral by construction</span>
+            <p>Flex-start capacity cannot be paused. The instance self-deletes at its 4-hour
+            max-run-duration and the endpoint disappears with it.</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="colophon">
+    <span>Measured 3 Aug 2026</span>
+    <span>project aisprint-491218</span>
+    <span>vllm/vllm-tpu:nightly</span>
+    <span>All figures read from vLLM engine logs and /metrics</span>
+  </div>
+
+</div>
+</body>
+</html>

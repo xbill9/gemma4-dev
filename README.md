@@ -15,6 +15,7 @@ boundaries.
 | Rig | Runtime | Hardware | Model | Notes |
 | --- | --- | --- | --- | --- |
 | [`tpu-vllm-v5e1-2b`](tpu-vllm-v5e1-2b/) | vLLM in Docker | v5e-1 | `gemma-4-E2B-it` | Flex-start Queued Resource; the live-demo rig |
+| [`tpu-vllm-v6e1-2b`](tpu-vllm-v6e1-2b/) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | Fork of the v5e-1 rig retargeted to Trillium; provisions in `us-east5-b` |
 | [`tpu-jax-v5e1-2b`](tpu-jax-v5e1-2b/) | pure JAX | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | Hand-rolled engine + OpenAI-compatible server; no Docker, no HF token |
 | [`tpu-pytorch-v5e1-12b`](tpu-pytorch-v5e1-12b/) | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | Static-shape decode server |
 | [`tpu-pytorch-v5e1-2b`](tpu-pytorch-v5e1-2b/) | PyTorch / `torch_xla` | v5e-1 | 2B | Near-identical fork of the 12B rig |

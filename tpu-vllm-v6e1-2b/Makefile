@@ -1,0 +1,179 @@
+# Configuration - tpu.env is the single source of truth; server.py and mcp-run.sh read
+# the same file. Override per-invocation with e.g. `make status ZONE=europe-west4-a`.
+-include tpu.env
+
+PROJECT_ID ?= $(GOOGLE_CLOUD_PROJECT)
+REGION ?= $(GOOGLE_CLOUD_REGION)
+ZONE ?= $(GOOGLE_CLOUD_ZONE)
+MODEL_PATH ?= $(MODEL_NAME)
+BUCKET_NAME ?= $(PROJECT_ID)-bucket
+# The hand-provisioned tpu-vm is named after this rig directory, matching the RESOURCE_ID
+# default server.py derives the same way. Set SERVICE_NAME in tpu.env (or on the command
+# line) to point these targets at a VM whose name predates that, e.g.
+#   make status SERVICE_NAME=tpu-2B-v6e1-devops-agent
+SERVICE_NAME ?= $(notdir $(CURDIR))
+# Key this rig's MCP server is registered under in the client, and the name server.py
+# advertises. It prefixes every tool (mcp__$(MCP_SERVER_NAME)__find_tpu), so it has to be
+# unique across the sibling rigs — they used to share "tpu-devops". Same derivation as
+# RIG_NAME in server.py; tpu.env or the command line override it.
+MCP_SERVER_NAME ?= $(notdir $(CURDIR))
+
+install:
+	pip install -r requirements.txt
+
+run:
+	python server.py
+
+test:
+	python test_agent.py
+
+lint:
+	ruff check .
+	ruff format --check .
+	mypy .
+
+format:
+	ruff format .
+	ruff check --fix .
+
+# Regenerates GemmaTools.md from the @mcp.tool() decorators in server.py
+tools:
+	python generate_tools_doc.py
+
+# Writes .mcp.json registering this rig's server under $(MCP_SERVER_NAME). Idempotent, and
+# it merges into an existing .mcp.json rather than replacing it, so other servers in the
+# file survive. .mcp.json is gitignored at the monorepo root; mcp_config.json is the
+# committed example of the same entry.
+mcp-config:
+	@python3 -c 'import json,sys; \
+path, name, cmd = sys.argv[1:4]; \
+config = json.load(open(path)) if __import__("os").path.exists(path) else {}; \
+config.setdefault("mcpServers", {})[name] = {"command": cmd, "args": [], "env": {}}; \
+json.dump(config, open(path, "w"), indent=2); \
+open(path, "a").write("\n"); \
+print(f"✅ registered MCP server {name!r} in {path}")' \
+		"$(CURDIR)/.mcp.json" "$(MCP_SERVER_NAME)" "$(CURDIR)/mcp-run.sh"
+
+clean:
+	rm -rf __pycache__
+	find . -type d -name ".ruff_cache" -exec rm -rf {} +
+	find . -type d -name ".mypy_cache" -exec rm -rf {} +
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type f -name "*.log" -exec rm -rf {} +
+
+# Provisioning model for this hand-provisioned tpu-vm path. gcloud accepts standard, spot,
+# or reservation-bound here. This is separate from the MCP tools' provisioning_model
+# parameter, which drives the Queued Resource path (and additionally offers flex-start).
+TPU_PROVISIONING_MODEL ?= standard
+
+# Recommended deployment settings for vLLM on Cloud TPU v6e (Trillium). Unlike v5e, whose
+# TPU-API name is v5litepod, v6e is spelled v6e everywhere — --type=v6e with --topology=1x1
+# is the same chip as ACCELERATOR_TYPE=v6e-1 in tpu.env.
+deploy-tpu:
+	@echo "🚀 Creating $(TPU_PROVISIONING_MODEL) TPU v6e instance ($(SERVICE_NAME)) in $(ZONE)..."
+	gcloud alpha compute tpus tpu-vm create $(SERVICE_NAME) \
+		--project=$(PROJECT_ID) \
+		--zone=$(ZONE) \
+		--type=v6e \
+		--topology=1x1 \
+		--provisioning-model=$(TPU_PROVISIONING_MODEL) \
+		--version=v2-alpha-tpuv6e
+
+# Spot: heavily discounted, preempted whenever the capacity is wanted back, no run limit.
+deploy-tpu-spot:
+	@$(MAKE) deploy-tpu TPU_PROVISIONING_MODEL=spot
+
+# On-demand: full price, no preemption. Same as plain `make deploy-tpu`.
+deploy-tpu-ondemand:
+	@$(MAKE) deploy-tpu TPU_PROVISIONING_MODEL=standard
+
+# Note: Running the container requires SSHing into the TPU VM.
+# This target provides the command for reference.
+run-container:
+	@echo "🛠 Run this command on the TPU VM to start vLLM:"
+	@echo "sudo docker run -t --rm --name vllm-gemma4 --privileged --net=host \\"
+	@echo "    -v /dev/shm:/dev/shm --shm-size 10gb \\"
+	@echo "    -e HF_HOME=/dev/shm \\"
+	@echo "    -e HF_TOKEN=\$$HF_TOKEN \\"
+	@echo "    vllm/vllm-tpu:nightly \\"
+	@echo "    vllm serve $(MODEL_PATH) \\"
+	@echo "    --max-model-len 16384 \\"
+	@echo "    --tensor-parallel-size $(TENSOR_PARALLEL_SIZE) \\"
+	@echo "    --disable_chunked_mm_input \\"
+	@echo "    --max_num_batched_tokens 4096 \\"
+	@echo "    --enable-auto-tool-choice \\"
+	@echo "    --tool-call-parser gemma4 \\"
+	@echo "    --reasoning-parser gemma4"
+
+# Deploy the vLLM inference stack
+deploy: deploy-tpu
+
+# Destroy the vLLM inference stack
+destroy-tpu:
+	@echo "🗑️  Destroying TPU VM $(SERVICE_NAME) in $(ZONE)..."
+	gcloud compute tpus tpu-vm delete $(SERVICE_NAME) \
+		--project=$(PROJECT_ID) \
+		--zone=$(ZONE) \
+		--quiet
+
+destroy: destroy-tpu
+
+# Check status of the TPU VM
+status:
+	@echo "🔍 Checking status of TPU VM $(SERVICE_NAME) in $(ZONE)..."
+	gcloud compute tpus tpu-vm describe $(SERVICE_NAME) \
+		--project=$(PROJECT_ID) \
+		--zone=$(ZONE)
+
+# Get the IP address of the deployed TPU VM
+endpoint:
+	@gcloud compute tpus tpu-vm describe $(SERVICE_NAME) \
+		--project=$(PROJECT_ID) \
+		--zone=$(ZONE) \
+		--format='value(networkEndpoints[0].ipAddress)'
+
+# Run the performance benchmarking suite
+benchmark:
+	@echo "📊 Discovering endpoint for $(SERVICE_NAME)..."
+	@IP=$$(gcloud compute tpus tpu-vm describe $(SERVICE_NAME) --project=$(PROJECT_ID) --zone=$(ZONE) --format='value(networkEndpoints[0].accessConfig.externalIp)'); \
+	if [ -z "$$IP" ]; then IP=$$(gcloud compute tpus tpu-vm describe $(SERVICE_NAME) --project=$(PROJECT_ID) --zone=$(ZONE) --format='value(networkEndpoints[0].ipAddress)'); fi; \
+	if [ -z "$$IP" ]; then echo "❌ Error: Could not find IP for $(SERVICE_NAME)"; exit 1; fi; \
+	echo "🚀 Starting benchmark against http://$$IP:8000"; \
+	python benchmarking_suite.py --url http://$$IP:8000 --model $(MODEL_PATH)
+
+PROMPT ?= "What is Site Reliability Engineering?"
+
+# Query the vLLM model via the TPU VM endpoint (assuming it's running)
+query:
+	@echo "🔍 Querying $(SERVICE_NAME) with prompt: \"$(PROMPT)\"..."
+	@IP=$$(gcloud compute tpus tpu-vm describe $(SERVICE_NAME) --project=$(PROJECT_ID) --zone=$(ZONE) --format='value(networkEndpoints[0].accessConfig.externalIp)'); \
+	if [ -z "$$IP" ]; then IP=$$(gcloud compute tpus tpu-vm describe $(SERVICE_NAME) --project=$(PROJECT_ID) --zone=$(ZONE) --format='value(networkEndpoints[0].ipAddress)'); fi; \
+	curl -s -X POST "http://$$IP:8000/v1/completions" \
+		-H "Content-Type: application/json" \
+		-d '{"model": "$(MODEL_PATH)", "prompt": "$(PROMPT)", "max_tokens": 128, "temperature": 0.2}' | python3 -m json.tool
+
+.PHONY: install run test lint format tools mcp-config clean deploy-tpu deploy-tpu-spot deploy-tpu-ondemand deploy destroy-tpu destroy status endpoint benchmark run-container query help
+
+help:
+	@echo "Make targets:"
+	@echo ""
+	@echo "  install        - Install Python dependencies"
+	@echo "  run            - Start the MCP server on stdio"
+	@echo "  test           - Run the test suite (unittest)"
+	@echo "  lint           - ruff check + ruff format --check + mypy"
+	@echo "  format         - Apply ruff formatting and autofixes"
+	@echo "  tools          - Regenerate GemmaTools.md from server.py"
+	@echo "  mcp-config     - Write .mcp.json registering this server as $(MCP_SERVER_NAME)"
+	@echo "  clean          - Remove caches and logs"
+	@echo ""
+	@echo "  deploy-tpu     - Create the TPU v6e instance ($(SERVICE_NAME) in $(ZONE), $(TPU_PROVISIONING_MODEL))"
+	@echo "  deploy-tpu-spot     - Same, as a preemptible Spot VM (discounted, no run limit)"
+	@echo "  deploy-tpu-ondemand - Same, at standard on-demand pricing"
+	@echo "  destroy-tpu    - Delete the TPU v6e instance"
+	@echo "  status         - Describe the TPU instance"
+	@echo "  endpoint       - Print the TPU instance IP"
+	@echo "  run-container  - Print the docker run command to paste on the TPU VM"
+	@echo "  benchmark      - Run benchmarking_suite.py against the live endpoint"
+	@echo "  query          - Send one completion request (override with PROMPT=\"...\")"
+	@echo ""
+	@echo "For the MCP tool catalog see GemmaTools.md, or call the get_help tool."
