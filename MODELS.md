@@ -8,8 +8,10 @@ Anything that depends on a runtime, an engine build, or a chip generation does *
 `QUANTIZATION.md` covers what the serving stack supports, `HARDWARE.md` what the silicon can compute in,
 and measured throughput lives with the rig that measured it, under its `benchmarks/runs/`.
 
-Read out of `config.json` in the running container on 2026-08-07, cross-checked against
-`tpu_inference` source. Where a claim is inferred rather than measured it says so.
+Read out of `config.json` and the **safetensors tensor headers** on 2026-08-07, cross-checked against
+`tpu_inference` source and boot-time allocation logs. Where a claim is inferred rather than measured it
+says so. **Config fields alone were not sufficient here** — `head_dim` is a single value for a model with
+two attention geometries, and trusting it produced a 17% KV sizing error that only the weights exposed.
 
 ## E2B — `google/gemma-4-E2B-it`
 
@@ -30,12 +32,45 @@ Read out of `config.json` in the running container on 2026-08-07, cross-checked 
 Also `tie_word_embeddings=True`, `final_logit_softcapping=30.0`, and per-layer embeddings
 (`vocab_size_per_layer_input=262144`, `hidden_size_per_layer_input=256`).
 
-### 35 layers, 15 KV caches
+### Two attention geometries, not one
+
+**Verified by reading the safetensors headers** (`model.safetensors`, filtered to
+`model.language_model.layers.*.self_attn.*`; script at
+`tpu-vllm-v5e1-2b/benchmarks/runs/2026-08-07-kv-quant-v5e1/inspect_weights.py`). Shapes are `[out, in]`:
+
+| Layer type | Count | `q_proj` | `k_proj` / `v_proj` | `o_proj` | `q_norm` / `k_norm` | head_dim |
+| :--- | ---: | :--- | :--- | :--- | :--- | ---: |
+| `sliding_attention` | 28 | 2048x1536 | **256**x1536 | 1536x2048 | 256 | **256** |
+| `full_attention` | 7 | 4096x1536 | **512**x1536 | 1536x4096 | 512 | **512** |
+
+Both keep 8 query heads and **1 KV head**; what changes is head_dim. `global_head_dim=512` is therefore
+real and applies to Q, K, V **and** the norms in full-attention layers — it is not a Q-only field.
+
+**All 35 layers carry `q_proj`, `k_proj`, `v_proj`, `o_proj`, `q_norm` and `k_norm`. Nothing is missing
+from the base checkpoint** — `layers missing k_proj: []`, `layers missing k_norm: []`.
+
+> **Correction (2026-08-07).** An earlier version of this file claimed full-attention layers were
+> allocated at 256 like the rest, that KV cost 15 KiB/token, and that layers 15-34 "legitimately have no
+> K projection and no `k_norm`". The weights refute all three. The `k_norm`-missing failure on the QAT
+> exports is therefore **not** explained by the architecture and needs re-diagnosing against that
+> checkpoint; do not repeat the old explanation.
+
+**A caution when reading tensor names:** the checkpoint also contains `model.audio_tower.layers.N.*` and
+a vision tower, each with its own independent layer numbering and its own `self_attn.*`. A regex matching
+`layers\.(\d+)\.` collides with them and silently overwrites language-model values for low indices.
+Always anchor on `model.language_model.`.
+
+### Which layers hold a cache
 
 The split is `first_shared = num_hidden_layers - num_kv_shared_layers` = **35 - 20 = 15**:
 
-- **Layers 0-14** compute and store their own K/V — 15 cache tensors.
-- **Layers 15-34** compute no K/V at all and reuse an earlier layer's cache.
+- **Layers 0-14** own the 15 KV cache tensors the runtime allocates.
+- **Layers 15-34** are marked KV-shared and read an earlier layer's cache.
+
+This is a **runtime** property, not a checkpoint one — the weights above show K/V projections present for
+all 35 layers, so the sharing is in how the model is executed, not in what was shipped. Whether layers
+15-34's `k_proj`/`v_proj` are loaded-but-unused (~38 MB of dead weights at bf16) has **not** been
+verified.
 
 The source is *the last preceding layer of the same attention type* (sliding vs full). With the period-5
 `layer_types` pattern, full-attention layers sit at 4, 9, 14, 19, 24, 29, 34, so within layers 0-14 the
@@ -46,21 +81,43 @@ last full is **14** and the last sliding is **13**. Therefore:
 
 Not a rolling window and not paired layers. Twenty layers reading two tensors.
 
-**This is why loaders trip on layers 15-34.** Those layers legitimately have no K projection and no
-`k_norm`, because they never compute K. A loader expecting per-layer norms across all 35 layers asks for
-weights the architecture correctly does not have — the "`k_norm.weight` missing for layers 15-34"
-failure seen on the QAT exports. That is a loader bug, not a broken checkpoint.
+### KV cost: 18 KiB/token at bf16
 
-### KV cost: 15 KiB/token at bf16
+The 15 cached layers are **not** homogeneous. Layers 0-14 contain three full-attention layers (4, 9, 14)
+at head_dim 512 and twelve sliding layers at 256:
 
 ```
-1 KV head x 2 (K,V) x 256 head_dim x 2 bytes = 1,024 B/token/layer
-                          x 15 cached layers = 15,360 B = 15 KiB/token
+12 sliding x 1 KV head x 2 (K,V) x 256 x 2 bytes = 12 x 1,024 = 12,288 B
+ 3 full    x 1 KV head x 2 (K,V) x 512 x 2 bytes =  3 x 2,048 =  6,144 B
+                                                    total     = 18,432 B = 18 KiB/token
 ```
 
-**Do not extrapolate this figure to other sizes.** A 35-layer model paying KV for only 15 layers with a
-single KV head is an extraordinarily cheap configuration. Any model without KV sharing, or with real KV
-heads, costs multiples of this per token.
+**Independently cross-checked on two generations:**
+
+| | tokens | x 18,432 B | matches |
+| :--- | ---: | ---: | :--- |
+| v5e-1 | 321,376 | 5.52 GiB | `total_hbm_avail_gb=5.52GiB` in the boot log — exact |
+| v6e-1 | 1,151,744 | 19.77 GiB | 19.79 GiB measured pool — 0.1% |
+
+At the old 15 KiB/token figure the v5e number would be 4.60 GiB against 5.52 GiB available, i.e. 17% of
+the KV budget unexplained. **18 KiB/token is right and 15 KiB/token was wrong**, on both chips.
+
+> **Two derived figures elsewhere inherit the old error and need correcting:** the "KV cache 4.60 GiB
+> (derived)" row in `tpu-vllm-v5e1-2b/benchmarks/runs/2026-08-06-vllm-sweep-v5e1/REPORT.md` (should be
+> ~5.52 GiB), and any per-token sizing that used 15 KiB.
+
+**Unresolved, and the reason to distrust the runtime here.** The v5e boot log reports a *single* KV
+layout for all 15 tensors — `num_kv_cache_groups=1`, `regular_attn_shape=(num_blocks, (32, 1, 2, 256))`
+— for a model that demonstrably needs two shapes. The memory arithmetic says 18 KiB/token was actually
+allocated, so the printed 256 shape is at best one representative tensor and at worst evidence the
+allocator is flattening a hybrid cache to a single geometry. **Resolve this against a per-tensor
+allocation dump before trusting any KV sizing on a hybrid-attention model.** If a runtime really does
+allocate 256 for the full-attention layers, their K/V is being truncated and that is a correctness bug,
+not a sizing one.
+
+**Do not extrapolate 18 KiB/token to other sizes either.** A 35-layer model paying KV for only 15 layers
+with a single KV head is still an extraordinarily cheap configuration. Any model without KV sharing, or
+with real KV heads, costs multiples of this per token.
 
 ### Three head mismatches
 
@@ -69,20 +126,11 @@ heads, costs multiples of this per token.
 2. **Heads do not tile the hidden size** — `8 x 256 = 2048` against `hidden_size = 1536`. The Q
    projection is rectangular. Anything computing `head_dim = hidden_size / num_heads` gets 192 and is
    wrong.
-3. **`global_head_dim=512` vs `head_dim=256`** — full-attention layers carry a different head dim from
-   sliding ones. Observed KV allocation is uniform at 256 across all 15 tensors and the 15 KiB/token
-   arithmetic only closes at 256, so `global_head_dim` does not enlarge KV. Where it *is* applied has
-   not been traced — treat as unresolved.
-
-   **A v6e measurement pulls the other way and is unreconciled.** The v6e-1 run recorded in
-   `HARDWARE.md` allocated a 19.79 GiB KV pool holding 1,151,744 tokens — 18.02 KiB/token, not 15. Of
-   the 15 cached layers three are full-attention (4, 9, 14), so charging those three at
-   `global_head_dim=512` and the other twelve at 256 gives `12x1024 + 3x2048 = 18,432 B` = **18
-   KiB/token exactly**, which needs 19.77 GiB against the 19.79 measured. That is 0.1% out, where
-   uniform-256 is 17% out. Suggestive, not conclusive: both figures come from the same artifact, and
-   block padding or a different utilization accounting could open the same gap. **Resolve it against an
-   allocation log, not by arithmetic.** Until then size v6e KV at 18 KiB/token, the conservative of the
-   two, and treat 15 KiB/token as holding only where it was observed.
+3. **`global_head_dim=512` vs `head_dim=256` is real, and it applies to K/V.** Confirmed in the weights:
+   full-attention layers ship `k_proj`/`v_proj` at 512x1536 and norms at 512, against 256 for sliding.
+   **A single `head_dim` does not describe this model.** Anything that reads one value and applies it to
+   all 35 layers under-counts the seven full-attention layers by 2x — which is exactly how the
+   15 KiB/token error arose. The v6e reconciliation that first flagged this was correct.
 
 ### Single KV head does not shard
 
