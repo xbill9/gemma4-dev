@@ -144,26 +144,70 @@ A larger topology does not divide E2B's KV cost; it multiplies it. Check the tar
 Nothing structural is shared across sizes. Every row below differs from E2B in a way that changes
 loading, KV sizing, or both.
 
-| | E2B | E4B | 12B | **26B A4B** | **31B** |
+| | E2B | **E4B** | 12B | **26B A4B** | **31B** |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| Layers | 35 | — | — | **30** | **60** |
-| Attention pattern | `i%5==4` full | — | — | `i%6==5` full (25s/5f) | `i%6==5` full (50s/10f) |
-| `num_kv_shared_layers` | 20 | — | — | **0** | **0** |
-| `num_key_value_heads` | 1 | — | — | 8 | — |
-| `num_global_key_value_heads` | null (→1) | — | — | **2** | **4** |
-| `head_dim` / `global_head_dim` | 256 / 512 | — | — | 256 / 512 | — / 512 |
-| `sliding_window` | 512 | — | — | **1024** | — |
-| `attention_k_eq_v` | false | — | — | **true** | **true** |
+| Layers | 35 | **42** | — | **30** | **60** |
+| Attention pattern | `i%5==4` full (28s/7f) | **`i%6==5` full (35s/7f)** | — | `i%6==5` full (25s/5f) | `i%6==5` full (50s/10f) |
+| `num_kv_shared_layers` | 20 | **18** | — | **0** | **0** |
+| Layers owning KV | 15 of 35 | **24 of 42** | — | all 30 | all 60 |
+| `num_key_value_heads` | 1 | **2** | — | 8 | — |
+| `num_global_key_value_heads` | null (→1) | **null (→2)** | — | **2** | **4** |
+| `head_dim` / `global_head_dim` | 256 / 512 | 256 / 512 | — | 256 / 512 | — / 512 |
+| `hidden_size` | 1536 | **2560** | — | 2816 | — |
+| `sliding_window` | 512 | 512 | — | **1024** | — |
+| `attention_k_eq_v` | false | false | — | **true** | **true** |
 | Per-layer embeddings (PLE) | yes | yes | — | **no** (`hidden_size_per_layer_input=0`) | — |
 | Dense or sparse | dense | dense | dense | **sparse MoE** | dense |
+| **KV per token, bf16** | **18 KiB** | **56 KiB** | — | ~cheap (see §26B) | — |
 
 Dashes are unrecorded, not "same as E2B". **`num_kv_shared_layers=0` on both large models means the
 KV-sharing logic above simply does not apply to them** — every layer owns its KV.
+
+E2B/E4B config values read from the published `config.json` (public even though the weights are gated).
 
 Sources: `~/tpu-jax-26b/docs/gemma4-quirks.md` §15–21 and `~/tpu-jax-31b/docs/gemma4-quirks.md` §12,
 verified against the HF reference and by reading checkpoint bytes on a CPU box. Those repos sit outside
 this monorepo and predate the naming scheme; the facts are reproduced here so the monorepo is
 self-contained.
+
+## E4B — KV is 3.1x E2B's, not comparable
+
+E4B shares the 256/512 split by layer type, so it *looks* like a scaled E2B. It is not: **three separate
+things move at once, and they multiply.**
+
+| | E2B | E4B | effect on KV |
+| :--- | ---: | ---: | :--- |
+| Layers | 35 | 42 | more |
+| `num_kv_shared_layers` | 20 | 18 | **fewer shared** |
+| Layers owning KV | **15** | **24** | 1.6x |
+| `num_key_value_heads` | **1** | **2** | **2x per layer** |
+| head_dim by type | 256 / 512 | 256 / 512 | unchanged |
+
+**Cache sharing.** `first_shared = 42 - 18 = 24`, so layers **0-23 own a cache** and layers **24-41**
+share. E4B caches 57% of its layers against E2B's 43%. The mapping rule is the same — last preceding
+layer of matching type — and within 0-23 the last full is **23** and the last sliding is **22**, so all 18
+shared layers again resolve to just **two** source caches (3 full → L23, 15 sliding → L22).
+
+**Head type.** The 256/512 split is identical to E2B: full-attention layers are 512-wide, sliding are 256.
+The `layer_types` array is `i % 6 == 5` — full at 5, 11, 17, 23, 29, 35, 41 — so **4 of the 24 cached
+layers are full-attention** (5, 11, 17, 23) and 20 are sliding. What changed is the head *count*:
+`num_key_value_heads = 2`, and `num_global_key_value_heads` is null so full layers fall back to 2 as well.
+E2B's single KV head is the anomaly, not the family norm.
+
+```
+20 sliding x 2 KV heads x 2 (K,V) x 256 x 2 B = 20 x 2,048 = 40,960 B
+ 4 full    x 2 KV heads x 2 (K,V) x 512 x 2 B =  4 x 4,096 = 16,384 B
+                                                 total     = 57,344 B = 56 KiB/token
+```
+
+**56 KiB/token against E2B's 18 — 3.1x.** Sizing E4B's context budget from E2B experience overstates it
+by more than 3x. On a v5e-1 with int8 weights (~7.5 GiB, leaving ~7.0 GiB of the 14.49 usable) that is
+**~131,000 KV tokens**, against E2B's measured 321,376 — so roughly 8 concurrent streams at 16K context,
+not 20.
+
+Not verified against an allocation log yet: this is derived from the published config using the same
+arithmetic that reproduced E2B's measured 18 KiB/token to the byte on two chips. Confirm against
+`GPU KV cache size` on first boot.
 
 ## `attention_k_eq_v` — full-attention layers ship no `v_proj`
 
