@@ -106,14 +106,30 @@ the KV budget unexplained. **18 KiB/token is right and 15 KiB/token was wrong**,
 > (derived)" row in `tpu-vllm-v5e1-2b/benchmarks/runs/2026-08-06-vllm-sweep-v5e1/REPORT.md` (should be
 > ~5.52 GiB), and any per-token sizing that used 15 KiB.
 
-**Unresolved, and the reason to distrust the runtime here.** The v5e boot log reports a *single* KV
-layout for all 15 tensors — `num_kv_cache_groups=1`, `regular_attn_shape=(num_blocks, (32, 1, 2, 256))`
-— for a model that demonstrably needs two shapes. The memory arithmetic says 18 KiB/token was actually
-allocated, so the printed 256 shape is at best one representative tensor and at worst evidence the
-allocator is flattening a hybrid cache to a single geometry. **Resolve this against a per-tensor
-allocation dump before trusting any KV sizing on a hybrid-attention model.** If a runtime really does
-allocate 256 for the full-attention layers, their K/V is being truncated and that is a correctness bug,
-not a sizing one.
+**Resolved 2026-08-07: the allocation is correct; the log line is misleading.** The boot log reports a
+single KV layout for all 15 tensors — `num_kv_cache_groups=1`,
+`regular_attn_shape=(num_blocks, (32, 1, 2, 256))` — for a model that demonstrably needs two shapes,
+which looked like it could be silent truncation of the full-attention layers. It is not. In
+`tpu_inference/runner/kv_cache_manager.py` each layer's cache is built from **that layer's own spec**:
+
+```python
+kv_cache = create_kv_caches(..., num_kv_heads=layer_spec.num_kv_heads,
+                                 head_size=layer_spec.head_size, ...)   # per layer
+kv_caches.append(kv_cache)
+metadata["regular_attn"].count += 1
+if metadata["regular_attn"].shape is None:        # <- first layer only, never updated
+    metadata["regular_attn"].shape = kv_cache.shape
+```
+
+`count` increments for all 15 tensors but `shape` is written **once, from the first layer** — layer 0,
+which is sliding, hence 256. So the printed shape describes layer 0 alone and says nothing about layers
+4, 9 and 14. Heterogeneous per-layer caches are allocated correctly, and the 18 KiB/token memory
+arithmetic is the accurate reading.
+
+**Take this as a warning about the log, not the allocator:** `regular_attn_shape` is a first-wins sample
+presented as if it described the group. On any hybrid-attention model it under-reports, and it is what
+produced the 15 KiB/token error above. Size KV from the config geometry and check it against
+`total_hbm_avail_gb`, not from this line.
 
 **Do not extrapolate 18 KiB/token to other sizes either.** A 35-layer model paying KV for only 15 layers
 with a single KV head is still an extraordinarily cheap configuration. Any model without KV sharing, or
@@ -146,29 +162,41 @@ loading, KV sizing, or both.
 
 | | E2B | **E4B** | 12B | **26B A4B** | **31B** |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| Layers | 35 | **42** | — | **30** | **60** |
-| Attention pattern | `i%5==4` full (28s/7f) | **`i%6==5` full (35s/7f)** | — | `i%6==5` full (25s/5f) | `i%6==5` full (50s/10f) |
-| `num_kv_shared_layers` | 20 | **18** | — | **0** | **0** |
-| Layers owning KV | 15 of 35 | **24 of 42** | — | all 30 | all 60 |
-| `num_key_value_heads` | 1 | **2** | — | 8 | — |
-| `num_global_key_value_heads` | null (→1) | **null (→2)** | — | **2** | **4** |
-| `head_dim` / `global_head_dim` | 256 / 512 | 256 / 512 | — | 256 / 512 | — / 512 |
-| `hidden_size` | 1536 | **2560** | — | 2816 | — |
-| `sliding_window` | 512 | 512 | — | **1024** | — |
-| `attention_k_eq_v` | false | false | — | **true** | **true** |
-| Per-layer embeddings (PLE) | yes | yes | — | **no** (`hidden_size_per_layer_input=0`) | — |
+| Layers | 35 | **42** | **48** | **30** | **60** |
+| Attention pattern | `i%5==4` full (28s/7f) | **`i%6==5` full (35s/7f)** | `i%6==5` full (40s/8f) | `i%6==5` full (25s/5f) | `i%6==5` full (50s/10f) |
+| `num_kv_shared_layers` | 20 | **18** | **0** | **0** | **0** |
+| Layers owning KV | 15 of 35 | **24 of 42** | all 48 | all 30 | all 60 |
+| `num_key_value_heads` | 1 | **2** | 8 | 8 | 16 |
+| `num_global_key_value_heads` | null (→1) | **null (→2)** | **1** | **2** | **4** |
+| `head_dim` / `global_head_dim` | 256 / 512 | 256 / 512 | 256 / 512 | 256 / 512 | 256 / 512 |
+| `hidden_size` | 1536 | **2560** | **3840** | 2816 | **5376** |
+| `intermediate_size` | 6144 | — | **15360** | 2112 | — |
+| `sliding_window` | 512 | 512 | **1024** | **1024** | **1024** |
+| `attention_k_eq_v` | false | false | **true** | **true** | **true** |
+| Per-layer embeddings (PLE) | yes | yes | **no** | **no** (`hidden_size_per_layer_input=0`) | **no** |
+| `use_double_wide_mlp` | true | — | **false** | **false** | **false** |
 | Dense or sparse | dense | dense | dense | **sparse MoE** | dense |
-| **KV per token, bf16** | **18 KiB** | **56 KiB** | — | ~cheap (see §26B) | — |
+| **KV per token, bf16** | **18 KiB** | **56 KiB** | see caution below | ~cheap (see §26B) | — |
 
-Dashes are unrecorded, not "same as E2B". **`num_kv_shared_layers=0` on both large models means the
+Dashes are unrecorded, not "same as E2B". **`num_kv_shared_layers=0` on every size above E4B means the
 KV-sharing logic above simply does not apply to them** — every layer owns its KV.
+
+**`num_global_key_value_heads` is the one field with no pattern to extrapolate** — null, null, 1, 2, 4
+across the five sizes. Never carry one size's value onto another.
 
 E2B/E4B config values read from the published `config.json` (public even though the weights are gated).
 
 Sources: `~/tpu-jax-26b/docs/gemma4-quirks.md` §15–21 and `~/tpu-jax-31b/docs/gemma4-quirks.md` §12,
-verified against the HF reference and by reading checkpoint bytes on a CPU box. Those repos sit outside
-this monorepo and predate the naming scheme; the facts are reproduced here so the monorepo is
-self-contained.
+verified against the HF reference and by reading checkpoint bytes on a CPU box; the 12B column from
+`tpu-jax-v6e1-12b-w4a16/docs/12b-exploration-2026-07-31.md`, read off `config.json` on the device.
+The `~/tpu-jax-*` repos sit outside this monorepo and predate the naming scheme; the facts are
+reproduced here so the monorepo is self-contained.
+
+> **One line in the 12B exploration note contradicts this table, and the table wins.** That note's
+> comparison lists E2B at `num_key_value_heads` 4 and `num_global_key_value_heads` 4. The safetensors
+> headers say **1** — full MQA — and the boot-time allocation arithmetic agrees to 0.1% on two chip
+> generations. Its 12B column was read from `config.json` and is sound; its E2B column was filled in
+> from memory.
 
 ## E4B — KV is 3.1x E2B's, not comparable
 
@@ -211,15 +239,20 @@ arithmetic that reproduced E2B's measured 18 KiB/token to the byte on two chips.
 
 ## `attention_k_eq_v` — full-attention layers ship no `v_proj`
 
-**Set `true` on both the 26B and the 31B, `false` on E2B.** Where set, the full-attention layers carry
-`q_proj`, `k_proj`, `k_norm`, `o_proj` and **no `v_proj` at all** — one projection feeds both K and V.
+**Set `true` on the 12B, the 26B and the 31B; `false` on E2B and E4B.** Where set, the full-attention
+layers carry `q_proj`, `k_proj`, `k_norm`, `o_proj` and **no `v_proj` at all** — one projection feeds
+both K and V.
 
 - 31B: all **ten** full-attention layers, verified key by key on the checkpoint.
 - 26B: all **five** full-attention layers.
+- 12B: all **eight** full-attention layers.
 
-Loading either without handling it yields exactly ten (or five) missing tensors, and **a loader that
-tolerates `None` produces a silently broken model that still emits fluent text**. The fix is to alias V to
-K — the same arrays, not copies.
+**Every dense size at 12B and above sets it** — treat it as the family default above E4B rather than a
+big-model curiosity, and expect it on any new size until the config says otherwise.
+
+Loading any of them without handling it yields exactly ten (or five, or eight) missing tensors, and
+**a loader that tolerates `None` produces a silently broken model that still emits fluent text**. The
+fix is to alias V to K — the same arrays, not copies.
 
 This is a checkpoint-shape fact, so it is the first thing to check when a big-model load reports missing
 tensors. It is **not** the explanation for E2B: E2B sets the flag `false` and ships `v_proj` on all
@@ -227,6 +260,35 @@ fifteen non-shared layers.
 
 The KV cache still stores K and V separately where the flag is set — redundant but correct. Collapsing it
 would save one of the two planes on those layers, worth ~4.5% of the 31B's KV.
+
+## 12B — the MatFormer features switched off
+
+`google/gemma-4-12B-it-qat-w4a16-ct`, ported to the pure-JAX engine on a v6e-1, 2026-07-31.
+Artifacts in `tpu-jax-v6e1-12b-w4a16/`.
+
+**It needed zero code changes to load.** The 12B is the same `gemma4_unified` architecture as E2B with
+every MatFormer feature switched *off* — no PLE, no KV sharing, no double-wide MLP. `config_from_hf`
+already resolved all of it, because `pick()` tests `is not None` and so the `0`s that disable those
+features survive rather than being treated as absent. RoPE, logit softcapping (30.0), tied embeddings
+and the 262,144 vocab are identical to E2B. See the family table above for the full field list.
+
+`attention_k_eq_v` is **true** here too, so the eight full-attention layers ship no `v_proj` — the same
+load-time surprise documented for the 26B and 31B above.
+
+There is no `lm_head` tensor and no `embed_tokens_per_layer`; the checkpoint is one 10.26 GB
+`model.safetensors` including the vision and audio towers. At W4A16 it is **8.15 GB resident**.
+
+**The `'111111'` digit output on bare prompts is not an engine defect.** Without `<bos>` and the Gemma 4
+chat template, the HF PyTorch reference emits the same digit strings. It is a prompt-formatting
+requirement of the IT QAT checkpoint. Formatted, JAX and the reference reach 100% exact token parity.
+**The 31B does not share this** — it recovers the `<|channel>thought` scaffolding on its own from a
+bare prompt, so a bare-prompt smoke test that passes on the 31B proves nothing about the 12B.
+
+> **Do not quote that rig's per-token KV figure.** Its `REPORT.md` charges the `attention_k_eq_v`
+> layers for a V it also states is free (16 KiB/token where 8 KiB follows if V really is K), and adds
+> that to a *window-capped* sliding-layer figure as though both were uncapped rates. The stated
+> 336 KiB/token inherits both errors. Derive KV from this file and confirm against a boot allocation
+> log.
 
 ## 26B A4B — sparse MoE, and the odd one out twice over
 
@@ -305,6 +367,31 @@ Two ways to destroy those weights while "just repacking" them, both silent:
    `in`. Packing a transposed weight groups across `out`, where no grid exists — a real requantization
    dressed as a repack. Packing must happen in the loader, before the transpose.
 
+## 26B A4B — expert tensor layout
+
+Supplements the §26B section above with the shape traps, which are checkpoint facts rather than wiring.
+
+Expert weights are `nn.Parameter`, not `nn.Linear`, so **the keys carry no `.weight` suffix**:
+
+| key | shape | meaning |
+| :--- | :--- | :--- |
+| `layers.N.experts.gate_up_proj` | `[128, 1408, 2816]` | `[E, 2*moe_inter, hidden]` |
+| `layers.N.experts.down_proj` | `[128, 2816, 704]` | `[E, hidden, moe_inter]` |
+
+- **Gate and up are fused** into one `[2I, H]` tensor per expert — first `I` rows gate, last `I` up.
+  Splitting on the wrong axis or the wrong half silently swaps them, and `gelu(up) * gate` is a
+  plausible-looking model that is not this one.
+- **They stay in `[E, out, in]` orientation**, unlike every rank-2 projection, which loaders transpose
+  to `[in, out]`. Transposing them is actively harmful — it is what makes the Q4_0 repack group across
+  `out`, where no grid exists (see `QUANTIZATION.md`).
+
+**Prefill does 16x the expert FLOPs.** Decode gathers only the 8 selected banks per token; prefill
+cannot — at T tokens that would re-read T x 8 banks — so it dequantizes the whole 128-expert bank once
+and masks. Optimal in bytes moved, 128/8 = **16x wasteful in FLOPs**. That ratio is arithmetic from E
+and K, not a measurement. Fixing it needs expert-sorted dispatch, deliberately not attempted because
+capacity-padded dispatch **drops tokens** when an expert is oversubscribed — a silent drop being
+precisely the failure mode this codebase keeps producing.
+
 ## 31B — dense, 60 layers
 
 `google/gemma-4-31B-it` — 31.0B, 62 GB at bf16. Has `-w4a16-ct` and `-q4_0-unquantized` QAT exports.
@@ -322,6 +409,64 @@ Two ways to destroy those weights while "just repacking" them, both silent:
 **Not verified on TPU.** The 26B facts above are checked against the reference and the checkpoint bytes
 on CPU; as of the source doc, nothing was measured on a TPU. Treat performance claims for either large
 model as unmeasured.
+
+## 31B — the residual stream is clamped at both ends
+
+Behavioural structure measured on `gemma-4-31B-it-qat-w4a16-ct`, v6e-1, 2026-08-01. Workings in
+`tpu-jax-v6e1-31b-w4a16/benchmarks/runs/2026-07-31-gemma4-31b-v6e1/MODEL-INTEL.md`. The config facts
+are in the §31B section above; this is what the model *does* when it runs.
+
+Each layer ends with `h *= layer_scalar`, one learned scalar per layer over the whole residual stream.
+It is a **three-phase clamp**, not a smooth schedule: ~10-14x suppression at layers 0-1, essentially
+pass-through at 2-4, and **~31x suppression at layer 59** (`layer_scalar` = 0.0317). Full-attention
+layers are damped 14% harder than sliding ones (0.6891 vs 0.8010).
+
+It exists because **the pre-norms are enormous**: `input_layernorm` averages 23.5 with individual
+channels reaching **1248**, `pre_feedforward_layernorm` averages 40.8 — while the post-norms are
+sub-unit (0.47, 0.74). Each block amplifies hugely going in and is scaled back coming out.
+
+Consequently the residual stream **shrinks** with depth — RMS 10.06 at layer 0 to 1.239 at layer 59,
+**0.12x**. Most transformers grow it.
+
+### Massive activations, and why the first two tokens are load-bearing
+
+- **max/median ratio in the residual stream: mean 1,214x, peak 15,665x** (layer 7).
+- **78% of layers put their peak activation on `<bos>` or `<|turn>`** — position 1 in 32/60 layers,
+  position 0 in 15/60. Two channels (ch3770, ch1682) account for 57% of layers.
+- The sinks are **sparse in (position, channel) space** — mean |h| at position 0 is only 1.3x the other
+  positions. Whole positions are not large; specific channels at those positions are.
+- **The norm-weight outlier channels and the activation outlier channels do not overlap.** Static
+  top channels are ch1081/1400/1924/4206 (pre-norms) and a tight band at ch33-47 (post-norms); runtime
+  ones are ch3770/1682/2130/3067. You cannot predict one population from the other.
+
+Three consequences:
+
+1. **Per-tensor activation quantization will not survive this model.** A 15,665x in-tensor dynamic
+   range leaves nothing for the other channels. Per-(batch, head, position) KV scales are the right
+   shape, and this is the reason.
+2. **Do not trim or drop the leading tokens**, and never evict positions 0-1 from the **full**
+   layers' cache — layer 11 spends **44% of its entire attention budget** there.
+3. **Windowing the sliding layers' KV is provably safe.** A sliding layer is masked to
+   `(p - 1024, p]` regardless of `window_kv` — the ring buffer is memory, the mask is semantics — so
+   past 1024 tokens **50 of 60 layers cannot attend to position 0 at all**. Measured sink mass on
+   sliding layers is *exactly* 0.000000, against 0.2365 on the full layers.
+
+That last point explains the rest: **the 10 full-attention layers are the model's only sink pathway and
+only long-range pathway beyond 1024 tokens**, which is why they produce 33-37% larger outputs and are
+damped harder. The design tension is that this pathway runs through the *narrowest* KV in the model —
+4 KV heads against the sliding layers' 16, plus `attention_k_eq_v`. Most load-bearing, least capacity,
+no redundancy. If a mixed-precision KV scheme is ever worth doing on this model, **this** is the split
+that matters.
+
+### Output is a point mass on real prompts
+
+top-1 probability **1.0000**, entropy **0.000 nats**, top-1-to-top-2 margin **15.28**, max logit 27.9
+against the 30.0 softcap (so `tanh` is well into saturation without clipping any logit).
+
+**Greedy decoding is therefore extremely stable on real input and meaningless to evaluate on random
+tokens**, where the margin collapses toward zero and any numerical perturbation flips the argmax. A ~3%
+fusion-drift divergence between two `window_kv` settings looked like a cache-correctness bug and was
+this. Hold `window_kv` fixed across any A/B — greedy decoding is not bit-reproducible across it.
 
 ## Weight footprints
 
