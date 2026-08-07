@@ -24,7 +24,7 @@ Checks:
   (c) torch.compile(decode_step, backend="aot_eager", fullgraph=True) traces
       without graph breaks and matches the reference.
 
-Run:  cd /home/xbill/tpu-pytorch/ports/gemma4 && python3 e_parity_test.py
+Run:  cd ports/gemma4 && python3 e_parity_test.py
 """
 
 import sys

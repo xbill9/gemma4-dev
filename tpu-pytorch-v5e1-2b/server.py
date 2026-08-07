@@ -19,15 +19,27 @@ from mcp.types import ToolAnnotations
 from openai import AsyncOpenAI
 from pydantic import Field
 
+# This rig's identity. The directory name is the single identifier everything else derives
+# from — the MCP server name, the log channel, and the zone-status cache directory. Sibling
+# rigs share a GCP project and zone, so a shared constant here is how one rig ends up
+# answering for, or clobbering the state of, another. It is a literal rather than
+# basename(__file__) because the installed skill copy lives at
+# .claude/skills/<skill>/mcp/server.py, where deriving from the path would yield "mcp".
+RIG_NAME = "tpu-pytorch-v5e1-2b"
+
 # Setup logging
 logging.basicConfig(
     stream=sys.stderr, level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("vllm-devops-agent")
+logger = logging.getLogger(RIG_NAME)
 
-# Initialize FastMCP server. The name stays generic — model and topology come
-# from env vars, so they don't belong in the server identity.
-mcp = FastMCP("tpu-devops-agent")
+# Initialize FastMCP server. The name has to match the key the client registers this
+# server under, because that key prefixes every tool — mcp__<key>__find_tpu. Every
+# sibling rig used to answer to "tpu-devops", so with more than one registered you could
+# not tell which rig a tool call would reach. It now defaults to the rig directory name;
+# MCP_SERVER_NAME overrides it, and project-setup.sh passes the key it registered.
+MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
+mcp = FastMCP(MCP_SERVER_NAME)
 
 # Annotation presets — hints that let clients (e.g. permission layers) auto-allow
 # reads and require confirmation before destructive calls.
@@ -65,7 +77,9 @@ if not PROJECT_ID:
 ZONE = os.getenv("GOOGLE_CLOUD_ZONE", "europe-west4-a")
 REGION = os.getenv("GOOGLE_CLOUD_REGION", "europe-west4")
 MODEL_NAME = os.getenv("MODEL_NAME", "google/gemma-4-31B-it")
-HF_SECRET_ID = "hf-token"
+# Secret Manager secret holding the Hugging Face token. The startup script fetches it by
+# id at boot, so a rotated or per-project secret only needs this to change.
+HF_SECRET_ID = os.getenv("HF_SECRET_ID", "hf-token")
 ACCELERATOR_TYPE = os.getenv("ACCELERATOR_TYPE", "v6e-8")
 TENSOR_PARALLEL_SIZE = int(os.getenv("TENSOR_PARALLEL_SIZE", "8"))
 # Queued-resource runtime image, which is per TPU family — a v6e image will not
@@ -125,7 +139,15 @@ TPU_BACKEND_PIP_EXTRAS = os.getenv(
 # find_tpu records per-zone provisioning outcomes here so later sweeps can skip
 # zones that never delivered capacity. Lives outside the skill directory so
 # reinstalls (`make skill`, project-setup.sh) don't wipe the learned state.
-STATUS_FILE = os.path.join(os.path.expanduser("~"), ".cache", "tpu-devops", "tpu_zones_status.md")
+#
+# Keyed by RIG_NAME, not shared: the sibling rigs request different accelerator types, and
+# a zone that rejects one says nothing about another. Sharing one file meant a failure
+# recorded by one rig silently suppressed a different rig's scan of that zone. Override the
+# whole path with TPU_ZONES_STATUS_FILE.
+STATUS_FILE = os.getenv(
+    "TPU_ZONES_STATUS_FILE",
+    os.path.join(os.path.expanduser("~"), ".cache", RIG_NAME, "tpu_zones_status.md"),
+)
 
 # --- Helper Functions ---
 

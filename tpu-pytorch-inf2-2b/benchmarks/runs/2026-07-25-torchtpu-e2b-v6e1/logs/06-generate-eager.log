@@ -1,0 +1,44 @@
+Existing host keys found in /home/xbill/.ssh/google_compute_known_hosts
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1784992163.692846    5674 pjrt_api.cc:119] GetPjrtApi was found for TPU at /usr/local/lib/python3.12/dist-packages/libtpu/libtpu.so
+I0000 00:00:1784992163.705792    5674 tpu_profiler_plugin.cc:712] PyTorch PrivateUse1ProfilerRegistry not found. Native TPU profiling will be disabled (this is expected on PyTorch < 2.12).
+I0000 00:00:1784992164.515791    5674 device_rt.cc:125] PjRt runtime initialization deferred for tpu
+Successfully renamed PrivateUse1 backend to 'tpu'. Device: device(type='tpu')
+Registered Python module for 'tpu'.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+HF token loaded from Secret Manager.
+Device type: tpu, Device index: default
+Initializing TPU distributed runtime
+Loading google/gemma-4-E2B-it in bfloat16...
+Loading weights:   0%|          | 0/1951 [00:00<?, ?it/s]Loading weights:  48%|████▊     | 946/1951 [00:00<00:00, 9445.01it/s]Loading weights:  97%|█████████▋| 1891/1951 [00:00<00:00, 9188.97it/s]Loading weights: 100%|██████████| 1951/1951 [00:00<00:00, 9245.45it/s]
+I0000 00:00:1784992220.124994    5674 pjrt_api.cc:168] The PJRT plugin has PJRT API version 0.113. The framework PJRT API version is 0.113.
+I0000 00:00:1784992221.426572    5674 pjrt_c_api_client.cc:201] PjRtCApiClient created.
+Loaded 5,506,950,688 params in 61.1s
+Traceback (most recent call last):
+  File "/tmp/torchtpu_generate.py", line 123, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/tmp/torchtpu_generate.py", line 89, in main
+    inputs = tokenizer.apply_chat_template(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/transformers/tokenization_utils_base.py", line 3121, in apply_chat_template
+    rendered_chat, generation_indices = render_jinja_template(
+                                        ^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/transformers/utils/chat_template_utils.py", line 514, in render_jinja_template
+    compiled_template = _compile_jinja_template(chat_template)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/transformers/utils/chat_template_utils.py", line 421, in _compile_jinja_template
+    return _cached_compile_jinja_template(chat_template)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/transformers/utils/chat_template_utils.py", line 474, in _cached_compile_jinja_template
+    raise ImportError(
+ImportError: apply_chat_template requires jinja2>=3.1.0 to be installed. Your version is 3.0.3.
+I0000 00:00:1784992226.288596    5674 compilation_cache.cc:345] Compilation cache evicted.
+I0000 00:00:1784992226.288628    5674 compilation_cache.cc:209] CompilationCache final stats: num_cache_reqs=0
+num_cache_hits=0 {NA}
+peak_compilation_memory_bytes=unknown
+
+
+real	1m6.377s
+user	0m32.856s
+sys	0m27.286s

@@ -284,9 +284,21 @@ On-demand rates are list, us-west4:
 | AWS EC2 `g6.xlarge` (1× L4) | ~$0.35 / hr (spot) | ~$0.97 / hr |
 | Azure `NVadsA10v5` (1× A10G) | ~$0.35 / hr (spot) | ~$1.05 / hr |
 
-For reference, published **spot** v5e is around $0.35/chip-hr and spot v6e $0.60–1.30/chip-hr — cheaper than flex-start, but preemptible with 30 seconds' warning, which is a different risk profile than flex-start's bounded run duration.
+Measured from the Cloud Billing Catalog for `us-west4` (Las Vegas) on 2026-08-06, per chip-hour:
 
-Rates vary by region and change; check current pricing before you commit. One warning from this codebase: `estimate_deployment_cost` in `server.py:880` carries `"v5e": 0.12` in its rate table, which is off by an order of magnitude against the $1.20 list rate. Don't trust a hardcoded rate table — including this one.
+| Provisioning model | SKU | Rate |
+| --- | --- | --- |
+| On-demand | `TpuV5e running in Las Vegas` | $1.2000 |
+| Flex-start | `DWS Defined Duration V5e running in Las Vegas` | $0.6000 |
+| Spot | `TpuV5e attached to Spot Preemptible VMs running in Las Vegas` | $0.5779 |
+| Reserved (calendar) | `Reserved V5e TPU in Las Vegas in Calendar Mode` | $0.8400 |
+| 1yr / 3yr commitment | `Commitment v1: TpuV5e …` | $0.8400 / $0.5400 |
+
+Spot lands just under flex-start — a 3.7% gap, not the large discount its reputation suggests — and buys that with preemption at 30 seconds' notice instead of flex-start's bounded run duration. Note the catalog calls flex-start "DWS Defined Duration" (Dynamic Workload Scheduler).
+
+Rates vary by region and change, so don't quote the table above as current: `estimate_deployment_cost` in `server.py` now reads these live from the Billing Catalog API and reports nothing at all when a SKU is missing. It used to carry a hardcoded `"v5e": 0.12`, off by 10x against the $1.20 list rate — which is the argument against hardcoded rate tables generally, including any transcribed from here.
+
+A published price is not an offer of capacity: `europe-west4` quotes a flex-start v5e rate while the API still refuses to provision `v5litepod-1` there.
 
 **Cost per million output tokens**, computed directly from the measured sweep:
 

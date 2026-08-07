@@ -1,0 +1,18 @@
+Chunked prefill STEP temp vs layer depth (total_len=4096, chunk=256, window_kv=False)
+v6e-1, gemma-4-31B-it-qat-w4a16-ct, 2026-07-31
+
+layers   chunkstep_temp
+     6      1.988 GB
+    15      5.090 GB
+    30      6.601 GB
+    60   OOM, needs 32.32G   (GiB, = 34.70 GB; available 31.24 GiB = 33.55 GB)
+
+Compare one-shot prefill_with_kv_cache temp at S=4096, window_kv=True:
+     6      2.184 GB
+    15      5.209 GB
+    30      7.443 GB
+    60      9.174 GB
+
+Chunked is competitive (and at 30 layers slightly BETTER) up to 30 layers,
+then regresses 5.3x for a 2x in depth. A compilation cliff, not a property
+of chunking.

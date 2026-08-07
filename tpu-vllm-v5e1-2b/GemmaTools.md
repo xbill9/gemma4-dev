@@ -17,7 +17,7 @@ Simple check to see if a Queued Resource has reached ACTIVE state.
 
 ### `create_tpu_queued_resource`
 
-Creates a TPU Queued Resource (Flex-start) in the given zone. Non-destructive.
+Creates a TPU Queued Resource in the given zone. Non-destructive.
 
 ### `describe_queued_resource`
 
@@ -29,7 +29,7 @@ Safely deletes a Queued Resource and its node.
 
 ### `estimate_deployment_cost`
 
-Estimates the cost of a TPU deployment.
+Estimates the cost of a TPU deployment from live Google Cloud published pricing.
 
 ### `find_gpu`
 
@@ -113,7 +113,7 @@ Manages the vLLM Docker container on the TPU VM.
 
 ### `query_queued_gemma4`
 
-Queries the self-hosted Gemma 4 model on the active Queued Resource.
+Queries the self-hosted Gemma 4 model on whichever TPU node is serving it.
 
 ### `query_queued_gemma4_with_stats`
 

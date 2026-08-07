@@ -216,8 +216,25 @@ and the Makefile uses `?=` — so `make status ZONE=...` still works for a one-o
 `us-east5`. Still check what is actually running before assuming: `list_queued_resources` and
 `discover_vllm_url` only look in the configured zone.
 
+**Silicon facts live at the monorepo root, not here.** `@../HARDWARE.md` is canonical for v6e's memory,
+bandwidth, native numeric formats, and gcloud spelling; `@../MODELS.md` for E2B's layer structure, KV cost
+per token, and weight footprint. Read them rather than re-deriving, and correct them there rather than
+restating a number in this file. Two of their facts decide things in this rig:
+
+- **v6e has no native fp8**, exactly like v5e — int8 is the only low-precision format with a compute win
+  (2x bf16 peak), and fp8 values widen back to bf16 before the matmul. So the fp8 KV-cache experiment in
+  `benchmarks/runs/2026-08-07-kv-quant-v5e1/` finding no speedup is **the expected result on this chip
+  too**, not a v5e limitation the retarget lifts. fp8 can still buy footprint and bandwidth. The first
+  TPU that changes this is v7/Ironwood.
+- **32 GB HBM, ~19.8 GiB of it free for KV** after E2B's weights, against roughly 5.5 GiB on v5e-1. That
+  is the reason to be on this chip: v6e costs 2.25x for ~1.9x the bandwidth, so it does not buy decode
+  throughput — it buys context. Which makes `MAX_MODEL_LEN=16384` here a v5e-era setting inherited by the
+  fork; the demo deployment ran 65,536 on this hardware. Raising it is a tuning decision nobody has made
+  yet, not an oversight to fix silently.
+
 **`--tensor-parallel-size` is 1.** v6e-1 is a single chip. If you see `4` or `8` anywhere, it's copy-paste
-from a larger topology.
+from a larger topology. Note `MODELS.md`: E2B has `num_key_value_heads=1`, which cannot shard — more chips
+would multiply its KV cost, not divide it.
 
 **v6e is spelled `v6e` to gcloud — the v5e `v5litepod` trap does not apply here.** The accelerator type is
 `v6e-1`, the Flex-start runtime is `v2-alpha-tpuv6e`, and `make deploy-tpu` passes `--type=v6e

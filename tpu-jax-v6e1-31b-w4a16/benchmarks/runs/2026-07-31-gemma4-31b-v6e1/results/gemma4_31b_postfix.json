@@ -1,0 +1,143 @@
+{
+  "model": "google/gemma-4-31B-it-qat-w4a16-ct",
+  "devices": [
+    "TPU_0(process=0,(0,0,0,0))"
+  ],
+  "jax_version": "0.11.0",
+  "stages_requested": [
+    "config",
+    "load",
+    "parity",
+    "sweep"
+  ],
+  "config": {
+    "resolved": {
+      "hidden_size": 5376,
+      "intermediate_size": 21504,
+      "num_hidden_layers": 60,
+      "num_attention_heads": 32,
+      "num_key_value_heads": 16,
+      "num_global_key_value_heads": 4,
+      "head_dim": 256,
+      "global_head_dim": 512,
+      "sliding_window": 1024,
+      "num_kv_shared_layers": 0,
+      "hidden_size_per_layer_input": 0,
+      "attention_k_eq_v": true,
+      "logit_softcapping": 30.0,
+      "rope_theta": 10000.0,
+      "global_rope_theta": 1000000.0
+    },
+    "sliding_layers": 50,
+    "full_layers": 10,
+    "mismatches": []
+  },
+  "load": {
+    "load_s": 7.0,
+    "weight_gb": 19.357,
+    "hbm_in_use_gb": 19.297,
+    "hbm_limit_gb": 33.546,
+    "headroom_gb": 14.249,
+    "w4a16_impl": "reference"
+  },
+  "parity": {
+    "templated": {
+      "prompt_tokens": 20,
+      "output": "The capital of France is Paris.",
+      "finish_reason": "stop",
+      "prefill_ms": 25527.0,
+      "decode_tok_s": 0.37,
+      "wall_s": 44.7
+    },
+    "bare": {
+      "prompt_tokens": 7,
+      "output": "\n<|channel>thought\n<channel|>The capital of France is Paris.",
+      "finish_reason": "stop",
+      "prefill_ms": 216.0,
+      "decode_tok_s": 13.03,
+      "wall_s": 1.3
+    }
+  },
+  "sweep": [
+    {
+      "B": 1,
+      "S": 1024,
+      "bucket_S": 1024,
+      "prefill_ms": 294.89,
+      "decode_step_ms": 78.309,
+      "agg_decode_tok_s": 12.8,
+      "per_user_tok_s": 12.8,
+      "status": "OK"
+    },
+    {
+      "B": 1,
+      "S": 2048,
+      "bucket_S": 2048,
+      "prefill_ms": 481.86,
+      "decode_step_ms": 78.263,
+      "agg_decode_tok_s": 12.8,
+      "per_user_tok_s": 12.8,
+      "status": "OK"
+    },
+    {
+      "B": 1,
+      "S": 4096,
+      "bucket_S": 4096,
+      "prefill_ms": 1065.32,
+      "decode_step_ms": 78.412,
+      "agg_decode_tok_s": 12.8,
+      "per_user_tok_s": 12.8,
+      "status": "OK"
+    },
+    {
+      "B": 1,
+      "S": 8192,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 1,
+      "S": 16384,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 2,
+      "S": 1024,
+      "bucket_S": 1024,
+      "prefill_ms": 460.13,
+      "decode_step_ms": 129.185,
+      "agg_decode_tok_s": 15.5,
+      "per_user_tok_s": 7.7,
+      "status": "OK"
+    },
+    {
+      "B": 2,
+      "S": 2048,
+      "bucket_S": 2048,
+      "prefill_ms": 856.39,
+      "decode_step_ms": 130.122,
+      "agg_decode_tok_s": 15.4,
+      "per_user_tok_s": 7.7,
+      "status": "OK"
+    },
+    {
+      "B": 2,
+      "S": 4096,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 2,
+      "S": 8192,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 2,
+      "S": 16384,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    }
+  ]
+}

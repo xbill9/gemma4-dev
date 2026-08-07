@@ -3,7 +3,7 @@ import termplotlib as tpl
 
 # Load the benchmark data
 try:
-    df = pd.read_csv("benchmark_results.csv")
+    df = pd.read_csv("benchmarks/runs/2026-04-28-vllm-concurrency-v6e1/benchmark_results.csv")
 except FileNotFoundError:
     print("Error: benchmark_results.csv not found.")
     print("Please run the benchmark suite first.")

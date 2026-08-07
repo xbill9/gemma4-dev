@@ -1,11 +1,20 @@
 import json
+import os
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+# Comparison CSVs live in sibling checkouts outside this monorepo. COMPARE_DATA_ROOT points
+# at whatever directory holds them; the default reproduces the original absolute paths.
+DATA_ROOT = os.getenv("COMPARE_DATA_ROOT", os.path.expanduser("~"))
+
+# Optional output directory for the comparison report and its plot. Defaults to the CWD;
+# this used to be a hardcoded UUID path inside another tool's scratch directory.
+ARTIFACT_DIR = os.getenv("ARTIFACT_DIR", ".")
+
 # 1. Load v6e-4 data
-with open("benchmark_results.json", "r") as f:
+with open("benchmarks/runs/undated-vllm-grid-a-v6e1/benchmark_results.json", "r") as f:
     v6e4_data = json.load(f)
 df_v6e4 = pd.DataFrame(v6e4_data)
 df_v6e4 = df_v6e4[df_v6e4["status"] == "success"]
@@ -30,13 +39,17 @@ df_qat = df_qat[["concurrency", "context_len", "throughput"]].dropna()
 df_qat["deployment"] = "GCP GPU QAT L4 (x8)"
 
 # 5. Load AWS Inferentia QAT data
-df_aws = pd.read_csv("/home/xbill/gemma4-tips-aws/gpu-12B-qat-inf-devops-agent/benchmark_sweep_results.csv")
+df_aws = pd.read_csv(
+    os.path.join(DATA_ROOT, "gemma4-tips-aws/gpu-12B-qat-inf-devops-agent/benchmark_sweep_results.csv")
+)
 df_aws = df_aws.rename(columns={"context_size": "context_len", "req_per_sec": "throughput"})
 df_aws = df_aws[["concurrency", "context_len", "throughput"]].dropna()
 df_aws["deployment"] = "AWS Inferentia QAT"
 
 # 6. Load Azure ACA QAT data
-df_azure = pd.read_csv("/home/xbill/gemma4-tips-azure/gpu-12B-qat-aca-devops-agent/benchmark_sweep_results.csv")
+df_azure = pd.read_csv(
+    os.path.join(DATA_ROOT, "gemma4-tips-azure/gpu-12B-qat-aca-devops-agent/benchmark_sweep_results.csv")
+)
 df_azure = df_azure.rename(columns={"context_size": "context_len", "req_per_sec": "throughput"})
 df_azure = df_azure[["concurrency", "context_len", "throughput"]].dropna()
 df_azure["deployment"] = "Azure ACA QAT"
@@ -74,11 +87,10 @@ for ctx in target_contexts:
     pivot = subset.groupby(["concurrency", "deployment"])["throughput"].mean().unstack()
     report += pivot.to_markdown() + "\n\n"
 
-report += "![Comparison Plot](/home/xbill/.gemini/antigravity-cli/brain/c8b3fe3d-b59c-4eaa-91ed-44864e64c16b/comparison_plot_v3.png)\n"
+report += f"![Comparison Plot]({os.path.join(ARTIFACT_DIR, 'comparison_plot_v3.png')})\n"
 
-with open(
-    "/home/xbill/.gemini/antigravity-cli/brain/c8b3fe3d-b59c-4eaa-91ed-44864e64c16b/deployment_comparison_v3.md", "w"
-) as f:
+os.makedirs(ARTIFACT_DIR, exist_ok=True)
+with open(os.path.join(ARTIFACT_DIR, "deployment_comparison_v3.md"), "w") as f:
     f.write(report)
 
 print("Comparison completed.")

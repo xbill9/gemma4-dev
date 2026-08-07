@@ -6,7 +6,7 @@ Builds a MINI Gemma4 dense text config (both attention geometries, truncated
 identical (fuzzed) weights, and compares final logits — with per-layer hidden
 state localization on failure.
 
-Run:  cd /home/xbill/tpu-pytorch/ports/gemma4 && python3 parity_test.py
+Run:  cd ports/gemma4 && python3 parity_test.py
 
 Note: HF's Gemma4TextConfig force-coerces the LAST layer to "full_attention"
 (a hard __post_init__ rule), so the truncated pattern used here ends in a full

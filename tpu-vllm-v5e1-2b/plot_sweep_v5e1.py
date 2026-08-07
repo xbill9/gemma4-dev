@@ -182,7 +182,7 @@ def lines(rows, out):
 
 
 def main():
-    csv_path = sys.argv[1] if len(sys.argv) > 1 else "sweep_results_v5e1.csv"
+    csv_path = sys.argv[1] if len(sys.argv) > 1 else "benchmarks/runs/2026-08-05-vllm-sweep-v5e1/sweep_results_v5e1.csv"
     prefix = sys.argv[2] if len(sys.argv) > 2 else "sweep"
     rows = load(csv_path)
     print(f"✅ {heatmap(rows, f'{prefix}_heatmap_v5e1.png')}")

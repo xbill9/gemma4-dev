@@ -1,16 +1,26 @@
 # gemma4-dev
 
-A monorepo of **accelerator rigs** for serving [Gemma 4](https://ai.google.dev/gemma) on Google Cloud TPU.
+A monorepo of **accelerator rigs** for serving [Gemma 4](https://ai.google.dev/gemma) on Google Cloud TPU,
+AWS Inferentia2, and NVIDIA GPUs.
 
 Each rig is a self-contained project that serves one Gemma 4 checkpoint on one hardware shape through one
-runtime. Every rig ships the same shape of thing: a single-file [MCP](https://modelcontextprotocol.io) server
-(`server.py`, built on FastMCP) exposing a `tpu-devops` agent that provisions TPU capacity, starts a model
-server on it, and does SRE diagnostics against the running endpoint.
+runtime. A serving rig ships the same shape of thing: a single-file [MCP](https://modelcontextprotocol.io)
+server (`server.py`, built on FastMCP) exposing a devops agent that provisions capacity, starts a model
+server on it, and does SRE diagnostics against the running endpoint. A handful of **artifact rigs** carry
+only measurements — see the second table below.
+
+**Each rig's MCP server is named after the rig directory** — `tpu-jax-v5e1-2b`, `tpu-vllm-v5e1-2b`, and so
+on. That name is the key the server is registered under, so it prefixes every tool as
+`mcp__<rig>__find_tpu`. The rigs previously all registered as `tpu-devops`, which made a tool call
+ambiguous whenever more than one was loaded. Override per rig with `MCP_SERVER_NAME` (or
+`project-setup.sh --server-name`) only when a client has already registered one under a different key.
 
 The rigs are siblings, not layers — they share ancestry and diverge. Nothing is imported across rig
 boundaries.
 
 ## The variants
+
+**Serving rigs** — each ships a `server.py`, an MCP server, and a deployment path:
 
 | Rig | Runtime | Hardware | Model | Notes |
 | --- | --- | --- | --- | --- |
@@ -19,8 +29,31 @@ boundaries.
 | [`tpu-jax-v5e1-2b`](tpu-jax-v5e1-2b/) | pure JAX | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | Hand-rolled engine + OpenAI-compatible server; no Docker, no HF token |
 | [`tpu-pytorch-v5e1-12b`](tpu-pytorch-v5e1-12b/) | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | Static-shape decode server |
 | [`tpu-pytorch-v5e1-2b`](tpu-pytorch-v5e1-2b/) | PyTorch / `torch_xla` | v5e-1 | 2B | Near-identical fork of the 12B rig |
+| [`tpu-pytorch-v6e1-2b`](tpu-pytorch-v6e1-2b/) | PyTorch / `torch_xla` | v6e-1 | 2B | |
+| [`tpu-pytorch-inf2-2b`](tpu-pytorch-inf2-2b/) | PyTorch / `torch_neuronx` | inf2 | 2B | **AWS Inferentia2, not GCP** — EC2 + Neuron DLAMI, driven over Systems Manager |
 
-Directory names follow a four-slot scheme — `<platform>-<runtime>-<hardware>-<model>`.
+**Artifact rigs** — measurements and findings only. No `server.py`, no MCP server, no deployment
+path. They exist so results measured on hardware no serving rig covers are filed under the hardware
+they came from. See [`NAMING.md`](NAMING.md#artifact-rigs--a-rig-that-serves-nothing).
+
+| Rig | Runtime | Hardware | Model | Notes |
+| --- | --- | --- | --- | --- |
+| [`tpu-jax-v6e1-12b-w4a16`](tpu-jax-v6e1-12b-w4a16/) | pure JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | 100% token parity vs the HF reference; ~29.5 ms/step flat from 1K to 8K |
+| [`tpu-jax-v6e1-26b-q4_0`](tpu-jax-v6e1-26b-q4_0/) | pure JAX | v6e-1 *(target)* | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | The only **sparse** checkpoint and the only size with no `-w4a16-ct`. **Verified on CPU; never run on a TPU** |
+| [`tpu-jax-v6e1-31b-w4a16`](tpu-jax-v6e1-31b-w4a16/) | pure JAX | v6e-1 | `gemma-4-31B-it-qat-w4a16-ct` | Measured W4A16 error, massive activations, sink reachability, XLA memory cliffs |
+| [`gpu-vllm-l4-2b-w4a16`](gpu-vllm-l4-2b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-E2B-it-qat-w4a16-ct` | 2D concurrency grid, GCE |
+| [`gpu-vllm-l4-4b-w4a16`](gpu-vllm-l4-4b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-E4B-it-qat-w4a16-ct` | 2D concurrency grid, GCE |
+| [`gpu-vllm-l4-12b-w4a16`](gpu-vllm-l4-12b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-12B-it-qat-w4a16-ct` | Four grids — Cloud Run, GCE, EC2, and an MTP build |
+| [`gpu-vllm-l4-26b-w4a16`](gpu-vllm-l4-26b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-26B-A4B-it-qat-w4a16-ct` | **That Hub id does not exist** — the reports name a local mount; see the rig |
+| [`gpu-vllm-l4-31b-w4a16`](gpu-vllm-l4-31b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-31B-it-qat-w4a16-ct` | At bf16 the 31B leaves **0 GB** for KV on an L4 |
+
+The five `gpu-vllm-l4-*` rigs were migrated from `~/gemma4-tips` on 2026-08-07. That tree duplicated
+its artifacts heavily — **82 report files, 20 unique**, with directory names that misattribute models
+— so only the 10 reports that self-identify came across. Each rig's `CLAUDE.md` carries the full
+warning; do not go back to that tree and read a model off a directory name.
+
+Directory names follow a four-slot scheme — `<platform>-<runtime>-<hardware>-<model>` — plus an
+optional fifth slot naming the weight **encoding** when it isn't the reference build.
 **[`NAMING.md`](NAMING.md) is the spec**: it defines the permitted value for every slot, the rules for adding
 or renaming a rig, and the separate date-first scheme used for benchmark artifacts. Read it before naming
 anything.
@@ -31,15 +64,19 @@ The name is documentation, not configuration. A rig's authoritative values live 
 
 ## Installing a rig as a Claude Code plugin
 
-Three of the rigs ship their `tpu-management` skill and `tpu-devops` MCP server as an installable plugin:
+Three of the rigs ship their skill and their MCP server as an installable plugin:
 
 ```
 /plugin marketplace add xbill9/gemma4-dev
 ```
 
-then install `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-12b`, or `tpu-pytorch-v5e1-2b`. The plugin is named after
-the rig it comes from, since all three provide a skill called `tpu-management` and would otherwise collide.
+then install `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-12b`, or `tpu-pytorch-v5e1-2b`.
 `tpu-vllm-v5e1-2b` is not packaged as a plugin — use it directly.
+
+Everything a rig installs into a shared namespace is named after the rig, for the same reason: the plugin,
+the MCP server (`tpu-jax-v5e1-2b`), and the skill (`tpu-jax-v5e1-2b-management`). The skills previously were
+all called `tpu-management`, and `make skill-install` `rm -rf`s its destination — so installing a second rig
+silently replaced the first. See `NAMING.md` for the full table and the override variables.
 
 ## Working in a rig
 

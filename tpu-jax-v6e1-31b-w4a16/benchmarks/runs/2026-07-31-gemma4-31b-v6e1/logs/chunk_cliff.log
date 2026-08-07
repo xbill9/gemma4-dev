@@ -1,0 +1,18 @@
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2375.48it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+
+full 60-layer model, chunk=256, window_kv=False
+
+  total_len  donate        KV    step temp
+       1024   False    0.92 GB     8.785 GB
+       1024    True    0.92 GB     8.520 GB
+       2048   False    1.84 GB     8.027 GB
+       2048    True    1.84 GB     8.793 GB
+       4096   False    3.69 GB   OOM 32.32G
+       4096    True    3.69 GB     8.013 GB
+
+  total_len=1024: donation +0.265 GB (8.785 -> 8.520)
+  total_len=2048: donation -0.767 GB (8.027 -> 8.793)
+  total_len=4096: donation FIXES IT (OOM -> 8.013 GB)
+
+Wrote gemma4_31b_chunk_cliff.json

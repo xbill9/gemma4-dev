@@ -1,0 +1,25 @@
+
+=== STATIC: model.safetensors ===
+
+layer_scalar (residual damping applied to the whole stream each layer)
+  n=60  mean=0.7823  min=0.0317 (layer 59)  max=0.9922 (layer 2)
+  depth 0->59: ▁▁█▇▇▇▇▇▇▇▇▆▅▇▇▆▇▆▇▇▇▇▇▅▆▆▅▅▄▄▅▆▆▆▆▅▆▆▆▅▅▅▆▆▆▇▇▇▇▆▇▇▆▇▇▇▇▆▅▁
+  sliding mean 0.8010   full mean 0.6891
+
+RMSNorm weight magnitude by kind (mean of |w| over layers)
+  input_layernorm              absmean   23.475   max 1248.000
+  post_attention_layernorm     absmean    0.473   max   19.625
+  pre_feedforward_layernorm    absmean   40.797   max  860.000
+  post_feedforward_layernorm   absmean    0.737   max   63.000
+
+W4A16 group-scale dynamic range  (p99.9/median of |scale|; higher = more outlier channels = harder to quantize)
+    projection       all   sliding      full  early(0-19)  late(40-59)
+        q_proj      3.25      3.27      3.16         2.78         3.37
+        k_proj      3.56      3.58      3.49         3.06         3.67
+        v_proj      4.22      4.22       nan         3.96         4.61
+        o_proj      3.44      3.46      3.37         3.66         3.34
+     gate_proj      2.75      2.75      2.78         2.31         2.79
+       up_proj      2.41      2.40      2.46         2.22         2.19
+     down_proj      3.13      3.14      3.06         3.56         2.42
+
+Wrote gemma4_31b_model_intel.json

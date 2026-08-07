@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/xbill9/tpu-skill-claude/main/benchmarks/serving-report.schema.json",
+  "$id": "https://raw.githubusercontent.com/xbill9/gemma4-dev/main/benchmarks/serving-report.schema.json",
   "title": "LLM Serving Benchmark Report",
   "description": "One report per (model, hardware, engine config) deployment: identity of the stack, throughput sweep, capability probes, memory anatomy, startup, and cost. Unknown extra fields are allowed everywhere so the schema can evolve without breaking old reports.",
   "type": "object",
@@ -8,7 +8,8 @@
   "properties": {
     "schema_version": {
       "type": "string",
-      "const": "1.0"
+      "enum": ["1.0", "1.1"],
+      "description": "1.1 added throughput.sweep[].input_len, .output_len and .status, so a two-dimensional (context x concurrency) sweep and its infeasible cells are representable. Purely additive: every valid 1.0 report is a valid 1.1 report apart from this string."
     },
     "run": {
       "type": "object",
@@ -116,8 +117,8 @@
           "properties": {
             "tool": { "type": "string", "description": "e.g. vllm bench serve" },
             "dataset": { "type": "string" },
-            "input_len": { "type": "integer" },
-            "output_len": { "type": "integer" },
+            "input_len": { "type": "integer", "description": "Context length held constant across the sweep. Omit for a two-dimensional sweep and set sweep[].input_len per point instead." },
+            "output_len": { "type": "integer", "description": "Generated tokens per request, held constant across the sweep. A point may override with sweep[].output_len." },
             "num_prompts": { "type": "integer" },
             "runs_per_point": { "type": "integer", "default": 1 },
             "noise_floor_pct": { "type": "number", "description": "Treat deltas below this percentage as noise" }
@@ -131,6 +132,19 @@
             "required": ["concurrency"],
             "properties": {
               "concurrency": { "type": "integer", "minimum": 1 },
+              "input_len": {
+                "type": "integer",
+                "description": "Context length for this point, overriding workload.input_len. Present when the sweep is two-dimensional (context x concurrency); the pair (input_len, concurrency) is then the cell key."
+              },
+              "output_len": { "type": "integer", "description": "Generated tokens for this point, overriding workload.output_len." },
+              "status": {
+                "type": "string",
+                "enum": ["ok", "infeasible", "failed"],
+                "default": "ok",
+                "description": "ok = measured; infeasible = the cell cannot exist on this hardware+config (e.g. context exceeds the bootable max_model_len) and was deliberately not run; failed = attempted and did not produce a result. Record infeasible and failed cells explicitly with their metrics omitted — an absent cell is indistinguishable from an untried one, which is how a sweep silently overstates its coverage.",
+                "$comment": "A cell with status other than ok is expected to carry no throughput or latency fields."
+              },
+              "error": { "type": "string", "description": "Failure or infeasibility signature, when status is not ok" },
               "request_rate_rps": { "type": "number", "description": "vllm: request_throughput" },
               "output_tok_per_s": { "type": "number", "description": "vllm: output_throughput" },
               "total_tok_per_s": { "type": "number", "description": "vllm: total_token_throughput" },

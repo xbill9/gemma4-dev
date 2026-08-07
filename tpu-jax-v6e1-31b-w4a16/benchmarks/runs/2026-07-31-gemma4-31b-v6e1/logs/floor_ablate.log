@@ -1,0 +1,36 @@
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2676.65it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+
+weights 19.357 GB    S=1024, B=1
+
+   layers        temp        args      output   d(temp)/layer
+        1     0.485 GB     3.088 GB     0.018 GB                
+        2     0.678 GB     3.357 GB     0.035 GB        192.5 MB
+        6     2.184 GB     4.472 GB     0.093 GB        376.6 MB
+       15     5.209 GB     6.935 GB     0.236 GB        336.1 MB
+       30     7.443 GB    11.088 GB     0.463 GB        148.9 MB
+       60     9.174 GB    19.357 GB     0.924 GB         57.7 MB
+
+  linear fit over 1..60 layers:
+    per-layer      147.3 MB/layer
+    intercept      0.338 GB   <- layer-independent floor
+    => at 60 layers: 8.836 GB layers + 0.338 GB fixed
+
+  XLA dump: 90 files
+    module_0025.jit_prefill_with_kv_cache.cl_954665169
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_codegen.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_optimizations-buffer-assignment-values.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_optimizations-buffer-assignment.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_optimizations-live-range.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_optimizations-memory-usage-report.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_optimizations.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_optimizations_after_buffer_assignment.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.after_optimizations_before_buffer_assignment.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.basic_compiler_metadata.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.before_optimizations.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.debug_options
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.execution_options.txt
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.flagfile
+    module_0025.jit_prefill_with_kv_cache.cl_954665169.hlo_module_config.txt
+
+Wrote gemma4_31b_floor_ablate.json

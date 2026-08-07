@@ -31,7 +31,7 @@ def load_data(filepath, is_v6e1=True):
 
 
 def main():
-    v6e1_file = "grid_benchmark_results.csv"
+    v6e1_file = "benchmarks/runs/undated-vllm-grid-b-v6e1/grid_benchmark_results.csv"
     v6e4_file = "../tpu-2B-v6e4-devops-agent/grid_benchmark_results.csv"
 
     v6e1_data = load_data(v6e1_file, is_v6e1=True)

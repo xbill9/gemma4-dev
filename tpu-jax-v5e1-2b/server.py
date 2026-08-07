@@ -19,15 +19,27 @@ from mcp.types import ToolAnnotations
 from openai import AsyncOpenAI
 from pydantic import Field
 
+# This rig's identity. The directory name is the single identifier everything else derives
+# from — the MCP server name, the log channel, and the zone-status cache directory. Sibling
+# rigs share a GCP project and zone, so a shared constant here is how one rig ends up
+# answering for, or clobbering the state of, another. It is a literal rather than
+# basename(__file__) because the installed skill copy lives at
+# .claude/skills/<skill>/mcp/server.py, where deriving from the path would yield "mcp".
+RIG_NAME = "tpu-jax-v5e1-2b"
+
 # Setup logging
 logging.basicConfig(
     stream=sys.stderr, level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("vllm-devops-agent")
+logger = logging.getLogger(RIG_NAME)
 
-# Initialize FastMCP server. The name stays generic — model and topology come
-# from env vars, so they don't belong in the server identity.
-mcp = FastMCP("tpu-devops-agent")
+# Initialize FastMCP server. The name has to match the key the client registers this
+# server under, because that key prefixes every tool — mcp__<key>__find_tpu. Every
+# sibling rig used to answer to "tpu-devops", so with more than one registered you could
+# not tell which rig a tool call would reach. It now defaults to the rig directory name;
+# MCP_SERVER_NAME overrides it, and project-setup.sh passes the key it registered.
+MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
+mcp = FastMCP(MCP_SERVER_NAME)
 
 # Annotation presets — hints that let clients (e.g. permission layers) auto-allow
 # reads and require confirmation before destructive calls.
@@ -69,7 +81,9 @@ REGION = os.getenv("GOOGLE_CLOUD_REGION", "us-west4")
 # A v5e-1 chip has 16GB of HBM, so the default payload is an E2B-class checkpoint,
 # not the 31B this server used to assume. Raise it with MODEL_NAME on bigger shapes.
 MODEL_NAME = os.getenv("MODEL_NAME", "google/gemma-4-E2B-it")
-HF_SECRET_ID = "hf-token"
+# Secret Manager secret holding the Hugging Face token. The startup script fetches it by
+# id at boot, so a rotated or per-project secret only needs this to change.
+HF_SECRET_ID = os.getenv("HF_SECRET_ID", "hf-token")
 ACCELERATOR_TYPE = os.getenv("ACCELERATOR_TYPE", "v5e-1")
 TENSOR_PARALLEL_SIZE = int(os.getenv("TENSOR_PARALLEL_SIZE", "1"))
 # Queued-resource runtime image, which is per TPU family — a v6e image will not
@@ -147,7 +161,15 @@ JAX_PIP_EXTRAS = os.getenv(
 # find_tpu records per-zone provisioning outcomes here so later sweeps can skip
 # zones that never delivered capacity. Lives outside the skill directory so
 # reinstalls (`make skill`, project-setup.sh) don't wipe the learned state.
-STATUS_FILE = os.path.join(os.path.expanduser("~"), ".cache", "tpu-devops", "tpu_zones_status.md")
+#
+# Keyed by RIG_NAME, not shared: the sibling rigs request different accelerator types, and
+# a zone that rejects one says nothing about another. Sharing one file meant a failure
+# recorded by one rig silently suppressed a different rig's scan of that zone. Override the
+# whole path with TPU_ZONES_STATUS_FILE.
+STATUS_FILE = os.getenv(
+    "TPU_ZONES_STATUS_FILE",
+    os.path.join(os.path.expanduser("~"), ".cache", RIG_NAME, "tpu_zones_status.md"),
+)
 
 # --- Helper Functions ---
 
@@ -282,7 +304,9 @@ async def get_secret(secret_id: str = HF_SECRET_ID) -> Optional[str]:
 # failing at VM-creation time with a confusing "no such file".
 _TEMPLATE_SEARCH_DIRS = (
     os.path.dirname(os.path.abspath(__file__)),
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), ".claude", "skills", "tpu-management", "mcp"),
+    # Derived, not spelled out: the skill directory carries the rig name, so a rename that
+    # updates RIG_NAME keeps this search path pointing at the right place.
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), ".claude", "skills", f"{RIG_NAME}-management", "mcp"),
 )
 
 
@@ -302,9 +326,7 @@ def _read_template(filename: str) -> str:
                     return f.read()
             except OSError as e:
                 raise RuntimeError(f"Cannot read startup script template {path}: {e}") from e
-    raise RuntimeError(
-        f"Startup script template '{filename}' not found. Searched: " + ", ".join(tried)
-    )
+    raise RuntimeError(f"Startup script template '{filename}' not found. Searched: " + ", ".join(tried))
 
 
 def _get_formatted_startup_script(model_name: str, zone: str, tp_size: Optional[int] = None) -> str:
@@ -625,12 +647,14 @@ async def _create_queued_resource(
     if reserved:
         create_cmd.append("--reserved")
     else:
-        create_cmd.extend([
-            "--provisioning-model=flex-start",
-            "--max-run-duration=4h",
-            "--valid-until-duration=4h",
-            "--labels=purpose=flex-start",
-        ])
+        create_cmd.extend(
+            [
+                "--provisioning-model=flex-start",
+                "--max-run-duration=4h",
+                "--valid-until-duration=4h",
+                "--labels=purpose=flex-start",
+            ]
+        )
 
     logger.info(f"Executing gcloud command: {' '.join(shlex.quote(c) for c in create_cmd)}")
     try:
@@ -817,7 +841,9 @@ async def create_tpu_vm_instance(
     request_valid_for: str = "2h",
     workload: Annotated[
         Literal["vllm", "jax"],
-        Field(description="'vllm' serves model_name via docker; 'jax' installs a bare jax[tpu] dev environment (no docker, no HF token)"),
+        Field(
+            description="'vllm' serves model_name via docker; 'jax' installs a bare jax[tpu] dev environment (no docker, no HF token)"
+        ),
     ] = "vllm",
 ) -> str:
     """Creates a flex-start TPU VM as a GCE instance (the default path; v5e/v6e/v5p).
@@ -1083,15 +1109,15 @@ async def create_cpu_debug_vm(
     zone: Optional[str] = None,
     machine_type: Annotated[
         str,
-        Field(description="GCE machine type. Memory gates what loads, vCPUs gate how long you wait. "
-                          "e2-highmem-16 = 16 vCPU/128 GiB runs a 31B; 64 GiB only loads one; 32 GiB is E2B only"),
+        Field(
+            description="GCE machine type. Memory gates what loads, vCPUs gate how long you wait. "
+            "e2-highmem-16 = 16 vCPU/128 GiB runs a 31B; 64 GiB only loads one; 32 GiB is E2B only"
+        ),
     ] = CPU_DEBUG_MACHINE_TYPE,
     boot_disk_size_gb: Annotated[
         int, Field(ge=50, description="Checkpoints are large: E2B 8.3 GB, 31B W4A16 23.3 GB, MoE ~14 GB")
     ] = 100,
-    spot: Annotated[
-        bool, Field(description="Spot is ~70% cheaper and preemption is harmless for a debug box")
-    ] = True,
+    spot: Annotated[bool, Field(description="Spot is ~70% cheaper and preemption is harmless for a debug box")] = True,
     max_run_duration: Annotated[
         Optional[str],
         Field(description="Auto-delete after this long, e.g. '8h'. Omit to leave it running."),
@@ -1126,7 +1152,11 @@ async def create_cpu_debug_vm(
     script_file = _write_startup_script(startup_script_content)
 
     create_cmd = [
-        "gcloud", "compute", "instances", "create", instance_name,
+        "gcloud",
+        "compute",
+        "instances",
+        "create",
+        instance_name,
         f"--project={PROJECT_ID}",
         f"--zone={zone}",
         f"--machine-type={machine_type}",
@@ -1142,8 +1172,7 @@ async def create_cpu_debug_vm(
     if spot:
         create_cmd += ["--provisioning-model=SPOT", "--instance-termination-action=STOP"]
     if max_run_duration:
-        create_cmd += [f"--max-run-duration={max_run_duration}",
-                       "--instance-termination-action=DELETE"]
+        create_cmd += [f"--max-run-duration={max_run_duration}", "--instance-termination-action=DELETE"]
 
     logger.info(f"Executing gcloud command: {' '.join(shlex.quote(c) for c in create_cmd)}")
     rc, stdout, stderr = await run_command(create_cmd, timeout=600)
@@ -1202,8 +1231,8 @@ async def wait_for_jax_ready(
             )
         if emitted(serial, "JAX-BOOTLOADER: FAILED"):
             detail = [ln for ln in serial.splitlines() if "JAX-BOOTLOADER: ERROR" in ln or ln.startswith("ERROR:")]
-            return (
-                f"❌ JAX startup failed on `{instance_name}`:\n" + "\n".join(detail or ["see `get_tpu_vm_serial_log`"])
+            return f"❌ JAX startup failed on `{instance_name}`:\n" + "\n".join(
+                detail or ["see `get_tpu_vm_serial_log`"]
             )
         if not serial.startswith("❌") and serial.strip():
             last_signal = serial.splitlines()[-1]
@@ -1481,7 +1510,9 @@ async def find_tpu_vm(
     ] = "5m",
     workload: Annotated[
         Literal["vllm", "jax"],
-        Field(description="'vllm' serves model_name via docker; 'jax' installs a bare jax[tpu] dev environment (no docker, no HF token)"),
+        Field(
+            description="'vllm' serves model_name via docker; 'jax' installs a bare jax[tpu] dev environment (no docker, no HF token)"
+        ),
     ] = "vllm",
 ) -> str:
     """GCE counterpart of `find_tpu`: tries flex-start TPU VM creation across zones
@@ -1493,9 +1524,7 @@ async def find_tpu_vm(
     instance_name = instance_name or ("jax-tpu-vm" if workload == "jax" else "vllm-gemma4-vm")
     # Sweep the zones with quota for *this* accelerator's family — the v6e metric
     # would send a v5e sweep to europe-west4, where the shape does not exist.
-    candidate_zones = zones or await _get_zones_with_available_quota_list(
-        quota_id=_quota_id_for(accelerator)
-    )
+    candidate_zones = zones or await _get_zones_with_available_quota_list(quota_id=_quota_id_for(accelerator))
     if not candidate_zones:
         return "❌ No candidate zones: no zones with TPU quota found — pass `zones` explicitly."
 
@@ -1539,7 +1568,9 @@ async def manage_vllm_docker(
     ] = None,
     load_format: Annotated[
         Optional[str],
-        Field(description="vLLM load format, e.g. 'tpu_streaming_loader' or 'runai_streamer'; auto-picked from model size"),
+        Field(
+            description="vLLM load format, e.g. 'tpu_streaming_loader' or 'runai_streamer'; auto-picked from model size"
+        ),
     ] = None,
     max_model_len: Annotated[
         Optional[int], Field(ge=1, description="Context length override; auto-picked from model size")
@@ -1557,9 +1588,7 @@ async def manage_vllm_docker(
     the existing container (or creates one with defaults)."""
     zone = _zone(zone)
     selected_model = model_name or MODEL_NAME
-    config_given = any(
-        p is not None for p in (model_name, load_format, max_model_len, gpu_memory_utilization)
-    )
+    config_given = any(p is not None for p in (model_name, load_format, max_model_len, gpu_memory_utilization))
     # Auto-detect defaults based on model name
     is_large = "26B" in selected_model or "31B" in selected_model
     resolved_load_format = load_format or ("tpu_streaming_loader" if is_large else "runai_streamer")
@@ -1914,9 +1943,7 @@ async def run_vllm_benchmark(
     remote_cmd = docker_cmd
     if save_result:
         remote_cmd += (
-            f" && echo {BENCH_RESULT_MARKER}"
-            f" && sudo cat /dev/shm/{result_name}"
-            f" && sudo rm -f /dev/shm/{result_name}"
+            f" && echo {BENCH_RESULT_MARKER} && sudo cat /dev/shm/{result_name} && sudo rm -f /dev/shm/{result_name}"
         )
 
     ssh_cmd, target = await _build_tpu_ssh_cmd(remote_cmd, resource_id, instance_name, zone)

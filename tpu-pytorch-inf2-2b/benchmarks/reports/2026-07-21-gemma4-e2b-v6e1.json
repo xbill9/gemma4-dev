@@ -1,0 +1,231 @@
+{
+  "schema_version": "1.0",
+  "run": {
+    "id": "2026-07-21-gemma4-e2b-v6e1",
+    "date": "2026-07-21",
+    "source": "devto-post.md",
+    "notes": "Single benchmark run per configuration; a kernel study on this stack measured run-to-run cv <= 0.3% under greedy decoding with static shapes."
+  },
+  "hardware": {
+    "accelerator": "tpu-v6e",
+    "chips": 1,
+    "hbm_gb_per_chip": 32,
+    "machine_type": "ct6e-standard-1t",
+    "host": {
+      "cloud": "gcp",
+      "zone": "europe-west4-a",
+      "provisioning": "flex-start",
+      "instance_name": "vllm-gemma4-e2b",
+      "max_run_duration_hours": 4
+    },
+    "pricing": {
+      "currency": "USD",
+      "rate_per_chip_hour": 1.35,
+      "source": "https://cloud.google.com/products/dws/pricing"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "parameters_b": 2,
+    "weights_dtype": "bfloat16",
+    "quantization": "none",
+    "kv_cache_dtype": "fp8_e5m2",
+    "max_model_len": 65536,
+    "architecture_notes": "KV sharing: only 15 of 35 layers hold KV tensors (num_kv_shared_layers=20), single 256-dim KV head; ~15 KiB KV per token in bf16, ~7.5 KiB under fp8."
+  },
+  "software": {
+    "engine": "vllm",
+    "version": "0.23.1rc1.dev1076+g5c342876a",
+    "container_image": "vllm/vllm-tpu:nightly",
+    "backend": "tpu-inference (JAX)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "--tensor-parallel-size 1",
+      "--max-model-len 65536",
+      "--gpu-memory-utilization 0.9",
+      "--max_num_batched_tokens 4096",
+      "--disable_chunked_mm_input",
+      "--enable-auto-tool-choice",
+      "--tool-call-parser gemma4",
+      "--reasoning-parser gemma4",
+      "--limit-mm-per-prompt {\"image\":4,\"audio\":1}"
+    ]
+  },
+  "load_matrix": [
+    {
+      "model_id": "google/gemma-4-E2B-it",
+      "backend": "tpu-inference (JAX)",
+      "verdict": "loads"
+    },
+    {
+      "model_id": "google/gemma-4-E2B-it-qat-w4a16-ct",
+      "backend": "tpu-inference (JAX)",
+      "verdict": "fails",
+      "error": "int4 compressed-tensors scheme unimplemented for E2B's per_layer_model_projection",
+      "issue": "https://github.com/vllm-project/tpu-inference/issues/3225"
+    },
+    {
+      "model_id": "google/gemma-4-E2B-it-qat-q4_0-unquantized",
+      "backend": "tpu-inference (JAX)",
+      "verdict": "fails",
+      "error": "loader demands self_attn.k_norm.weight for KV-shared layers 15-34 that the checkpoint legitimately omits",
+      "issue": "https://github.com/vllm-project/tpu-inference/issues/3225"
+    },
+    {
+      "model_id": "google/gemma-4-E2B-it-qat-q4_0-unquantized",
+      "backend": "torchax (MODEL_IMPL_TYPE=vllm)",
+      "verdict": "fails",
+      "error": "identical missing-weights error as the JAX path",
+      "issue": "https://github.com/vllm-project/tpu-inference/issues/3225"
+    }
+  ],
+  "throughput": {
+    "workload": {
+      "tool": "vllm bench serve",
+      "dataset": "random",
+      "input_len": 1024,
+      "output_len": 128,
+      "num_prompts": 100,
+      "runs_per_point": 1,
+      "noise_floor_pct": 10
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "request_rate_rps": 1.64,
+        "output_tok_per_s": 209,
+        "total_tok_per_s": 1884,
+        "per_stream_tok_per_s": 213,
+        "ttft_ms": { "median": 16, "p99": 17 },
+        "tpot_ms": { "median": 4.7 }
+      },
+      {
+        "concurrency": 8,
+        "request_rate_rps": 9.44,
+        "output_tok_per_s": 1209,
+        "total_tok_per_s": 10878,
+        "per_stream_tok_per_s": 161,
+        "ttft_ms": { "median": 27, "p99": 99 },
+        "tpot_ms": { "median": 6.2 }
+      },
+      {
+        "concurrency": 32,
+        "request_rate_rps": 12.78,
+        "output_tok_per_s": 1636,
+        "total_tok_per_s": 14721,
+        "per_stream_tok_per_s": 57,
+        "ttft_ms": { "median": 155, "p99": 189 },
+        "tpot_ms": { "median": 17.5 }
+      },
+      {
+        "concurrency": 64,
+        "request_rate_rps": 16.72,
+        "output_tok_per_s": 2140,
+        "total_tok_per_s": 19262,
+        "per_stream_tok_per_s": 39,
+        "ttft_ms": { "median": 122, "p99": 349 },
+        "tpot_ms": { "median": 25.3 }
+      },
+      {
+        "concurrency": 100,
+        "request_rate_rps": 17.31,
+        "output_tok_per_s": 2215,
+        "total_tok_per_s": 19938,
+        "per_stream_tok_per_s": 27,
+        "ttft_ms": { "median": 833, "p99": 1573 },
+        "tpot_ms": { "median": 36.8 }
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "domain": "tool_calling",
+      "verdict": "pass",
+      "conditions": { "tool_call_parser": "gemma4", "enable_auto_tool_choice": true, "temperature": 0 },
+      "probes": [
+        { "name": "simple-call", "verdict": "pass", "latency_ms": 166, "observed": "correct tool, inferred optional unit arg from phrasing" },
+        { "name": "result-synthesis", "verdict": "pass", "latency_ms": 140, "observed": "tool result fed back yields clean natural-language answer" },
+        { "name": "no-tool-restraint", "verdict": "pass", "latency_ms": 97, "observed": "answered directly, no spurious call" },
+        { "name": "parallel-calls", "verdict": "pass", "latency_ms": 150, "observed": "both calls emitted in one turn, correct args each" },
+        { "name": "underspecified", "verdict": "pass", "latency_ms": 44, "observed": "asked for the missing city instead of hallucinating a call" }
+      ]
+    },
+    {
+      "domain": "structured_output",
+      "verdict": "partial",
+      "conditions": { "enable_thinking": true },
+      "probes": [
+        { "name": "json_schema-thinking-off", "verdict": "fail", "observed": "free prose with 200 status; strict/guided_json/structured_outputs spellings all unenforced" },
+        { "name": "json_object-thinking-off", "verdict": "partial", "observed": "fenced code block, array instead of object, invented enum value" },
+        { "name": "json_schema-thinking-on", "verdict": "pass", "observed": "exact schema conformance: bare JSON object, typed integer, ASAP mapped to high enum" }
+      ],
+      "notes": "With --reasoning-parser gemma4, grammar enforcement engages only after the reasoning section ends; thinking off means it never engages and unconstrained prose ships with a 200. Keep client-side validation regardless."
+    },
+    {
+      "domain": "reasoning",
+      "verdict": "pass",
+      "conditions": { "enable_thinking": true },
+      "probes": [
+        { "name": "default", "verdict": "not_tested", "observed": "no reasoning traces on any prompt; off by default" },
+        { "name": "enable-thinking", "verdict": "pass", "observed": "parser cleanly splits thinking trace from terse answer; ~2.4x completion tokens" }
+      ]
+    },
+    {
+      "domain": "vision",
+      "verdict": "pass",
+      "conditions": { "limit_mm_per_prompt": { "image": 4, "audio": 1 }, "image_input": "base64 data URI", "temperature": 0 },
+      "probes": [
+        { "name": "describe", "verdict": "pass", "latency_ms": 197, "observed": "two tabby cats, pink surface, remote control identified" },
+        { "name": "count-attributes", "verdict": "pass", "latency_ms": 421, "observed": "2 animals, both cats, remote and blanket identified" },
+        { "name": "scene", "verdict": "pass", "latency_ms": 329, "observed": "bear lying down in grassy outdoor environment" },
+        { "name": "room-inventory", "verdict": "pass", "latency_ms": 874, "observed": "wall-mounted TV, shelving, furniture correctly enumerated" }
+      ],
+      "notes": "~280 prompt tokens per image. Server-side fetching of external image URLs is flaky (intermittent 422s) — base64 data URIs are the reliable path. First multimodal request after boot can 422 while the processor warms; retry once."
+    }
+  ],
+  "memory": {
+    "usable_hbm_gib": 31.24,
+    "weights_gib": 5.75,
+    "kv_cache_gib": 16.3,
+    "workspace_gib": 6,
+    "kv_bytes_per_token": 7680,
+    "resident_kv_tokens": 1100000,
+    "notes": "Measured on a bf16-KV boot at 0.9 utilization (28.12 GiB working set); kv_bytes_per_token/resident_kv_tokens are for the default fp8_e5m2 cache. fp8 vs bf16 KV: 6 of 6 greedy outputs byte-identical."
+  },
+  "startup": {
+    "time_to_healthy_s": 510,
+    "engine_init_s": 404,
+    "compile_s": 329,
+    "notes": "From VM RUNNING: Docker ~60s, image pull ~360s, weights+compile+health ~510s. 200 GB boot disk required; 10 GB default cannot hold the vLLM image."
+  },
+  "cost": {
+    "per_m_output_tokens": [
+      { "operating_point": "saturation", "output_tok_per_s": 2215, "usd": 0.17 },
+      { "operating_point": "c=64", "output_tok_per_s": 2140, "usd": 0.18 },
+      { "operating_point": "c=8", "output_tok_per_s": 1209, "usd": 0.31 },
+      { "operating_point": "single-stream", "output_tok_per_s": 209, "usd": 1.79 }
+    ],
+    "cold_start_usd": 0.24,
+    "comparisons": [
+      {
+        "name": "gemini-2.5-flash-lite",
+        "usd_per_m_output_tokens": 0.40,
+        "source": "https://ai.google.dev/gemini-api/docs/pricing"
+      }
+    ],
+    "notes": "Breakeven vs Flash-Lite at ~940 sustained output tok/s (~c=8 held continuously). A full 4-hour session costs $5.40 and delivers ~30M output tokens at saturation."
+  },
+  "issues": [
+    {
+      "url": "https://github.com/vllm-project/tpu-inference/issues/3225",
+      "summary": "Gemma 4 E2B loader demands per-layer k_norm/v_norm that KV-shared layers legitimately lack; blocks both QAT checkpoint variants",
+      "status": "open"
+    }
+  ],
+  "notes": [
+    "Direct SSH silently times out on some networks even when the VPC allows tcp:22 — use IAP tunneling (gcloud compute ssh --tunnel-through-iap, or start-iap-tunnel for port 8000).",
+    "vLLM auto-selects fp8_e5m2 KV cache on v6e — the largest memory consumer is 8-bit before any weight quantization.",
+    "Capacity planning: run at <=64 concurrent streams; ceiling ~17 req/s at this workload shape; knee between c=32 and c=64."
+  ]
+}

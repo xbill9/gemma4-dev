@@ -19,7 +19,7 @@ Google Cloud's **flex-start** capacity model — TPU chips granted on request, b
 This repo glues that operator into **Claude Code**, so your coding agent can provision, serve, verify, benchmark, and destroy TPU capacity as a natural part of a session. It ships as two things in one repo:
 
 1. A **Model Context Protocol (MCP) server** (`tpu-devops`, a single-file FastMCP app in `server.py`) exposing thirty-one tools.
-2. A **Claude Code skill** (`tpu-management`) that teaches Claude *when* and *how* to use those tools well.
+2. A **Claude Code skill** (`tpu-pytorch-v5e1-12b-management`) that teaches Claude *when* and *how* to use those tools well.
 
 ## Flex-start: TPU capacity with a meter running
 
@@ -58,7 +58,7 @@ Errors come back as `❌ ...` text strings rather than protocol errors, so the a
 
 If MCP is the *hands* (the tools Claude can physically call), a **skill** is the *muscle memory* — a markdown file (`SKILL.md`) plus bundled resources that load into Claude's context and teach it the workflow: which tool to reach for, in what order, with which constraints.
 
-For `tpu-management`, the skill encodes things like:
+For `tpu-pytorch-v5e1-12b-management`, the skill encodes things like:
 
 - **Status first.** `get_system_status` or `list_queued_resources` before creating anything — never provision on top of capacity you already have.
 - The **standard lifecycle**: acquire → wait for ACTIVE → serve → verify → (benchmark) → tear down. Each step names its tool.
@@ -78,7 +78,7 @@ Inside Claude Code, type:
 
 ```
 /plugin marketplace add xbill9/tpu-pytorch-v5e1-12b
-/plugin install tpu-management@tpu-pytorch-v5e1-12b
+/plugin install tpu-pytorch-v5e1-12b-management@tpu-pytorch-v5e1-12b
 ```
 
 This installs the skill **and** auto-registers the MCP server. The plugin manifest carries no project id or credentials (as it should!) — the server reads `GOOGLE_CLOUD_PROJECT`, `MODEL_NAME`, `ACCELERATOR_TYPE`, and friends from your environment, falling back to your active gcloud config.
@@ -109,15 +109,15 @@ From a clone of the repo:
 make init TARGET=/path/to/your/project ARGS='--project <gcp-project-id>'
 ```
 
-This copies the skill into `<project>/.claude/skills/tpu-management/` and merges the `tpu-devops` entry into that project's `.mcp.json` without touching your other servers. Restart Claude Code in the target project, approve the server, done.
+This copies the skill into `<project>/.claude/skills/tpu-pytorch-v5e1-12b-management/` and merges the `tpu-devops` entry into that project's `.mcp.json` without touching your other servers. Restart Claude Code in the target project, approve the server, done.
 
 ### Path D: Zip install (no clone at all)
 
 ```bash
-curl -L -o /tmp/tpu-management-skill.zip \
-  https://github.com/xbill9/tpu-pytorch-v5e1-12b/raw/main/dist/tpu-management-skill.zip
-mkdir -p ~/.claude/skills && unzip -o /tmp/tpu-management-skill.zip -d ~/.claude/skills/
-~/.claude/skills/tpu-management/mcp/project-setup.sh --global   # optional: register the MCP server
+curl -L -o /tmp/tpu-pytorch-v5e1-12b-management-skill.zip \
+  https://github.com/xbill9/tpu-pytorch-v5e1-12b/raw/main/dist/tpu-pytorch-v5e1-12b-management-skill.zip
+mkdir -p ~/.claude/skills && unzip -o /tmp/tpu-pytorch-v5e1-12b-management-skill.zip -d ~/.claude/skills/
+~/.claude/skills/tpu-pytorch-v5e1-12b-management/mcp/project-setup.sh --global   # optional: register the MCP server
 ```
 
 The zip is self-installing: the installer script rides along inside it, so the skill can stand up its own server anywhere.
@@ -192,7 +192,7 @@ If the term is new to you: **"eating your own dog food"** means using your own p
 
 This repo dogfoods itself at every layer:
 
-- The **skill is active inside its own repository** — open Claude Code in a clone and the `tpu-management` skill and `tpu-devops` server are already wired up, so every development session doubles as an integration test.
+- The **skill is active inside its own repository** — open Claude Code in a clone and the `tpu-pytorch-v5e1-12b-management` skill and `tpu-devops` server are already wired up, so every development session doubles as an integration test.
 - The repo's companion deep-dive — *[Gemma 4 E2B on a Single TPU v6e Chip](https://github.com/xbill9/tpu-pytorch-v5e1-12b/blob/main/devto-post.md)* — was **produced with this agent**: the concurrency sweep ran through `run_vllm_benchmark save_result=True`, the boot timeline came off `get_tpu_vm_serial_log`, and the cost table started from `estimate_deployment_cost`. The pipeline promoted in this article is the pipeline that produced its own field data.
 - **The field notes flowed back into the skill.** The boot-disk trap, the IAP workaround, the QAT checkpoints that won't load (filed upstream as [tpu-inference #3225](https://github.com/vllm-project/tpu-inference/issues/3225)) — every one was hit for real during dogfooding, then encoded into `SKILL.md` so Claude sidesteps it next time.
 

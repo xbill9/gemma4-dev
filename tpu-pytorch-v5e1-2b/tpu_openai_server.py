@@ -30,7 +30,9 @@ import urllib.request
 import uuid
 
 METADATA = "http://metadata.google.internal/computeMetadata/v1"
-HF_SECRET_ID = "hf-token"
+# Secret Manager secret holding the Hugging Face token. The startup script fetches it by
+# id at boot, so a rotated or per-project secret only needs this to change.
+HF_SECRET_ID = os.getenv("HF_SECRET_ID", "hf-token")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("tpu_openai_server")

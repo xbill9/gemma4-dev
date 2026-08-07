@@ -1,0 +1,41 @@
+Existing host keys found in /home/xbill/.ssh/google_compute_known_hosts
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1784992442.966188   10997 pjrt_api.cc:119] GetPjrtApi was found for TPU at /usr/local/lib/python3.12/dist-packages/libtpu/libtpu.so
+I0000 00:00:1784992442.978864   10997 tpu_profiler_plugin.cc:712] PyTorch PrivateUse1ProfilerRegistry not found. Native TPU profiling will be disabled (this is expected on PyTorch < 2.12).
+I0000 00:00:1784992443.737456   10997 device_rt.cc:125] PjRt runtime initialization deferred for tpu
+Successfully renamed PrivateUse1 backend to 'tpu'. Device: device(type='tpu')
+Registered Python module for 'tpu'.
+HF token loaded from Secret Manager.
+Device type: tpu, Device index: default
+Initializing TPU distributed runtime
+Loading weights:   0%|          | 0/1951 [00:00<?, ?it/s]Loading weights:  59%|█████▉    | 1153/1951 [00:00<00:00, 11528.09it/s]Loading weights: 100%|██████████| 1951/1951 [00:00<00:00, 11546.23it/s]
+I0000 00:00:1784992447.871534   10997 pjrt_api.cc:168] The PJRT plugin has PJRT API version 0.113. The framework PJRT API version is 0.113.
+I0000 00:00:1784992449.213867   10997 pjrt_c_api_client.cc:201] PjRtCApiClient created.
+Loaded in 6.8s
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/transformers/tokenization_utils_base.py", line 289, in __getattr__
+    return self.data[item]
+           ~~~~~~~~~^^^^^^
+KeyError: 'shape'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/tmp/torchtpu_decode_bench.py", line 118, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/tmp/torchtpu_decode_bench.py", line 63, in main
+    n_prompt = ids.shape[1]
+               ^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/transformers/tokenization_utils_base.py", line 291, in __getattr__
+    raise AttributeError
+AttributeError
+I0000 00:00:1784992453.884201   10997 compilation_cache.cc:345] Compilation cache evicted.
+I0000 00:00:1784992453.884452   10997 compilation_cache.cc:209] CompilationCache final stats: num_cache_reqs=0
+num_cache_hits=0 {NA}
+peak_compilation_memory_bytes=unknown
+
+
+real	0m14.569s
+user	0m14.381s
+sys	0m6.033s

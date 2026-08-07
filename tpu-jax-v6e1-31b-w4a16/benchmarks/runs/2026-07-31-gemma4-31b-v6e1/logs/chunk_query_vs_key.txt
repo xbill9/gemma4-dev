@@ -1,0 +1,12 @@
+Chunked prefill step, total_len=8192, 60 layers, donate_argnums=(1,2), window_kv=False
+v6e-1, gemma-4-31B-it-qat-w4a16-ct, 2026-07-31.  Budget: 31.24 GiB.
+
+chunk   temp required
+  128      32.44 GiB
+  256      32.41 GiB
+ 1024      32.98 GiB
+
+8x range in chunk size -> 1.7% change. The 8192 cliff is driven by the KEY
+(total_len) dimension, not the QUERY dimension that chunking bounds.
+Corollary: capping key extent (windowed KV, 1024 keys for the 50 sliding
+layers) is the lever; chunk-size tuning is not.

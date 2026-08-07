@@ -22,11 +22,14 @@ device="tpu", bfloat16, inputs padded to a multiple of 128, no prints or
 import argparse
 import base64
 import json
+import os
 import time
 import urllib.request
 
 METADATA = "http://metadata.google.internal/computeMetadata/v1"
-HF_SECRET_ID = "hf-token"
+# Secret Manager secret holding the Hugging Face token. The startup script fetches it by
+# id at boot, so a rotated or per-project secret only needs this to change.
+HF_SECRET_ID = os.getenv("HF_SECRET_ID", "hf-token")
 
 
 def _metadata(path: str) -> str:

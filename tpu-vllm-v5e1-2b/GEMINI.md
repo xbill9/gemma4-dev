@@ -47,6 +47,8 @@ The agent relies on several Google Cloud services and Python libraries:
 You can configure the following variables for the MCP server:
 *   `GOOGLE_CLOUD_PROJECT`: Your GCP Project ID (defaults to `aisprint-491218`).
 *   `MODEL_NAME`: The model identifier used by vLLM (defaults to `google/gemma-4-E2B-it`).
+*   `MCP_SERVER_NAME`: Name this server advertises, and the key it must be registered under — it prefixes
+    every tool as `mcp__<name>__find_tpu` (defaults to the rig directory name, `tpu-vllm-v5e1-2b`).
 
 ## Technical Standards
 -   **vLLM API:** OpenAI-compatible endpoint at `/v1/chat/completions`.

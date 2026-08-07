@@ -2,7 +2,10 @@
 
 **Run:** 2026-07-25 · `vllm-sweep-vm` (ct6e-standard-1t, flex-start, europe-west4-a, `comglitn`), deleted after collection
 **Matrix:** 3 models × 7 concurrency levels {1,2,4,8,16,32,64} × 13 context lengths {8…65536}, output 128 tok/cell, greedy (`--ignore-eos`)
-**Coverage: 252 measured cells, 0 failed, 42 infeasible-by-hardware** (recorded, not silently skipped). Full matrices in [`tables.md`](tables.md), raw JSONs in `results/`, per-cell logs on request from `sweep-main.tgz`/`sweep-fixup.tgz`.
+**Coverage: 245 measured cells, 0 failed, 28 infeasible-by-hardware** (recorded, not silently skipped) — 273 cells total, matching the 3 × 13 × 7 matrix above.
+
+> **Corrected 2026-08-06.** Previously "252 measured, 0 failed, 42 infeasible", which totals 294 — more cells than the matrix contains. The 42 came from counting `.skip` marker files, 14 of which are stale: `sweep_64k_fixup.sh` later measured the e2b and e4b 65536-context rows and left the original `.skip` markers beside the new `.json` results. `aggregate.py` always resolved that correctly, so `tables.md` and `summary.json` were right — only this hand-written line was wrong.
+ Full matrices in [`tables.md`](tables.md), raw JSONs in `results/`, per-cell logs on request from `sweep-main.tgz`/`sweep-fixup.tgz`.
 
 ## 1. The chip decides what each model is
 

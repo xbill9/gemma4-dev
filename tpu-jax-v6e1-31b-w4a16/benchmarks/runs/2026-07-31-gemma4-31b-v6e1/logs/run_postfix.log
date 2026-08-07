@@ -1,0 +1,68 @@
+============================================================================================
+GEMMA 4 31B QAT — pure-JAX E-series engine on [TpuDevice(id=0, process_index=0, coords=(0,0,0), core_on_chip=0)]
+============================================================================================
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+--- resolved config -------------------------------------------
+  hidden_size                            5376   ok
+  intermediate_size                     21504   ok
+  num_hidden_layers                        60   ok
+  num_attention_heads                      32   ok
+  num_key_value_heads                      16   ok
+  num_global_key_value_heads                4   ok
+  head_dim                                256   ok
+  global_head_dim                         512   ok
+  sliding_window                         1024   ok
+  num_kv_shared_layers                      0   ok
+  hidden_size_per_layer_input               0   ok
+  attention_k_eq_v                       True   ok
+  logit_softcapping                      30.0   ok
+  rope_theta                          10000.0   ok
+  global_rope_theta                 1000000.0   ok
+  layer_types                      50 sliding / 10 full
+  first_kv_shared_layer_idx                60
+
+--- load ------------------------------------------------------
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2674.09it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+  load time                 7.0 s
+  weight bytes            19.36 GB
+  HBM in use              19.30 GB
+  HBM limit               33.55 GB
+  headroom                14.25 GB (42.5%)
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+
+--- parity ----------------------------------------------------
+  formatted prompt: '<bos><|turn>user\nWhat is the capital of France?<turn|>\n<|turn>model\n<|channel>thought\n<channel|>'
+  stop tokens: [1, 106]
+  [templated]   20 prompt tok -> 'The capital of France is Paris.'
+              44.7s wall (incl. compile), prefill 25527.0 ms, decode 0.4 tok/s
+  [bare     ]    7 prompt tok -> '\n<|channel>thought\n<channel|>The capital of France is Paris.'
+              1.3s wall (incl. compile), prefill 216.0 ms, decode 13.0 tok/s
+
+--- sweep -----------------------------------------------------
+  B= 1 | ctx=   1K ... prefill     294.9 ms | step   78.309 ms | agg    12.8 tok/s | per-user   12.8 tok/s
+  B= 1 | ctx=   2K ... prefill     481.9 ms | step   78.263 ms | agg    12.8 tok/s | per-user   12.8 tok/s
+  B= 1 | ctx=   4K ... prefill    1065.3 ms | step   78.412 ms | agg    12.8 tok/s | per-user   12.8 tok/s
+  B= 1 | ctx=   8K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 1 | ctx=  16K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 2 | ctx=   1K ... prefill     460.1 ms | step  129.185 ms | agg    15.5 tok/s | per-user    7.7 tok/s
+  B= 2 | ctx=   2K ... prefill     856.4 ms | step  130.122 ms | agg    15.4 tok/s | per-user    7.7 tok/s
+  B= 2 | ctx=   4K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 2 | ctx=   8K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 2 | ctx=  16K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+
+| Users (B) | Context (S) | Prefill (TTFT) | Decode Step | Aggregate | Per-User |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | 1K | 294.9 ms | 78.31 ms | 12.8 tok/s | 12.8 tok/s |
+| 1 | 2K | 481.9 ms | 78.26 ms | 12.8 tok/s | 12.8 tok/s |
+| 1 | 4K | 1065.3 ms | 78.41 ms | 12.8 tok/s | 12.8 tok/s |
+| 1 | 8K | FAILED | — | — | — |
+| 1 | 16K | FAILED | — | — | — |
+| 2 | 1K | 460.1 ms | 129.19 ms | 15.5 tok/s | 7.7 tok/s |
+| 2 | 2K | 856.4 ms | 130.12 ms | 15.4 tok/s | 7.7 tok/s |
+| 2 | 4K | FAILED | — | — | — |
+| 2 | 8K | FAILED | — | — | — |
+| 2 | 16K | FAILED | — | — | — |
+
+Wrote gemma4_31b_postfix.json

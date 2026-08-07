@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Refresh the bundled tpu-management skill snapshots from the repo-root sources.
+"""Refresh the bundled skill snapshots from the repo-root sources.
 
 Regenerates:
-  .claude/skills/tpu-management/mcp/server.py              from  server.py
-  .claude/skills/tpu-management/mcp/project-setup.sh       from  project-setup.sh
-  .claude/skills/tpu-management/references/tpu-guide.md
+  .claude/skills/<skill>/mcp/server.py              from  server.py
+  .claude/skills/<skill>/mcp/project-setup.sh       from  project-setup.sh
+  .claude/skills/<skill>/references/tpu-guide.md
                                                             from  tpu.md
                                                             (base64 screenshots stripped)
 
@@ -12,13 +12,17 @@ SKILL.md and mcp/startup_script_template.sh
 are hand-maintained and left alone.
 """
 
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SKILL = ROOT / ".claude" / "skills" / "tpu-management"
+# Skill name carries the rig directory so sibling rigs do not collide on one
+# ~/.claude/skills/<name>; the Makefile passes the same value.
+SKILL_NAME = os.getenv("SKILL_NAME", f"{ROOT.name}-management")
+SKILL = ROOT / ".claude" / "skills" / SKILL_NAME
 
 IMAGE_DEF = re.compile(r"^\[image\d+\]: <data:image/[^;]+;base64,")
 

@@ -1,0 +1,28 @@
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+
+=== DYNAMIC: where does the magnitude actually land? ===
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2573.98it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+
+  prompt (20 tokens): ['<bos>', '<|turn>', 'user', '\n', 'What', ' is', ' the', ' capital', ' of', ' France', '?', '<turn|>', '\n', '<|turn>', 'model', '\n', '<|channel>', 'thought', '\n', '<channel|>']
+
+  layer    type     max|h|  ratio_to_med  at pos          token     ch
+      0    slid        860         329.6       1      '<|turn>'   3970
+      1    slid      243.5         153.9       0        '<bos>'   1999
+      2    slid        281        2217.1       0        '<bos>'   1682
+      3    slid      499.6        4458.5       0        '<bos>'   1682
+     10    slid      788.2        2677.6       0        '<bos>'   1682
+     20    slid      185.1         599.7       1      '<|turn>'   2491
+     30    slid      403.6         516.8       5          ' is'   3770
+     40    slid      198.5         552.6       1      '<|turn>'   3770
+     50    slid      169.8         209.9       1      '<|turn>'   3770
+     58    slid      104.3         361.2       6         ' the'   3067
+     59    full      18.33          31.7       4         'What'   3069
+
+  token position holding the max, over 60 layers: pos1 ('<|turn>') x32, pos0 ('<bos>') x15, pos5 (' is') x5, pos6 (' the') x5
+  channel holding the max: ch3770 x23, ch1682 x11, ch2130 x7, ch3067 x5
+  max/median ratio: mean 1214.5, peak 15664.7 at layer 7
+  mean |h| at position 0: 1.199   at positions 1..19: 0.8988   (1.3x)
+
+Wrote gemma4_31b_massive_act_dyn.json

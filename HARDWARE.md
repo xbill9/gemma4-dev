@@ -100,6 +100,25 @@ buy decode throughput. It is the way to buy context. What runs out on v5e is mem
 above. Take 31.24 GiB total as the firm number and re-measure the split for another model or context
 length.
 
+#### 31.24 GiB and 33.55 GB are the same number
+
+This repo quotes both. **XLA prints GiB and `memory_analysis()` returns bytes**, so `31.24G` in an OOM
+message is 31.24 **GiB** = 33.55 GB — the figure the JAX-engine reports for the 12B/26B/31B all use.
+Mixing the two produced a wrong ratio (3.70x instead of 3.98x) that disagreed with an independent
+measurement until the units were fixed. Same trap as the GiBps/GBps row above, one level down.
+
+Two further cautions when reading memory on this chip, both from the 31B work
+(`tpu-jax-v6e1-31b-w4a16/docs/gemma4-31b-quirks.md` §C):
+
+- **XLA compares *temporaries alone* against the whole chip** and does not subtract resident weights.
+  `available HBM (31.24G)` in an error message is not headroom.
+- **`peak_bytes_in_use` does not capture intra-call transients** — it returned exactly `bytes_in_use`
+  on every sample. A resident-memory series cannot be used to infer peak; call `memory_analysis()` on
+  the compiled executable, which predicted every pass/fail exactly.
+- **An HLO instruction's output shape says nothing about allocation.** Ranking instructions by output
+  size suggested the 31B's `f32[262144,5376]` lm_head (5.637 GB) was the temp floor; the decode step
+  contains the same three instructions at a total temp of 0.146 GB. They are fused, not materialized.
+
 ## Spelling: v5e is `v5litepod` to gcloud, v6e is just `v6e`
 
 | Context | v5e single chip | v6e single chip |
@@ -124,9 +143,69 @@ sibling's.
 
 ## Other targets in this monorepo
 
-- **inf2** — AWS Inferentia2, served by `tpu-pytorch-inf2-2b`. Takes platform slot `tpu` per `NAMING.md`
-  (a dedicated inference accelerator on a VM), with the part in the hardware slot. Specs and native
-  format support are **not recorded here** — nobody has verified them. Don't infer them from the TPU
-  rows above.
 - **v6e-1** — several benchmark artifacts in this repo were measured on v6e and travelled with forks.
   A report's hardware short-name is the hardware *measured*, not the rig hosting the file.
+
+## inf2 — AWS Inferentia2
+
+Served by `tpu-pytorch-inf2-2b`. Takes platform slot `tpu` per `NAMING.md` (a dedicated inference
+accelerator on a VM), with the part in the hardware slot.
+
+Measured on `inf2.xlarge`, 2026-07-31/08-01, with jax 0.6.2 / jax-neuronx 0.6.2.1.0.6446 /
+neuronx-cc 2.24.8799.0 / Neuron runtime 2.31.24. Full workings in
+`tpu-pytorch-inf2-2b/docs/neuron-jax-quirks.md`.
+
+| Spec | Value | How known |
+| :--- | ---: | :--- |
+| HBM **per NeuronCore** | **16 GiB** | `hbm_limit_bytes` = 17,179,869,184, reported identically whether one core or two is visible |
+| HBM per chip | 32 GB | 16 GiB × 2 cores |
+| NeuronCores per `inf2.xlarge` | 2 | |
+| HBM bandwidth | ~820 GB/s | published, **not calibrated here** — used only as an order-of-magnitude bound |
+
+**The 16 GiB is per core, not a pool.** `NEURON_RT_NUM_CORES=1` therefore withholds a *device*, not
+memory — a single-device engine always had its 16 GiB. Setting it to 2 cut parameter load from 263.0 s
+to **68.8 s (3.8x)** and exposed the second core, but changed serving latency not at all: a visible
+device that a single-device engine never targets cannot help.
+
+A second process can claim the other core with `NEURON_RT_VISIBLE_CORES=1`, which is useful for
+probing a live deployment. With `NEURON_RT_NUM_CORES=2` the server claims both and that stops working.
+
+### Native format support: worse than the TPU rows above, not better
+
+**There is no compressed-compute path at all.** `_CAPS.pallas` is `False`, so a fused W4A16 kernel
+cannot lower — neuronx-cc will not accept Mosaic — and the W4A16 implementation is forced to
+`"reference"`, which **materializes a dense BF16 copy of every weight before the matmul**:
+
+| variant | s/call | compile s |
+| :--- | ---: | ---: |
+| W4A16 reference (dequantize + matmul) | **0.027** | 39.5 |
+| dense BF16 matmul | **0.001** | 3.9 |
+
+**27x per call, 10x compile.** So on this part 4-bit weights are *stored* compressed and *read* dense,
+and it happens silently — the loud fallback warning only fires when `"auto"` or `"fused"` degrades at
+runtime, and the default is already `"reference"`.
+
+**Buffer donation also fails at runtime**, removing the lever that keeps a large argument in place on
+TPU. Do not "fix" that by closing over the parameters instead: measured, that is strictly worse — JAX
+captures them as lowering constants and parks the whole tree in host RAM permanently.
+
+### Three failure modes with no TPU equivalent
+
+1. **A too-large gather returns zeros, not an error.** Above roughly 4–5 GB in a single device tensor,
+   a gather that "ran" can yield an all-zero result and execution continues. Zero logits make `argmax`
+   return token 0 — the pad id, which is in the EOS set — so the server returns a clean `200 OK` with
+   `finish_reason: "stop"` and **zero completion tokens**. Nothing in the response, the logs or
+   `/metrics` indicates a fault. The same gather is exactly correct at every geometry that fits
+   (0.81 GB `embed_tokens` included). **The gather primitive is fine; the allocation is not.** Check a
+   norm, never a shape.
+2. **Eager ops invoke the compiler at runtime.** A bare `jnp.full` reaches `RunNeuronCCImpl` — the
+   first symptom was `FileNotFoundError: 'neuronx-cc'` raised from an array *construction*. Fixed
+   shapes are cached and free; a **new** shape costs ~3.9 s per call. Anything shape-varying in a
+   per-token path is a compile per token.
+3. **Per-buffer dispatch has a cliff above ~128 buffers.** At a constant 2.05 GB total split across N
+   arrays: 8 arrays → 0.008 s/call, 128 → 0.008, **512 → 0.418**. A 52x jump at identical total bytes.
+   A Gemma 4 E2B parameter pytree has several hundred leaves and sits past the cliff.
+
+**Do not carry TPU intuition here.** Sizes and dtypes matter in ways they do not on TPU, and the
+platform announces itself with `Platform 'neuron' is experimental and not all JAX functionality may be
+correctly supported!` — and then means it.

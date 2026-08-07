@@ -74,15 +74,64 @@ was given, so `find_tpu`'s zone sweep is safe. Keep that split.
 **`tpu_zones_status.md` is mutable state, not documentation.** `find_tpu` rewrites it in place to record which
 zones have failed, and reads it back to skip known-bad zones. Do not hand-edit it as if it were docs.
 
-**Endpoint discovery is dynamic.** `discover_vllm_url()` lists queued resources in `ZONE`, takes the first
-`ACTIVE` one, resolves its node and external IP, and builds `http://{ip}:8000`. Never hardcode an endpoint —
-the IP changes every time the Queued Resource is recreated. Use the `get_vllm_endpoint` tool.
+**Endpoint discovery is dynamic, and provisioning-path agnostic.** `_discover_vllm_node()` lists **TPU VM
+nodes** in `ZONE` — not queued resources — because both provisioning paths end at a node in that same
+namespace: a Queued Resource creates one indirectly, and `make deploy-tpu-spot` / any hand-provisioned VM
+creates one with no QR behind it at all. It ranks candidates (this rig's names first, then `READY`, then
+QR-backed), probes each on `/v1/models`, and returns the first that answers, as
+`VllmNode(name, url, serving)`; `discover_vllm_url()` is the thin wrapper. Never hardcode an endpoint — the
+IP changes every time the node is recreated. Use the `get_vllm_endpoint` tool.
 
-**The Makefile's TPU targets are a separate, hand-provisioned path.** `make endpoint` / `status` / `benchmark`
-/ `query` all `describe` a tpu-vm named `$(SERVICE_NAME)` = `tpu-2B-v5e1-devops-agent`. Every MCP tool
-defaults to `resource_id="vllm-gemma4-qr"`, whose node is `vllm-gemma4-qr-node`. The names don't match, so
-those targets will not find an agent-provisioned Queued Resource. Go through the MCP tools for anything the
-agent deployed.
+Two rules fall out of sibling rigs sharing this zone: a node of **ours** that is up but not yet answering is
+returned with `serving=False` so callers can poll it while vLLM boots, and a node that is **not** ours is
+never returned unless a probe confirmed it is serving. That second rule is stricter than the old code, which
+would hand back the first `ACTIVE` QR in the zone even if it belonged to the jax or pytorch rig.
+
+Until 2026-08-06 discovery listed queued resources only, so a healthy hand-provisioned spot VM
+(`tpu-2B-v5e1-devops-agent`, the pre-rename node) reported as "No ACTIVE Queued Resource found" and every
+query tool refused to run against a TPU that was serving fine.
+
+**`_resolve_node_id()` is the matching fix for the SSH-based tools** (`manage_vllm_docker`,
+`run_vllm_benchmark`, `get_vllm_docker_logs`, `get_tpu_system_logs`). It tries the queued resource's node,
+then a TPU VM named exactly `resource_id` or `<resource_id>-node`, then — last resort — the node that
+discovery confirmed is serving vLLM, so the default `resource_id` still reaches a deployment whose node was
+named by an earlier convention. `_get_node_id()` remains the QR-only primitive; don't call it directly from a
+tool.
+
+**Resource names are derived from the rig directory.** `RIG_NAME` in `server.py` is
+`os.path.basename(...)` of the rig directory; `RESOURCE_ID` defaults to it and is the default `resource_id`
+of every MCP tool, and the Makefile's `SERVICE_NAME` is `$(notdir $(CURDIR))`. So in this directory both
+resolve to `tpu-vllm-v5e1-2b`. `RIG_NAME` also supplies the default `MCP_SERVER_NAME`, which names the
+FastMCP server. Nothing here reads a *slot* out of
+the directory — that is still forbidden (`v5e1` never becomes a gcloud flag); it reads the whole name as an
+identifier, which is what keeps sibling rigs off each other's capacity in a shared project and zone.
+
+The derivation is a default, not a lock: `RESOURCE_ID` in `tpu.env` (or the environment), `MCP_SERVER_NAME`
+in either, and `SERVICE_NAME`
+on the make command line all win. **Renaming the rig directory orphans anything already provisioned** —
+the tools will look for the new name and the old resource keeps billing. Pin the old name in `tpu.env`
+before renaming, or destroy first.
+
+**The MCP server name has to match the key the client registers it under**, because that key is what
+prefixes every tool: `mcp__tpu-vllm-v5e1-2b__find_tpu`. All six rigs used to register as `tpu-devops`, so a
+tool call was ambiguous whenever more than one was loaded, and a user-scope `tpu-devops` shadowed this rig
+entirely (it has no committed `.mcp.json`). `mcp_config.json` is the committed example of the entry;
+`make mcp-config` writes a real `.mcp.json` using `MCP_SERVER_NAME` (default `$(notdir $(CURDIR))`), merging
+into any existing file rather than replacing it. `.mcp.json` is gitignored at the monorepo root.
+
+Note the ordering constraint in `server.py`: `load_dotenv` now runs *before* `FastMCP(...)` is constructed,
+because `MCP_SERVER_NAME` set in `tpu.env` would otherwise arrive too late to name the server. Don't move
+the FastMCP construction back above the dotenv block.
+
+**The Makefile's TPU targets are still a separate, hand-provisioned path.** `make endpoint` / `status` /
+`benchmark` / `query` all `describe` a tpu-vm named `$(SERVICE_NAME)` = `tpu-vllm-v5e1-2b`, while the MCP
+tools manage a Queued Resource of the same name whose *node* is `tpu-vllm-v5e1-2b-node`. Those are two
+different TPU nodes, so the make targets still will not find an agent-provisioned Queued Resource — the names
+are now merely related instead of unrelated. Go through the MCP tools for anything the agent deployed.
+
+VMs created before this change are named `tpu-2B-v5e1-devops-agent` and the pre-existing Queued Resource id
+was `vllm-gemma4-qr`; reach them with `make status SERVICE_NAME=tpu-2B-v5e1-devops-agent` or by passing
+`resource_id` explicitly.
 
 **Raw `/v1/completions` returns an empty completion on `-it` models.** `make query` and
 `benchmarking_suite.py` use it, so an empty result there is expected, not a broken deploy. `server.py`
@@ -101,6 +150,40 @@ zone (all 44 have it) says nothing about this — the provisioning model is the 
 default `ZONE` of `europe-west4-a` cannot ever provision this rig; export `GOOGLE_CLOUD_ZONE=us-west4-a`.
 The skill's reference guide lists `europe-west4-b` as flex-start-capable for v5e, but its example uses
 `v5litepod-4` — the single-chip shape is narrower than the table suggests.
+
+**The Queued Resource path takes three provisioning models.** `_provisioning_flags()` in `server.py` is the
+one place that maps `flex-start` / `spot` / `on-demand` to gcloud flags; every creation tool
+(`create_tpu_queued_resource`, `manage_queued_resource`, `find_tpu`) takes a `provisioning_model` argument
+defaulting to `PROVISIONING_MODEL` in `tpu.env`. Two things do not generalize across them:
+
+- **Only flex-start passes `--max-run-duration`** — gcloud documents that flag as flex-start-only. A spot or
+  on-demand node has no automatic stop and bills until it is preempted or destroyed. `--valid-until-duration`
+  bounds the *request*, not the run, so it is shared by all three.
+- **Spot is metered by a different quota**, `TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI`
+  (`TPU_SPOT_QUOTA_ID`), not `TPU_QUOTA_ID`. `find_tpu` and `get_zones_with_available_quota` pick the id from
+  the provisioning model, so don't pass `quota_id` explicitly unless you mean to override that.
+
+`tpu_zones_status.md` rows now carry a `[model]` prefix in the detail column and `find_tpu` only skips a zone
+whose recorded failure was under the *same* model — a zone that rejects flex-start is not evidence about spot,
+which is the whole reason spot exists here. Untagged rows predate this and read as flex-start.
+
+The Makefile's separate hand-provisioned `tpu-vm` path has its own knob, `TPU_PROVISIONING_MODEL`
+(`standard` | `spot` | `reservation-bound` — gcloud's vocabulary there, with no flex-start), surfaced as
+`make deploy-tpu-spot` / `make deploy-tpu-ondemand`. Don't confuse the two spellings.
+
+**`estimate_deployment_cost` reads live pricing — never reintroduce a rate table.** It queries the Cloud
+Billing Catalog API (Compute Engine service `6F81-5844-456A`, where TPU SKUs live), matching on region,
+`usageType`, and a description pattern per provisioning model. The previous hardcoded table said v5e was
+$0.12/chip-hr against a $1.20 list rate — wrong by 10x, and undetectable from inside the code. If no SKU
+matches, the tool says so rather than falling back to a guess; keep that property. Requires a working
+`gcloud auth print-access-token` and the Cloud Billing API enabled.
+
+Two naming traps in the catalog: flex-start is sold as **"DWS Defined Duration"** (Dynamic Workload
+Scheduler) and drops the `Tpu` prefix (`DWS Defined Duration V5e`), and spot is `usageType: Preemptible`
+spelled `TpuV5e attached to Spot Preemptible VMs`. The `Reserved …` and `Commitment v1: …` SKUs describe the
+same chip in the same region and two of them are also `OnDemand`, so the patterns are anchored with `^`.
+A price existing does not mean capacity is obtainable — `europe-west4` quotes a flex-start v5e rate while
+still rejecting `v5litepod-1` at the API.
 
 **`tpu.env` is the single source of truth for deployment parameters.** Project, region, zone, model,
 accelerator type, and tensor-parallel size are defined once there and consumed by `server.py` (via
@@ -130,7 +213,8 @@ login` (ADC, for the `google-cloud-secret-manager` client). `set_env.sh` must be
 
 Env vars `server.py` reads: `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_ZONE`, `GOOGLE_CLOUD_REGION`, `MODEL_NAME`,
 `ACCELERATOR_TYPE`, `TPU_RUNTIME_VERSION`, `TPU_QUOTA_ID`, `TENSOR_PARALLEL_SIZE`, `LOCAL_DOCKER_IMAGE`,
-`MAX_MODEL_LEN`, `MAX_NUM_BATCHED_TOKENS`, `LIMIT_MM_PER_PROMPT`, `TPU_NETWORK`, `TPU_SUBNETWORK`. The HF
+`MAX_MODEL_LEN`, `MAX_NUM_BATCHED_TOKENS`, `LIMIT_MM_PER_PROMPT`, `TPU_NETWORK`, `TPU_SUBNETWORK`,
+`RESOURCE_ID` and `MCP_SERVER_NAME` (both default to the rig directory name). The HF
 token lives in GCP Secret Manager under the secret id `hf-token` — never log, return, or commit it.
 
 `TPU_NETWORK` / `TPU_SUBNETWORK` default to empty, which means gcloud uses the project's default network.
@@ -154,8 +238,27 @@ This rig was forked out of `/home/xbill/gemma4-queens`, which is still a separat
 `-devops-agent` naming. Nothing here is shared with it any more — don't look for this project's history
 there.
 
-Committed benchmark artifacts (`*.png` plots, `benchmark_results.*`, `grid_benchmark_results.csv`) are
-intentionally tracked. Don't regenerate or delete them unless asked.
+Committed benchmark artifacts are intentionally tracked. Don't regenerate or delete them unless asked.
+They no longer sit at the rig root — as of 2026-08-06 they live under `benchmarks/runs/<date>-<what>-<hw>/`,
+moved with `git mv` so history follows:
+
+| Run dir | What |
+|---|---|
+| `2026-08-06-vllm-sweep-v5e1` | This rig's first conformant run — 12 measured + 4 infeasible cells, schema 1.1 report in `benchmarks/reports/` |
+| `2026-08-05-vllm-sweep-v5e1` | 4 × 5 sweep, real numbers but no recorded engine version — no report JSON, deliberately |
+| `2026-04-28-vllm-concurrency-v6e1` | 5-point concurrency run; the only legacy artifact that records its own date |
+| `undated-vllm-grid-a-v6e1`, `-b-` | **Two different** 156-cell grids over the same matrix, ~4× apart, neither dated. Not interchangeable — see their REPORT.md files |
+
+The rig-root scripts that *read* those files were repointed at the new paths. Scripts that *write*
+(`run_sweep.py`, `run_grid_benchmark.py`, `run_fast_sweep.py`, `benchmarking_suite.py --output`,
+`plot_grid_benchmark.py`) still use bare filenames in the CWD on purpose: pinning a writer at an
+archived run dir would overwrite a recorded measurement. File new output into a new dated run dir.
+
+`benchmarks/serving-report.schema.json`, `benchmarks/README.md`, and `benchmarks/INDEX.md` are all
+generated or synced from the monorepo root — see the root `CLAUDE.md`. Don't hand-edit them here.
+
+`mypy` excludes `benchmarks/runs/` (`pyproject.toml`): each run dir carries its own `aggregate.py`,
+and the shared module name is a fatal collision that aborts the whole mypy run. ruff still covers them.
 
 `AGENTS.md` in this directory is maintained by a different tool and overlaps with this file — if you change a
 convention here, check whether it needs the same change there. It has already drifted on two points: it claims

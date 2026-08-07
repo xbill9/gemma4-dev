@@ -1,0 +1,59 @@
+{
+  "jax_version": "0.9.2",
+  "device": "NeuronCore(id=0, process_index=0, local_id=0)",
+  "platform": "neuron",
+  "trivial_on_cpu": "0",
+  "shape": {
+    "out_features": 256,
+    "packed_k": 32,
+    "in_features": 256
+  },
+  "first_diverging_stage": null,
+  "stages": [
+    {
+      "stage": "identity",
+      "description": "int32 round trip (control)",
+      "elements": 8192,
+      "mismatched": 0,
+      "match_rate": 1.0,
+      "max_abs_err": 0.0,
+      "passed": true
+    },
+    {
+      "stage": "shift",
+      "description": "signed int32 arithmetic right shift",
+      "elements": 65536,
+      "mismatched": 0,
+      "match_rate": 1.0,
+      "max_abs_err": 0.0,
+      "passed": true
+    },
+    {
+      "stage": "shift_mask",
+      "description": "shift then & 0xF -> nibble value",
+      "elements": 65536,
+      "mismatched": 0,
+      "match_rate": 1.0,
+      "max_abs_err": 0.0,
+      "passed": true
+    },
+    {
+      "stage": "to_bf16",
+      "description": "nibble -> bfloat16, minus 8 (zero point)",
+      "elements": 65536,
+      "mismatched": 0,
+      "match_rate": 1.0,
+      "max_abs_err": 0.0,
+      "passed": true
+    },
+    {
+      "stage": "full",
+      "description": "qat_w4a16_unpack_dequant_jax (with group scale)",
+      "elements": 65536,
+      "mismatched": 0,
+      "match_rate": 1.0,
+      "max_abs_err": 0.0018170475959777832,
+      "passed": true
+    }
+  ]
+}

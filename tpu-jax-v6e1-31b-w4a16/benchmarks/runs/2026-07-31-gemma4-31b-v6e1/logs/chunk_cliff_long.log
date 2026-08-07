@@ -1,0 +1,49 @@
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2588.01it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+
+full 60-layer model, chunk=256, window_kv=False
+
+  total_len  donate        KV    step temp
+       8192   False    7.38 GB   OOM 38.99G
+       8192    True    7.38 GB   OOM 32.41G
+Traceback (most recent call last):
+  File "/home/xbill/tpu-jax-31b/ports/gemma4/jax_31b_chunk_cliff.py", line 116, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/xbill/tpu-jax-31b/ports/gemma4/jax_31b_chunk_cliff.py", line 88, in main
+    r = measure(eng.model, eng.params, eng.config, T, args.chunk, donate)
+  File "/home/xbill/tpu-jax-31b/ports/gemma4/jax_31b_chunk_cliff.py", line 48, in measure
+    caches = init_kv_cache(cfg, batch_size=1, max_seq_len=total_len,
+                           dtype=jnp.bfloat16, window_kv=False)
+  File "/home/xbill/tpu-jax-31b/ports/gemma4/jax_e_model.py", line 1059, in init_kv_cache
+    entry = (jnp.zeros(k_shape, dtype=dtype), jnp.zeros(v_shape, dtype=dtype))
+                                              ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/numpy/array_creation.py", line 95, in zeros
+    return lax.full(shape, 0, dtype, sharding=sharding)
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/lax/lax.py", line 3640, in full
+    return broadcast(fill_value, shape)
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/lax/lax.py", line 2872, in broadcast
+    return broadcast_in_dim(operand, tuple(sizes) + np.shape(operand), dims,
+                            out_sharding=out_sharding)
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/lax/lax.py", line 2938, in broadcast_in_dim
+    return broadcast_in_dim_p.bind(
+           ~~~~~~~~~~~~~~~~~~~~~~~^
+        operand, shape=tuple(shape),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        broadcast_dimensions=tuple(broadcast_dimensions), sharding=out_sharding)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/core.py", line 727, in bind
+    return self.bind_with_trace(prev_trace, args, avals, params)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/core.py", line 735, in bind_with_trace
+    return trace.process_primitive(self, args, params)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/core.py", line 1316, in process_primitive
+    return primitive.impl(*args, **params)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/dist-packages/jax/_src/dispatch.py", line 88, in apply_primitive
+    outs = fun(*args)
+ValueError: RESOURCE_EXHAUSTED: E0100: RuntimeBufferAllocationFailure:
+Error allocating device buffer: Attempting to allocate 128.00M. That was not possible. There are 22.40M free.; (0x0x0_HBM0)
+See https://openxla.org/xla/errors/error_0100 for more details. [type.googleapis.com/pjrt.OOM='']

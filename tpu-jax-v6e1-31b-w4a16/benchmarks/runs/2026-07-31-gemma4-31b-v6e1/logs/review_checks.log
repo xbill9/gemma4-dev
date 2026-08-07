@@ -1,0 +1,31 @@
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2595.75it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+
+============================================================================================
+CHECK 1 — logits_at bitwise equality, TPU + W4A16 + real weights
+============================================================================================
+  B=1 S=  512  bitwise=False  max|diff|=3.702e-02  differing=262143/262144  same_argmax=True
+  B=1 S= 1024  bitwise=False  max|diff|=3.696e-02  differing=262138/262144  same_argmax=True
+  B=2 S= 1024  bitwise=False  max|diff|=5.722e-06  differing=385150/524288  same_argmax=True
+
+============================================================================================
+CHECK 2 — does the decode step materialize f32[262144,5376]?
+============================================================================================
+  decode step temp: 0.146 GB
+  f32[262144,5376] instructions : 3  (16.911 GB aggregate)
+  bf16[262144,5376] instructions: 3
+  largest buffers in the decode step:
+        5.637 GB  broadcast      f32[262144,5376]
+        5.637 GB  convert        f32[262144,5376]
+        5.637 GB  multiply       f32[262144,5376]
+        2.819 GB  parameter      bf16[262144,5376]
+        2.819 GB  parameter      bf16[262144,5376]
+        2.819 GB  parameter      bf16[262144,5376]
+        0.462 GB  broadcast      f32[21504,672,8]
+        0.462 GB  broadcast      s32[21504,672,8]
+        0.462 GB  broadcast      s32[21504,672,8]
+        0.462 GB  shift-right-arithmetic s32[21504,672,8]
+        0.462 GB  broadcast      s32[21504,672,8]
+        0.462 GB  and            s32[21504,672,8]
+
+Wrote gemma4_31b_review_checks.json

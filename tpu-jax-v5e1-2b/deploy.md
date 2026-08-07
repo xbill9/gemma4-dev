@@ -37,7 +37,7 @@ as a **flex-start GCE instance** via **JAX**.
 
 ### Via the MCP agent (preferred)
 
-The `tpu-devops` server defaults to this shape (`ACCELERATOR_TYPE=v5e-1`,
+The `tpu-jax-v5e1-2b` server defaults to this shape (`ACCELERATOR_TYPE=v5e-1`,
 `TENSOR_PARALLEL_SIZE=1`, `GOOGLE_CLOUD_ZONE=us-west4-a`):
 
 ```

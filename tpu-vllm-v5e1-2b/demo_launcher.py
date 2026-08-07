@@ -3,6 +3,8 @@
 import asyncio
 
 from server import (
+    MODEL_NAME,
+    RESOURCE_ID,
     analyze_cloud_logging,
     get_vllm_deployment_config,
     get_vllm_endpoint,
@@ -30,8 +32,8 @@ async def devops_demo():
     # Step 3: Deployment Config & TPU instructions
     print("\n[Step 3] Generating TPU v5e (v5litepod) Deployment Config...")
     config = await get_vllm_deployment_config(
-        service_name="tpu-2B-v5e1-devops-agent",
-        model_name="google/gemma-4-E2B-it",
+        service_name=RESOURCE_ID,
+        model_name=MODEL_NAME,
     )
     print(config)
 

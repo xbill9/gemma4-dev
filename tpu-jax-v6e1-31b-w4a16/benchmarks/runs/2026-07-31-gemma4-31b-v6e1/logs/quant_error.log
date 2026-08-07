@@ -1,0 +1,57 @@
+
+=== CONTROL: do the unquantized tensors match? ===
+
+  norm.weight                                    identical=True  rel_max=0.000e+00
+  layers.0.input_layernorm.weight                identical=True  rel_max=0.000e+00
+  layers.0.post_attention_layernorm.weight       identical=True  rel_max=0.000e+00
+  layers.0.pre_feedforward_layernorm.weight      identical=True  rel_max=0.000e+00
+  layers.0.post_feedforward_layernorm.weight     identical=True  rel_max=0.000e+00
+  layers.0.layer_scalar                          identical=True  rel_max=0.000e+00
+  layers.30.input_layernorm.weight               identical=True  rel_max=0.000e+00
+  layers.30.post_attention_layernorm.weight      identical=True  rel_max=0.000e+00
+  layers.30.pre_feedforward_layernorm.weight     identical=True  rel_max=0.000e+00
+  layers.30.post_feedforward_layernorm.weight    identical=True  rel_max=0.000e+00
+  layers.30.layer_scalar                         identical=True  rel_max=0.000e+00
+  layers.59.input_layernorm.weight               identical=True  rel_max=0.000e+00
+  layers.59.post_attention_layernorm.weight      identical=True  rel_max=0.000e+00
+  layers.59.pre_feedforward_layernorm.weight     identical=True  rel_max=0.000e+00
+  layers.59.post_feedforward_layernorm.weight    identical=True  rel_max=0.000e+00
+  layers.59.layer_scalar                         identical=True  rel_max=0.000e+00
+  embed_tokens.weight                            identical=True  rel_max=0.000e+00
+
+  => base weights MATCH
+
+=== W4A16 round-trip error vs the half-precision QAT weights ===
+
+  layer  projection              shape    rel_fro    rel_max   SNR dB
+      0      q_proj       (8192, 5376)    0.06666    0.06383    23.52
+      0      k_proj       (4096, 5376)    0.06666    0.06849    23.52
+      0      v_proj       (4096, 5376)    0.06666    0.06466    23.52
+      0      o_proj       (5376, 8192)    0.06666    0.06809    23.52
+      0   gate_proj      (21504, 5376)    0.06671    0.06381    23.52
+      0     up_proj      (21504, 5376)    0.06670    0.06618    23.52
+      0   down_proj      (5376, 21504)    0.06670    0.06711    23.52
+     30      q_proj       (8192, 5376)    0.06664    0.06849    23.52
+     30      k_proj       (4096, 5376)    0.06663    0.06724    23.53
+     30      v_proj       (4096, 5376)    0.06664    0.06466    23.53
+     30      o_proj       (5376, 8192)    0.06666    0.06867    23.52
+     30   gate_proj      (21504, 5376)    0.06671    0.06849    23.52
+     30     up_proj      (21504, 5376)    0.06671    0.06810    23.52
+     30   down_proj      (5376, 21504)    0.06670    0.06494    23.52
+     59      q_proj      (16384, 5376)    0.06669    0.06429    23.52
+     59      k_proj       (2048, 5376)    0.06665    0.06569    23.52
+     59      o_proj      (5376, 16384)    0.06668    0.06447    23.52
+     59   gate_proj      (21504, 5376)    0.06670    0.06338    23.52
+     59     up_proj      (21504, 5376)    0.06671    0.06472    23.52
+     59   down_proj      (5376, 21504)    0.06670    0.06757    23.52
+
+  mean relative Frobenius error by projection:
+      gate_proj 0.06671
+        up_proj 0.06671
+      down_proj 0.06670
+         o_proj 0.06667
+         q_proj 0.06666
+         v_proj 0.06665
+         k_proj 0.06664
+
+Wrote gemma4_31b_quant_error.json

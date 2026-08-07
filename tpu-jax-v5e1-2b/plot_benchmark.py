@@ -18,6 +18,8 @@ The B=1 column is additionally self-inconsistent: reconstructed wall time is
 Re-run ``jax_e_benchmark_sweep_v2.py`` on a TPU VM and replot from its
 ``--json-out`` before publishing any chart.
 """
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -191,5 +193,8 @@ ax4.set_yscale('log', base=2)
 ax4.set_ylim(32, 8192)
 
 plt.tight_layout(rect=[0, 0, 1, 0.94])
-plt.savefig('/home/xbill/tpu-jax-v5e1-2b/gemma4_tpu_v6e_benchmark.png', facecolor=fig.get_facecolor(), edgecolor='none')
-print("Successfully generated plot at /home/xbill/tpu-jax-v5e1-2b/gemma4_tpu_v6e_benchmark.png")
+# Writers use a bare filename in the CWD so an archived run dir is never overwritten;
+# ARTIFACT_DIR redirects it. This was an absolute path to one machine's checkout.
+out_path = os.path.join(os.getenv('ARTIFACT_DIR', '.'), 'gemma4_tpu_v6e_benchmark.png')
+plt.savefig(out_path, facecolor=fig.get_facecolor(), edgecolor='none')
+print(f"Successfully generated plot at {out_path}")

@@ -5,7 +5,12 @@ import sys
 import time
 
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "aisprint-491218")
-ZONE = "europe-west4-a"
+ZONE = os.getenv("GOOGLE_CLOUD_ZONE", "us-west4-a")
+# Same derivation server.py uses for RESOURCE_ID, without importing it: this script runs
+# standalone and server.py pulls in the mcp/google-cloud stack. A Queued Resource's node
+# id is always <resource_id>-node.
+RESOURCE_ID = os.getenv("RESOURCE_ID", os.path.basename(os.path.dirname(os.path.abspath(__file__))))
+TPU_NODE_NAME = f"{RESOURCE_ID}-node"
 
 
 def get_tpu_ip():
@@ -15,7 +20,7 @@ def get_tpu_ip():
         "tpus",
         "tpu-vm",
         "describe",
-        "vllm-gemma4-qr-node",
+        TPU_NODE_NAME,
         f"--project={PROJECT_ID}",
         f"--zone={ZONE}",
         "--format=value(networkEndpoints[0].accessConfig.externalIp)",

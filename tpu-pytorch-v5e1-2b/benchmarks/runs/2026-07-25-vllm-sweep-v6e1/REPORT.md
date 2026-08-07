@@ -2,7 +2,9 @@
 
 **Run:** 2026-07-25 · `vllm-sweep-vm` (ct6e-standard-1t, flex-start, europe-west4-a, `comglitn`), deleted after collection
 **Matrix:** 3 models × 7 concurrency levels {1,2,4,8,16,32,64} × 13 context lengths {8…65536}, output 128 tok/cell, greedy (`--ignore-eos`)
-**Coverage: 252 measured cells, 0 failed, 42 infeasible-by-hardware** (recorded, not silently skipped). Full matrices in [`tables.md`](tables.md), raw JSONs in `results/`, per-cell logs on request from `sweep-main.tgz`/`sweep-fixup.tgz`.
+**Coverage: 245 measured cells, 0 failed, 28 infeasible-by-hardware** (recorded, not silently skipped) — 273 cells total, matching the 3 × 13 × 7 matrix above. Full matrices in [`tables.md`](tables.md), raw JSONs in `results/`, per-cell logs on request from `sweep-main.tgz`/`sweep-fixup.tgz`.
+
+> **Corrected 2026-08-06.** This line previously read "252 measured, 0 failed, 42 infeasible", which totals 294 — more cells than the matrix contains. The 42 came from counting `.skip` marker files, and 14 of those are stale: `sweep_64k_fixup.sh` later measured the e2b and e4b 65536-context rows and left the original `.skip` markers sitting beside the new `.json` results. `aggregate.py` always resolved that correctly (a `.skip` never overrides a `.json`), so `tables.md` and `summary.json` were right — only this hand-written line was wrong. The counts now come from `aggregate.py`'s own `##` heading output rather than from a file count.
 **Companion:** the PyTorch TPU backend single-stream + batched-loop numbers from [`../2026-07-25-tpu-e2b-v6e1/REPORT.md`](../2026-07-25-tpu-e2b-v6e1/REPORT.md) and `logs/batch-sweep.log` (same day, same chip type, same zone).
 
 ## 1. The chip decides what each model is

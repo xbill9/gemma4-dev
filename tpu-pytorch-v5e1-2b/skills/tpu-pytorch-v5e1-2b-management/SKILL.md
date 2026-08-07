@@ -1,5 +1,5 @@
 ---
-name: tpu-management
+name: tpu-pytorch-v5e1-2b-management
 description: Manage Google Cloud TPU capacity and Gemma 4 vLLM serving on TPU VMs. Use when the user asks about provisioning, finding, listing, or destroying TPUs / queued resources / flex-start VMs, starting or debugging vLLM on TPU (v6e, v5p, v5e), TPU quotas and zones, TPU cost estimates, benchmarking TPU serving, or the TPU devops MCP agent. Triggers include "TPU", "queued resource", "flex-start", "v6e", "vLLM on TPU", "TPU quota".
 ---
 
@@ -8,7 +8,7 @@ description: Manage Google Cloud TPU capacity and Gemma 4 vLLM serving on TPU VM
 Operate Google Cloud TPU serving infrastructure for Gemma 4: acquire capacity, run vLLM,
 verify health, benchmark, and tear down. Two ways to act:
 
-1. **Preferred — MCP agent tools.** If the `tpu-devops-agent` MCP server is
+1. **Preferred — MCP agent tools.** If the `tpu-pytorch-v5e1-2b` MCP server is
    connected in this session, use its tools (catalog below). They wrap the correct
    `gcloud` invocations, discovery, and retry/cleanup logic.
 2. **Fallback — direct `gcloud`.** If the MCP server is not connected, either offer to
@@ -32,7 +32,7 @@ verify health, benchmark, and tear down. Two ways to act:
 ## Registering the MCP server
 
 Easiest path — run the bundled installer (idempotent; installs this skill into the
-target project and writes the `tpu-devops` entry into the project's `.mcp.json`,
+target project and writes the `tpu-pytorch-v5e1-2b` entry into the project's `.mcp.json`,
 using the system `python3` — it warns if the pip deps below are missing but never
 creates a venv):
 
@@ -44,17 +44,17 @@ mcp/project-setup.sh --global                                      # all project
 
 Run `mcp/project-setup.sh --help` for all options (`--model`, `--accelerator`, `--tp`,
 `--server-name`, `--skip-deps`). Then restart Claude Code in the target project and
-approve the server when prompted; `/mcp` should list `tpu-devops`.
+approve the server when prompted; `/mcp` should list `tpu-pytorch-v5e1-2b`.
 
 Manual alternative:
 
 ```bash
-claude mcp add tpu-devops \
+claude mcp add tpu-pytorch-v5e1-2b \
   --env GOOGLE_CLOUD_PROJECT=<project-id> \
   --env MODEL_NAME=google/gemma-4-31B-it \
   --env ACCELERATOR_TYPE=v6e-8 \
   --env TENSOR_PARALLEL_SIZE=8 \
-  -- python .claude/skills/tpu-management/mcp/server.py
+  -- python .claude/skills/tpu-pytorch-v5e1-2b-management/mcp/server.py
 ```
 
 Requires: `pip install -r mcp/requirements.txt`, an authenticated

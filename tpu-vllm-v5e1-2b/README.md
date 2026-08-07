@@ -41,6 +41,10 @@ You can configure the following variables for the MCP server:
 *   `TPU_RUNTIME_VERSION`: TPU VM runtime (defaults to `v2-alpha-tpuv5-lite`).
 *   `TPU_QUOTA_ID`: Cloud Quotas id scanned by `find_tpu` (defaults to `TPUV5sLitepodPerProjectPerZoneForTPUAPI`).
 *   `TENSOR_PARALLEL_SIZE`: Tensor parallel size (defaults to `1`).
+*   `MCP_SERVER_NAME`: Name this server advertises, and the key it must be registered under — it prefixes
+    every tool as `mcp__<name>__find_tpu` (defaults to the rig directory name, `tpu-vllm-v5e1-2b`). Set it
+    only to match a client that already registered this server under a different key. `make mcp-config`
+    writes a `.mcp.json` using the same value.
 
 ## Technical Standards
 -   **vLLM API:** OpenAI-compatible endpoint at `/v1/chat/completions`.

@@ -4,7 +4,7 @@ import os
 
 
 def main():
-    csv_file = "grid_benchmark_results.csv"
+    csv_file = "benchmarks/runs/undated-vllm-grid-b-v6e1/grid_benchmark_results.csv"
     if not os.path.exists(csv_file):
         print(f"❌ Error: {csv_file} does not exist.")
         return
@@ -60,11 +60,16 @@ def main():
         f.write("\n".join(report))
     print(f"💾 Saved Markdown report to: {report_file}")
 
-    # Copy to artifacts directory
-    artifact_file = "/home/xbill/.gemini/antigravity-cli/brain/c482e7a6-8d62-45be-a43a-ea5de1c760c4/benchmark_tables.md"
-    with open(artifact_file, "w") as f:
-        f.write("\n".join(report))
-    print(f"💾 Report saved as artifact to: {artifact_file}")
+    # Optional second copy for an external viewer. The report is already written to the CWD
+    # above, so this is off unless ARTIFACT_DIR is set. It used to be a hardcoded UUID path
+    # inside another tool's scratch directory, which raised FileNotFoundError anywhere else.
+    artifact_dir = os.getenv("ARTIFACT_DIR")
+    if artifact_dir:
+        os.makedirs(artifact_dir, exist_ok=True)
+        artifact_file = os.path.join(artifact_dir, report_file)
+        with open(artifact_file, "w") as f:
+            f.write("\n".join(report))
+        print(f"💾 Report saved as artifact to: {artifact_file}")
 
 
 if __name__ == "__main__":

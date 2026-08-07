@@ -1,0 +1,70 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+============================================================================================
+GEMMA 4 31B QAT — pure-JAX E-series engine on [TpuDevice(id=0, process_index=0, coords=(0,0,0), core_on_chip=0)]
+============================================================================================
+
+--- resolved config -------------------------------------------
+  hidden_size                            5376   ok
+  intermediate_size                     21504   ok
+  num_hidden_layers                        60   ok
+  num_attention_heads                      32   ok
+  num_key_value_heads                      16   ok
+  num_global_key_value_heads                4   ok
+  head_dim                                256   ok
+  global_head_dim                         512   ok
+  sliding_window                         1024   ok
+  num_kv_shared_layers                      0   ok
+  hidden_size_per_layer_input               0   ok
+  attention_k_eq_v                       True   ok
+  logit_softcapping                      30.0   ok
+  rope_theta                          10000.0   ok
+  global_rope_theta                 1000000.0   ok
+  layer_types                      50 sliding / 10 full
+  first_kv_shared_layer_idx                60
+
+--- load ------------------------------------------------------
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2556.20it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+  load time                 8.7 s
+  weight bytes            19.36 GB
+  HBM in use              19.30 GB
+  HBM limit               33.55 GB
+  headroom                14.25 GB (42.5%)
+
+--- parity ----------------------------------------------------
+  formatted prompt: '<bos><|turn>user\nWhat is the capital of France?<turn|>\n<|turn>model\n<|channel>thought\n<channel|>'
+  [templated]   20 prompt tok -> 'The capital of France is Paris.<turn|>\n\n}<turn|>\n<channel|>The capital of France is Paris.<turn|>\n}<turn|>\n<channel|>The capital of France is'
+              46.6s wall (incl. compile), prefill 25984.0 ms, decode 1.6 tok/s
+  [bare     ]    7 prompt tok -> '\n<|channel>thought\n<channel|>The capital of France is Paris.<turn|>\n\n<eos><turn|>\n<channel|>The capital of France is Paris.<turn|>\n}\n<eos><turn|>'
+              2.8s wall (incl. compile), prefill 217.3 ms, decode 13.4 tok/s
+
+--- sweep -----------------------------------------------------
+  B= 1 | ctx=   1K ... prefill     296.4 ms | step   78.668 ms | agg    12.7 tok/s | per-user   12.7 tok/s
+  B= 1 | ctx=   2K ... prefill     489.3 ms | step   78.692 ms | agg    12.7 tok/s | per-user   12.7 tok/s
+  B= 1 | ctx=   4K ... prefill    1085.3 ms | step   78.450 ms | agg    12.7 tok/s | per-user   12.7 tok/s
+  B= 1 | ctx=   8K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 2 | ctx=   1K ... prefill     468.3 ms | step  131.265 ms | agg    15.2 tok/s | per-user    7.6 tok/s
+  B= 2 | ctx=   2K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 2 | ctx=   4K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 2 | ctx=   8K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 4 | ctx=   1K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 4 | ctx=   2K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 4 | ctx=   4K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+  B= 4 | ctx=   8K ... FAILED: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require
+
+| Users (B) | Context (S) | Prefill (TTFT) | Decode Step | Aggregate | Per-User |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | 1K | 296.4 ms | 78.67 ms | 12.7 tok/s | 12.7 tok/s |
+| 1 | 2K | 489.3 ms | 78.69 ms | 12.7 tok/s | 12.7 tok/s |
+| 1 | 4K | 1085.3 ms | 78.45 ms | 12.7 tok/s | 12.7 tok/s |
+| 1 | 8K | FAILED | — | — | — |
+| 2 | 1K | 468.3 ms | 131.26 ms | 15.2 tok/s | 7.6 tok/s |
+| 2 | 2K | FAILED | — | — | — |
+| 2 | 4K | FAILED | — | — | — |
+| 2 | 8K | FAILED | — | — | — |
+| 4 | 1K | FAILED | — | — | — |
+| 4 | 2K | FAILED | — | — | — |
+| 4 | 4K | FAILED | — | — | — |
+| 4 | 8K | FAILED | — | — | — |
+
+Wrote gemma4_31b_results.json

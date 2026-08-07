@@ -7,7 +7,16 @@ REGION ?= $(GOOGLE_CLOUD_REGION)
 ZONE ?= $(GOOGLE_CLOUD_ZONE)
 MODEL_PATH ?= $(MODEL_NAME)
 BUCKET_NAME ?= $(PROJECT_ID)-bucket
-SERVICE_NAME ?= tpu-2B-v5e1-devops-agent
+# The hand-provisioned tpu-vm is named after this rig directory, matching the RESOURCE_ID
+# default server.py derives the same way. Set SERVICE_NAME in tpu.env (or on the command
+# line) to point these targets at a VM whose name predates that, e.g.
+#   make status SERVICE_NAME=tpu-2B-v5e1-devops-agent
+SERVICE_NAME ?= $(notdir $(CURDIR))
+# Key this rig's MCP server is registered under in the client, and the name server.py
+# advertises. It prefixes every tool (mcp__$(MCP_SERVER_NAME)__find_tpu), so it has to be
+# unique across the sibling rigs — they used to share "tpu-devops". Same derivation as
+# RIG_NAME in server.py; tpu.env or the command line override it.
+MCP_SERVER_NAME ?= $(notdir $(CURDIR))
 
 install:
 	pip install -r requirements.txt
@@ -31,6 +40,20 @@ format:
 tools:
 	python generate_tools_doc.py
 
+# Writes .mcp.json registering this rig's server under $(MCP_SERVER_NAME). Idempotent, and
+# it merges into an existing .mcp.json rather than replacing it, so other servers in the
+# file survive. .mcp.json is gitignored at the monorepo root; mcp_config.json is the
+# committed example of the same entry.
+mcp-config:
+	@python3 -c 'import json,sys; \
+path, name, cmd = sys.argv[1:4]; \
+config = json.load(open(path)) if __import__("os").path.exists(path) else {}; \
+config.setdefault("mcpServers", {})[name] = {"command": cmd, "args": [], "env": {}}; \
+json.dump(config, open(path, "w"), indent=2); \
+open(path, "a").write("\n"); \
+print(f"✅ registered MCP server {name!r} in {path}")' \
+		"$(CURDIR)/.mcp.json" "$(MCP_SERVER_NAME)" "$(CURDIR)/mcp-run.sh"
+
 clean:
 	rm -rf __pycache__
 	find . -type d -name ".ruff_cache" -exec rm -rf {} +
@@ -38,15 +61,29 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type f -name "*.log" -exec rm -rf {} +
 
+# Provisioning model for this hand-provisioned tpu-vm path. gcloud accepts standard, spot,
+# or reservation-bound here. This is separate from the MCP tools' provisioning_model
+# parameter, which drives the Queued Resource path (and additionally offers flex-start).
+TPU_PROVISIONING_MODEL ?= standard
+
 # Recommended deployment settings for vLLM on Cloud TPU v5e (v5litepod)
 deploy-tpu:
-	@echo "🚀 Creating TPU v5e instance ($(SERVICE_NAME)) in $(ZONE)..."
+	@echo "🚀 Creating $(TPU_PROVISIONING_MODEL) TPU v5e instance ($(SERVICE_NAME)) in $(ZONE)..."
 	gcloud alpha compute tpus tpu-vm create $(SERVICE_NAME) \
 		--project=$(PROJECT_ID) \
 		--zone=$(ZONE) \
 		--type=v5litepod \
 		--topology=1x1 \
+		--provisioning-model=$(TPU_PROVISIONING_MODEL) \
 		--version=v2-alpha-tpuv5-lite
+
+# Spot: heavily discounted, preempted whenever the capacity is wanted back, no run limit.
+deploy-tpu-spot:
+	@$(MAKE) deploy-tpu TPU_PROVISIONING_MODEL=spot
+
+# On-demand: full price, no preemption. Same as plain `make deploy-tpu`.
+deploy-tpu-ondemand:
+	@$(MAKE) deploy-tpu TPU_PROVISIONING_MODEL=standard
 
 # Note: Running the container requires SSHing into the TPU VM.
 # This target provides the command for reference.
@@ -113,7 +150,7 @@ query:
 		-H "Content-Type: application/json" \
 		-d '{"model": "$(MODEL_PATH)", "prompt": "$(PROMPT)", "max_tokens": 128, "temperature": 0.2}' | python3 -m json.tool
 
-.PHONY: install run test lint format tools clean deploy-tpu deploy destroy-tpu destroy status endpoint benchmark run-container query help
+.PHONY: install run test lint format tools mcp-config clean deploy-tpu deploy-tpu-spot deploy-tpu-ondemand deploy destroy-tpu destroy status endpoint benchmark run-container query help
 
 help:
 	@echo "Make targets:"
@@ -124,9 +161,12 @@ help:
 	@echo "  lint           - ruff check + ruff format --check + mypy"
 	@echo "  format         - Apply ruff formatting and autofixes"
 	@echo "  tools          - Regenerate GemmaTools.md from server.py"
+	@echo "  mcp-config     - Write .mcp.json registering this server as $(MCP_SERVER_NAME)"
 	@echo "  clean          - Remove caches and logs"
 	@echo ""
-	@echo "  deploy-tpu     - Create the TPU v5e instance ($(SERVICE_NAME) in $(ZONE))"
+	@echo "  deploy-tpu     - Create the TPU v5e instance ($(SERVICE_NAME) in $(ZONE), $(TPU_PROVISIONING_MODEL))"
+	@echo "  deploy-tpu-spot     - Same, as a preemptible Spot VM (discounted, no run limit)"
+	@echo "  deploy-tpu-ondemand - Same, at standard on-demand pricing"
 	@echo "  destroy-tpu    - Delete the TPU v5e instance"
 	@echo "  status         - Describe the TPU instance"
 	@echo "  endpoint       - Print the TPU instance IP"

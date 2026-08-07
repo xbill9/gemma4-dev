@@ -32,7 +32,7 @@ That list is actively misleading read on its own.
 
 | Route | Implemented in | Reachable for Gemma 4? |
 | :--- | :--- | :--- |
-| **qwix PTQ** — int8/int4/fp8, weight-only or W8A8 | `models/jax/utils/qwix/` | **yes — the live route** |
+| **qwix PTQ** — int8/int4/fp8, weight-only or W8A8 | `models/jax/utils/qwix/` | reachable, but **does not boot** — see below |
 | compressed-tensors fp8 w8a8 | `layers/jax/quantization/compressed_tensors.py` | yes (needs a pre-quantized ckpt) |
 | compressed-tensors **w4a16 / wNa16** | nowhere on the JAX path | **no — `NotImplementedError`** |
 | **mxfp4** (4-bit) | `layers/jax/quantization/mxfp4.py` | **no — MoE-only**, see below |
@@ -49,10 +49,109 @@ raise NotImplementedError(...)
 
 `wNa16` is w4a16 — exactly the format of Google's QAT releases
 (`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). Those checkpoints fail a **second, independent** way too:
-`k_norm.weight` "missing" for layers 15-34, which are precisely the KV-shared layers that legitimately
-have no K projection (see `MODELS.md`). Upstream:
+`k_norm.weight` "missing" for layers 15-34. Upstream:
 [tpu-inference #3225](https://github.com/vllm-project/tpu-inference/issues/3225).
 `tpu-pytorch-v5e1-12b` is currently pinned at one of these checkpoints and therefore does not load.
+
+> **The old explanation for that second failure is retracted (2026-08-07).** This file used to say
+> layers 15-34 "legitimately have no K projection", citing KV sharing. `MODELS.md` read the
+> safetensors headers and refuted it: **all 35 layers carry `k_proj` and `k_norm`** in the base
+> checkpoint — `layers missing k_norm: []`. KV sharing is a *runtime* property, not a checkpoint one.
+> So the `k_norm`-missing failure on the **QAT exports** is unexplained and needs re-diagnosing
+> against that checkpoint specifically. Do not repeat the architectural explanation.
+
+## The QAT checkpoint formats themselves
+
+Properties of **Google's QAT artifacts**, independent of which engine reads them — established while
+porting the 12B/26B/31B to the hand-rolled JAX engine (`tpu-jax-v6e1-31b-w4a16`,
+`tpu-jax-v6e1-26b-q4_0`). They apply to any decoder, including the vLLM path above if `wNa16` is ever
+implemented there.
+
+**Note the stack boundary.** Everything above this section is vLLM + tpu_inference. Everything in
+this section was measured on a *different* stack — the pure-JAX engine in `~/tpu-jax-*`. What carries
+across is the on-disk format; nothing about performance does.
+
+### Decoding w4a16: two traps that both yield negative SNR
+
+1. **The int4 nibbles are BIASED, not two's complement.** Stored value is `value + 8`: 0 → −8, 8 → 0,
+   15 → +7. Sign-extending as two's complement scrambles the weights.
+2. **Packed words are `I32` and must never pass through float32.** A word packing eight nibbles
+   routinely exceeds 2²⁴, which float32's mantissa cannot hold — the bit pattern is *silently rounded*
+   and the nibbles are destroyed. Any reader that normalizes tensors to float32 needs a raw path.
+
+Both were caught the same way: **SNR ≈ −8 dB**. A quantizer cannot produce error larger than signal,
+so any "quantization error" above 100% is a decoder bug, never a model property. Keep that tripwire.
+
+Aside: `safetensors` cannot decode bf16 on a bare JAX VM — `framework="np"` and `framework="flax"`
+both raise `data type 'bfloat16' not understood`, and torch is usually not installed. The container is
+trivial (8-byte header length, JSON header, raw buffer) and bf16 → f32 is a 16-bit left shift.
+
+### Measured w4a16 error: 6.67%, and flat everywhere
+
+Measured on the 31B by dequantizing `-qat-w4a16-ct` against `-qat-q4_0-unquantized`, which ships the
+same QAT weights in half precision. Control: every tensor neither variant quantizes — all four
+RMSNorms, `layer_scalar`, `final_norm`, all 1.4B parameters of `embed_tokens` — is **bit-identical**,
+so the two are the same base model.
+
+| | relative Frobenius error | SNR |
+| :--- | ---: | ---: |
+| every projection, layers 0 / 30 / 59 | **0.0667** | **23.52 dB** |
+
+Across 20 (layer, projection) pairs: min 0.06663, max 0.06671 — a spread of **0.12%**.
+
+> **Scale dynamic range does NOT predict quantization damage.** A proxy metric (p99.9/median of
+> |scale|) ranked `v_proj` hardest at 4.22 and `up_proj` easiest at 2.41, and concluded late-layer
+> attention was where extra bits would pay. Measured error is flat to 0.1% and `v_proj` is among the
+> *lowest*. The proxy measured the spread of the **scales**, and the scales exist precisely to absorb
+> that spread — with one bf16 scale per 32 input columns, a wide scale distribution means the
+> mechanism is working, not struggling.
+
+**Consequence: there is no cheap mixed-precision win on Gemma 4 weights.** Nothing is
+disproportionately damaged by W4A16, so spending extra bits on a subset of projections buys
+proportionally little.
+
+### `-q4_0-unquantized` is QAT data in an unquantized container
+
+The 26B A4B is **the only size with no `-w4a16-ct` release** — enumerated from the Hub 2026-07-31, so
+do not assume the suffix set is uniform across sizes:
+
+| size | `-w4a16-ct` | `-q4_0-unquantized` | `-q4_0-gguf` | mobile |
+| :--- | :---: | :---: | :---: | :---: |
+| E2B, E4B | ✅ | ✅ | ✅ | ✅ |
+| 12B, 31B | ✅ | ✅ | ✅ | — |
+| **26B A4B** | **❌** | ✅ | ✅ | — |
+
+> **Two migrated reports name `gemma-4-26B-A4B-it-qat-w4a16-ct` anyway, and that is not a
+> counter-example.** `gpu-vllm-l4-26b-w4a16` carries L4 grids from 2026-06-10 and 2026-07-12 whose
+> `Model:` line is exactly that string — but as a **local mount path** (`/mnt/models/...`), not a Hub
+> id, and a local directory is named whatever the operator called it. The Hub enumeration above stands.
+> What the runs *do* establish, by physical bound, is that the weights were 4-bit: 51.61 GB of bf16
+> cannot fit a 24 GB L4 and ~15.27 GB can. The likely history is a local repack by the route described
+> immediately below, stored under an aspirational name.
+
+**"Unquantized" describes the container, not the values.** Those weights already sit on a Q4_0 grid —
+verified by range-reading the shards: all 256 sampled groups of 32 land exactly on a 4-bit grid, for
+expert, attention, MLP, router and embedding tensors alike. **Group size 32 is measured, not assumed**
+— group size 64 fails the same test. So 51.61 GB of BF16 repacks to 15.27 GB losslessly enough to fit
+a 33.55 GB chip.
+
+### Two ways to destroy those weights while "just repacking" them
+
+1. **`d = amax / 8` is the wrong step.** The textbook Q4_0 rule assumes each block's largest magnitude
+   sits at level ±8; plenty of blocks peak lower. When they do, the derived step is a fraction of the
+   true one, `round(x/d)` lands between grid points, and the block is requantized onto a grid that does
+   not contain its own values — **4.9e-2 median error, and nothing raises.** The model loads and
+   generates fluent text while being 5% wrong in every expert weight. Search for the level the peak
+   actually occupies (m over 1..8) and refine by least squares: 93.1% of values then reconstruct
+   exactly. Return a count of unplaceable groups and *raise* on any nonzero count rather than logging.
+2. **Packing after the transpose.** W4A16 packs nibbles along the **last** axis, and the Q4_0 grid runs
+   along `in`. A loader that transposes `[out, in] → [in, out]` before packing groups across `out`,
+   where no grid exists — a real requantization dressed up as a repack. Pack in the loader, before the
+   transpose.
+
+Done correctly: 89–93% of values bit-identical, worst case ~1.6 BF16 ULP. That residue is **scale
+precision, not level assignment** — Q4_0 carries an fp16 block scale and this format stores BF16,
+three mantissa bits shorter. Refining the step moves zero levels.
 
 ### mxfp4 is MoE-only
 
@@ -62,7 +161,30 @@ E2B is dense (`enable_moe_block=False`, `num_experts=None`), so there are no `Ja
 it to attach to. It also calls `dequantize_tensor_from_mxfp4_packed` in `process_weights_after_loading`,
 so even where it does apply it unpacks to bf16 — consistent with there being no fp4 MXU anywhere yet.
 
-## qwix is the way in
+## qwix is the only way in, and as of 2026-08-07 it does not get there
+
+Everything below about how qwix is invoked is confirmed correct — the config routes end to end, the
+rule parses exactly as written, and both code paths run. **Neither reaches an allocation.** Measured
+on E2B / v5e-1, full write-up in
+`tpu-vllm-v5e1-2b/benchmarks/runs/2026-08-07-qwix-int8-v5e1/REPORT.md`:
+
+| path | how far it gets | failure |
+| :--- | :--- | :--- |
+| concrete (default) | loads bf16 weights, `hbm=[(8.97, 15.75)]Gb`, starts quantizing | `RESOURCE_EXHAUSTED: HLO temporaries (16.23G) exceeds available HBM (15.75G)` |
+| `use_abstract_model: true` | `hbm=[(0.0, 15.75)]Gb` — no bf16 copy, as designed | `ValueError: no module or parameter named '…layers.0.mlp.down_proj.weight'`; the quantized `JaxLinear` exposes `set()` |
+
+**The two failures are independent** — fixing either leaves the other. And the OOM lands on **E2B**,
+the one size whose bf16 weights fit a v5e-1 with 5.5 GiB spare; the concrete path needs the bf16 model
+and the quantization temporaries resident at once, so "it fits at bf16" does not imply "it can be
+quantized in place". Both fail in 2.5–4 min, well before the ~738 s compile, so probing further
+configurations is cheap.
+
+**No weight-quantization footprint number exists for Gemma 4 on this stack.** Anything downstream —
+int8 throughput, the int4-for-12B plan, E4B's ~131K KV tokens at int8 — is contingent on one of these
+two being fixed. The `HARDWARE.md` case for int8 (2x bf16 in the MXU, the only compute win on
+v5e/v6e) is untouched by this and is still the reason to want it.
+
+### How it is invoked
 
 `tpu_inference/models/jax/utils/qwix/` ships Google's QWIX library wired into the JAX path, with four
 configs under `configs/`, all using `module_path: '.*'`:
@@ -113,7 +235,9 @@ worse. The four shipped configs are per-tensor over `.*` and are therefore **not
 4-bit: you want group scales plus an `lm_head` / embedding exclusion via `module_path` (Gemma's vocab is
 262,144, so the head is both large and quality-sensitive).
 
-Constructing a rule is not evidence it works end-to-end. Verify per the rule at the bottom of this file.
+Constructing a rule is not evidence it works end-to-end — and int8, the simplest rule of all, was
+constructed successfully and still did not boot (see the top of this section). Nothing about int4 has
+been attempted on device. Verify per the rule at the bottom of this file.
 
 ### `use_abstract_model` is the critical path for anything that doesn't fit at bf16
 
@@ -123,8 +247,17 @@ impossible when bf16 weights exceed HBM. The alternative is gated by `apply_qwix
 (default `False`), which quantizes the shape-only model so weights load straight into QArrays.
 
 Its docstring marks that path **(Deprecated)**. On a 16 GB chip both E4B (14.9 GiB) and 12B (22.4 GiB)
-depend on it. **Verify it still functions before planning around it** — and test on E2B, where bf16 does
-fit, so a failure isolates to that code path rather than to memory pressure.
+depend on it.
+
+**Verified 2026-08-07 on E2B / v5e-1: it does not function.** The memory behaviour is right — it
+reports `hbm=[(0.0, 15.75)]Gb` before quantizing, against 8.97 GiB on the concrete path, so no bf16
+copy is materialized. Weight loading then raises `ValueError: There is no module or parameter named
+'model.language_model.layers.0.mlp.down_proj.weight'`, listing the available parameters of that
+`JaxLinear` as `set()` — the quantized abstract module carries no parameter structure for the loader
+to bind to. The design is sound and the implementation is broken downstream of it.
+
+Testing on E2B was deliberate: bf16 fits there, so the failure isolates to the code path rather than
+to memory pressure. It did — this is a `ValueError`, not an OOM.
 
 ## KV cache quantization
 
@@ -171,4 +304,6 @@ reported in `/metrics` as `cache_dtype="fp8_e4m3"`, and allocated a genuinely `f
   width predicts. Read the `Init kv-cache` line for the actual block shape and dtype.
 - **Weights:** check whether `Memory statistics | total_hbm_used_gb` drops. E2B's bf16 figure is
   **8.97 GiB**; if the number does not move, nothing downstream matters and there is no point
-  benchmarking.
+  benchmarking. **If the line never prints, that is the answer too** — on both qwix arms the engine
+  died before `tpu_worker.py:557`, and an absent allocation log is a cleaner negative than a
+  suspicious number.

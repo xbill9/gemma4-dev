@@ -2,11 +2,12 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shlex
 import sys
 import tempfile
 import time
-from typing import Optional
+from typing import NamedTuple, Optional
 
 import httpx
 from google.cloud import secretmanager
@@ -14,18 +15,25 @@ from mcp.server.fastmcp import FastMCP
 from openai import AsyncOpenAI
 
 # Setup logging
+# The rig directory name is this deployment's identity — it names the MCP server, names the
+# log channel, and is the default id for every resource the tools provision. Sibling rigs
+# share a project and a zone, so deriving from the directory is what keeps one rig's tools
+# off another rig's capacity, and its log lines distinguishable from another rig's.
+# NAMING.md constrains the directory to lowercase/digits/hyphens, which is a valid GCP id.
+RIG_NAME = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
+
 logging.basicConfig(
     stream=sys.stderr, level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("vllm-devops-agent")
-
-# Initialize FastMCP server
-mcp = FastMCP("tpu-2B-v5e1-devops-agent")
+logger = logging.getLogger(RIG_NAME)
 
 # --- Configuration ---
 # tpu.env is the single source of truth for the deployment parameters. load_dotenv does
 # not overwrite variables that are already set, so a real environment variable (or an
 # MCP client's env block) still wins over the file.
+#
+# This has to run before FastMCP is constructed: MCP_SERVER_NAME is read below, and a value
+# set in tpu.env would otherwise arrive too late to name the server.
 try:
     from dotenv import load_dotenv
 
@@ -33,14 +41,34 @@ try:
 except Exception as e:  # python-dotenv missing or unreadable file — fall back to defaults
     logger.warning(f"Could not load tpu.env, using environment and defaults only: {e}")
 
+# Name this server advertises over MCP. It has to match the key the client registers it
+# under (mcp_config.json / .mcp.json), because that key is what prefixes every tool —
+# mcp__<key>__find_tpu. Every sibling rig used to answer to "tpu-devops", so with more than
+# one registered you could not tell which rig a tool call would reach. Defaulting to the rig
+# directory makes the prefix name the rig; MCP_SERVER_NAME overrides it for a client that
+# has already registered this server under something else.
+MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
+
+# Initialize FastMCP server
+mcp = FastMCP(MCP_SERVER_NAME)
+
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "aisprint-491218")
 ZONE = os.getenv("GOOGLE_CLOUD_ZONE", "us-west4-a")
 REGION = os.getenv("GOOGLE_CLOUD_REGION", "us-west4")
 MODEL_NAME = os.getenv("MODEL_NAME", "google/gemma-4-E2B-it")
-HF_SECRET_ID = "hf-token"
-# Force GOOGLE_APPLICATION_CREDENTIALS and HOME if missing in environment
+# Secret Manager secret holding the Hugging Face token. The startup script fetches it by
+# id at boot, so a rotated or per-project secret only needs this to change.
+HF_SECRET_ID = os.getenv("HF_SECRET_ID", "hf-token")
+# Default Queued Resource id for every tool; its node is derived as <RESOURCE_ID>-node.
+# Follows the directory, but tpu.env still wins — pin RESOURCE_ID there when a name has to
+# outlive a rename, because a rename otherwise orphans whatever is already provisioned.
+RESOURCE_ID = os.getenv("RESOURCE_ID", RIG_NAME)
+# Force GOOGLE_APPLICATION_CREDENTIALS and HOME if missing in environment.
+# An MCP client can launch this with no HOME, and both gcloud and ADC need one. Ask the
+# passwd database for the account's real home rather than baking in one machine's path —
+# expanduser("~") falls back to pwd.getpwuid() precisely when HOME is unset.
 if "HOME" not in os.environ:
-    os.environ["HOME"] = "/home/xbill"
+    os.environ["HOME"] = os.path.expanduser("~")
 if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
     default_adc_path = os.path.expanduser("~/.config/gcloud/application_default_credentials.json")
     if os.path.exists(default_adc_path):
@@ -50,7 +78,31 @@ ACCELERATOR_TYPE = os.getenv("ACCELERATOR_TYPE", "v5litepod-1")
 # v5e is called "v5litepod" by the TPU API; the matching Flex-start runtime is v2-alpha-tpuv5-lite.
 TPU_RUNTIME_VERSION = os.getenv("TPU_RUNTIME_VERSION", "v2-alpha-tpuv5-lite")
 TPU_QUOTA_ID = os.getenv("TPU_QUOTA_ID", "TPUV5sLitepodPerProjectPerZoneForTPUAPI")
+# Spot capacity is metered by its own preemptible quota, so a zone sweep for spot has to ask
+# about this id instead of TPU_QUOTA_ID. Both ids confirmed present on the TPU API 2026-08-06.
+TPU_SPOT_QUOTA_ID = os.getenv("TPU_SPOT_QUOTA_ID", "TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI")
 TENSOR_PARALLEL_SIZE = int(os.getenv("TENSOR_PARALLEL_SIZE", "1"))
+
+# How a Queued Resource asks for capacity. flex-start is the historical default and the only
+# model this rig has provisioned in production — note it is accepted for v5litepod-1 in
+# us-west4-a only (see CLAUDE.md), which is the reason the other two exist.
+PROVISIONING_MODELS = ("flex-start", "spot", "on-demand")
+PROVISIONING_MODEL = os.getenv("PROVISIONING_MODEL", "flex-start")
+
+# Cloud Billing Catalog service id for Compute Engine, which is where the TPU SKUs live.
+COMPUTE_BILLING_SERVICE_ID = "6F81-5844-456A"
+_SKU_CACHE: dict[str, list] = {}
+
+# How each provisioning model is spelled in SKU descriptions, anchored at the start so the
+# Reserved/Commitment/Capacity-Optimized variants of the same chip do not match. The catalog
+# calls flex-start "DWS Defined Duration" (Dynamic Workload Scheduler) and drops the "Tpu"
+# prefix there, and calls spot "Preemptible". Verified against the live catalog 2026-08-06.
+_SKU_DESCRIPTION_PATTERNS = {
+    "on-demand": r"^Tpu{fam} running in ",
+    "flex-start": r"^DWS Defined Duration {fam} running in ",
+    "spot": r"^Tpu{fam} attached to Spot Preemptible VMs",
+}
+_SKU_USAGE_TYPES = {"on-demand": "OnDemand", "flex-start": "OnDemand", "spot": "Preemptible"}
 LOCAL_DOCKER_IMAGE = os.getenv("LOCAL_DOCKER_IMAGE", "")
 
 # Serving parameters. Both deployment paths (the boot-time startup script and
@@ -201,6 +253,25 @@ def _vllm_serve_flags(mm_limit: Optional[str] = None) -> str:
     )
 
 
+def _provisioning_flags(provisioning_model: str) -> list[str]:
+    """The gcloud flags that select how a Queued Resource asks for capacity.
+
+    Only flex-start passes --max-run-duration: gcloud documents that flag as flex-start
+    only. A spot or on-demand node therefore has no automatic stop — it runs until it is
+    preempted or destroyed, so it keeps billing after a demo ends.
+    """
+    if provisioning_model == "spot":
+        return ["--spot", "--labels=purpose=spot"]
+    if provisioning_model == "on-demand":
+        return ["--labels=purpose=on-demand"]
+    return ["--provisioning-model=flex-start", "--max-run-duration=4h", "--labels=purpose=flex-start"]
+
+
+def _quota_id_for(provisioning_model: str) -> str:
+    """Spot draws on the separate preemptible quota; flex-start and on-demand share TPU_QUOTA_ID."""
+    return TPU_SPOT_QUOTA_ID if provisioning_model == "spot" else TPU_QUOTA_ID
+
+
 async def _list_queued_resources_json(zone: str) -> Optional[list]:
     """Lists the Queued Resources in a zone. Returns None if the gcloud call failed."""
     cmd = [
@@ -224,12 +295,20 @@ async def _list_queued_resources_json(zone: str) -> Optional[list]:
         return []
 
 
-async def _create_queued_resource(resource_id: str, zone: str) -> tuple[bool, str]:
+async def _create_queued_resource(
+    resource_id: str, zone: str, provisioning_model: str = PROVISIONING_MODEL
+) -> tuple[bool, str]:
     """Renders the startup script and issues the queued-resources create call.
 
     The rendered script carries no secret — it reads 'hf-token' from Secret Manager at
     boot — but it is still written to a private temp file and removed afterwards.
     """
+    if provisioning_model not in PROVISIONING_MODELS:
+        return (
+            False,
+            f"❌ Aborted: unknown provisioning_model '{provisioning_model}'. Use one of {PROVISIONING_MODELS}.",
+        )
+
     # Pre-flight only: confirm the secret exists before spending scarce Flex-start
     # capacity on a VM that would spin for 30 minutes and then fail. The value is
     # checked for presence and discarded — it is never written into the script.
@@ -253,13 +332,12 @@ async def _create_queued_resource(resource_id: str, zone: str) -> tuple[bool, st
             f"--zone={zone}",
             f"--runtime-version={TPU_RUNTIME_VERSION}",
             f"--node-id={resource_id}-node",
-            "--provisioning-model=flex-start",
-            "--max-run-duration=4h",
+            # Bounds how long the *request* stays queued, independent of provisioning model.
             "--valid-until-duration=4h",
             f"--project={PROJECT_ID}",
-            "--labels=purpose=flex-start",
             f"--accelerator-type={ACCELERATOR_TYPE}",
             f"--metadata-from-file=startup-script={script_file}",
+            *_provisioning_flags(provisioning_model),
         ]
         if TPU_NETWORK:
             create_cmd.append(f"--network={TPU_NETWORK}")
@@ -276,12 +354,57 @@ async def _create_queued_resource(resource_id: str, zone: str) -> tuple[bool, st
 
     if rc != 0:
         return False, f"❌ Creation failed: {err}"
-    return True, f"🚀 Resource {resource_id} creation initiated in {zone} with startup script."
+
+    lifetime = {
+        "flex-start": "Self-terminates after 4h.",
+        "spot": "⚠️ Preemptible with ~30s notice and has no max-run-duration — destroy it when you are done.",
+        "on-demand": "⚠️ No max-run-duration — it bills until you destroy it.",
+    }[provisioning_model]
+    return True, (
+        f"🚀 Resource {resource_id} creation initiated in {zone} ({provisioning_model}) with startup script. {lifetime}"
+    )
 
 
-async def discover_vllm_url() -> Optional[str]:
-    """Finds the URL of an ACTIVE Queued Resource vLLM service."""
-    list_cmd = [
+async def _list_tpu_vm_nodes(zone: str = ZONE) -> list[dict]:
+    """Lists every TPU VM node in the zone, however it was provisioned.
+
+    A Queued Resource creates a node in this same namespace (which is why _get_node_ip
+    can `tpu-vm describe` it), so one call covers both provisioning paths — the QR path
+    and a directly created node like the ones `make deploy-tpu-spot` makes.
+    """
+    cmd = [
+        "gcloud",
+        "compute",
+        "tpus",
+        "tpu-vm",
+        "list",
+        f"--project={PROJECT_ID}",
+        f"--zone={zone}",
+        "--format=json",
+    ]
+    rc, stdout, _ = await run_command(cmd)
+    if rc != 0 or not stdout:
+        return []
+    try:
+        nodes = json.loads(stdout)
+    except json.JSONDecodeError as e:
+        logger.error(f"Could not parse tpu-vm list: {e}")
+        return []
+    return nodes if isinstance(nodes, list) else []
+
+
+def _node_ip(node: dict) -> Optional[str]:
+    """External IP of a listed node, falling back to the internal one."""
+    for endpoint in node.get("networkEndpoints") or []:
+        ip = (endpoint.get("accessConfig") or {}).get("externalIp") or endpoint.get("ipAddress")
+        if ip:
+            return str(ip)
+    return None
+
+
+async def _active_qr_node_ids(zone: str = ZONE) -> set[str]:
+    """Node ids belonging to an ACTIVE Queued Resource in the zone."""
+    cmd = [
         "gcloud",
         "alpha",
         "compute",
@@ -289,27 +412,135 @@ async def discover_vllm_url() -> Optional[str]:
         "queued-resources",
         "list",
         f"--project={PROJECT_ID}",
-        f"--zone={ZONE}",
+        f"--zone={zone}",
         "--format=json",
     ]
-    rc, stdout, _ = await run_command(list_cmd)
+    rc, stdout, _ = await run_command(cmd)
     if rc != 0 or not stdout:
-        return None
-
+        return set()
     try:
         resources = json.loads(stdout)
-        for res in resources:
-            if res.get("state", {}).get("state") == "ACTIVE":
-                resource_id = res.get("name", "").split("/")[-1]
-                node_id = await _get_node_id(resource_id)
-                if node_id:
-                    ip = await _get_node_ip(node_id)
-                    if ip:
-                        url = f"http://{ip}:8000"
-                        logger.info(f"📡 Found ACTIVE Queued Resource {resource_id} at {url}")
-                        return url
-    except Exception as e:
-        logger.error(f"Discovery error: {e}")
+    except json.JSONDecodeError:
+        return set()
+    node_ids = set()
+    for res in resources:
+        if res.get("state", {}).get("state") != "ACTIVE":
+            continue
+        for spec in (res.get("tpu") or {}).get("nodeSpec") or []:
+            if spec.get("nodeId"):
+                node_ids.add(spec["nodeId"])
+    return node_ids
+
+
+async def _probe_vllm(url: str, timeout: float = 5.0) -> Optional[str]:
+    """Returns the served model id if a vLLM OpenAI server answers at url, else None."""
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            res = await client.get(f"{url}/v1/models")
+            if res.status_code != 200:
+                return None
+            data = res.json().get("data") or []
+    except Exception:
+        return None
+    return str(data[0].get("id", "unknown")) if data else "unknown"
+
+
+def _is_this_rig(node_name: str) -> bool:
+    """Whether a node name is one this rig provisions (RESOURCE_ID or <RESOURCE_ID>-node)."""
+    return node_name == RESOURCE_ID or node_name.startswith(f"{RESOURCE_ID}-")
+
+
+class VllmNode(NamedTuple):
+    """A TPU node discovery picked out, and whether vLLM answered on it."""
+
+    name: str
+    url: str
+    serving: bool
+
+
+class _Candidate(NamedTuple):
+    sort_key: tuple
+    name: str
+    url: str
+    mine: bool
+
+
+async def _discover_vllm_node() -> Optional[VllmNode]:
+    """Finds the TPU node serving vLLM in ZONE, whichever way it was provisioned.
+
+    Both provisioning paths end at a TPU VM node, so this lists nodes rather than Queued
+    Resources: the old QR-only sweep was blind to a directly created node, and read a
+    perfectly healthy spot VM as "no TPU". Candidates are ranked with this rig's own names
+    first and then probed on /v1/models; the first node actually answering wins. If none
+    answers, a node of ours that is still booting is returned anyway (serving=False) so
+    callers can poll it — but a node that is not ours is never returned unprobed, since
+    sibling rigs share this zone and one of theirs is not ours to talk to.
+    """
+    nodes = await _list_tpu_vm_nodes()
+    if not nodes:
+        return None
+    qr_node_ids = await _active_qr_node_ids()
+
+    candidates: list[_Candidate] = []
+    for node in nodes:
+        name = (node.get("name") or "").split("/")[-1]
+        ip = _node_ip(node)
+        if not name or not ip:
+            continue
+        mine = _is_this_rig(name)
+        sort_key = (
+            0 if mine else 1,
+            0 if node.get("state") == "READY" else 1,
+            0 if name in qr_node_ids else 1,
+            name,
+        )
+        candidates.append(_Candidate(sort_key, name, f"http://{ip}:8000", mine))
+    candidates.sort(key=lambda c: c.sort_key)
+
+    for cand in candidates:
+        model_id = await _probe_vllm(cand.url)
+        if model_id:
+            origin = "queued resource" if cand.name in qr_node_ids else "standalone TPU VM"
+            logger.info(f"📡 Found vLLM serving {model_id} on {cand.name} ({origin}) at {cand.url}")
+            return VllmNode(cand.name, cand.url, True)
+
+    for cand in candidates:
+        if cand.mine:
+            logger.info(f"📡 Node {cand.name} is up at {cand.url} but vLLM is not answering yet.")
+            return VllmNode(cand.name, cand.url, False)
+
+    logger.info(f"No TPU node in {ZONE} is serving vLLM.")
+    return None
+
+
+async def discover_vllm_url() -> Optional[str]:
+    """Finds the URL of a running vLLM service in ZONE, Queued Resource or not."""
+    node = await _discover_vllm_node()
+    return node.url if node else None
+
+
+async def _resolve_node_id(resource_id: str, zone: str = ZONE) -> Optional[str]:
+    """Resolves an id the tools were given to an actual TPU VM node name.
+
+    Tried in order: the node of a Queued Resource by that id; a TPU VM by that exact name
+    or by <id>-node (a directly created node has no Queued Resource to describe); and last,
+    the node currently serving vLLM, so the default resource_id still reaches a running
+    deployment whose node was named by hand or by an earlier convention.
+    """
+    node_id = await _get_node_id(resource_id)
+    if node_id:
+        return node_id
+
+    names = {(n.get("name") or "").split("/")[-1] for n in await _list_tpu_vm_nodes(zone)}
+    for candidate in (resource_id, f"{resource_id}-node"):
+        if candidate in names:
+            logger.info(f"No queued resource {resource_id}; using standalone TPU VM {candidate}.")
+            return candidate
+
+    serving = await _discover_vllm_node()
+    if serving and serving.serving:
+        logger.info(f"No node named {resource_id}; falling back to {serving.name}, which is serving vLLM.")
+        return serving.name
     return None
 
 
@@ -317,7 +548,7 @@ async def get_vllm_client() -> AsyncOpenAI:
     """Initializes and returns an AsyncOpenAI client for the vLLM service."""
     url = await discover_vllm_url()
     if not url:
-        raise Exception(f"No ACTIVE Queued Resource found in {ZONE}.")
+        raise Exception(f"No TPU node in {ZONE} is serving vLLM (checked queued resources and standalone TPU VMs).")
     return AsyncOpenAI(base_url=f"{url}/v1", api_key="not-needed")
 
 
@@ -377,7 +608,7 @@ async def save_hf_token(token: str) -> str:
 
 
 @mcp.tool()
-async def get_vllm_deployment_config(service_name: str = "vllm-gemma4-qr", model_name: str = MODEL_NAME) -> str:
+async def get_vllm_deployment_config(service_name: str = RESOURCE_ID, model_name: str = MODEL_NAME) -> str:
     """Generates the gcloud command for a single-host TPU v5e vLLM deployment."""
     # The token is read on the VM at runtime — never interpolated into the returned text.
     # The whole startup script is one single-quoted argument, so the JSON value has to be
@@ -455,11 +686,17 @@ async def destroy_queued_resource(resource_id: str, zone: str = ZONE) -> str:
 
 
 @mcp.tool()
-async def manage_queued_resource(resource_id: str = "vllm-gemma4-qr", zone: str = ZONE) -> str:
+async def manage_queued_resource(
+    resource_id: str = RESOURCE_ID, zone: str = ZONE, provisioning_model: str = PROVISIONING_MODEL
+) -> str:
     """DESTRUCTIVE. Ensures the primary Queued Resource exists and DELETES every other one in the zone.
 
     Only call this when the user has explicitly asked to clean up a zone. To create a
     resource without touching anything else, use create_tpu_queued_resource.
+
+    provisioning_model is only consulted if the primary has to be created: one of
+    'flex-start' (default), 'spot', or 'on-demand'. An existing primary keeps whatever
+    model it was created with — this tool does not convert one in place.
     """
     resources = await _list_queued_resources_json(zone)
     if resources is None:
@@ -485,7 +722,7 @@ async def manage_queued_resource(resource_id: str = "vllm-gemma4-qr", zone: str 
             redundant_deleted.append(name)
 
     if not primary_res:
-        ok, msg = await _create_queued_resource(resource_id, zone)
+        ok, msg = await _create_queued_resource(resource_id, zone, provisioning_model)
         return f"{msg} Cleaned up: {redundant_deleted}"
 
     state = primary_res.get("state", {}).get("state", "UNKNOWN")
@@ -493,12 +730,21 @@ async def manage_queued_resource(resource_id: str = "vllm-gemma4-qr", zone: str 
 
 
 @mcp.tool()
-async def create_tpu_queued_resource(resource_id: str = "vllm-gemma4-qr", zone: str = ZONE) -> str:
-    """Creates a TPU Queued Resource (Flex-start) in the given zone. Non-destructive.
+async def create_tpu_queued_resource(
+    resource_id: str = RESOURCE_ID, zone: str = ZONE, provisioning_model: str = PROVISIONING_MODEL
+) -> str:
+    """Creates a TPU Queued Resource in the given zone. Non-destructive.
 
     Other Queued Resources in the zone are left alone. If a resource with this exact id
     already exists it is reported and nothing is created; only a FAILED/SUSPENDED
     resource under that same id is deleted, so it can be recreated.
+
+    provisioning_model is one of:
+      * 'flex-start' (default) — queues for scarce capacity, self-terminates after 4h.
+        Only accepted for v5litepod-1 in us-west4-a; other zones reject it at the API.
+      * 'spot' — cheapest, draws on the separate preemptible quota, and can be reclaimed
+        with ~30s notice. No max-run-duration, so destroy it when you are done.
+      * 'on-demand' — standard capacity at full price, no preemption, no run bound.
     """
     resources = await _list_queued_resources_json(zone)
     if resources is None:
@@ -513,10 +759,10 @@ async def create_tpu_queued_resource(resource_id: str = "vllm-gemma4-qr", zone: 
 
         logger.info(f"Resource {resource_id} is {state}. Deleting it so it can be recreated.")
         await destroy_queued_resource(resource_id, zone=zone)
-        _, msg = await _create_queued_resource(resource_id, zone)
+        _, msg = await _create_queued_resource(resource_id, zone, provisioning_model)
         return f"{msg} (replaced the previous {state} resource of the same id)"
 
-    _, msg = await _create_queued_resource(resource_id, zone)
+    _, msg = await _create_queued_resource(resource_id, zone, provisioning_model)
     return msg
 
 
@@ -566,15 +812,24 @@ async def _get_zones_with_available_quota_list(
 @mcp.tool()
 async def get_zones_with_available_quota(
     service: str = "tpu.googleapis.com",
-    quota_id: str = TPU_QUOTA_ID,
+    quota_id: Optional[str] = None,
+    provisioning_model: str = PROVISIONING_MODEL,
 ) -> str:
     """
     Retrieves a list of GCP zones that have a non-zero quota for a specific metric.
 
+    Non-zero quota does NOT mean the zone will accept the request — flex-start is refused
+    for v5litepod-1 outside us-west4-a in zones that all report quota. Quota is a ceiling,
+    not an offer of capacity.
+
     Args:
         service: The GCP service to query (defaults to 'tpu.googleapis.com').
-        quota_id: The specific quota ID to filter by (defaults to 'TPUV5sLitepodPerProjectPerZoneForTPUAPI').
+        quota_id: The specific quota ID to filter by. Defaults to the one matching
+            provisioning_model; pass a value to override.
+        provisioning_model: 'flex-start' (default), 'spot', or 'on-demand'. Spot is metered
+            by a separate preemptible quota, so this picks a different id.
     """
+    quota_id = quota_id or _quota_id_for(provisioning_model)
     zones = await _get_zones_with_available_quota_list(service, quota_id)
     if not zones:
         return f"No zones/locations found with non-zero quota limit for `{quota_id}`."
@@ -585,6 +840,19 @@ async def get_zones_with_available_quota(
     return "\n".join(output)
 
 
+def _status_model(detail: str) -> str:
+    """Reads the provisioning model back out of a tpu_zones_status.md detail cell.
+
+    Rows written before the models were configurable carry no tag; they all recorded
+    flex-start attempts, so that is the right reading for an untagged row.
+    """
+    detail = detail.strip()
+    for model in PROVISIONING_MODELS:
+        if detail.startswith(f"[{model}]"):
+            return model
+    return "flex-start"
+
+
 async def _update_status_file(zone: str, success_str: str, detail_str: str) -> None:
     status_file = os.path.join(os.path.dirname(__file__), "tpu_zones_status.md")
     if not os.path.exists(status_file):
@@ -592,8 +860,6 @@ async def _update_status_file(zone: str, success_str: str, detail_str: str) -> N
     try:
         with open(status_file, "r") as f:
             content = f.read()
-
-        import re
 
         if success_str == "Yes":
             content = re.sub(
@@ -622,33 +888,43 @@ async def _update_status_file(zone: str, success_str: str, detail_str: str) -> N
 
 @mcp.tool()
 async def find_tpu(
-    resource_id: str = "vllm-gemma4-qr",
+    resource_id: str = RESOURCE_ID,
     service: str = "tpu.googleapis.com",
-    quota_id: str = TPU_QUOTA_ID,
+    quota_id: Optional[str] = None,
+    provisioning_model: str = PROVISIONING_MODEL,
 ) -> str:
     """
     Finds a zone with available quota and attempts to create the TPU queued resource in that zone until successful.
+
+    provisioning_model is one of 'flex-start' (default), 'spot', or 'on-demand', and also
+    selects which quota the zone sweep reads — spot has its own preemptible quota. The
+    sweep is non-destructive: it only touches the named resource_id.
     """
+    if provisioning_model not in PROVISIONING_MODELS:
+        return f"❌ Aborted: unknown provisioning_model '{provisioning_model}'. Use one of {PROVISIONING_MODELS}."
+
+    quota_id = quota_id or _quota_id_for(provisioning_model)
     zones = await _get_zones_with_available_quota_list(service, quota_id)
     if not zones:
         return f"❌ Aborted: No zones found with non-zero quota for `{quota_id}`."
 
-    # Parse flat status file to skip zones where TPU could not be started
+    # Parse flat status file to skip zones where TPU could not be started. A failure is only
+    # evidence about the provisioning model that produced it — flex-start is refused outside
+    # us-west4-a in zones where spot is fine — so only same-model failures are skipped.
     skipped_zones = set()
     status_file = os.path.join(os.path.dirname(__file__), "tpu_zones_status.md")
     if os.path.exists(status_file):
         try:
             with open(status_file, "r") as f:
                 content = f.read()
-            import re
 
             for line in content.splitlines():
-                # Matches lines like: | **zone-name** | Yes | No | ...
-                match = re.search(r"\|\s*\*\*([a-zA-Z0-9-]+)\*\*\s*\|\s*([^|]+)\|\s*No\s*\|", line)
-                if match:
+                # Matches lines like: | **zone-name** | Yes | No | [spot] reason...
+                match = re.search(r"\|\s*\*\*([a-zA-Z0-9-]+)\*\*\s*\|\s*([^|]+)\|\s*No\s*\|([^|]*)\|", line)
+                if match and _status_model(match.group(3)) == provisioning_model:
                     zone_name = match.group(1).strip()
                     skipped_zones.add(zone_name)
-            logger.info(f"Skipping zones (marked as failed in status file): {list(skipped_zones)}")
+            logger.info(f"Skipping {provisioning_model} zones (marked as failed in status file): {list(skipped_zones)}")
         except Exception as e:
             logger.error(f"Error parsing status file: {e}")
 
@@ -661,13 +937,15 @@ async def find_tpu(
             attempts.append(f"- **Zone {zone}**: ⏭️ Skipped (previously failed according to status file)")
             continue
 
-        logger.info(f"Attempting to create TPU queued resource {resource_id} in zone {zone}...")
-        result = await create_tpu_queued_resource(resource_id=resource_id, zone=zone)
+        logger.info(f"Attempting to create {provisioning_model} queued resource {resource_id} in zone {zone}...")
+        result = await create_tpu_queued_resource(
+            resource_id=resource_id, zone=zone, provisioning_model=provisioning_model
+        )
 
         if result.startswith("❌"):
             attempts.append(f"- **Zone {zone}**: {result}")
             reason = result.replace("❌ Creation failed:", "").strip()
-            await _update_status_file(zone, "No", reason)
+            await _update_status_file(zone, "No", f"[{provisioning_model}] {reason}")
             continue
 
         # Wait up to 3 minutes (180s) or 10 minutes (600s) if it becomes PROVISIONING
@@ -708,7 +986,9 @@ async def find_tpu(
                 logger.warning(f"Failed to check state: {stderr_s or stdout_s}")
 
         if success:
-            await _update_status_file(zone, "Yes", "Successfully started and reached ACTIVE state.")
+            await _update_status_file(
+                zone, "Yes", f"[{provisioning_model}] Successfully started and reached ACTIVE state."
+            )
             attempts.append(f"- **Zone {zone}**: ✅ Successfully created and reached ACTIVE state.")
 
             # Dynamically update global ZONE variable
@@ -728,18 +1008,21 @@ async def find_tpu(
                 if extended
                 else "Timed out waiting 3 minutes to reach ACTIVE state."
             )
-            await _update_status_file(zone, "No", timeout_msg)
+            await _update_status_file(zone, "No", f"[{provisioning_model}] {timeout_msg}")
             attempts.append(f"- **Zone {zone}**: ❌ {timeout_msg}")
 
     return "❌ Failed to start TPU in any zone. Attempted zones:\n" + "\n".join(attempts)
 
 
 @mcp.tool()
-async def manage_vllm_docker(resource_id: str = "vllm-gemma4-qr", action: str = "start") -> str:
+async def manage_vllm_docker(resource_id: str = RESOURCE_ID, action: str = "start") -> str:
     """Manages the vLLM Docker container on the TPU VM."""
-    node_id = await _get_node_id(resource_id)
+    node_id = await _resolve_node_id(resource_id)
     if not node_id:
-        return f"❌ Could not find node for resource {resource_id}. Ensure it is ACTIVE."
+        return (
+            f"❌ Could not find a TPU node for {resource_id} in {ZONE} "
+            "(no ACTIVE queued resource and no standalone TPU VM by that name)."
+        )
 
     # Same image and serve flags the boot-time startup script uses, so a container
     # recreated here matches what the queued resource originally booted with.
@@ -805,7 +1088,7 @@ async def list_queued_resources(zone: str = ZONE) -> str:
 
 
 @mcp.tool()
-async def describe_queued_resource(resource_id: str = "vllm-gemma4-qr", zone: str = ZONE) -> str:
+async def describe_queued_resource(resource_id: str = RESOURCE_ID, zone: str = ZONE) -> str:
     """Provides detailed information about a specific Queued Resource."""
     cmd = [
         "gcloud",
@@ -840,7 +1123,7 @@ async def describe_queued_resource(resource_id: str = "vllm-gemma4-qr", zone: st
 
 
 @mcp.tool()
-async def get_reservation_status(resource_id: str = "vllm-gemma4-qr") -> str:
+async def get_reservation_status(resource_id: str = RESOURCE_ID) -> str:
     """Checks the lifecycle state and expiry time of a Queued Resource."""
     # This function can be simplified if `describe_queued_resource` is sufficient
     return await describe_queued_resource(resource_id)
@@ -872,25 +1155,138 @@ async def check_tpu_availability(resource_id: str) -> str:
     )
 
 
+def _parse_topology(topology: str) -> Optional[int]:
+    """Chip count from a topology string like '1x1' or '2x4x4'. None if it isn't one."""
+    parts = topology.lower().split("x")
+    if not all(p.strip().isdigit() for p in parts) or not parts:
+        return None
+    chips = 1
+    for p in parts:
+        chips *= int(p)
+    return chips or None
+
+
+async def _fetch_compute_skus() -> tuple[Optional[list], str]:
+    """Fetches the Compute Engine SKU catalog from the Cloud Billing Catalog API.
+
+    TPU SKUs live under the Compute Engine service. The catalog has no server-side
+    description filter, so this pages through all ~32k SKUs and callers match locally.
+    Cached for the life of the process — published prices do not move within a session.
+    """
+    if _SKU_CACHE.get("skus"):
+        return _SKU_CACHE["skus"], ""
+
+    rc, token, err = await run_command(["gcloud", "auth", "print-access-token"])
+    if rc != 0 or not token:
+        return None, f"could not get an access token ({err or 'gcloud auth print-access-token failed'})"
+
+    skus: list = []
+    page_token = None
+    base = f"https://cloudbilling.googleapis.com/v1/services/{COMPUTE_BILLING_SERVICE_ID}/skus"
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            while True:
+                params = {"pageSize": "5000", "currencyCode": "USD"}
+                if page_token:
+                    params["pageToken"] = page_token
+                res = await client.get(base, params=params, headers={"Authorization": f"Bearer {token}"})
+                if res.status_code != 200:
+                    return None, f"Billing Catalog API returned HTTP {res.status_code}"
+                payload = res.json()
+                skus.extend(payload.get("skus", []))
+                page_token = payload.get("nextPageToken")
+                if not page_token:
+                    break
+    except Exception as e:
+        return None, f"Billing Catalog API request failed ({e})"
+
+    _SKU_CACHE["skus"] = skus
+    return skus, ""
+
+
+async def _lookup_tpu_rate(
+    tpu_type: str, provisioning_model: str, region: str
+) -> tuple[Optional[float], str, Optional[str]]:
+    """Looks up the published USD rate for one TPU chip-hour. Returns (rate, unit, sku_description).
+
+    rate is None when the catalog has no SKU for that combination — this returns nothing
+    rather than falling back to a guess, because a confident wrong price is worse than
+    no price. Note published list rates ignore any negotiated or committed-use discount
+    on the billing account, so a real invoice can be lower.
+    """
+    skus, err = await _fetch_compute_skus()
+    if skus is None:
+        return None, "", err
+
+    pattern = re.compile(_SKU_DESCRIPTION_PATTERNS[provisioning_model].format(fam=re.escape(tpu_type)), re.I)
+    usage_type = _SKU_USAGE_TYPES[provisioning_model]
+
+    for sku in skus:
+        if region not in sku.get("serviceRegions", []):
+            continue
+        if sku.get("category", {}).get("usageType") != usage_type:
+            continue
+        description = sku.get("description", "")
+        if not pattern.match(description):
+            continue
+        try:
+            expression = sku["pricingInfo"][0]["pricingExpression"]
+            unit_price = expression["tieredRates"][-1]["unitPrice"]
+            rate = int(unit_price.get("units", 0)) + unit_price.get("nanos", 0) / 1e9
+        except (KeyError, IndexError, TypeError) as e:
+            logger.warning(f"SKU '{description}' has an unreadable price: {e}")
+            continue
+        return rate, expression.get("usageUnit", "h"), description
+
+    return None, "", f"no `{provisioning_model}` SKU published for `{tpu_type}` in `{region}`"
+
+
 @mcp.tool()
 async def estimate_deployment_cost(
-    hours: float = 1.0, tpu_type: str = "v5e", topology: str = "1x1", is_flex: bool = True
+    hours: float = 1.0,
+    tpu_type: str = "v5e",
+    topology: str = "1x1",
+    provisioning_model: str = PROVISIONING_MODEL,
+    region: str = REGION,
 ) -> str:
-    """Estimates the cost of a TPU deployment."""
-    rates = {"v6e": 1.35, "v5e": 0.12, "v5p": 0.60}  # Flex-start rates
-    rate = rates.get(tpu_type, rates["v5e"]) * (1 if is_flex else 2)
+    """Estimates the cost of a TPU deployment from live Google Cloud published pricing.
 
-    try:
-        chips = eval(topology.replace("x", "*"))
-    except Exception as e:
-        logger.warning(f"Failed to parse topology string '{topology}': {e}. Using default chips=8.")
-        chips = 8
+    Rates come from the Cloud Billing Catalog API, not a table in this file — an earlier
+    hardcoded table was wrong by 10x and there is no way to notice that from inside the
+    code. If the catalog has no matching SKU this reports that instead of guessing.
+
+    Requires a usable gcloud access token and the Cloud Billing API enabled on the project.
+    """
+    if provisioning_model not in PROVISIONING_MODELS:
+        return f"❌ Unknown provisioning_model '{provisioning_model}'. Use one of {PROVISIONING_MODELS}."
+
+    chips = _parse_topology(topology)
+    if chips is None:
+        return f"❌ Could not read a chip count from topology `{topology}`. Expected something like `1x1` or `2x4`."
+
+    rate, unit, detail = await _lookup_tpu_rate(tpu_type, provisioning_model, region)
+    if rate is None:
+        return (
+            f"❌ No published rate found: {detail}.\n"
+            f"Nothing is estimated rather than guessing — check "
+            f"https://cloud.google.com/tpu/pricing for `{tpu_type}` in `{region}`."
+        )
 
     total_cost = chips * rate * hours
-    return (
+    lines = [
         f"### 💸 Estimated Cost: `${total_cost:.2f}` for `{hours}h` on `{chips}` chip `{tpu_type}` "
-        f"({'Flex-start' if is_flex else 'On-demand'})."
-    )
+        f"({provisioning_model}) in `{region}`",
+        f"- **Rate:** `${rate:.4f}` per chip-{unit} × `{chips}` chips × `{hours}h`",
+        f"- **SKU:** {detail}",
+    ]
+    if provisioning_model == "spot":
+        lines.append("- ⚠️ Spot can be preempted mid-run, so billed hours may be shorter than requested.")
+    elif provisioning_model == "flex-start":
+        lines.append("- Flex-start self-terminates at `--max-run-duration` (4h here), capping the bill.")
+    else:
+        lines.append("- ⚠️ On-demand has no run bound — this bills until you destroy the resource.")
+    lines.append("_List price from the Cloud Billing Catalog; committed-use or negotiated discounts are not applied._")
+    return "\n".join(lines)
 
 
 @mcp.tool()
@@ -898,25 +1294,45 @@ async def get_system_status() -> str:
     """Provides a high-level dashboard of system status."""
     resources_str = await list_queued_resources()
     health = "🔴 Offline"
-    url = await discover_vllm_url()
-    if url:
+    node = await _discover_vllm_node()
+    if node:
         try:
             async with httpx.AsyncClient() as client:
-                res = await client.get(f"{url}/health", timeout=2)
+                res = await client.get(f"{node.url}/health", timeout=2)
                 if res.status_code == 200:
-                    health = f"🟢 Online ({url})"
+                    health = f"🟢 Online ({node.url} on `{node.name}`)"
         except Exception:
             pass
+        if "🔴" in health:
+            health = f"🟡 Node `{node.name}` up at {node.url}, vLLM not answering"
 
-    next_step = "Call `manage_queued_resource` to provision infrastructure."
-    if "ACTIVE" in resources_str:
-        next_step = (
-            "Use `query_queued_gemma4` to interact with the model."
-            if "🟢" in health
-            else "Use `start_vllm_docker` to start the service."
-        )
+    # Queued resources alone do not describe the zone: a directly created node (make
+    # deploy-tpu-spot, or anything provisioned by hand) has no queued resource behind it
+    # and used to be missing from this dashboard entirely.
+    nodes = await _list_tpu_vm_nodes()
+    if nodes:
+        rows = [
+            f"- `{(n.get('name') or '').split('/')[-1]}` — {n.get('state', 'UNKNOWN')}, "
+            f"{n.get('acceleratorType', 'unknown type')}, ip {_node_ip(n) or 'none'}"
+            for n in nodes
+        ]
+        nodes_str = "**🖥️ TPU VM Nodes:**\n" + "\n".join(rows)
+    else:
+        nodes_str = "**🖥️ TPU VM Nodes:** none"
 
-    return f"### 🌀 System Status ({ZONE})\n- **vLLM Health:** {health}\n{resources_str}\n**👉 Next Step:** {next_step}"
+    if "🟢" in health:
+        next_step = "Use `query_queued_gemma4` to interact with the model."
+    elif node:
+        next_step = "A node is up but vLLM is not answering — use `manage_vllm_docker` to start the service."
+    elif "ACTIVE" in resources_str:
+        next_step = "Use `manage_vllm_docker` to start the service on the ACTIVE resource."
+    else:
+        next_step = "Call `manage_queued_resource` to provision infrastructure."
+
+    return (
+        f"### 🌀 System Status ({ZONE})\n- **vLLM Health:** {health}\n"
+        f"{resources_str}\n{nodes_str}\n**👉 Next Step:** {next_step}"
+    )
 
 
 @mcp.tool()
@@ -925,7 +1341,7 @@ async def get_vllm_endpoint() -> str:
     url = await discover_vllm_url()
     if url:
         return f"🟢 vLLM is Online at: {url}"
-    return "❌ No ACTIVE Queued Resource with a reachable vLLM service found."
+    return f"❌ No TPU node in {ZONE} is serving vLLM (checked queued resources and standalone TPU VMs)."
 
 
 @mcp.tool()
@@ -937,7 +1353,7 @@ async def get_deployed_endpoint() -> str:
 
 @mcp.tool()
 async def query_queued_gemma4(prompt: str) -> str:
-    """Queries the self-hosted Gemma 4 model on the active Queued Resource."""
+    """Queries the self-hosted Gemma 4 model on whichever TPU node is serving it."""
     logger.info(f"Querying model with prompt: '{prompt[:50]}...'")
     try:
         client = await get_vllm_client()
@@ -1016,9 +1432,54 @@ async def query_queued_gemma4_with_stats(prompt: str) -> str:
         return f"❌ An error occurred while querying the model with stats: {e}"
 
 
+BENCH_RESULT_MARKER = "---BENCH-RESULT-JSON---"
+
+
+def _sweep_point_from_bench_result(result: dict, concurrency: int, input_len: int, output_len: int) -> dict:
+    """Maps a `vllm bench serve --save-result` dump to a `throughput.sweep[]` entry of
+    benchmarks/serving-report.schema.json v1.1.
+
+    input_len is passed in rather than read from the dump: vLLM records `random_input_len`
+    as null there, and it is the second axis of a 2-D sweep, so losing it would collapse
+    the cell key. The full dump goes under `raw` minus its list-valued keys, which are
+    per-request arrays with one element per prompt."""
+
+    def _stats(metric: str) -> dict:
+        out = {}
+        for stat in ("mean", "median", "p90", "p99"):
+            v = result.get(f"{stat}_{metric}_ms")
+            if isinstance(v, (int, float)):
+                out[stat] = round(v, 2)
+        return out
+
+    point: dict = {
+        "concurrency": concurrency,
+        "input_len": input_len,
+        "output_len": output_len,
+        "status": "ok",
+    }
+    for key, src in (
+        ("request_rate_rps", "request_throughput"),
+        ("output_tok_per_s", "output_throughput"),
+        ("total_tok_per_s", "total_token_throughput"),
+    ):
+        v = result.get(src)
+        if isinstance(v, (int, float)):
+            point[key] = round(v, 2)
+    for key, metric in (("ttft_ms", "ttft"), ("tpot_ms", "tpot"), ("itl_ms", "itl")):
+        stats = _stats(metric)
+        if stats:
+            point[key] = stats
+    tpot_median = point.get("tpot_ms", {}).get("median")
+    if tpot_median:
+        point["per_stream_tok_per_s"] = round(1000 / tpot_median, 1)
+    point["raw"] = {k: v for k, v in result.items() if not isinstance(v, list)}
+    return point
+
+
 @mcp.tool()
 async def run_vllm_benchmark(
-    resource_id: str = "vllm-gemma4-qr",
+    resource_id: str = RESOURCE_ID,
     backend: str = "vllm",
     model: str = MODEL_NAME,
     dataset_name: str = "random",
@@ -1026,11 +1487,19 @@ async def run_vllm_benchmark(
     random_input_len: int = 1024,
     random_output_len: int = 128,
     max_concurrency: Optional[int] = None,
+    save_result: bool = False,
 ) -> str:
-    """Runs vLLM's internal benchmark tool inside the container on the TPU VM."""
-    node_id = await _get_node_id(resource_id)
+    """Runs vLLM's internal benchmark tool inside the container on the TPU VM.
+
+    With save_result=True the run's --save-result JSON is fetched back and returned as a
+    ready-made throughput.sweep[] entry for benchmarks/serving-report.schema.json, one call
+    per sweep point."""
+    node_id = await _resolve_node_id(resource_id)
     if not node_id:
-        return f"❌ Could not find node for resource {resource_id}. Ensure it is ACTIVE."
+        return (
+            f"❌ Could not find a TPU node for {resource_id} in {ZONE} "
+            "(no ACTIVE queued resource and no standalone TPU VM by that name)."
+        )
 
     benchmark_cmd = (
         "vllm bench serve "
@@ -1044,6 +1513,12 @@ async def run_vllm_benchmark(
     if max_concurrency:
         benchmark_cmd += f" --max-concurrency {max_concurrency}"
 
+    # /dev/shm is already bind-mounted into the container, so a result written there outlives
+    # the --rm container and can be read back in the same SSH session.
+    result_name = f"vllm-bench-{os.urandom(4).hex()}.json"
+    if save_result:
+        benchmark_cmd += f" --save-result --result-dir /dev/shm --result-filename {result_name}"
+
     # We run the benchmark in a new container to not interfere with the serving container
     docker_cmd = (
         "sudo docker run --rm --privileged --net=host "
@@ -1051,6 +1526,11 @@ async def run_vllm_benchmark(
         "-e HF_TOKEN=$(gcloud secrets versions access latest --secret=hf-token) "
         f"vllm/vllm-tpu:nightly {benchmark_cmd}"
     )
+    remote_cmd = docker_cmd
+    if save_result:
+        remote_cmd += (
+            f" && echo {BENCH_RESULT_MARKER} && sudo cat /dev/shm/{result_name} && sudo rm -f /dev/shm/{result_name}"
+        )
 
     ssh_cmd = [
         "gcloud",
@@ -1062,7 +1542,7 @@ async def run_vllm_benchmark(
         f"--zone={ZONE}",
         f"--project={PROJECT_ID}",
         "--command",
-        docker_cmd,
+        remote_cmd,
     ]
 
     rc, out, err = await run_command(ssh_cmd, timeout=600)  # Increased timeout for benchmark
@@ -1070,16 +1550,38 @@ async def run_vllm_benchmark(
         return f"""⚠️ Benchmark failed on {node_id}.
 Error: {err}
 Output: {out}"""
-    return f"""✅ Benchmark completed on {node_id}:
+    if not save_result:
+        return f"""✅ Benchmark completed on {node_id}:
 {out}"""
+
+    bench_stdout, sep, result_json = out.partition(BENCH_RESULT_MARKER)
+    if not sep:
+        return f"""⚠️ Benchmark ran on {node_id} but no result JSON came back:
+{out}"""
+    try:
+        result = json.loads(result_json)
+    except json.JSONDecodeError as e:
+        return f"""⚠️ Benchmark ran on {node_id} but the result JSON did not parse ({e}):
+{result_json.strip()[:2000]}"""
+    concurrency = int(max_concurrency) if max_concurrency else int(num_prompts)
+    point = _sweep_point_from_bench_result(result, concurrency, int(random_input_len), int(random_output_len))
+    return (
+        f"✅ Benchmark completed on {node_id}.\n\n"
+        "throughput.sweep[] entry (benchmarks/serving-report.schema.json):\n"
+        f"```json\n{json.dumps(point, indent=2)}\n```\n\n"
+        f"Benchmark output:\n{bench_stdout.strip()}"
+    )
 
 
 @mcp.tool()
-async def get_vllm_docker_logs(resource_id: str = "vllm-gemma4-qr", tail: Optional[int] = None) -> str:
+async def get_vllm_docker_logs(resource_id: str = RESOURCE_ID, tail: Optional[int] = None) -> str:
     """Retrieves logs from the vLLM Docker container on the TPU VM."""
-    node_id = await _get_node_id(resource_id)
+    node_id = await _resolve_node_id(resource_id)
     if not node_id:
-        return f"❌ Could not find node for resource {resource_id}. Ensure it is ACTIVE."
+        return (
+            f"❌ Could not find a TPU node for {resource_id} in {ZONE} "
+            "(no ACTIVE queued resource and no standalone TPU VM by that name)."
+        )
 
     log_cmd = "sudo docker logs vllm-gemma4"
     if tail:
@@ -1108,12 +1610,15 @@ Error: {err}"""
 
 @mcp.tool()
 async def get_tpu_system_logs(
-    resource_id: str = "vllm-gemma4-qr", service: str = "docker", tail: Optional[int] = None
+    resource_id: str = RESOURCE_ID, service: str = "docker", tail: Optional[int] = None
 ) -> str:
     """Retrieves systemd logs for a specific service from the TPU VM."""
-    node_id = await _get_node_id(resource_id)
+    node_id = await _resolve_node_id(resource_id)
     if not node_id:
-        return f"❌ Could not find node for resource {resource_id}. Ensure it is ACTIVE."
+        return (
+            f"❌ Could not find a TPU node for {resource_id} in {ZONE} "
+            "(no ACTIVE queued resource and no standalone TPU VM by that name)."
+        )
 
     log_cmd = f"journalctl -u {service} -n {tail or 100}"
 
@@ -1194,7 +1699,7 @@ async def get_model_details() -> str:
     """
     url = await discover_vllm_url()
     if not url:
-        return "❌ No ACTIVE Queued Resource with a reachable vLLM service found."
+        return f"❌ No TPU node in {ZONE} is serving vLLM (checked queued resources and standalone TPU VMs)."
 
     report = f"### 🧩 Model & vLLM Engine Details ({url})\n\n"
 
@@ -1295,7 +1800,7 @@ async def get_metrics() -> str:
     """
     url = await discover_vllm_url()
     if not url:
-        return "❌ No ACTIVE Queued Resource with a reachable vLLM service found."
+        return f"❌ No TPU node in {ZONE} is serving vLLM (checked queued resources and standalone TPU VMs)."
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:

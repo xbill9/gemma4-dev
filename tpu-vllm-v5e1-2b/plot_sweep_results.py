@@ -5,7 +5,7 @@ import pandas as pd
 import seaborn as sns
 
 # Load the JSON results
-with open("benchmark_results.json", "r") as f:
+with open("benchmarks/runs/undated-vllm-grid-a-v6e1/benchmark_results.json", "r") as f:
     results = json.load(f)
 
 # Convert to DataFrame

@@ -1,0 +1,106 @@
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2593.08it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+
+weights 19.357 GB   HBM limit 33.546 GB
+
+============================================================================================
+PHASE 1 — largest buffers in the optimized HLO
+============================================================================================
+
+--- B=1 S=1024   temp 9.174 GB   (39087 instructions parsed) ---
+      5.637 GB  broadcast      f32[262144,5376]
+      5.637 GB  convert        f32[262144,5376]
+      5.637 GB  multiply       f32[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      0.462 GB  broadcast      s32[21504,672,8]
+      0.462 GB  bitcast        s32[21504,5376]
+      0.462 GB  broadcast      s32[21504,5376]
+      0.462 GB  shift-right-arithmetic s32[21504,5376]
+      0.462 GB  broadcast      s32[21504,5376]
+      0.462 GB  and            s32[21504,5376]
+      0.462 GB  convert        f32[21504,5376]
+      0.462 GB  convert        f32[21504,5376]
+      0.462 GB  add            f32[21504,5376]
+      0.462 GB  convert        f32[21504,5376]
+      0.462 GB  multiply       f32[21504,5376]
+      0.462 GB  broadcast      s32[21504,672,8]
+
+--- B=1 S=2048   temp 10.191 GB   (36021 instructions parsed) ---
+      5.637 GB  broadcast      f32[262144,5376]
+      5.637 GB  convert        f32[262144,5376]
+      5.637 GB  multiply       f32[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      0.537 GB  convolution    f32[16,2,2048,2048]
+      0.537 GB  broadcast      f32[16,2,2048,2048]
+      0.537 GB  add            f32[16,2,2048,2048]
+      0.537 GB  parameter      f32[16,2,2048,2048]
+      0.537 GB  broadcast      f32[16,2,2048,2048]
+      0.537 GB  add            f32[16,2,2048,2048]
+      0.537 GB  broadcast      f32[16,2,2048,2048]
+      0.537 GB  subtract       f32[16,2,2048,2048]
+      0.537 GB  exponential    f32[16,2,2048,2048]
+      0.537 GB  parameter      f32[16,2,2048,2048]
+      0.537 GB  broadcast      f32[16,2,2048,2048]
+      0.537 GB  add            f32[16,2,2048,2048]
+
+--- B=1 S=4096   temp 10.336 GB   (36135 instructions parsed) ---
+      5.637 GB  broadcast      f32[262144,5376]
+      5.637 GB  convert        f32[262144,5376]
+      5.637 GB  multiply       f32[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      2.819 GB  parameter      bf16[262144,5376]
+      2.147 GB  convolution    f32[16,2,4096,4096]
+      2.147 GB  broadcast      f32[16,2,4096,4096]
+      2.147 GB  add            f32[16,2,4096,4096]
+      2.147 GB  parameter      f32[16,2,4096,4096]
+      2.147 GB  broadcast      f32[16,2,4096,4096]
+      2.147 GB  add            f32[16,2,4096,4096]
+      2.147 GB  broadcast      f32[16,2,4096,4096]
+      2.147 GB  subtract       f32[16,2,4096,4096]
+      2.147 GB  exponential    f32[16,2,4096,4096]
+      2.147 GB  parameter      f32[16,2,4096,4096]
+      2.147 GB  broadcast      f32[16,2,4096,4096]
+      2.147 GB  add            f32[16,2,4096,4096]
+
+--- scaling of named buffers, S=2048 -> S=4096 (S ratio 2x) ---
+   broadcast         720.15 -> 1423.73 GB    1.98x   [S]
+   parameter         431.18 ->  854.89 GB    1.98x   [S]
+   add               247.53 ->  570.74 GB    2.31x   [S]
+   multiply          298.12 ->  473.01 GB    1.59x   [S]
+   convert           453.93 ->  460.98 GB    1.02x   [fixed]
+   bitcast           272.74 ->  319.44 GB    1.17x   [fixed]
+   fusion            155.99 ->  317.22 GB    2.03x   [S]
+   subtract           64.42 ->  257.70 GB    4.00x   [S^2]
+   exponential        64.42 ->  257.70 GB    4.00x   [S^2]
+   convolution        69.31 ->  203.04 GB    2.93x   [S]
+   get-tuple-element   74.51 ->  196.74 GB    2.64x   [S]
+   divide             32.21 ->  128.85 GB    4.00x   [S^2]
+   and               117.60 ->  117.64 GB    1.00x   [fixed]
+   shift-right-arithmetic  117.59 ->  117.59 GB    1.00x   [fixed]
+   copy               48.42 ->   48.42 GB    1.00x   [fixed]
+   pad                13.51 ->   27.03 GB    2.00x   [S]
+   tanh               10.57 ->   21.14 GB    2.00x   [S]
+   copy-done          13.59 ->   20.79 GB    1.53x   [S]
+   maximum             6.72 ->   13.45 GB    2.00x   [S]
+   slice               6.49 ->   12.99 GB    2.00x   [S]
+   slice-done          9.35 ->   11.14 GB    1.19x   [fixed]
+   custom-call         8.51 ->   10.30 GB    1.21x   [fixed]
+   negate              3.27 ->    6.54 GB    2.00x   [S]
+   reshape             1.34 ->    1.37 GB    1.02x   [fixed]
+
+============================================================================================
+PHASE 2 — logits_at A/B, same chip, same process, back to back
+============================================================================================
+        cell      OLD temp      NEW temp       saved
+  B=1 S=2048     11.596 GB     10.191 GB    1.405 GB
+  B=1 S=4096     10.745 GB     10.336 GB    0.409 GB
+  B=2 S=2048        FAILED     10.408 GB           —
+  B=2 S=4096        FAILED        FAILED           —
+  B=1 S=8192        FAILED        FAILED           —
+
+Wrote gemma4_31b_buffers_ab.json

@@ -1,6 +1,6 @@
 # 🚀 tpu-skill-claude — TPU Management Skill & MCP Agent
 
-This repository packages the **`tpu-management` Claude Code skill** and the **`tpu-devops` MCP server**: an AI DevOps/SRE agent for operating Google Cloud TPU capacity and **Gemma 4** vLLM serving on TPU VMs. It finds and provisions TPU capacity (flex-start VMs, queued resources), starts and debugs vLLM, verifies model health, runs benchmarks, analyzes logs with the self-hosted Gemma 4 model, and tears everything down safely.
+This repository packages the **`tpu-pytorch-v5e1-2b-management` Claude Code skill** and the **`tpu-pytorch-v5e1-2b` MCP server**: an AI DevOps/SRE agent for operating Google Cloud TPU capacity and **Gemma 4** vLLM serving on TPU VMs. It finds and provisions TPU capacity (flex-start VMs, queued resources), starts and debugs vLLM, verifies model health, runs benchmarks, analyzes logs with the self-hosted Gemma 4 model, and tears everything down safely.
 
 **GitHub:** https://github.com/xbill9/tpu-skill-claude
 
@@ -8,7 +8,7 @@ This repository packages the **`tpu-management` Claude Code skill** and the **`t
 
 ## ⚡ Quick Start — set up a project in one command
 
-`project-setup.sh` installs the `tpu-management` skill **and** registers the `tpu-devops` MCP server for any project (idempotent — re-run to refresh):
+`project-setup.sh` installs the `tpu-pytorch-v5e1-2b-management` skill **and** registers the `tpu-pytorch-v5e1-2b` MCP server for any project (idempotent — re-run to refresh):
 
 ```bash
 ./project-setup.sh /path/to/project --project <gcp-project-id>   # one project (.mcp.json + .claude/skills)
@@ -16,27 +16,27 @@ This repository packages the **`tpu-management` Claude Code skill** and the **`t
 make init TARGET=/path/to/project ARGS='--project <id>' # same, refreshing skill snapshots first
 ```
 
-It uses the system `python3` (warning with a `pip install -r requirements.txt` hint if server dependencies are missing — it never creates a venv), merges the server entry into the project's `.mcp.json` without touching other servers, and prints the remaining manual steps (restart Claude Code, gcloud auth, HF token). See `./project-setup.sh --help` for all options. The installer is also bundled inside the skill itself (`mcp/project-setup.sh`), so an unzipped `dist/tpu-management-skill.zip` is self-installing.
+It uses the system `python3` (warning with a `pip install -r requirements.txt` hint if server dependencies are missing — it never creates a venv), merges the server entry into the project's `.mcp.json` without touching other servers, and prints the remaining manual steps (restart Claude Code, gcloud auth, HF token). See `./project-setup.sh --help` for all options. The installer is also bundled inside the skill itself (`mcp/project-setup.sh`), so an unzipped `dist/tpu-pytorch-v5e1-2b-management-skill.zip` is self-installing.
 
 This repo's **own** `.mcp.json` is gitignored (it embeds your GCP project id) and is generated automatically: `./init.sh` registers the server on first run (leaving an existing entry untouched), or regenerate it any time with `./project-setup.sh . --project <gcp-project-id> [--model ... --accelerator ... --tp ...]`.
 
 ---
 
-## 📦 Installing the `tpu-management` Skill
+## 📦 Installing the `tpu-pytorch-v5e1-2b-management` Skill
 
 Claude Code auto-discovers any skill folder containing a `SKILL.md` in two places:
 
-- **Project-level:** `<project>/.claude/skills/tpu-management/` — available only in that project (this repo ships its own copy, so working inside this repo needs no install).
-- **User-level:** `~/.claude/skills/tpu-management/` — available in every project on the machine.
+- **Project-level:** `<project>/.claude/skills/tpu-pytorch-v5e1-2b-management/` — available only in that project (this repo ships its own copy, so working inside this repo needs no install).
+- **User-level:** `~/.claude/skills/tpu-pytorch-v5e1-2b-management/` — available in every project on the machine.
 
 Pick the install path that fits:
 
 | Goal | Command |
 | :--- | :--- |
 | This machine, all projects | `make skill-install` |
-| One specific project (skill **and** `tpu-devops` MCP server) | `make init TARGET=/path/to/project ARGS='--project <gcp-project-id>'` |
+| One specific project (skill **and** `tpu-pytorch-v5e1-2b` MCP server) | `make init TARGET=/path/to/project ARGS='--project <gcp-project-id>'` |
 | All projects + user-scope MCP registration | `make init ARGS='--global'` |
-| Another machine | `make skill-package`, copy `dist/tpu-management-skill.zip`, unzip into `~/.claude/skills/` |
+| Another machine | `make skill-package`, copy `dist/tpu-pytorch-v5e1-2b-management-skill.zip`, unzip into `~/.claude/skills/` |
 
 ### Install from GitHub
 
@@ -44,10 +44,10 @@ Pick the install path that fits:
 
 ```
 /plugin marketplace add xbill9/tpu-skill-claude
-/plugin install tpu-management@tpu-skill-claude
+/plugin install tpu-pytorch-v5e1-2b-management@tpu-skill-claude
 ```
 
-This installs the `tpu-management` skill **and** registers the `tpu-devops` MCP server in one step, with updates managed by Claude Code (`/plugin` → manage/update). Configure the server through environment variables (e.g. `GOOGLE_CLOUD_PROJECT`, `MODEL_NAME`, `ACCELERATOR_TYPE`) — see `SKILL.md` or the `get_help` tool for the full list.
+This installs the `tpu-pytorch-v5e1-2b-management` skill **and** registers the `tpu-pytorch-v5e1-2b` MCP server in one step, with updates managed by Claude Code (`/plugin` → manage/update). Configure the server through environment variables (e.g. `GOOGLE_CLOUD_PROJECT`, `MODEL_NAME`, `ACCELERATOR_TYPE`) — see `SKILL.md` or the `get_help` tool for the full list.
 
 **Option B — clone and install** (all projects on this machine):
 
@@ -55,21 +55,21 @@ This installs the `tpu-management` skill **and** registers the `tpu-devops` MCP 
 git clone https://github.com/xbill9/tpu-skill-claude
 cd tpu-skill-claude
 make skill-install                                   # skill only
-./project-setup.sh --global                          # skill + user-scope tpu-devops MCP server
+./project-setup.sh --global                          # skill + user-scope tpu-pytorch-v5e1-2b MCP server
 ```
 
 **Option C — zip install, no clone** (straight from the packaged zip):
 
 ```bash
-curl -L -o /tmp/tpu-management-skill.zip \
-  https://github.com/xbill9/tpu-skill-claude/raw/main/dist/tpu-management-skill.zip
-mkdir -p ~/.claude/skills && unzip -o /tmp/tpu-management-skill.zip -d ~/.claude/skills/
-~/.claude/skills/tpu-management/mcp/project-setup.sh --global   # optional: register the MCP server
+curl -L -o /tmp/tpu-pytorch-v5e1-2b-management-skill.zip \
+  https://github.com/xbill9/tpu-skill-claude/raw/main/dist/tpu-pytorch-v5e1-2b-management-skill.zip
+mkdir -p ~/.claude/skills && unzip -o /tmp/tpu-pytorch-v5e1-2b-management-skill.zip -d ~/.claude/skills/
+~/.claude/skills/tpu-pytorch-v5e1-2b-management/mcp/project-setup.sh --global   # optional: register the MCP server
 ```
 
 All of these first run `make skill` (`refresh_skill.py`), which regenerates the bundled snapshots from the repo-root sources: `server.py`, `project-setup.sh`, and `requirements.txt` are copied into the skill's `mcp/` folder, and `references/tpu-guide.md` is rebuilt from `tpu.md` with the embedded screenshots stripped. `SKILL.md` and the `mcp/startup_script*_template.sh` scripts are hand-maintained and never overwritten.
 
-After installing (or updating), **restart Claude Code** or start a new session so it picks up the skill. Verify with `/skills` — `tpu-management` should be listed.
+After installing (or updating), **restart Claude Code** or start a new session so it picks up the skill. Verify with `/skills` — `tpu-pytorch-v5e1-2b-management` should be listed.
 
 Because installs are refresh-and-copy (not symlinks), an installed copy goes stale when `server.py`, `tpu.md`, or `SKILL.md` changes — rerun `make skill-install` (or `make init ...`) after editing those files.
 
@@ -79,15 +79,15 @@ Because installs are refresh-and-copy (not symlinks), an installed copy goes sta
 
 | Path | Purpose |
 | :--- | :--- |
-| `server.py` | The `tpu-devops` FastMCP server — the authoritative source (full tool catalog in `SKILL.md` / the `get_help` tool) |
+| `server.py` | The `tpu-pytorch-v5e1-2b` FastMCP server — the authoritative source (full tool catalog in `SKILL.md` / the `get_help` tool) |
 | `project-setup.sh` | One-command installer: skill + MCP registration for a target project |
 | `refresh_skill.py` | Regenerates the bundled skill snapshots from the repo-root sources |
 | `requirements.txt` | Python dependencies for the MCP server |
 | `Makefile` | `skill` / `skill-install` / `skill-package` / `init` targets (see below) |
-| `.claude/skills/tpu-management/` | Project-level skill: `SKILL.md`, `mcp/` (server snapshot, installer, startup script template), `references/tpu-guide.md` |
+| `.claude/skills/tpu-pytorch-v5e1-2b-management/` | Project-level skill: `SKILL.md`, `mcp/` (server snapshot, installer, startup script template), `references/tpu-guide.md` |
 | `.claude-plugin/` | `plugin.json` + `marketplace.json` — the repo doubles as a Claude Code plugin marketplace |
-| `skills/tpu-management/` | Plugin-layout copy of the skill (synced by `make skill`) |
-| `dist/tpu-management-skill.zip` | Packaged skill for zip installs (built by `make skill-package`) |
+| `skills/tpu-pytorch-v5e1-2b-management/` | Plugin-layout copy of the skill (synced by `make skill`) |
+| `dist/tpu-pytorch-v5e1-2b-management-skill.zip` | Packaged skill for zip installs (built by `make skill-package`) |
 | `init.sh`, `set_env.sh`, `set_adc.sh` | GCP environment / credentials setup helpers |
 | `tpu.md` | TPU getting started guide source (gitignored; the stripped, vendor-neutral text copy ships in `references/tpu-guide.md`) |
 
@@ -95,7 +95,7 @@ Because installs are refresh-and-copy (not symlinks), an installed copy goes sta
 
 ## 🛠 Features & Capabilities
 
-The `tpu-devops` MCP server covers the full TPU serving lifecycle (catalog with usage guidance in [SKILL.md](.claude/skills/tpu-management/SKILL.md), live listing via the `get_help` tool):
+The `tpu-pytorch-v5e1-2b` MCP server covers the full TPU serving lifecycle (catalog with usage guidance in [SKILL.md](.claude/skills/tpu-pytorch-v5e1-2b-management/SKILL.md), live listing via the `get_help` tool):
 
 - **Capacity discovery & provisioning:** sweep zones for available capacity (`find_tpu_vm` for flex-start VMs, `find_tpu` for queued resources), check quotas (`get_zones_with_available_quota`), estimate cost, create flex-start TPU VMs (v6e/v5p) or legacy queued resources (v5e) with an auto-serving startup script, then `wait_for_vllm_ready` until the model is up.
 - **Serving stack control:** manage the vLLM Docker container (`manage_vllm_docker` — works on both flex-start VMs and queued-resource nodes), fetch endpoints and the gcloud deployment one-liner, store the HF token in Secret Manager.
@@ -110,9 +110,9 @@ The `tpu-devops` MCP server covers the full TPU serving lifecycle (catalog with 
 ```bash
 make skill         # Refresh skill snapshots from server.py / tpu.md (also syncs the plugin copy in skills/)
 make skill-install # Refresh + copy the skill to ~/.claude/skills (all projects)
-make skill-package # Refresh + build dist/tpu-management-skill.zip
+make skill-package # Refresh + build dist/tpu-pytorch-v5e1-2b-management-skill.zip
 make init TARGET=/path/to/project [ARGS='--project my-gcp-id']
-                   # Refresh + install skill AND register the tpu-devops MCP server
+                   # Refresh + install skill AND register the tpu-pytorch-v5e1-2b MCP server
 ```
 
 Edit the repo-root sources (`server.py`, `tpu.md`, `project-setup.sh`), then run the appropriate target — never edit the snapshot copies directly.
@@ -143,7 +143,7 @@ When deploying to Google Cloud or Hugging Face, secure credentials using:
 
 ## 📖 Related Documentation
 
-- [SKILL.md](.claude/skills/tpu-management/SKILL.md) — the skill itself: lifecycle, tool catalog, required vLLM flags, field notes, cautions
+- [SKILL.md](.claude/skills/tpu-pytorch-v5e1-2b-management/SKILL.md) — the skill itself: lifecycle, tool catalog, required vLLM flags, field notes, cautions
 - [GEMINI.md](GEMINI.md) — Gemini CLI integration via a LiteLLM proxy pointed at the self-hosted Gemma 4 TPU endpoint
 - `references/tpu-guide.md` — TPU getting started guide: flex-start zones, quotas, troubleshooting
 

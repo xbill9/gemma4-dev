@@ -1,6 +1,5 @@
-wrote results/summary.json
 
-## gemma-4-12b-it — 63 cells ok, max_model_len=8192, time_to_healthy=622s
+## gemma-4-12b-it — 63 measured, 0 failed, 28 infeasible, max_model_len=8192, time_to_healthy=622s
 
 ### Aggregate output tok/s
 
@@ -15,10 +14,10 @@ wrote results/summary.json
 | 512 |45 |89 |171 |312 |468 |473 |473 |
 | 2048 |43 |78 |137 |136 |135 |134 |134 |
 | 4096 |41 |75 |76 |76 |76 |76 |76 |
-| 8192 |skip |skip |skip |skip |skip |skip |skip |
-| 16384 |skip |skip |skip |skip |skip |skip |skip |
-| 32768 |skip |skip |skip |skip |skip |skip |skip |
-| 65536 |skip |skip |skip |skip |skip |skip |skip |
+| 8192 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 16384 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 32768 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 65536 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
 
 ### Median TPOT ms (per-stream latency)
 
@@ -33,10 +32,10 @@ wrote results/summary.json
 | 512 |22.1 |22.4 |22.7 |24.1 |26.7 |26.2 |26.2 |
 | 2048 |22.6 |23.9 |26.0 |27.2 |27.3 |27.3 |27.3 |
 | 4096 |22.6 |24.7 |24.7 |24.7 |24.7 |24.7 |24.7 |
-| 8192 |skip |skip |skip |skip |skip |skip |skip |
-| 16384 |skip |skip |skip |skip |skip |skip |skip |
-| 32768 |skip |skip |skip |skip |skip |skip |skip |
-| 65536 |skip |skip |skip |skip |skip |skip |skip |
+| 8192 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 16384 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 32768 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 65536 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
 
 ### Median TTFT ms
 
@@ -51,12 +50,12 @@ wrote results/summary.json
 | 512 |34 |51 |89 |215 |265 |3912 |11013 |
 | 2048 |107 |219 |394 |4041 |11700 |27015 |43993 |
 | 4096 |218 |265 |3624 |10394 |23927 |50975 |79888 |
-| 8192 |skip |skip |skip |skip |skip |skip |skip |
-| 16384 |skip |skip |skip |skip |skip |skip |skip |
-| 32768 |skip |skip |skip |skip |skip |skip |skip |
-| 65536 |skip |skip |skip |skip |skip |skip |skip |
+| 8192 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 16384 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 32768 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
+| 65536 |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |infeasible |
 
-## gemma-4-e2b-it — 91 cells ok, max_model_len=65536, time_to_healthy=490s
+## gemma-4-e2b-it — 91 measured, 0 failed, 0 infeasible, max_model_len=65536, time_to_healthy=490s
 
 ### Aggregate output tok/s
 
@@ -112,7 +111,7 @@ wrote results/summary.json
 | 32768 |404 |163 |288 |2410 |2126 |7730 |13766 |
 | 65536 |1442 |372 |563 |1547 |2362 |6826 |40660 |
 
-## gemma-4-e4b-it — 91 cells ok, max_model_len=65536, time_to_healthy=524s
+## gemma-4-e4b-it — 91 measured, 0 failed, 0 infeasible, max_model_len=65536, time_to_healthy=524s
 
 ### Aggregate output tok/s
 

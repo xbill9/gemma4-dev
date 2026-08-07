@@ -1,0 +1,42 @@
+Existing host keys found in /home/xbill/.ssh/google_compute_known_hosts
+-rw-r--r-- 1 xbill xbill  273 Jul 25 15:07 /tmp/smoke.py
+-rw-r--r-- 1 xbill xbill 4578 Jul 25 15:07 /tmp/torchtpu_generate.py
+--- smoke test ---
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/torch/__init__.py", line 3030, in _import_device_backends
+    entrypoint = backend_extension.load()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/importlib/metadata/__init__.py", line 205, in load
+    module = import_module(match.group('module'))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/usr/local/lib/python3.12/dist-packages/torch_tpu/_loader.py", line 32, in <module>
+    from torch_tpu._internal import tracing
+  File "/usr/local/lib/python3.12/dist-packages/torch_tpu/_internal/tracing/__init__.py", line 35, in <module>
+    from torch_tpu._internal.compile import tpu_torch_compile
+  File "/usr/local/lib/python3.12/dist-packages/torch_tpu/_internal/compile/__init__.py", line 22, in <module>
+    from torch_tpu._internal.compile import tpu_torch_compile
+ImportError: /usr/local/lib/python3.12/dist-packages/torch_tpu/_internal/compile/../../common/libpywrap_torch_tpu_common.so: undefined symbol: _ZN5torch8autograd10deleteNodeEPNS0_4NodeE
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/torchtpu_smoke.py", line 1, in <module>
+    import torch
+  File "/usr/local/lib/python3.12/dist-packages/torch/__init__.py", line 3077, in <module>
+    _import_device_backends()
+  File "/usr/local/lib/python3.12/dist-packages/torch/__init__.py", line 3034, in _import_device_backends
+    raise RuntimeError(
+RuntimeError: Failed to load the backend extension: torch_tpu. You can disable extension auto-loading with TORCH_DEVICE_BACKEND_AUTOLOAD=0.
+
+real	0m2.252s
+user	0m6.393s
+sys	0m0.292s

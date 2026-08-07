@@ -17,7 +17,11 @@ import sys
 
 import torch
 
-sys.path.insert(0, "/home/xbill/tpu-pytorch/ports/moe_experts")
+import os
+
+# quant_experts sits next to this test. This was an absolute path to a rig checkout —
+# in two of the three copies, to a rig that does not exist under this monorepo at all.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from quant_experts import W4A16Experts, dequantize_expert_tensor, quantize_expert_tensor
 
 from transformers.models.gemma4.configuration_gemma4 import Gemma4TextConfig

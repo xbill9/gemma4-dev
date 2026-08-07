@@ -13,7 +13,7 @@ attention geometries, truncated 5:1 sliding/full pattern), float32 on CPU:
   c. torch.compile(backend="aot_eager", fullgraph=True) of the full MoE model
      forward — any graph break fails the test.
 
-Run:  cd /home/xbill/tpu-pytorch/ports/gemma4 && python3 moe_parity_test.py
+Run:  cd ports/gemma4 && python3 moe_parity_test.py
 
 Note: HF's Gemma4TextConfig force-coerces the LAST layer to "full_attention",
 so the truncated pattern ends in a full layer (same as parity_test.py).

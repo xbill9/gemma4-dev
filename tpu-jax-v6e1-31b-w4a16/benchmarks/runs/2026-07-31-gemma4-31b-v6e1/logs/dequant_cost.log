@@ -1,0 +1,14 @@
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2558.54it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+
+full 31B w4a16 weights: 19.357 GB
+
+  layers     mode    weights       step    tok/s      GB/s  % roofline
+       8    w4a16     5.01 GB    12.17 ms     82.2    411.9       25.1%
+       8    dense    10.61 GB    10.03 ms     99.7   1057.9       64.5%
+      15    w4a16     6.93 GB    20.91 ms     47.8    331.6       20.2%
+      15    dense  FAILED: RESOURCE_EXHAUSTED: E0101: RuntimeProgramAllocationFailure:
+
+  8 layers: dense is 1.21x faster in wall time while reading 2.12x more bytes -> 2.57x better per byte
+
+Wrote gemma4_31b_dequant_cost.json

@@ -64,8 +64,13 @@ offline and mock cloud, subprocess, and network boundaries.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-1`, the Flex-start runtime version is
   `v2-alpha-tpuv5-lite`, and `--type=v5litepod --topology=1x1` is the tpu-vm form. Use "v5e-1" in prose only,
   never as a gcloud argument.
-- `discover_vllm_url()` dynamically finds the first ACTIVE queued resource in the configured zone, resolves
-  its node and external IP, and constructs `http://{ip}:8000`. Use it instead of stale endpoints.
+- `_discover_vllm_node()` / `discover_vllm_url()` dynamically find the TPU node serving vLLM in the configured
+  zone and construct `http://{ip}:8000`. They list **TPU VM nodes**, not queued resources, so a node created
+  directly (`make deploy-tpu-spot`, or by hand) is found as readily as one a queued resource created; nodes
+  are ranked with this rig's own names first and probed on `/v1/models`. A node belonging to another rig is
+  only used if a probe confirmed it is serving. Use these instead of stale endpoints.
+- The SSH-based tools resolve their `resource_id` through `_resolve_node_id()`, which falls back from the
+  queued resource's node to a TPU VM of that name, then to whichever node is confirmed serving vLLM.
 - `startup_script_template.sh` is rendered with Python `str.format()`. Its supported placeholders are
   `{project_id}`, `{zone}`, `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`,
   `{max_num_batched_tokens}`, and `{limit_mm_per_prompt}`. Escape every other literal brace as `{{` or `}}`,

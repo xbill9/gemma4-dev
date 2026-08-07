@@ -1,0 +1,87 @@
+===== EAGER google/gemma-4-E4B-it =====
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1784993099.320169   23039 pjrt_api.cc:119] GetPjrtApi was found for TPU at /usr/local/lib/python3.12/dist-packages/libtpu/libtpu.so
+I0000 00:00:1784993099.333127   23039 tpu_profiler_plugin.cc:712] PyTorch PrivateUse1ProfilerRegistry not found. Native TPU profiling will be disabled (this is expected on PyTorch < 2.12).
+I0000 00:00:1784993100.090226   23039 device_rt.cc:125] PjRt runtime initialization deferred for tpu
+Successfully renamed PrivateUse1 backend to 'tpu'. Device: device(type='tpu')
+Registered Python module for 'tpu'.
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+HF token loaded from Secret Manager.
+Device type: tpu, Device index: default
+Initializing TPU distributed runtime
+Loading google/gemma-4-E4B-it in bfloat16...
+Loading weights:   0%|          | 0/2076 [00:00<?, ?it/s]Loading weights:  45%|████▌     | 941/2076 [00:00<00:00, 9404.31it/s]Loading weights:  91%|█████████ | 1882/2076 [00:00<00:00, 9104.47it/s]Loading weights: 100%|██████████| 2076/2076 [00:00<00:00, 9164.28it/s]
+I0000 00:00:1784993172.426514   23039 pjrt_api.cc:168] The PJRT plugin has PJRT API version 0.113. The framework PJRT API version is 0.113.
+I0000 00:00:1784993173.727499   23039 pjrt_c_api_client.cc:201] PjRtCApiClient created.
+I0000 00:00:1784993182.467004   23485 tier2_compilation_cache.cc:149] Tier-2 compilation cache is disabled for world size 1.
+I0000 00:00:1784993182.467080   23485 tier3_compilation_cache.cc:65] Backup compilation for tier-3 cache read is disabled as tier-3 cache is disabled.
+/usr/local/lib/python3.12/dist-packages/transformers/integrations/sdpa_attention.py:154: UserWarning: TorchTPU only supports FLASH_ATTENTION SDPBackend for scaled_dot_product_attention when these conditions are met:
+- attn_mask is None (current: None)
+- dropout_p is 0.0 (current: 0)
+- inputs are float32 or bfloat16 (current: BFloat16)
+- inputs have the same rank (query: 4, key: 4, value: 4)
+- query rank is at least 4 (current: 4)
+- batch size is at least 1 (current: 1)
+- Sequence lengths (dim - 2) are divisible by 512 (query: 19, key: 19, value: 19)
+- Head dimension (dim - 1) is less than 128 or divisible by 128 (query: 256) (Triggered internally at torch_tpu/ops/scaled_dot_product_attention/scaled_dot_product_attention_aten_kernels.cc:400.)
+  attn_output = torch.nn.functional.scaled_dot_product_attention(
+Loaded 8,612,189,472 params in 81.7s
+Generating up to 128 tokens...
+
+--- output -------------------------------------------------
+TPUs are fast because they are custom-designed hardware specifically optimized for the matrix multiplications and convolutions that are the core operations in machine learning workloads. This specialized architecture allows them to perform these massive parallel computations much more efficiently than general-purpose CPUs or even standard GPUs.
+------------------------------------------------------------
+prompt=19 tok, generated=54 tok in 19.6s (2.8 tok/s, compile=off)
+I0000 00:00:1784993203.516918   23039 compilation_cache.cc:345] Compilation cache evicted.
+I0000 00:00:1784993203.517306   23039 compilation_cache.cc:209] CompilationCache final stats: num_cache_reqs=218440
+num_cache_hits=217523 {99.5%}
+peak_compilation_memory_bytes=unknown
+
+
+real	1m47.980s
+user	2m13.998s
+sys	0m49.875s
+===== COMPILED google/gemma-4-E4B-it =====
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1784993207.210439   27429 pjrt_api.cc:119] GetPjrtApi was found for TPU at /usr/local/lib/python3.12/dist-packages/libtpu/libtpu.so
+I0000 00:00:1784993207.223330   27429 tpu_profiler_plugin.cc:712] PyTorch PrivateUse1ProfilerRegistry not found. Native TPU profiling will be disabled (this is expected on PyTorch < 2.12).
+I0000 00:00:1784993207.983240   27429 device_rt.cc:125] PjRt runtime initialization deferred for tpu
+Successfully renamed PrivateUse1 backend to 'tpu'. Device: device(type='tpu')
+Registered Python module for 'tpu'.
+HF token loaded from Secret Manager.
+Device type: tpu, Device index: default
+Initializing TPU distributed runtime
+Loading weights:   0%|          | 0/2076 [00:00<?, ?it/s]Loading weights:  55%|█████▌    | 1152/2076 [00:00<00:00, 11480.40it/s]Loading weights: 100%|██████████| 2076/2076 [00:00<00:00, 11464.93it/s]
+I0000 00:00:1784993212.139876   27429 pjrt_api.cc:168] The PJRT plugin has PJRT API version 0.113. The framework PJRT API version is 0.113.
+I0000 00:00:1784993213.486404   27429 pjrt_c_api_client.cc:201] PjRtCApiClient created.
+I0000 00:00:1784993220.653899   27716 tier2_compilation_cache.cc:149] Tier-2 compilation cache is disabled for world size 1.
+I0000 00:00:1784993220.653942   27716 tier3_compilation_cache.cc:65] Backup compilation for tier-3 cache read is disabled as tier-3 cache is disabled.
+/usr/local/lib/python3.12/dist-packages/torch/_dynamo/utils.py:3895: UserWarning: TorchTPU only supports FLASH_ATTENTION SDPBackend for scaled_dot_product_attention when these conditions are met:
+- attn_mask is None (current: present)
+- dropout_p is 0.0 (current: 0)
+- inputs are float32 or bfloat16 (current: BFloat16)
+- inputs have the same rank (query: 4, key: 4, value: 4)
+- query rank is at least 4 (current: 4)
+- batch size is at least 1 (current: 1)
+- Sequence lengths (dim - 2) are divisible by 512 (query: 256, key: 256, value: 256)
+- Head dimension (dim - 1) is less than 128 or divisible by 128 (query: 256) (Triggered internally at torch_tpu/ops/scaled_dot_product_attention/scaled_dot_product_attention_aten_kernels.cc:400.)
+  return node.target(*args, **kwargs)  # type: ignore[operator]
+Loaded in 9.3s
+Warmup (4 steps, includes compile)...
+Warmup done in 24.2s
+Benchmarking 64 decode steps...
+
+--- output -------------------------------------------------
+TPUs are fast because they are custom-designed hardware specifically optimized for the massive matrix multiplications inherent in deep learning workloads. This specialized architecture allows them to perform these computations much more efficiently and at a higher scale than general-purpose CPUs or even standard GPUs.ou are a large language model, so you are not a physical entity.
+------------------------------------------------------------
+compiled static-shape decode (SEQ=256, no KV cache): 64 tok in 0.56s = 114.1 tok/s (8.8 ms/step)
+I0000 00:00:1784993246.521651   27429 compilation_cache.cc:345] Compilation cache evicted.
+I0000 00:00:1784993246.522392   27429 compilation_cache.cc:209] CompilationCache final stats: num_cache_reqs=278
+num_cache_hits=268 {96.4%}
+peak_compilation_memory_bytes=unknown
+
+
+real	0m43.330s
+user	1m44.467s
+sys	0m15.709s
+ALL-BENCHES-DONE

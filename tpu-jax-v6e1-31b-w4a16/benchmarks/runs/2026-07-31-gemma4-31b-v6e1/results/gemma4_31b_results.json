@@ -1,0 +1,149 @@
+{
+  "model": "google/gemma-4-31B-it-qat-w4a16-ct",
+  "devices": [
+    "TPU_0(process=0,(0,0,0,0))"
+  ],
+  "jax_version": "0.11.0",
+  "stages_requested": [
+    "config",
+    "load",
+    "parity",
+    "sweep"
+  ],
+  "config": {
+    "resolved": {
+      "hidden_size": 5376,
+      "intermediate_size": 21504,
+      "num_hidden_layers": 60,
+      "num_attention_heads": 32,
+      "num_key_value_heads": 16,
+      "num_global_key_value_heads": 4,
+      "head_dim": 256,
+      "global_head_dim": 512,
+      "sliding_window": 1024,
+      "num_kv_shared_layers": 0,
+      "hidden_size_per_layer_input": 0,
+      "attention_k_eq_v": true,
+      "logit_softcapping": 30.0,
+      "rope_theta": 10000.0,
+      "global_rope_theta": 1000000.0
+    },
+    "sliding_layers": 50,
+    "full_layers": 10,
+    "mismatches": []
+  },
+  "load": {
+    "load_s": 8.7,
+    "weight_gb": 19.357,
+    "hbm_in_use_gb": 19.297,
+    "hbm_limit_gb": 33.546,
+    "headroom_gb": 14.249,
+    "w4a16_impl": "reference"
+  },
+  "parity": {
+    "templated": {
+      "prompt_tokens": 20,
+      "output": "The capital of France is Paris.<turn|>\n\n}<turn|>\n<channel|>The capital of France is Paris.<turn|>\n}<turn|>\n<channel|>The capital of France is",
+      "prefill_ms": 25984.0,
+      "decode_tok_s": 1.56,
+      "wall_s": 46.6
+    },
+    "bare": {
+      "prompt_tokens": 7,
+      "output": "\n<|channel>thought\n<channel|>The capital of France is Paris.<turn|>\n\n<eos><turn|>\n<channel|>The capital of France is Paris.<turn|>\n}\n<eos><turn|>",
+      "prefill_ms": 217.3,
+      "decode_tok_s": 13.42,
+      "wall_s": 2.8
+    }
+  },
+  "sweep": [
+    {
+      "B": 1,
+      "S": 1024,
+      "bucket_S": 1024,
+      "prefill_ms": 296.35,
+      "decode_step_ms": 78.668,
+      "agg_decode_tok_s": 12.7,
+      "per_user_tok_s": 12.7,
+      "status": "OK"
+    },
+    {
+      "B": 1,
+      "S": 2048,
+      "bucket_S": 2048,
+      "prefill_ms": 489.34,
+      "decode_step_ms": 78.692,
+      "agg_decode_tok_s": 12.7,
+      "per_user_tok_s": 12.7,
+      "status": "OK"
+    },
+    {
+      "B": 1,
+      "S": 4096,
+      "bucket_S": 4096,
+      "prefill_ms": 1085.29,
+      "decode_step_ms": 78.45,
+      "agg_decode_tok_s": 12.7,
+      "per_user_tok_s": 12.7,
+      "status": "OK"
+    },
+    {
+      "B": 1,
+      "S": 8192,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 2,
+      "S": 1024,
+      "bucket_S": 1024,
+      "prefill_ms": 468.29,
+      "decode_step_ms": 131.265,
+      "agg_decode_tok_s": 15.2,
+      "per_user_tok_s": 7.6,
+      "status": "OK"
+    },
+    {
+      "B": 2,
+      "S": 2048,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 2,
+      "S": 4096,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 2,
+      "S": 8192,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 4,
+      "S": 1024,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 4,
+      "S": 2048,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 4,
+      "S": 4096,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    },
+    {
+      "B": 4,
+      "S": 8192,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory require"
+    }
+  ]
+}

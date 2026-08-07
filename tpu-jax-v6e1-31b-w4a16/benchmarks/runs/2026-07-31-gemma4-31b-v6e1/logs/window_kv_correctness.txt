@@ -1,0 +1,51 @@
+KV-buffer-size dependence in prefill logits — gemma-4-31B-it-qat-w4a16-ct, v6e-1 spot, 2026-08-01
+Random-token prompts, greedy, w4a16, bf16 cache. prefill_with_kv_cache only (NO chunking).
+
+(1) window_kv=False vs window_kv=True, same one-shot prefill:
+  S      sliding buf F/T     max|diff|   rel      argmax match
+   512   520 / 520            0.00000    0.00e+00  YES  (buffers identical)
+  1024   1032 / 1024          2.41263    1.20e-01  NO
+  2048   2056 / 1024          3.54227    1.36e-01  NO
+
+  At S=1024 the two buffers differ by EIGHT slots and both take the same
+  `S <= buf_len` store path, yet the logits move 12%.
+
+(2) Ground truth = same model, kv_caches=None (no cache at all), S=1024:
+  no-cache            top1 = 237221
+  window_kv=True      top1 = 237221   MATCH      max|diff| 7.29
+  window_kv=False     top1 = 759      MISMATCH   max|diff| 9.13
+
+CONCLUSION: prefill logits depend on the KV buffer's size, which they must not —
+the docstring states prefill attends over the freshly computed K/V, not the cache.
+window_kv=True agrees with the cache-free reference on argmax; window_kv=False
+does not. Chunked prefill REQUIRES window_kv=False.
+
+NOT ESTABLISHED: the mechanism. Reading the attention cache branch, prefill does
+not reassign k/v (it only builds kv_out_override via _ring_store), so buffer size
+should be unobservable. The large max|diff| against no-cache in BOTH modes is also
+unexplained. Do not act on a guessed cause.
+
+=== RESOLUTION (same session, later) ===
+
+(3) CPU tiny-scale reproduction: tests/test_kv_buffer_size_invariance.py
+    6/6 PASS. No buffer-size dependence at all at 4 layers, fp32 cache.
+
+(4) Same TPU A/B with a REAL prompt (chat-templated, repeated to 1024 tokens so
+    the sliding window binds), instead of random tokens:
+
+      window_kv=False   top1 = 624 ('and')
+      window_kv=True    top1 = 624 ('and')     MATCH
+      max|diff| = 0.6887  rel = 2.99e-02  top1-to-top2 margin = 1.565
+
+    The divergence (0.69) is well below the top-1 margin (1.565), so argmax is
+    stable on real input.
+
+VERDICT: NOT a logic bug. Different KV buffer sizes produce different HLO, hence
+different fusion and accumulation order, hence ~3% bf16 divergence across 60
+layers. The earlier 12% / flipped-argmax result used RANDOM TOKEN prompts, which
+are out of distribution: logits are near-flat, top-1 margins are ~0, and any
+reordering flips the argmax. The measurement was real; the interpretation was
+wrong.
+
+Still true and worth knowing: greedy decoding is NOT bit-reproducible across
+window_kv settings, and on OOD input the sampled token can differ.

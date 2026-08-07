@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# One-command setup of the tpu-management skill + tpu-devops MCP server for a project.
+# One-command setup of the tpu-jax-v5e1-2b-management skill + this rig's MCP server for a project.
 #
 # Usage:
 #   ./project-setup.sh [TARGET_DIR] [options]
 #
 #   TARGET_DIR              Project to set up (default: current directory).
-#                           Installs the skill into TARGET_DIR/.claude/skills/tpu-management
+#                           Installs the skill into TARGET_DIR/.claude/skills/tpu-jax-v5e1-2b-management
 #                           and registers the MCP server in TARGET_DIR/.mcp.json.
 #
 # Options:
@@ -16,7 +16,10 @@
 #   --model NAME            MODEL_NAME            (default: google/gemma-4-E2B-it)
 #   --accelerator TYPE      ACCELERATOR_TYPE      (default: v5e-1)
 #   --tp N                  TENSOR_PARALLEL_SIZE  (default: 1)
-#   --server-name NAME      MCP server name       (default: tpu-devops)
+#   --server-name NAME      MCP server name       (default: the rig directory this
+#                           script ships in, e.g. tpu-jax-v5e1-2b). This is the key the
+#                           server is registered under, and it prefixes every tool as
+#                           mcp__<name>__find_tpu — keep it unique per rig.
 #   --skip-deps             Don't check Python dependencies.
 #   -h, --help              Show this help.
 #
@@ -24,7 +27,7 @@
 # existing .mcp.json entry in place, leaving other servers untouched.
 #
 # Works from either checkout layout:
-#   - the skill repo root (uses .claude/skills/tpu-management), or
+#   - the skill repo root (uses .claude/skills/tpu-jax-v5e1-2b-management), or
 #   - inside an unzipped skill bundle (mcp/project-setup.sh next to mcp/server.py).
 
 set -euo pipefail
@@ -34,12 +37,14 @@ info() { echo "==> $*"; }
 
 # --- Locate the skill source relative to this script ---------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/.claude/skills/tpu-management/SKILL.md" ]; then
-  SKILL_SRC="$SCRIPT_DIR/.claude/skills/tpu-management"     # repo root
+if [ -f "$SCRIPT_DIR/.claude/skills/tpu-jax-v5e1-2b-management/SKILL.md" ]; then
+  SKILL_SRC="$SCRIPT_DIR/.claude/skills/tpu-jax-v5e1-2b-management"     # repo root
+  DEFAULT_SERVER_NAME="$(basename "$SCRIPT_DIR")"           # ...which is the rig directory
 elif [ -f "$SCRIPT_DIR/../SKILL.md" ]; then
   SKILL_SRC="$(cd "$SCRIPT_DIR/.." && pwd)"                 # skill-bundle mcp/ dir
+  DEFAULT_SERVER_NAME=""                                    # no rig dir here; see TARGET_DIR
 else
-  err "cannot find the tpu-management skill next to $SCRIPT_DIR"
+  err "cannot find the tpu-jax-v5e1-2b-management skill next to $SCRIPT_DIR"
 fi
 
 # --- Parse arguments -----------------------------------------------------------------
@@ -50,7 +55,7 @@ GCP_PROJECT=""
 MODEL_NAME="google/gemma-4-E2B-it"
 ACCELERATOR_TYPE="v5e-1"
 TENSOR_PARALLEL_SIZE="1"
-SERVER_NAME="tpu-devops"
+SERVER_NAME=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -61,7 +66,7 @@ while [ $# -gt 0 ]; do
     --tp)           TENSOR_PARALLEL_SIZE="$2"; shift ;;
     --server-name)  SERVER_NAME="$2"; shift ;;
     --skip-deps)    SKIP_DEPS=1 ;;
-    -h|--help)      sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)      sed -n '2,31p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)             err "unknown option: $1 (see --help)" ;;
     *)              [ -n "$TARGET_DIR" ] && err "unexpected argument: $1"
                     TARGET_DIR="$1" ;;
@@ -76,6 +81,12 @@ TARGET_DIR="${TARGET_DIR:-$PWD}"
 [ -d "$TARGET_DIR" ] || err "target directory does not exist: $TARGET_DIR"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
+# The client's key for this server prefixes every tool (mcp__<key>__find_tpu), so it has to
+# identify the rig. A shared constant is what made six sibling rigs indistinguishable in
+# /mcp. Default to the rig directory this script ships in; from an unzipped bundle there is
+# no rig directory, so fall back to the project being set up.
+SERVER_NAME="${SERVER_NAME:-${DEFAULT_SERVER_NAME:-$(basename "$TARGET_DIR")}}"
+
 if [ -z "$GCP_PROJECT" ] && command -v gcloud >/dev/null 2>&1; then
   GCP_PROJECT="$(gcloud config get-value project 2>/dev/null || true)"
   [ "$GCP_PROJECT" = "(unset)" ] && GCP_PROJECT=""
@@ -83,9 +94,9 @@ fi
 
 # --- Install the skill copy ----------------------------------------------------------
 if [ "$GLOBAL" -eq 1 ]; then
-  SKILL_DEST="$HOME/.claude/skills/tpu-management"
+  SKILL_DEST="$HOME/.claude/skills/tpu-jax-v5e1-2b-management"
 else
-  SKILL_DEST="$TARGET_DIR/.claude/skills/tpu-management"
+  SKILL_DEST="$TARGET_DIR/.claude/skills/tpu-jax-v5e1-2b-management"
 fi
 
 if [ "$SKILL_SRC" != "$SKILL_DEST" ]; then
@@ -118,10 +129,14 @@ fi
 build_env_json() {
   # Emits the "env" object for the server entry; omits GOOGLE_CLOUD_PROJECT when unset
   # so server.py falls back to its built-in default.
-  "$PYTHON_BIN" - "$GCP_PROJECT" "$MODEL_NAME" "$ACCELERATOR_TYPE" "$TENSOR_PARALLEL_SIZE" <<'EOF'
+  "$PYTHON_BIN" - "$GCP_PROJECT" "$MODEL_NAME" "$ACCELERATOR_TYPE" "$TENSOR_PARALLEL_SIZE" \
+                 "$SERVER_NAME" <<'EOF'
 import json, sys
-project, model, accel, tp = sys.argv[1:5]
-env = {"MODEL_NAME": model, "ACCELERATOR_TYPE": accel, "TENSOR_PARALLEL_SIZE": tp}
+project, model, accel, tp, server_name = sys.argv[1:6]
+# MCP_SERVER_NAME keeps the name server.py advertises equal to the key it is registered
+# under; they have to agree or /mcp and the tool prefix disagree about what this is.
+env = {"MODEL_NAME": model, "ACCELERATOR_TYPE": accel, "TENSOR_PARALLEL_SIZE": tp,
+       "MCP_SERVER_NAME": server_name}
 if project:
     env["GOOGLE_CLOUD_PROJECT"] = project
 print(json.dumps(env))
@@ -152,7 +167,7 @@ except FileNotFoundError:
     config = {}
 config.setdefault("mcpServers", {})[name] = {
     "command": python_bin,
-    "args": [".claude/skills/tpu-management/mcp/server.py"],
+    "args": [".claude/skills/tpu-jax-v5e1-2b-management/mcp/server.py"],
     "env": json.loads(env_json),
 }
 with open(path, "w") as f:
@@ -166,6 +181,7 @@ fi
 echo
 echo "Done. Configuration:"
 echo "  skill:                $SKILL_DEST"
+echo "  MCP server name:      $SERVER_NAME"
 echo "  python:               $PYTHON_BIN"
 echo "  GOOGLE_CLOUD_PROJECT: ${GCP_PROJECT:-<server.py default>}"
 echo "  MODEL_NAME:           $MODEL_NAME"

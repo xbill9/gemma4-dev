@@ -1,0 +1,36 @@
+# Shared ruff config for rigs that don't pin their own.
+#
+# Ruff resolves config from the nearest ancestor directory, so this file applies
+# to every rig EXCEPT the two that already pin a rule set and keep it:
+#   tpu-vllm-v5e1-2b/pyproject.toml  ([tool.ruff], py313, line-length 120)
+#   tpu-pytorch-inf2-2b/ruff.toml    (py311, line-length 110)
+#
+# Pinning matters because ruff's implicit defaults drift across releases, and
+# that drift had already bitten: under ruff 0.16 with no config in the tree,
+# `make lint` in the four unconfigured rigs selected UP/BLE/RUF/ASYNC/S/PLW on
+# top of the intended rules and failed with 118-145 findings — including UP045,
+# which flags the `Optional[str]` style this repo uses on purpose.
+
+target-version = "py313"
+line-length = 120
+
+# Generated snapshots and packaged artifacts — lint the sources at rig root, not the copies.
+extend-exclude = [
+    ".claude/skills",
+    "skills",
+    "dist",
+]
+
+[lint]
+# This pins ruff's current default select explicitly, so a ruff upgrade can't
+# silently change what these rigs lint. It is deliberately NOT wider than the
+# defaults: adding "I" (import sorting) and "B" (bugbear) fires 57-182 findings
+# across the unconfigured rigs and would break `make lint` on day one. Turn them
+# on per rig after a cleanup pass, not here.
+select = ["E4", "E7", "E9", "F"]
+
+# Line length is enforced by the formatter, not the linter.
+ignore = ["E501"]
+
+[format]
+quote-style = "double"

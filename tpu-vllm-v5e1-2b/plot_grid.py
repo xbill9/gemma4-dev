@@ -6,7 +6,7 @@ import seaborn as sns
 
 
 def parse_and_plot():
-    csv_path = "grid_benchmark_results.csv"
+    csv_path = "benchmarks/runs/undated-vllm-grid-b-v6e1/grid_benchmark_results.csv"
     if not os.path.exists(csv_path):
         print("CSV results file not found!")
         return
@@ -42,7 +42,10 @@ def parse_and_plot():
     # Drop duplicate grid entries (keep the latest one)
     df_success = df_success.drop_duplicates(subset=["concurrency", "context_len"], keep="last")
 
-    artifact_dir = "/home/xbill/.gemini/antigravity-cli/brain/df37b9db-2283-44a3-9790-2a67815b7be4"
+    # Where the heatmaps land. Defaults to the CWD, matching the convention that writers use
+    # bare filenames in the working directory so an archived run dir is never overwritten.
+    # This was a hardcoded UUID path inside another tool's scratch directory.
+    artifact_dir = os.getenv("ARTIFACT_DIR", ".")
     os.makedirs(artifact_dir, exist_ok=True)
 
     # Style configuration

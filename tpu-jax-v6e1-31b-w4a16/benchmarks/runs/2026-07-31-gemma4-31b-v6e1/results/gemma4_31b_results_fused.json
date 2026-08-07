@@ -1,0 +1,46 @@
+{
+  "model": "google/gemma-4-31B-it-qat-w4a16-ct",
+  "devices": [
+    "TPU_0(process=0,(0,0,0,0))"
+  ],
+  "jax_version": "0.11.0",
+  "stages_requested": [
+    "load",
+    "parity",
+    "sweep"
+  ],
+  "load": {
+    "load_s": 7.4,
+    "weight_gb": 19.357,
+    "hbm_in_use_gb": 19.297,
+    "hbm_limit_gb": 33.546,
+    "headroom_gb": 14.249,
+    "w4a16_impl": "auto"
+  },
+  "parity": {
+    "templated": {
+      "prompt_tokens": 20,
+      "output": "The capital of France is Paris.",
+      "finish_reason": "stop",
+      "prefill_ms": 94011.8,
+      "decode_tok_s": 0.07,
+      "wall_s": 191.6
+    },
+    "bare": {
+      "prompt_tokens": 7,
+      "output": "\n<|channel>thought\n<channel|>The capital of France is Paris.",
+      "finish_reason": "stop",
+      "prefill_ms": 403.6,
+      "decode_tok_s": 2.47,
+      "wall_s": 5.3
+    }
+  },
+  "sweep": [
+    {
+      "B": 1,
+      "S": 1024,
+      "status": "FAILED",
+      "error": "RESOURCE_EXHAUSTED: E1001: CompileTimeScopedVmemOom:"
+    }
+  ]
+}

@@ -3,8 +3,13 @@
 # Dynamically discover all subdirectories containing a Makefile
 SUBDIRS := $(patsubst %/,%,$(dir $(wildcard */Makefile)))
 
-SKILL_DIR  := .claude/skills/tpu-management
-PLUGIN_DIR := skills/tpu-management
+# The skill name carries the rig directory: five rigs all shipping a skill called
+# "tpu-management" meant `make skill-install` rm -rf'd one shared
+# ~/.claude/skills/tpu-management, so whichever rig ran last silently replaced the
+# rest. Same rule as the plugin and MCP server names (NAMING.md).
+SKILL_NAME ?= $(notdir $(CURDIR))-management
+SKILL_DIR  := .claude/skills/$(SKILL_NAME)
+PLUGIN_DIR := skills/$(SKILL_NAME)
 DIST_DIR   := dist
 
 .PHONY: all clean test lint install deploy help init skill skill-install skill-package $(SUBDIRS)
@@ -22,12 +27,12 @@ help:
 	@echo "  make lint    - ruff + bash -n on repo sources, then 'make lint' in subdirectories"
 	@echo "  make install - Run 'make install' in all subdirectories"
 	@echo "  make deploy  - Run 'make deploy' in all subdirectories"
-	@echo "  make skill         - Refresh tpu-management skill snapshots from server.py / tpu.md"
+	@echo "  make skill         - Refresh $(SKILL_NAME) skill snapshots from server.py / tpu.md"
 	@echo "                       (also syncs the plugin copy in skills/ for the marketplace)"
 	@echo "  make skill-install - Refresh + copy the skill to ~/.claude/skills (all projects)"
-	@echo "  make skill-package - Refresh + build dist/tpu-management-skill.zip"
+	@echo "  make skill-package - Refresh + build dist/$(SKILL_NAME)-skill.zip"
 	@echo "  make init TARGET=/path/to/project [ARGS='--project my-gcp-id']"
-	@echo "                     - Refresh + install skill AND register the tpu-devops MCP"
+	@echo "                     - Refresh + install skill AND register the tpu-jax-v5e1-2b MCP"
 	@echo "                       server in TARGET (or globally with ARGS='--global')"
 	@echo "========================================================="
 
@@ -40,7 +45,7 @@ init: skill
 	./project-setup.sh $(TARGET) $(ARGS)
 
 skill:
-	python3 refresh_skill.py
+	SKILL_NAME=$(SKILL_NAME) python3 refresh_skill.py
 	rm -rf $(PLUGIN_DIR)
 	mkdir -p $(dir $(PLUGIN_DIR))
 	cp -r $(SKILL_DIR) $(PLUGIN_DIR)
@@ -48,16 +53,16 @@ skill:
 
 skill-install: skill
 	mkdir -p $(HOME)/.claude/skills
-	rm -rf $(HOME)/.claude/skills/tpu-management
-	cp -r $(SKILL_DIR) $(HOME)/.claude/skills/tpu-management
-	@echo "Installed to $(HOME)/.claude/skills/tpu-management"
+	rm -rf $(HOME)/.claude/skills/$(SKILL_NAME)
+	cp -r $(SKILL_DIR) $(HOME)/.claude/skills/$(SKILL_NAME)
+	@echo "Installed to $(HOME)/.claude/skills/$(SKILL_NAME)"
 
 skill-package: skill
 	mkdir -p $(DIST_DIR)
-	rm -f $(DIST_DIR)/tpu-management-skill.zip
-	cd $(dir $(SKILL_DIR)) && zip -qr $(CURDIR)/$(DIST_DIR)/tpu-management-skill.zip $(notdir $(SKILL_DIR))
-	@echo "Packaged $(DIST_DIR)/tpu-management-skill.zip"
-	@unzip -l $(DIST_DIR)/tpu-management-skill.zip
+	rm -f $(DIST_DIR)/$(SKILL_NAME)-skill.zip
+	cd $(dir $(SKILL_DIR)) && zip -qr $(CURDIR)/$(DIST_DIR)/$(SKILL_NAME)-skill.zip $(notdir $(SKILL_DIR))
+	@echo "Packaged $(DIST_DIR)/$(SKILL_NAME)-skill.zip"
+	@unzip -l $(DIST_DIR)/$(SKILL_NAME)-skill.zip
 
 # Target-specific variable assignments
 clean: TARGET := clean

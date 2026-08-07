@@ -1,0 +1,36 @@
+
+=== DYNAMIC: residual stream through the stack ===
+
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2600.58it/s]
+  host read: 22.11 GB text, skipped ~1.15 GB of vision/audio towers
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+  prompt tokens: 20, recorded 60 attn / 60 mlp blocks
+
+  layer               type    resid_in    attn_out     mlp_out  attn/resid
+      0  sliding_attention       10.06       5.394       1.997      0.5360
+      1  sliding_attention       4.538        3.22        2.53      0.7097
+      2  sliding_attention        1.89       3.626       2.121      1.9190
+      3  sliding_attention       2.291       4.231       3.357      1.8464
+      4  sliding_attention      0.6076       1.407       2.888      2.3153
+      5     full_attention       3.747       4.672       3.149      1.2470
+     11     full_attention       4.722       3.378       2.809      0.7153
+     17     full_attention       3.615       2.391       3.614      0.6616
+     23     full_attention       2.779       1.701      0.8348      0.6121
+     29     full_attention       2.974       1.258        1.19      0.4232
+     35     full_attention       1.697       1.374      0.3489      0.8095
+     41     full_attention      0.9613       1.402      0.3437      1.4587
+     47     full_attention      0.5896       1.274      0.5712      2.1610
+     53     full_attention       1.137       1.195      0.7506      1.0515
+     57  sliding_attention      0.9956      0.4498      0.6056      0.4518
+     58  sliding_attention      0.8221      0.5654      0.6128      0.6878
+     59     full_attention       1.239      0.6647      0.6277      0.5363
+
+  sliding layers (n=50): attn/resid mean 0.7253
+  full    layers (n=10): attn/resid mean 0.9676
+  residual RMS: layer0 in 10.06 -> layer59 in 1.239 (0.12x over the stack)
+
+  logits: rms 6.026  max 27.9  top1-top2 margin 15.28
+  at softcap (30.0): 0.000000   top-1 prob 1.0000   top-10 mass 1.0000   entropy 0.000 nats
+
+Wrote gemma4_31b_model_intel_dyn.json

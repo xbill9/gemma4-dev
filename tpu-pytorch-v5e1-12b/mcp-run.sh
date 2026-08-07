@@ -1,5 +1,5 @@
 #!/bin/bash
-# Launch the tpu-devops MCP server with the parameters from tpu.env.
+# Launch the tpu-pytorch-v5e1-12b MCP server with the parameters from tpu.env.
 #
 # MCP client configs can point here instead of straight at server.py so the zone,
 # model, and accelerator live in exactly one place (tpu.env) rather than being

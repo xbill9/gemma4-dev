@@ -1,9 +1,13 @@
-[mcp_servers.tpu-devops]
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The values below are this rig's: pure-JAX Gemma 4 E2B on a
+# single v5e chip. They previously read 31B / v6e-8 / TP=8, inherited from a PyTorch sibling.
+[mcp_servers.tpu-jax-v5e1-2b]
 command = "python3"
-args = [".claude/skills/tpu-management/mcp/server.py"]
+args = [".claude/skills/tpu-jax-v5e1-2b-management/mcp/server.py"]
 
-[mcp_servers.tpu-devops.env]
-MODEL_NAME = "google/gemma-4-31B-it"
-ACCELERATOR_TYPE = "v6e-8"
-TENSOR_PARALLEL_SIZE = "8"
+[mcp_servers.tpu-jax-v5e1-2b.env]
+MODEL_NAME = "google/gemma-4-E2B-it"
+ACCELERATOR_TYPE = "v5e-1"
+TENSOR_PARALLEL_SIZE = "1"
 GOOGLE_CLOUD_PROJECT = "aisprint-491218"
+MCP_SERVER_NAME = "tpu-jax-v5e1-2b"

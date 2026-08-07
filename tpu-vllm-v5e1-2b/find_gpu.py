@@ -207,7 +207,9 @@ def main():
     print(report_text)
 
     # Save the report as an artifact
-    artifact_dir = "/home/xbill/.gemini/antigravity-cli/brain/d7571dec-bde7-4d8b-993e-256bb06732e8"
+    # Defaults to the CWD; ARTIFACT_DIR redirects it. This was a hardcoded UUID path inside
+    # another tool's scratch directory, so the report only landed on one machine.
+    artifact_dir = os.getenv("ARTIFACT_DIR", ".")
     os.makedirs(artifact_dir, exist_ok=True)
     report_path = os.path.join(artifact_dir, "gpu_discovery_report.md")
     with open(report_path, "w") as f:
