@@ -18,6 +18,16 @@ Rigs: `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-12b`, `tpu-pytorch-v5e1-2b`, `tpu-pyt
 
 `tpu-pytorch-inf2-2b/` and `tpu-pytorch-v6e1-2b/` are real rigs that are not committed yet. `README.md` and `NAMING.md`'s inventory table are stale about them — treat the working tree as truth and fix the docs when convenient.
 
+## Canonical root references
+
+Three facts-not-code files at the root, each scoped to what does **not** vary by rig. Read the relevant one before deriving its numbers yourself, and correct it there rather than restating it in a rig:
+
+- **`@MODELS.md`** — checkpoint properties: layer structure, attention/head shape, KV cost per token, bf16 weight footprints. Same whatever serves them.
+- **`@HARDWARE.md`** — accelerator properties: usable HBM, bandwidth, and **which numeric formats the MXU natively supports**. v5e and v6e have no native fp8 (int8 is the only low-precision compute win); v7/Ironwood is the first that does, so quantization conclusions do not carry forward across generations.
+- **`@NAMING.md`** — how any of the above is spelled in a directory name.
+
+Anything that depends on a runtime or engine build belongs with the rig that measured it, not here — e.g. `tpu-vllm-v5e1-2b/gemma4-quantization.md`.
+
 ## Naming
 
 Rig directories are `<platform>-<runtime>-<hardware>-<model>[-<variant>]` — four positional lowercase slots, plus an optional fifth naming the **weight encoding** when it isn't the reference build (`w4a16`, `q4_0`, `int4`). Three hyphens without a variant, four with one; most rigs have none. Not `qat` (that's a training procedure, not an encoding) and not runtime params like `kv_cache_dtype` — those live in `tpu.env`.
