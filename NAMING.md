@@ -252,6 +252,8 @@ Three things that trip people up:
 | Rig | Platform | Runtime | Hardware | Model | Variant |
 | --- | --- | --- | --- | --- | --- |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it` | — |
+| `~/gemma4-dev/tpu-vllm-v5e1-2b-q4_0` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | `q4_0` |
+| `~/gemma4-dev/tpu-vllm-v5e1-2b-w4a16` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the `-ct` container is not part of the slot |
 | `~/gemma4-dev/tpu-vllm-v6e1-2b` | TPU Queued Resource | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-jax-v5e1-2b` | TPU | JAX | v5e-1 | 2B | — |
 | `~/gemma4-dev/tpu-jax-v6e1-12b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |

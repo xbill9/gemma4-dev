@@ -1,0 +1,27 @@
+[project]
+name = "tpu-2b-v5e1-devops-agent"
+version = "0.1.0"
+description = "MCP devops agent for serving Gemma 4 with vLLM on a Cloud TPU v5e-1 Flex-start Queued Resource"
+requires-python = ">=3.13"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+ignore_missing_imports = true
+check_untyped_defs = true
+disable_error_code = ["attr-defined"]
+# Each benchmarks/runs/*/aggregate.py is a self-contained artifact of one measurement, kept
+# beside the data it produced. They share a module name, which mypy treats as a fatal
+# collision that halts the whole run. ruff still checks and formats them.
+exclude = ['^benchmarks/runs/']
+
+[[tool.mypy.overrides]]
+module = "google.cloud.*"
+ignore_missing_imports = true

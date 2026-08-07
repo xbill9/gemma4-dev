@@ -25,6 +25,8 @@ boundaries.
 | Rig | Runtime | Hardware | Model | Notes |
 | --- | --- | --- | --- | --- |
 | [`tpu-vllm-v5e1-2b`](tpu-vllm-v5e1-2b/) | vLLM in Docker | v5e-1 | `gemma-4-E2B-it` | Flex-start Queued Resource; the live-demo rig |
+| [`tpu-vllm-v5e1-2b-q4_0`](tpu-vllm-v5e1-2b-q4_0/) | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | QAT-at-q4_0 weights shipped as bf16; the 4-bit load path is unsupported on this stack — see the rig README |
+| [`tpu-vllm-v5e1-2b-w4a16`](tpu-vllm-v5e1-2b-w4a16/) | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | Real 4-bit compressed-tensors weights; **expected to fail** at `compressed_tensors.py:149` until a `wNa16` scheme lands — the rig exists to record that |
 | [`tpu-vllm-v6e1-2b`](tpu-vllm-v6e1-2b/) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | Fork of the v5e-1 rig retargeted to Trillium; provisions in `us-east5-b` |
 | [`tpu-jax-v5e1-2b`](tpu-jax-v5e1-2b/) | pure JAX | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | Hand-rolled engine + OpenAI-compatible server; no Docker, no HF token |
 | [`tpu-pytorch-v5e1-12b`](tpu-pytorch-v5e1-12b/) | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | Static-shape decode server |
