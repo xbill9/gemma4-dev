@@ -4,8 +4,9 @@ Properties of the **silicon** — memory, bandwidth, and which numeric formats t
 support. Independent of model and runtime, so this file is canonical for the monorepo and rigs should
 read it rather than restating the numbers.
 
-The companion files: `MODELS.md` for checkpoint properties, `NAMING.md` for how these values are spelled
-in directory names, and each rig's own docs for what a given runtime does with them.
+The companion files: `MODELS.md` for checkpoint properties, `QUANTIZATION.md` for what the serving stack
+can actually do with the formats below, `NAMING.md` for how these values are spelled in directory names,
+and each rig's `benchmarks/runs/` for what was measured on it.
 
 ## Native numeric format support — the table that decides quantization strategy
 
@@ -41,8 +42,18 @@ a v5e/v6e quantization conclusion forward to Ironwood without rechecking it.**
 | On-demand list | ~$1.20 / chip-hr | ~$2.70 / chip-hr | 2.25x |
 
 v5e figures verified against [Google's v5e page](https://docs.cloud.google.com/tpu/docs/v5e) on
-2026-08-07. v6e figures carried from the same source set via `tpu-vllm-v5e1-2b/v5e.md`; v7 fp8 support
-from Google's TPU7x documentation. Treat the v6e and v7 rows as less directly verified than v5e.
+2026-08-07. v6e FLOPS and bandwidth are carried from the same source set via
+`tpu-vllm-v5e1-2b/v5e.md`; v7 fp8 support from Google's TPU7x documentation. Treat the v6e FLOPS and
+bandwidth rows, and all of v7, as less directly verified than v5e. Two v6e rows are now firmer than
+that: `ct6e-standard-1t` is confirmed by a real deployment (see the measured memory below), and the
+on-demand rate was read straight from the Cloud Billing Catalog on 2026-08-07.
+
+**Rates are per-region, and the provisioning-model ranking is not fixed.** The $2.70 v6e figure holds
+across the US regions; europe-west4 quotes $2.97 and europe-west2 / asia-northeast1 / asia-south1 quote
+$3.24. In us-east5, **flex-start ($1.35/chip-hr) is cheaper than spot ($1.4033)** — the reverse of the
+v5e ordering, where spot undercut flex-start. Never assume spot is cheapest; read the catalog. The
+`estimate_deployment_cost` tool in the vLLM rigs does exactly that and reports nothing rather than
+guessing when no SKU matches.
 
 **Units trap:** Google quotes v5e bandwidth in **GiBps** and v6e in **GBps**. Normalize before
 comparing — the real ratio is ~1.9x, not a clean 2x. Don't quote "2x the bandwidth" as exact.
@@ -51,9 +62,13 @@ comparing — the real ratio is ~1.9x, not a clean 2x. Don't quote "2x the bandw
 decode-bound workload — which is bandwidth-bound, not FLOPS-bound — v5e is priced close to right. The
 4.7x only pays for prefill-heavy or long-context work that actually burns the matrix units.
 
-## v5e usable memory, measured
+## Usable memory, measured
 
-Nominal 16 GB is not what you get. Measured on `v5litepod-1` with vLLM:
+Nominal capacity is not what you get, on either generation.
+
+### v5e-1 — 16 GB nominal
+
+Measured on `v5litepod-1` with vLLM:
 
 | | GiB |
 | :--- | ---: |
@@ -63,18 +78,49 @@ Nominal 16 GB is not what you get. Measured on `v5litepod-1` with vLLM:
 **14.49 GiB is the number to size against**, not 16. Weights plus KV must fit inside it. See `MODELS.md`
 for per-model weight footprints — the short version is that only E2B fits at bf16.
 
-## Spelling: v5e is `v5litepod` to gcloud
+### v6e-1 — 32 GB nominal
 
-| Context | v5e single chip |
-| :--- | :--- |
-| Prose, directory names | `v5e-1` / `v5e1` |
-| `ACCELERATOR_TYPE`, gcloud | **`v5litepod-1`** |
-| Flex-start runtime version | `v2-alpha-tpuv5-lite` |
-| `gcloud ... --type` / `--topology` | `v5litepod` / `1x1` |
+Measured on `ct6e-standard-1t` serving E2B under vLLM at 65,536 context. The allocation is recorded in
+`tpu-vllm-v6e1-2b/gemma4-e2b-v6e1-demo.html`, cross-checked against the comparison table in
+`tpu-vllm-v5e1-2b/v5e.md`:
 
-"v5e-1" is fine in prose and required in directory names; it is never valid in a gcloud argument.
-`NAMING.md` covers the directory form. Rigs spell `ACCELERATOR_TYPE` inconsistently across siblings
-(`v5litepod-1` vs `v5e-1`) — read the rig's own env file, never copy a sibling's.
+| | GiB |
+| :--- | ---: |
+| Total HBM | 31.24 |
+| E2B weights, resident | 8.97 |
+| KV cache pool | **19.79** |
+| Reserved headroom | 2.48 |
+
+**The KV pool is what the generation buys.** 19.79 GiB against roughly 5.5 GiB left over on a v5e-1
+after the same weights — about 3.6x — measured as 1,151,744 KV tokens against ~290K derived on v5e.
+Read that beside the shape trap above: v6e costs 2.25x for ~1.9x the bandwidth, so it is not the way to
+buy decode throughput. It is the way to buy context. What runs out on v5e is memory.
+
+**Sizing caution:** this is one run at one `gpu_memory_utilization`, not a ceiling like the v5e row
+above. Take 31.24 GiB total as the firm number and re-measure the split for another model or context
+length.
+
+## Spelling: v5e is `v5litepod` to gcloud, v6e is just `v6e`
+
+| Context | v5e single chip | v6e single chip |
+| :--- | :--- | :--- |
+| Prose, directory names | `v5e-1` / `v5e1` | `v6e-1` / `v6e1` |
+| `ACCELERATOR_TYPE`, gcloud | **`v5litepod-1`** | `v6e-1` |
+| Flex-start runtime version | `v2-alpha-tpuv5-lite` | `v2-alpha-tpuv6e` |
+| `gcloud ... --type` / `--topology` | `v5litepod` / `1x1` | `v6e` / `1x1` |
+| TPU API quota id | `TPUV5sLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPerProjectPerZoneForTPUAPI` |
+| Spot (preemptible) quota id | `TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPreemptiblePerProjectPerZoneForTPUAPI` |
+
+**The v5e rename does not generalize.** v6e keeps its marketing name everywhere, and the quota ids drop
+the `Litepod` that the v5e ids carry — so nothing in this table survives a chip retarget by analogy, and
+a stale quota id fails quietly by matching no rows rather than erroring. v6e column verified against the
+live TPU API and Cloud Quotas on 2026-08-07.
+
+"v5e-1" is fine in prose and required in directory names; it is never valid in a gcloud argument. v6e is
+the trap in reverse — the slot value and the gcloud value coincide at `v6e`, but the *directory* spelling
+`v6e1` still is not a gcloud value. `NAMING.md` covers the directory form. Rigs spell `ACCELERATOR_TYPE`
+inconsistently across siblings (`v5litepod-1` vs `v5e-1`) — read the rig's own env file, never copy a
+sibling's.
 
 ## Other targets in this monorepo
 

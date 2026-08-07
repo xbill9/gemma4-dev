@@ -5,8 +5,8 @@ footprint. These are the same whatever serves them, so this file is canonical fo
 and every rig should read it rather than re-deriving the numbers.
 
 Anything that depends on a runtime, an engine build, or a chip generation does **not** belong here.
-Quantization support, kernel behaviour and measured throughput live with the rig that measured them —
-see `tpu-vllm-v5e1-2b/gemma4-quantization.md` for the vLLM-on-TPU quantization landscape.
+`QUANTIZATION.md` covers what the serving stack supports, `HARDWARE.md` what the silicon can compute in,
+and measured throughput lives with the rig that measured it, under its `benchmarks/runs/`.
 
 Read out of `config.json` in the running container on 2026-08-07, cross-checked against
 `tpu_inference` source. Where a claim is inferred rather than measured it says so.
@@ -73,6 +73,16 @@ heads, costs multiples of this per token.
    sliding ones. Observed KV allocation is uniform at 256 across all 15 tensors and the 15 KiB/token
    arithmetic only closes at 256, so `global_head_dim` does not enlarge KV. Where it *is* applied has
    not been traced — treat as unresolved.
+
+   **A v6e measurement pulls the other way and is unreconciled.** The v6e-1 run recorded in
+   `HARDWARE.md` allocated a 19.79 GiB KV pool holding 1,151,744 tokens — 18.02 KiB/token, not 15. Of
+   the 15 cached layers three are full-attention (4, 9, 14), so charging those three at
+   `global_head_dim=512` and the other twelve at 256 gives `12x1024 + 3x2048 = 18,432 B` = **18
+   KiB/token exactly**, which needs 19.77 GiB against the 19.79 measured. That is 0.1% out, where
+   uniform-256 is 17% out. Suggestive, not conclusive: both figures come from the same artifact, and
+   block padding or a different utilization accounting could open the same gap. **Resolve it against an
+   allocation log, not by arithmetic.** Until then size v6e KV at 18 KiB/token, the conservative of the
+   two, and treat 15 KiB/token as holding only where it was observed.
 
 ### Single KV head does not shard
 

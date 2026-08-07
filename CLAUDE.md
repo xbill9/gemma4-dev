@@ -20,13 +20,14 @@ Rigs: `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-12b`, `tpu-pytorch-v5e1-2b`, `tpu-pyt
 
 ## Canonical root references
 
-Three facts-not-code files at the root, each scoped to what does **not** vary by rig. Read the relevant one before deriving its numbers yourself, and correct it there rather than restating it in a rig:
+Four facts-not-code files at the root, each scoped to one axis that does **not** vary by rig. Read the relevant one before deriving its numbers yourself, and correct it there rather than restating it in a rig:
 
 - **`@MODELS.md`** — checkpoint properties: layer structure, attention/head shape, KV cost per token, bf16 weight footprints. Same whatever serves them.
 - **`@HARDWARE.md`** — accelerator properties: usable HBM, bandwidth, and **which numeric formats the MXU natively supports**. v5e and v6e have no native fp8 (int8 is the only low-precision compute win); v7/Ironwood is the first that does, so quantization conclusions do not carry forward across generations.
+- **`@QUANTIZATION.md`** — what vLLM + tpu_inference actually support for Gemma 4: which routes are reachable from the JAX model path, which are dead, and how to enable qwix. Stack properties, so they hold across hardware slots.
 - **`@NAMING.md`** — how any of the above is spelled in a directory name.
 
-Anything that depends on a runtime or engine build belongs with the rig that measured it, not here — e.g. `tpu-vllm-v5e1-2b/gemma4-quantization.md`.
+**File by what a fact is true of, not by where it was measured.** A finding from one rig that describes the model, the chip, or the serving stack belongs in the matching root file; only the measurement itself stays in that rig's `benchmarks/runs/`.
 
 ## Naming
 
