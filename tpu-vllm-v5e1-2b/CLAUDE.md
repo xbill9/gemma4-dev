@@ -67,6 +67,31 @@ values as placeholders. Both deploy paths and the generated one-liner therefore 
 second hardcoded flag list. Note the JSON value needs different quoting inside a single-quoted argument —
 that's what the `mm_limit` parameter is for.
 
+**`--gpu-memory-utilization` is unset, and 0.92 is the ceiling — not a conservative default.** The engine
+default in effect is 0.92, giving a 14.49 GiB cap: 8.97 GiB weights + 5.52 GiB KV = 321,376 resident
+tokens. **0.95 was measured on 2026-08-07 and does not boot.** The KV pool sizes exactly as arithmetic
+predicts (14.96 cap, 5.99 GiB KV, 348,896 tokens, 10,903 blocks — all within 0.03% of prediction), then
+XLA dies ~13 min later loading `jit_structured_decode_fn`: it wants 384.11 MB and finds 346.77 MB free.
+
+**The knob governs weights + KV only. Compiled program images come out of whatever the cap leaves
+behind, and are invisible to it** — at least ~836 MB of them, against the ~1,290 MB that 0.92 leaves and
+the ~799 MB that 0.95 leaves. That is the general lesson; it applies to any attempt to tighten the cap.
+Note the probe is expensive: the failure lands *after* the full compile, ~17 min in, not at allocation.
+Full write-up in `benchmarks/runs/2026-08-07-gpu-mem-util-v5e1/`.
+
+That run also confirmed E2B's KV cost by difference — 27,520 extra tokens for 0.47 extra GiB is
+**18 KiB/token**, cancelling the weights term. The retracted 15 KiB/token figure came from a boot log
+line describing one layer group as if it described the whole hybrid model; see `@MODELS.md`.
+
+**`gcloud compute tpus tpu-vm ssh` does not work from the dev sandbox.** It crashes with
+`ConnectionResetError` on its own internal API call, while plain gcloud API calls (`tpu-vm list`,
+`queued-resources list`) are unaffected. This breaks every MCP tool that shells out through it —
+`manage_vllm_docker`, `get_vllm_docker_logs`, `get_tpu_system_logs`, `run_vllm_benchmark` — which fail
+with that error rather than anything describing the real cause. Direct
+`ssh -i ~/.ssh/google_compute_engine xbill@<external-ip>` works, and `/v1/*` and `/metrics` over HTTP
+work, so most diagnostics do not need SSH at all: `kv_cache_size_tokens`, `num_gpu_blocks`,
+`gpu_memory_utilization` and `cache_dtype` all come off `vllm:cache_config_info` in `/metrics`.
+
 **`create_tpu_queued_resource` is non-destructive; `manage_queued_resource` is not.** The latter deletes every
 Queued Resource in the zone that isn't the named primary. `create_tpu_queued_resource` touches only the id it
 was given, so `find_tpu`'s zone sweep is safe. Keep that split.

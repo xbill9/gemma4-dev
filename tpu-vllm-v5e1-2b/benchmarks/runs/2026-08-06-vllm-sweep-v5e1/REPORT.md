@@ -58,11 +58,27 @@ context is not interactive.
 | Total HBM | 15.75 |
 | Usable (engine cap) | 14.49 |
 | Weights | 8.97 |
-| KV cache | 4.60 (derived) |
+| KV cache | **5.52** |
 
-KV is allocated for **15 layers only**, single 256-dim KV head — 15 KiB/token in bf16. `kv_cache_gib`
-is derived from the logged block count (10,043 blocks × 32 tokens × 15 layers), not read directly
-from a memory counter.
+KV is allocated for **15 layers**, at **18 KiB/token** in bf16, giving 321,376 resident tokens.
+The figure is read from `total_hbm_avail_gb=5.52GiB` in the boot log, and it closes the budget
+exactly: 8.97 + 5.52 = 14.49.
+
+> **Corrected 2026-08-07.** This table previously said **4.60 GiB and 15 KiB/token**, derived from the
+> block count as `10,043 × 32 × 15 layers`. That derivation took a boot log line describing **one layer
+> group** as if it described the whole model. E2B is hybrid — 28 sliding layers at 256-dim and 7
+> full-attention layers at 512-dim (`MODELS.md`) — so a single 256-dim head does not characterize it.
+> The old number left 17% of the KV budget unexplained.
+>
+> 18 KiB/token is confirmed two independent ways: the budget closes to the digit above, and the
+> `--gpu-memory-utilization 0.95` arm in [`../2026-08-07-gpu-mem-util-v5e1/`](../2026-08-07-gpu-mem-util-v5e1/REPORT.md)
+> measured **27,520 extra tokens for 0.47 extra GiB = 17.9 KiB/token** — a difference measurement that
+> cancels the weights term entirely. At 15 KiB/token that same 0.47 GiB would have bought 32,850
+> tokens, 19% more than observed.
+>
+> **No measured quantity in this run changes** — throughput, TTFT and cost are untouched. The corrected
+> fields in `../../reports/2026-08-06-gemma4-e2b-v5e1.json` are `memory.kv_cache_gib`,
+> `memory.kv_bytes_per_token`, and the two `notes` strings.
 
 ## Comparing this against the v6e-1 report
 

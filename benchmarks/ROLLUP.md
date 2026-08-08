@@ -56,7 +56,9 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-08-06-vllm-sweep-v5e1` | 28 | 13 | 0 | yes | yes |
+| tpu-vllm-v5e1-2b | `2026-08-07-gpu-mem-util-v5e1` | 3 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-07-kv-quant-v5e1` | 15 | 6 | 0 | yes | **no** |
+| tpu-vllm-v5e1-2b | `2026-08-07-qwix-int8-v5e1` | 4 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
@@ -83,5 +85,5 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-12b | 1 | 1 |
 | tpu-pytorch-v5e1-2b | 1 | 1 |
 | tpu-pytorch-v6e1-2b | 1 | 1 |
-| tpu-vllm-v5e1-2b | 1 | 6 |
+| tpu-vllm-v5e1-2b | 1 | 8 |
 | tpu-vllm-v6e1-2b | 1 | 6 |

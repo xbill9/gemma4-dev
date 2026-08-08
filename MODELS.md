@@ -47,13 +47,25 @@ Both keep 8 query heads and **1 KV head**; what changes is head_dim. `global_hea
 real and applies to Q, K, V **and** the norms in full-attention layers — it is not a Q-only field.
 
 **All 35 layers carry `q_proj`, `k_proj`, `v_proj`, `o_proj`, `q_norm` and `k_norm`. Nothing is missing
-from the base checkpoint** — `layers missing k_proj: []`, `layers missing k_norm: []`.
+from the base checkpoint** — `layers missing k_proj: []`, `layers missing k_norm: []`. Note the scope:
+this is the **base export**, `google/gemma-4-E2B-it`. The QAT exports are a different artifact and are
+**not** described by this row — see below.
 
 > **Correction (2026-08-07).** An earlier version of this file claimed full-attention layers were
 > allocated at 256 like the rest, that KV cost 15 KiB/token, and that layers 15-34 "legitimately have no
-> K projection and no `k_norm`". The weights refute all three. The `k_norm`-missing failure on the QAT
-> exports is therefore **not** explained by the architecture and needs re-diagnosing against that
-> checkpoint; do not repeat the old explanation.
+> K projection and no `k_norm`". The weights refute all three **as claims about the base checkpoint**.
+
+> **Amended 2026-08-07: that correction was then over-applied.** It was read as evidence that the
+> `k_norm`-missing failure on the **QAT** exports is unexplained. It is not evidence about those
+> exports at all — the headers above are the base repo's. Reading *both* repos shows the base ships
+> `self_attn.k_norm` for all 35 layers while **the QAT export ships it only for the 15 non-KV-shared
+> layers**, both configs declaring `num_kv_shared_layers: 20`. Those readings are compatible: the base
+> carries tensors layers 15-34 never use, and the QAT export drops them.
+>
+> Since KV sharing is a **runtime** property, a base-checkpoint header count can never settle a
+> question about the QAT export in either direction. That inference is what produced both the original
+> error and the overshoot; don't make it a third time. `QUANTIZATION.md` holds the full re-diagnosis
+> and the loading evidence — this file states only what the checkpoints contain.
 
 **A caution when reading tensor names:** the checkpoint also contains `model.audio_tower.layers.N.*` and
 a vision tower, each with its own independent layer numbering and its own `self_attn.*`. A regex matching

@@ -48,17 +48,45 @@ raise NotImplementedError(...)
 ```
 
 `wNa16` is w4a16 — exactly the format of Google's QAT releases
-(`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). Those checkpoints fail a **second, independent** way too:
+(`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). A **second, independent** failure hits the QAT exports:
 `k_norm.weight` "missing" for layers 15-34. Upstream:
 [tpu-inference #3225](https://github.com/vllm-project/tpu-inference/issues/3225).
-`tpu-pytorch-v5e1-12b` is currently pinned at one of these checkpoints and therefore does not load.
+`tpu-pytorch-v5e1-12b` is currently pinned at `gemma-4-12B-it-qat-w4a16-ct` and does not load.
 
-> **The old explanation for that second failure is retracted (2026-08-07).** This file used to say
-> layers 15-34 "legitimately have no K projection", citing KV sharing. `MODELS.md` read the
-> safetensors headers and refuted it: **all 35 layers carry `k_proj` and `k_norm`** in the base
-> checkpoint — `layers missing k_norm: []`. KV sharing is a *runtime* property, not a checkpoint one.
-> So the `k_norm`-missing failure on the **QAT exports** is unexplained and needs re-diagnosing
-> against that checkpoint specifically. Do not repeat the architectural explanation.
+> **Which export shows which failure is not cleanly recorded.** The devto forensics tabulate them
+> against **E2B**, and there they are *different* checkpoints: `-qat-w4a16-ct` dies on the int4
+> compressed-tensors scheme being unimplemented for `per_layer_model_projection`, while
+> `-qat-q4_0-unquantized` is the one that dies on `k_norm`. Whether the 12B `-qat-w4a16-ct` reaches
+> the `k_norm` error or hits the `wNa16` `NotImplementedError` first has not been separately
+> established. Don't assume both failures apply to both exports.
+
+> **The `k_norm` failure is a loader bug. Re-diagnosed 2026-08-07 — this supersedes both the original
+> architectural explanation and its retraction.**
+>
+> The sequence: this file first said layers 15-34 "legitimately have no K projection", citing KV
+> sharing. `MODELS.md` then read the safetensors headers, found **all 35 layers carry `k_proj` and
+> `k_norm`** (`layers missing k_norm: []`), and the claim was retracted as unexplained.
+>
+> **That retraction over-corrected, because `MODELS.md` read the *base* export.** The forensics in
+> `tpu-jax-v5e1-2b/devto-jax-gemma4-e2b.md` and `tpu-pytorch-v5e1-12b/devto-post.md` read *both*
+> repos: the plain export ships `self_attn.k_norm` for all 35 layers, and **the QAT export ships it
+> only for the 15 non-KV-shared layers** — both configs declaring `num_kv_shared_layers: 20`. Those
+> two readings are compatible: the base carries tensors layers 15-34 never use, and the QAT export
+> drops them. So the QAT export is the architecturally honest one and the loader is wrong to demand
+> the tensors. #3225 proposes skipping K/V-side parameters for KV-shared layers.
+>
+> **What survives from the retraction:** KV sharing is a runtime property, so the base checkpoint's
+> header count is not evidence about the QAT export *in either direction*. Never cite it as proof
+> about the QAT export — that is the move that produced both the original error and the overshoot.
+>
+> **Independent confirmation that `-qat-w4a16-ct` is loadable** — measured 2026-07-31 on the pure-JAX
+> engine in `~/tpu-jax-*` (a **different stack**; see the boundary note in the next section), filed
+> in the artifact rigs: `gemma-4-12B-it-qat-w4a16-ct` loads at **100% exact token parity** with the
+> HF PyTorch reference (`tpu-jax-v6e1-12b-w4a16`), and `gemma-4-31B-it-qat-w4a16-ct` loads, fits one
+> v6e chip and answers correctly **with zero engine changes** (`tpu-jax-v6e1-31b-w4a16`). Both are
+> different sizes and layer geometries from the E2B export the `k_norm` complaint is documented
+> against, so this is corroboration rather than a same-checkpoint reproduction — but the format is
+> demonstrably readable, which leaves the loader as the variable.
 
 ## The QAT checkpoint formats themselves
 

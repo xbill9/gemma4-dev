@@ -30,7 +30,7 @@
     "weights_dtype": "bfloat16",
     "quantization": "none",
     "max_model_len": 16384,
-    "architecture_notes": "KV sharing: the engine allocated KV for 15 layers only, with a single 256-dim KV head per layer \u2014 15 KiB per token in bf16."
+    "architecture_notes": "KV sharing: the engine allocated KV for 15 layers. CORRECTED 2026-08-07: this note previously added 'with a single 256-dim KV head per layer - 15 KiB per token', taken from a boot log line that describes one layer group as if it described the whole model. E2B is hybrid - sliding layers are 256-dim and full-attention layers are 512-dim - and the true cost is 18 KiB per token. See MODELS.md."
   },
   "software": {
     "engine": "vllm",
@@ -894,10 +894,10 @@
   "memory": {
     "usable_hbm_gib": 14.49,
     "weights_gib": 8.97,
-    "kv_cache_gib": 4.6,
-    "kv_bytes_per_token": 15360,
+    "kv_cache_gib": 5.52,
+    "kv_bytes_per_token": 18432,
     "resident_kv_tokens": 321376,
-    "notes": "Engine reported 15.75 GiB total HBM, capped at 14.49 GiB. kv_cache_gib is derived from the logged block count (10043 blocks x 32 tokens x 15 layers), not read directly."
+    "notes": "Engine reported 15.75 GiB total HBM, capped at 14.49 GiB, with total_hbm_avail_gb=5.52 GiB for KV. CORRECTED 2026-08-07: this field previously read 4.6 GiB / 15360 B per token, derived from a boot log line describing one layer group as if it described all of them. 18432 B per token is confirmed two ways - 14.49 - 8.97 = 5.52 GiB closes exactly, and the 0.95 gpu-memory-utilization arm in tpu-vllm-v5e1-2b/benchmarks/runs/2026-08-07-gpu-mem-util-v5e1 measured 27520 extra tokens for 0.47 extra GiB = 17.9 KiB per token, by difference."
   },
   "startup": {
     "time_to_healthy_s": 986,

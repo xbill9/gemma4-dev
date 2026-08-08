@@ -1,0 +1,39 @@
+SSH key found in project metadata; not updating instance.
+Using ssh batch size of 1. Attempting to SSH into 1 nodes with a total of 1 workers.
+SSH: Attempting to connect to worker 0...
+=== CONTAINER EXITED at poll 4 ===
+=== STATUS ===
+vllm-gemma4-qwix	Exited (1) 8 seconds ago
+=== QWIX/QUANT LINES ===
+(APIServer pid=1) INFO 08-07 20:37:50 [api_utils.py:273] non-default args: {'model_tag': 'google/gemma-4-E2B-it', 'enable_auto_tool_choice': True, 'tool_call_parser': 'gemma4', 'model': 'google/gemma-4-E2B-it', 'max_model_len': 16384, 'reasoning_parser': 'gemma4', 'limit_mm_per_prompt': {'image': 4, 'audio': 1}, 'max_num_batched_tokens': 4096, 'disable_chunked_mm_input': True, 'additional_config': {'quantization': {'qwix': {'rules': [{'module_path': '.*', 'weight_qtype': 'int8'}]}}}}
+(EngineCore pid=187) WARNING 08-07 20:39:09 [qwix_utils.py:498] Overwriting default Qwix quantization config with user provided quantization config.
+(EngineCore pid=187) INFO 08-07 20:40:20 [qwix_utils.py:290] Applying Qwix quantization on concrete model
+(EngineCore pid=187) INFO 08-07 20:40:20 [qwix_utils.py:313] Using num_hidden_layers from hf_config.text_config: 35
+(EngineCore pid=187) INFO 08-07 20:40:20 [qwix_utils.py:134] Qwix rules: [QuantizationRule(module_path='.*', op_names=(), weight_qtype='int8', act_qtype=None, tile_size=None, act_static_scale=None, weight_calibration_method='absmax', act_calibration_method=None, act_batch_axes=(0,))]
+(EngineCore pid=187) INFO 08-07 20:40:20 [qwix_utils.py:135] Memory usage before applying quantization of params: hbm=[(8.97, 15.75)]Gb
+=== MEMORY / KV ===
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]     self.model_runner.load_model()
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]   File "/workspace/tpu_inference/tpu_inference/runner/tpu_runner.py", line 1174, in load_model
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]     model = get_model(
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]             ^^^^^^^^^^
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]   File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 643, in get_model
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]     return get_flax_model(vllm_config, rng, mesh,
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]   File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 348, in get_flax_model
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]     jit_model = _get_nnx_model(model_class,
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]   File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 305, in _get_nnx_model
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]     jit_model = create_jit_model(
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]                 ^^^^^^^^^^^^^^^^^
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]   File "/usr/local/lib/python3.12/site-packages/flax/nnx/transforms/compilation.py", line 1023, in __call__
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]     pure_args_out, pure_kwargs_out, pure_out = self.jitted_fn(
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349]                                                ^^^^^^^^^^^^^^^
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349] jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory required for HLO temporaries (16.23G) exceeds available HBM (15.75G).
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349] --------------------
+(EngineCore pid=187) ERROR 08-07 20:40:29 [core.py:1349] For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+(EngineCore pid=187) Traceback (most recent call last):
+(EngineCore pid=187) jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the total memory required for HLO temporaries (16.23G) exceeds available HBM (15.75G).
+(EngineCore pid=187) For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+(APIServer pid=1) Traceback (most recent call last):
+(APIServer pid=1)     raise RuntimeError(
+(APIServer pid=1) RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
