@@ -47,7 +47,39 @@ doc. `README.md` intentionally lists only a handful of highlights and points at 
 
 Source of truth either way: `grep -n "^@mcp.tool" server.py`.
 
+## Upstream TPU tuning docs — read, but check the version first
+
+**<https://docs.vllm.ai/en/v0.11.1/configuration/tpu/>** is the upstream TPU configuration and tuning
+page: `max-num-seqs` as "concurrent decode slots", `max-num-batch-tokens` down for latency / up for
+throughput, XLA warmup and the compiled-graph cache, `VLLM_TPU_BUCKET_PADDING_GAP` (use increments of
+128), the TP rule, and a pointer to the vLLM auto-tuner. The directional guidance is sound and matches
+what this rig measures.
+
+**It is pinned at v0.11.1 and this rig runs `0.26.1rc1.dev125+ga7a204cc6`. Verify anything from it
+against the build before acting.** Checked 2026-08-09:
+
+| From the page | Status on this build |
+| :--- | :--- |
+| `VLLM_TPU_MOST_MODEL_LEN` — "pass 32k to `--max-model-len` and set this to 2048" | **Gone.** Absent from vLLM's `envs.py` at the pinned commit *and* from tpu_inference's 81-var `envs.py`. Setting it is a silent no-op |
+| `VLLM_TPU_BUCKET_PADDING_GAP` | Real, but lives in **tpu_inference**'s envs, not vLLM's |
+| `VLLM_XLA_CACHE_PATH` | Present in vLLM; this stack is the **JAX** path, whose cache is `/root/.cache/vllm` in the container (~169 MB) |
+| "v5e/v6e support INT8 W8A8, INT8 W8A16, FP8 KV cache" | **Contradicted by measurement** — qwix int8 reaches no allocation on either path, and `--kv-cache-dtype fp8_e4m3` measures a 1.000x capacity ratio. See `@QUANTIZATION.md`; the boot allocation log wins over the doc |
+
+The version string is the handle for checking: `0.26.1rc1.dev125+g**a7a204cc6**` embeds vLLM's git SHA
+(commit `a7a204cc6ec99b3…`, 2026-07-30), so upstream source at that exact commit is readable and
+authoritative. The **image** ID in this file (`sha256:2a4a1f82…`) is a config-blob ID, *not* a manifest
+digest — `docker pull` by it fails with `unexpected media type`. tpu_inference carries no such handle,
+so its source can only be read from `main` and is the weaker half of any source claim.
+
+Serving-parameter analysis, measurements and probe plan live in `SERVING-PARAMS.md`.
+
 ## Gotchas
+
+**The JAX compile cache is container-local and thrown away on every `docker rm`.** It is
+`/root/.cache/vllm` inside the container (~169 MB), nothing in `startup_script_template.sh` mounts it,
+and compilation is **738 s of the ~1,000 s** to healthy. So every restart, config change and spot
+preemption repays the full compile. Mounting `-v ~/.cache/vllm:/root/.cache/vllm` fixes restarts;
+durable storage would fix preemptions too. On spot capacity this is the largest cold-start lever there is.
 
 **`startup_script_template.sh` is consumed by `str.format()`.** Placeholders are `{project_id}`, `{zone}`,
 `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`, `{max_num_batched_tokens}`,

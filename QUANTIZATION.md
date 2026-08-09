@@ -287,16 +287,88 @@ to bind to. The design is sound and the implementation is broken downstream of i
 Testing on E2B was deliberate: bf16 fits there, so the failure isolates to the code path rather than
 to memory pressure. It did — this is a `ValueError`, not an OOM.
 
+## KV cache allocation: sliding windows are switched off for every Gemma 4 size
+
+Not a quantization route, but it sits in the same budget and is the larger number, so it belongs
+beside the section below. **tpu_inference allocates full-length KV for sliding-attention layers**,
+even though those layers are masked to `sliding_window` tokens and can never read past it.
+
+The trigger is a model having more than one head dim, in
+`tpu_inference/runner/kv_cache_manager.py`'s `get_kv_cache_spec` (read from `main`, 2026-08-09):
+
+```python
+head_size_set = {common_utils.get_padded_head_dim(getattr(attn_module, "head_size", 0))
+                 for attn_module in layers.values() if not isinstance(attn_module, MambaBase)}
+disable_sliding_window = len(head_size_set) > 1
+# TODO(yuyanpeng): enable sliding windows once mixed dims support
+#   Currently, with sliding windows, there is shared_kv_cache_layers among each group.
+```
+
+`SlidingWindowSpec` is constructed and then discarded: `if disable_sliding_window:
+attn_module.sliding_window = None`, collapsing everything to one full-attention group.
+
+**Every Gemma 4 size trips this**, because `head_dim` 256 / `global_head_dim` 512 is a family-wide
+split (`@MODELS.md` family table) — the same two-geometry fact that caused the 15-vs-18 KiB/token
+error. Confirmed against a boot log: E2B on v5e-1 reports `Hybrid KV cache layout:
+num_kv_cache_groups=1, num_kv_cache_tensors=15` with identical block counts on all 15 tensors.
+
+**What it costs**, on E2B (12 sliding layers at 1,024 B/token windowed to 512, 3 full at 2,048 B/token):
+
+| context | allocated | if windowed | forgone |
+| ---: | ---: | ---: | ---: |
+| 8,192 | 144.0 MiB/seq | 54.0 MiB/seq | 2.67x |
+| 16,384 | 288.0 MiB/seq | 102.0 MiB/seq | 2.82x |
+| 32,768 | 576.0 MiB/seq | 198.0 MiB/seq | 2.91x |
+
+So **18 KiB/token is the operative figure and no flag reduces it** — `--disable-sliding-window` goes
+the wrong way, and there is no switch for the reverse. This is worth more than every KV dtype below
+combined; re-check it on each image bump, since it is gated on a named upstream TODO.
+
+**Two things this does not mean.** Attention masking is unaffected — `attn_module` here comes from
+vLLM's `static_forward_context` and is spec bookkeeping, not the JAX `Gemma4Attention`, which takes
+`attention_chunk_size` from its own config; sliding layers still attend over exactly their window.
+And the waste is *allocation*, not bandwidth: the ragged-paged attention kernel still reads only what
+the mask admits.
+
 ## KV cache quantization
 
 Only 5 of vLLM's 15 `--kv-cache-dtype` values work on this path. `_DTYPE_STR_ALIAS_TO_JAX_DTYPE`
-(`tpu_inference/utils.py:36`) maps `fp8`, `fp8_e4m3`, `fp8_e5m2`, `fp4`, plus numpy-parseable names like
-`int8`. `int8_per_token_head`, `turboquant_*`, `nvfp4`, `fp8_inc`, `fp8_ds_mla` raise
-`TypeError: data type not understood` and **kill the server at boot**.
+(`tpu_inference/utils.py:36`) maps exactly four — `fp8`, `fp8_e4m3`, `fp8_e5m2`, `fp4` — and
+`to_jax_dtype` sends **everything else** to `jnp.dtype(...)`:
 
-- **`int8` resolves and is the most dangerous value in the list.** `gemma4.py:406-408` hardcodes
-  `_q_scale`/`_k_scale`/`_v_scale` to `1.0`, so int8 rounds K/V to whole integers — and it boots cleanly
-  while doing so.
+```python
+if isinstance(dtype, str) and (dict_dtype := _DTYPE_STR_ALIAS_TO_JAX_DTYPE.get(dtype, None)):
+    return dict_dtype
+return jnp.dtype(dtype)          # <- anything not in the four-entry table lands here
+```
+
+So the survivors are the four aliases plus whatever `jnp.dtype` accepts (`int8`, `bfloat16`,
+`float16` — note it is **`jnp.dtype`, not numpy**, which is why `bfloat16` resolves at all).
+`int8_per_token_head`, `turboquant_*`, `nvfp4`, `fp8_inc`, `fp8_ds_mla` raise
+`TypeError: data type not understood` and **kill the server at boot** — all of them are in vLLM's
+`CacheDType` literal, so passing CLI validation proves nothing here.
+
+> **`auto` never reaches that function**, since `jnp.dtype("auto")` would raise and the server boots
+> fine on `auto`. An explicit dtype therefore takes a **different code path** from `auto` — including
+> for `bfloat16`, which resolves to the same dtype the model already uses. Prefer `--kv-cache-dtype
+> auto` with `--dtype` pinned: identical bytes and block shape, without entering the branch where
+> `gemma4.py`'s write-side KV quantization and its hardcoded `_k_scale`/`_v_scale = 1.0` live.
+
+The enum itself moves: current `main` lists 17 values, against 15 on the pinned build. Re-count before
+quoting a fraction.
+
+- **Retracted 2026-08-09: plain `int8` is NOT passable, so it cannot silently corrupt.** This file
+  previously called it "the most dangerous value in the list", reasoning that `to_jax_dtype` falls
+  through to `jnp.dtype("int8")` while `gemma4.py:406-408` hardcodes `_q_scale`/`_k_scale`/`_v_scale`
+  to `1.0`. That reasoning skipped a step: **vLLM's CLI enum is checked first, and does not contain
+  `int8`** — the same failure mode already documented for `fp4` one bullet down. Measured on the
+  running image: `vllm serve: error: argument --kv-cache-dtype: invalid choice: 'int8'`. The full
+  accepted set on this build is **16 values**: `auto, bfloat16, float16, fp8, fp8_ds_mla, fp8_e4m3,
+  fp8_e5m2, fp8_inc, fp8_per_token_head, int4_per_token_head, int8_per_token_head, nvfp4,
+  turboquant_3bit_nc, turboquant_4bit_nc, turboquant_k3v4_nc, turboquant_k8v4`. Note `int8_per_token_head`
+  *is* accepted and dies loudly at boot; `nvfp4_4over6` is in the source `Literal` but not the CLI enum.
+  The scale-hardcoding in `gemma4.py` is real and would matter if a narrow integer dtype ever became
+  passable — it is not currently reachable.
 - **`fp4` is mapped but not passable** — the source comments `# NOTE: vLLM doesn't have this str dtype
   yet`, and it isn't in vLLM's CLI enum, so it fails validation before reaching tpu_inference.
 - **`--calculate-kv-scales` is a no-op** for Gemma 4 — honored only in
