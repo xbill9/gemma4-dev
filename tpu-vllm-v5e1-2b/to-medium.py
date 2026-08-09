@@ -131,6 +131,8 @@ def main():
     ap.add_argument("-o", "--output")
     ap.add_argument("--tables", choices=["code", "list", "auto"], default="auto")
     # Tested on Medium 2026-08-09: code and list both survive a rich-text paste;
+    ap.add_argument("--html", action="store_true",
+                    help="also emit medium-paste.html -- open it, select all, copy, paste into Medium")
     ap.add_argument("--width", type=int, default=100, help="max rendered width before auto falls back to list form")
     a = ap.parse_args()
 
@@ -138,6 +140,21 @@ def main():
     out, n_code, n_list = convert(md, a.tables, a.width)
     dest = a.output or a.input.replace(".md", "") + "-medium.md"
     open(dest, "w").write(out)
+
+    if a.html:
+        import markdown  # pip install markdown
+        body = markdown.markdown(out, extensions=["fenced_code", "sane_lists"])
+        style = (
+            "body{font:18px/1.7 Georgia,serif;max-width:740px;margin:40px auto;padding:0 20px;color:#222}"
+            "pre{background:#f6f8fa;padding:14px;overflow-x:auto;border-radius:6px;"
+            "font:13px/1.45 ui-monospace,Menlo,monospace}"
+            "code{font:0.9em ui-monospace,Menlo,monospace;background:#f0f0f0;padding:1px 4px;border-radius:3px}"
+            "pre code{background:none;padding:0}"
+            "blockquote{border-left:3px solid #ccc;margin-left:0;padding-left:16px;color:#555}"
+        )
+        html_path = "medium-paste.html"
+        open(html_path, "w").write(f'<meta charset="utf-8"><style>{style}</style>\n{body}\n')
+        print(f"wrote {html_path}  ({body.count('<pre>')} code blocks, {body.count('<table>')} tables)")
 
     imgs = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", out)
     print(f"wrote {dest}  ({len(out.splitlines())} lines, {len(out)} bytes)")
