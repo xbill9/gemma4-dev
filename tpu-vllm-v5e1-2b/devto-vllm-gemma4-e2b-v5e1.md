@@ -133,6 +133,69 @@ gcloud compute tpus tpu-vm delete gemma4-v5e --zone=us-west4-a --quiet
 
 ## Part 2 — The flags, and what they actually do
 
+### The chip: what one v5e actually gives you
+
+| spec | v5e, one chip | source |
+| :--- | ---: | :--- |
+| HBM capacity | 16 GB nominal · **15.75 GiB visible to the runtime** | vendor · measured |
+| Usable for weights + KV at `0.92` | **14.49 GiB** | measured |
+| HBM bandwidth | **800 GiBps** | vendor |
+| Peak bf16 | 197 TFLOPS | vendor |
+| Peak int8 | 393 TOPS (**exactly 2x bf16**) | vendor |
+| TensorCore | 1, with 4 MXUs (128x128) | vendor |
+| ICI | 400 GBps bidirectional, 4 ports | vendor |
+| Machine type | `ct5lp-hightpu-1t` | |
+| gcloud spelling | `v5litepod-1`, runtime `v2-alpha-tpuv5-lite` | measured |
+
+Two unit traps worth knowing before you compare anything. Google quotes **v5e bandwidth in GiBps and
+v6e in GBps** — normalise before dividing, the real generational ratio is ~1.9x, not a clean 2x. And
+the "16 GB" capacity figure sits awkwardly next to the 15.75 GiB the runtime reports (15.75 GiB is
+16.9 GB), so the vendor number is almost certainly 16 **GiB** loosely written. Size against the
+measured 15.75 GiB, never the marketing figure.
+
+### Data types: what the matrix units can actually compute in
+
+**This single table decides every quantization question on this chip.**
+
+| format | native in the MXU? | what it buys on v5e |
+| :--- | :---: | :--- |
+| **bf16** | ✅ | the baseline — everything here runs in it |
+| **int8** | ✅ **2x bf16 throughput** | the *only* low-precision compute win |
+| **fp8** | ❌ | storage and bandwidth only — values widen back to bf16 before the matmul |
+| **int4 / fp4** | ❌ | footprint and bandwidth only, then unpack to bf16 |
+
+Google publishes bf16 and Int8 peaks for v5e and **no fp8 figure at all**, which is the tell. The
+practical consequence: *a benchmark showing no speedup from fp8 on this chip is the correct result, not
+a misconfiguration.* **v7/Ironwood is the first TPU with fp8 in the MXU** — do not carry any conclusion
+here forward to it.
+
+### Quantization: what is actually reachable
+
+Gemma 4 exists only as a JAX implementation in this stack, so anything in the torch path is unreachable
+no matter what the platform advertises. Measured state:
+
+| route | status on this build |
+| :--- | :--- |
+| **KV cache, bf16 (`auto`)** | ✅ the only one worth running |
+| KV cache `fp8_e4m3` / `fp8_e5m2` | reachable, **1.000x capacity** — the block layout is word-aligned, so narrowing the element buys padding, not room. ~2% slower |
+| KV cache `int8` | ❌ **rejected by the CLI enum** — never reaches the engine |
+| KV cache `int8_per_token_head`, `turboquant_*`, `nvfp4`, `fp8_inc`, `fp8_ds_mla` | accepted by the CLI, then **kill the server at boot** |
+| Weights, compressed-tensors **w4a16** (Google's QAT format) | ❌ `NotImplementedError` on the JAX path |
+| Weights, **mxfp4** | ❌ MoE-only; E2B is dense, so there is nothing to attach to |
+| Weights, **qwix PTQ** int8/int4 | ❌ does not boot — the concrete path OOMs on quantization temporaries, the abstract path raises binding weights |
+| Weights, AWQ / GGUF / q4_0 | ❌ torch path or absent |
+
+**So bf16 is not a choice here, it is the only thing that runs** — and that is the single biggest
+constraint on the chip. Weights are **8.97 of the 14.49 GiB budget (62%)**, and none of it can be
+compressed today. Working int8 weights would roughly double the KV pool *and* buy real FLOPS, since
+int8 is the one format with a native MXU path. It is blocked upstream, not by configuration, so it is
+worth re-testing on every image bump.
+
+One measured consequence of all this: decode moves ~3.15 GiB per step against a **3.94 ms** bandwidth
+floor, and measures **8.02 ms** — about **49% of peak bandwidth**. *(The 3.15 GiB is derived from the
+model's layer geometry; the 8.02 ms is measured.)* The chip is not the bottleneck at any point in this
+article.
+
 ### The mental model: one HBM budget, and a part of it nobody governs
 
 Everything else follows from this:
