@@ -241,6 +241,22 @@ Warm boot was measured twice: **497 s and 500 s** (cold 857 s).
 - **Upstream's failing correctness test for E2B** — read from tpu-inference's support table, not
   independently reproduced. Local quality probes were clean.
 
+## What this run cost
+
+The node was a **spot** `v5litepod-1` in `us-west4-a`, alive **5.8 h** end to end, at the live
+catalog rate of $0.5779/chip-hr:
+
+| item | |
+| :--- | ---: |
+| node, 5.8 h at spot | **$3.38** |
+| flex-start verification QR (~10 min, reached ACTIVE then deleted) | $0.10 |
+| **total** | **~$3.48** |
+
+The same 5.8 h would have been $3.51 on flex-start and **$7.01 on-demand**. Nine arms, 36 benchmark
+cell-runs, four functional tests and five verification probes for under four dollars — which is the
+argument for measuring rather than deriving, given three of the derived recommendations turned out to
+be wrong.
+
 ## Still unexploited: 2.8x KV capacity
 
 `Hybrid KV cache layout: num_kv_cache_groups=1` on every arm — all 15 cached layers get full-length
