@@ -129,40 +129,19 @@ gcloud compute tpus tpu-vm delete gemma4-v5e --zone=us-west4-a --quiet
 
 ### The chip: what one v5e actually gives you
 
-**HBM capacity**
-- v5e, one chip: 16 GB nominal · **15.75 GiB visible to the runtime**
-- source: vendor · measured
-
-**Usable for weights + KV at `0.92`**
-- v5e, one chip: **14.49 GiB**
-- source: measured
-
-**HBM bandwidth**
-- v5e, one chip: **800 GiBps**
-- source: vendor
-
-**Peak bf16**
-- v5e, one chip: 197 TFLOPS
-- source: vendor
-
-**Peak int8**
-- v5e, one chip: 393 TOPS (**exactly 2x bf16**)
-- source: vendor
-
-**TensorCore**
-- v5e, one chip: 1, with 4 MXUs (128x128)
-- source: vendor
-
-**ICI**
-- v5e, one chip: 400 GBps bidirectional, 4 ports
-- source: vendor
-
-**Machine type**
-- v5e, one chip: `ct5lp-hightpu-1t`
-
-**gcloud spelling**
-- v5e, one chip: `v5litepod-1`, runtime `v2-alpha-tpuv5-lite`
-- source: measured
+```
+spec                             v5e, one chip                                     source
+-------------------------------  ------------------------------------------------  -----------------
+HBM capacity                     16 GB nominal · 15.75 GiB visible to the runtime  vendor · measured
+Usable for weights + KV at 0.92  14.49 GiB                                         measured
+HBM bandwidth                    800 GiBps                                         vendor
+Peak bf16                        197 TFLOPS                                        vendor
+Peak int8                        393 TOPS (exactly 2x bf16)                        vendor
+TensorCore                       1, with 4 MXUs (128x128)                          vendor
+ICI                              400 GBps bidirectional, 4 ports                   vendor
+Machine type                     ct5lp-hightpu-1t
+gcloud spelling                  v5litepod-1, runtime v2-alpha-tpuv5-lite          measured
+```
 
 Two unit traps worth knowing before you compare anything. Google quotes **v5e bandwidth in GiBps and v6e in GBps** — normalise before dividing, the real generational ratio is ~1.9x, not a clean 2x. And the "16 GB" capacity figure sits awkwardly next to the 15.75 GiB the runtime reports (15.75 GiB is 16.9 GB), so the vendor number is almost certainly 16 **GiB** loosely written. Size against the measured 15.75 GiB, never the marketing figure.
 
@@ -224,29 +203,18 @@ One measured consequence of all this: decode moves ~3.15 GiB per step against a 
 
 E2B is a strange checkpoint. Almost every intuition from a conventional decoder is wrong here, and the memory arithmetic later in this article only makes sense once these are on the table.
 
-**`num_hidden_layers`**
-- value: 35 (**28 sliding / 7 full attention**, `i % 5 == 4` is full)
-
-**`num_kv_shared_layers`**
-- value: **20** — so only **15 layers own a cache**
-
-**`num_attention_heads` / `num_key_value_heads`**
-- value: 8 / **1**
-
-**`head_dim` / `global_head_dim`**
-- value: **256 / 512**
-
-**`hidden_size` / `intermediate_size`**
-- value: 1536 / 6144
-
-**`vocab_size`**
-- value: 262,144 (tied embeddings)
-
-**`sliding_window`**
-- value: 512
-
-**resident at bf16**
-- value: **8.97 GiB**
+```
+field                                      value
+-----------------------------------------  ------------------------------------------------------
+num_hidden_layers                          35 (28 sliding / 7 full attention, i % 5 == 4 is full)
+num_kv_shared_layers                       20 — so only 15 layers own a cache
+num_attention_heads / num_key_value_heads  8 / 1
+head_dim / global_head_dim                 256 / 512
+hidden_size / intermediate_size            1536 / 6144
+vocab_size                                 262,144 (tied embeddings)
+sliding_window                             512
+resident at bf16                           8.97 GiB
+```
 
 **1. "E2B" is not a 2B model.** It is ~2B *effective* against ~5B total, and lands at **8.97 GiB** resident. The `E` prefix is load-bearing — reading `E4B` as "a 4B model" understates its weights by roughly 2x, which is exactly the difference between fitting a 16 GB chip and not.
 
@@ -457,25 +425,14 @@ context ↓ / clients →  1    4    16  64
 
 ### Recommended client counts
 
-**Interactive chat / agent turns**
-- context: ≤1K
-- clients: **16**
-- expected: 991–1,152 tok/s, 99–170 ms TTFT, ~14 ms TPOT
-
-**Max throughput, batch/offline**
-- context: ≤1K
-- clients: **64**
-- expected: 1,259–1,496 tok/s, 247–422 ms TTFT
-
-**RAG / long documents**
-- context: 8K
-- clients: **16**
-- expected: 399.6 tok/s, 594 ms TTFT
-
-**Long-context interactive**
-- context: 8K
-- clients: **≤4**
-- expected: 254 tok/s, ~304 ms TTFT
+```
+workload                        context  clients  expected
+------------------------------  -------  -------  --------------------------------------------
+Interactive chat / agent turns  ≤1K      16       991–1,152 tok/s, 99–170 ms TTFT, ~14 ms TPOT
+Max throughput, batch/offline   ≤1K      64       1,259–1,496 tok/s, 247–422 ms TTFT
+RAG / long documents            8K       16       399.6 tok/s, 594 ms TTFT
+Long-context interactive        8K       ≤4       254 tok/s, ~304 ms TTFT
+```
 
 **Rule of thumb: keep `clients × context < 250,000 tokens`** — about 78% of the 321,344-token KV pool. Cross it and you're paying in tail latency for throughput you don't get.
 
@@ -497,35 +454,15 @@ What it is *not* good for: long-context batch summarization at high concurrency 
 
 Live rates from the Cloud Billing Catalog for `us-west4`, per chip-hour:
 
-**3-year commitment**
-- $/chip-hr: 0.5400
-- vs spot: −6.6%
-- stops itself?: n/a
-- preemptible?: no
-
-**Spot**
-- $/chip-hr: **0.5779**
-- vs spot: —
-- stops itself?: **no**
-- preemptible?: yes, ~30 s notice
-
-**Flex-start (DWS)**
-- $/chip-hr: **0.6000**
-- vs spot: +3.8%
-- stops itself?: **yes** (`--max-run-duration`)
-- preemptible?: no, once running
-
-**1-year commit / Reserved**
-- $/chip-hr: 0.8400
-- vs spot: +45%
-- stops itself?: n/a
-- preemptible?: no
-
-**On-demand**
-- $/chip-hr: **1.2000**
-- vs spot: **+108%**
-- stops itself?: no
-- preemptible?: no
+```
+model                     $/chip-hr  vs spot  stops itself?             preemptible?
+------------------------  ---------  -------  ------------------------  -----------------
+3-year commitment         0.5400     −6.6%    n/a                       no
+Spot                      0.5779     —        no                        yes, ~30 s notice
+Flex-start (DWS)          0.6000     +3.8%    yes (--max-run-duration)  no, once running
+1-year commit / Reserved  0.8400     +45%     n/a                       no
+On-demand                 1.2000     +108%    no                        no
+```
 
 ### The result that surprised me: flex-start is the default choice, not spot
 
@@ -575,32 +512,19 @@ There's a fifth I haven't been able to fix. The boot log reports `Hybrid KV cach
 
 The final configuration was booted from scratch and exercised, not assembled from winning fragments:
 
-**cold boot**
-- result: **857 s** (compile 685 s = 80%)
-
-**warm boot, compile cache mounted**
-- result: **497 s** (−42%)
-
-**memory**
-- result: 14.49 GiB cap / 8.97 weights / 5.52 KV — matches every other arm
-
-**KV capacity**
-- result: `block_size` 64 x 5,021 blocks = **321,344 tokens**
-
-**chat completion**
-- result: ✅
-
-**tool calling**
-- result: ✅ `{"name":"get_weather","arguments":"{\"city\": \"Paris\"}"}`
-
-**multimodal image**
-- result: ✅ correctly described a synthetic gradient PNG
-
-**long context**
-- result: ✅ **26,016 prompt tokens** accepted
-
-**throughput**
-- result: 12 cells x 3 reps, cv ≤3.4%
+```
+check                             result
+--------------------------------  ----------------------------------------------------------------
+cold boot                         857 s (compile 685 s = 80%)
+warm boot, compile cache mounted  497 s (−42%)
+memory                            14.49 GiB cap / 8.97 weights / 5.52 KV — matches every other arm
+KV capacity                       block_size 64 x 5,021 blocks = 321,344 tokens
+chat completion                   ✅
+tool calling                      ✅ {"name":"get_weather","arguments":"{\"city\": \"Paris\"}"}
+multimodal image                  ✅ correctly described a synthetic gradient PNG
+long context                      ✅ 26,016 prompt tokens accepted
+throughput                        12 cells x 3 reps, cv ≤3.4%
+```
 
 The three flags that restate a default (`--dtype`, `--kv-cache-dtype`, `--gpu-memory-utilization`) are **confirmed no-ops by vLLM itself** — they do not appear in the engine's `non-default args` when passed at these values. They are in the command for auditability, since the real defaults are computed several layers from where they look like they are declared.
 

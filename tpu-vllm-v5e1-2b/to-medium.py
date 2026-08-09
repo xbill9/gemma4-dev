@@ -13,6 +13,13 @@ Strategies (--tables):
         Medium styling and mobile-friendly, but longer.
   auto  code for tables that fit `--width`, list for anything wider (default).
 
+Tested against a real Medium draft on 2026-08-09 by pasting the same table
+rendered four ways (see medium-table-test.html). Result: a pasted HTML table does
+NOT survive, raw markdown pipes do NOT survive, and both `code` and `list` do --
+with `code` reading better. So `code` is preferred, but a code block only holds
+about 100 characters before it scrolls horizontally and becomes unreadable on a
+phone, which is why `auto` still routes the widest tables to `list`.
+
 Also strips the front matter (Medium takes the title from the first H1) and
 reports any images, which Medium always requires you to upload by hand.
 
@@ -123,7 +130,8 @@ def main():
     ap.add_argument("input")
     ap.add_argument("-o", "--output")
     ap.add_argument("--tables", choices=["code", "list", "auto"], default="auto")
-    ap.add_argument("--width", type=int, default=76, help="max rendered width before auto falls back to list form")
+    # Tested on Medium 2026-08-09: code and list both survive a rich-text paste;
+    ap.add_argument("--width", type=int, default=100, help="max rendered width before auto falls back to list form")
     a = ap.parse_args()
 
     md = open(a.input).read()
