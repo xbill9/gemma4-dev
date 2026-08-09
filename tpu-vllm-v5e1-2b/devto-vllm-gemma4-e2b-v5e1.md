@@ -147,11 +147,7 @@ gcloud compute tpus tpu-vm delete gemma4-v5e --zone=us-west4-a --quiet
 | Machine type | `ct5lp-hightpu-1t` | |
 | gcloud spelling | `v5litepod-1`, runtime `v2-alpha-tpuv5-lite` | measured |
 
-Two unit traps worth knowing before you compare anything. Google quotes **v5e bandwidth in GiBps and
-v6e in GBps** — normalise before dividing, the real generational ratio is ~1.9x, not a clean 2x. And
-the "16 GB" capacity figure sits awkwardly next to the 15.75 GiB the runtime reports (15.75 GiB is
-16.9 GB), so the vendor number is almost certainly 16 **GiB** loosely written. Size against the
-measured 15.75 GiB, never the marketing figure.
+Two unit traps worth knowing before you compare anything. Google quotes **v5e bandwidth in GiBps and v6e in GBps** — normalise before dividing, the real generational ratio is ~1.9x, not a clean 2x. And the "16 GB" capacity figure sits awkwardly next to the 15.75 GiB the runtime reports (15.75 GiB is 16.9 GB), so the vendor number is almost certainly 16 **GiB** loosely written. Size against the measured 15.75 GiB, never the marketing figure.
 
 ### Data types: what the matrix units can actually compute in
 
@@ -164,15 +160,11 @@ measured 15.75 GiB, never the marketing figure.
 | **fp8** | ❌ | storage and bandwidth only — values widen back to bf16 before the matmul |
 | **int4 / fp4** | ❌ | footprint and bandwidth only, then unpack to bf16 |
 
-Google publishes bf16 and Int8 peaks for v5e and **no fp8 figure at all**, which is the tell. The
-practical consequence: *a benchmark showing no speedup from fp8 on this chip is the correct result, not
-a misconfiguration.* **v7/Ironwood is the first TPU with fp8 in the MXU** — do not carry any conclusion
-here forward to it.
+Google publishes bf16 and Int8 peaks for v5e and **no fp8 figure at all**, which is the tell. The practical consequence: *a benchmark showing no speedup from fp8 on this chip is the correct result, not a misconfiguration.* **v7/Ironwood is the first TPU with fp8 in the MXU** — do not carry any conclusion here forward to it.
 
 ### Quantization: what is actually reachable
 
-Gemma 4 exists only as a JAX implementation in this stack, so anything in the torch path is unreachable
-no matter what the platform advertises. Measured state:
+Gemma 4 exists only as a JAX implementation in this stack, so anything in the torch path is unreachable no matter what the platform advertises. Measured state:
 
 | route | status on this build |
 | :--- | :--- |
@@ -185,16 +177,48 @@ no matter what the platform advertises. Measured state:
 | Weights, **qwix PTQ** int8/int4 | ❌ does not boot — the concrete path OOMs on quantization temporaries, the abstract path raises binding weights |
 | Weights, AWQ / GGUF / q4_0 | ❌ torch path or absent |
 
-**So bf16 is not a choice here, it is the only thing that runs** — and that is the single biggest
-constraint on the chip. Weights are **8.97 of the 14.49 GiB budget (62%)**, and none of it can be
-compressed today. Working int8 weights would roughly double the KV pool *and* buy real FLOPS, since
-int8 is the one format with a native MXU path. It is blocked upstream, not by configuration, so it is
-worth re-testing on every image bump.
+**So bf16 is not a choice here, it is the only thing that runs** — and that is the single biggest constraint on the chip. Weights are **8.97 of the 14.49 GiB budget (62%)**, and none of it can be compressed today. Working int8 weights would roughly double the KV pool *and* buy real FLOPS, since int8 is the one format with a native MXU path. It is blocked upstream, not by configuration, so it is worth re-testing on every image bump.
 
-One measured consequence of all this: decode moves ~3.15 GiB per step against a **3.94 ms** bandwidth
-floor, and measures **8.02 ms** — about **49% of peak bandwidth**. *(The 3.15 GiB is derived from the
-model's layer geometry; the 8.02 ms is measured.)* The chip is not the bottleneck at any point in this
-article.
+One measured consequence of all this: decode moves ~3.15 GiB per step against a **3.94 ms** bandwidth floor, and measures **8.02 ms** — about **49% of peak bandwidth**. *(The 3.15 GiB is derived from the model's layer geometry; the 8.02 ms is measured.)* The chip is not the bottleneck at any point in this article.
+
+### The model: six things about Gemma 4 E2B that will catch you out
+
+E2B is a strange checkpoint. Almost every intuition from a conventional decoder is wrong here, and the memory arithmetic later in this article only makes sense once these are on the table.
+
+| field | value |
+| :--- | ---: |
+| `num_hidden_layers` | 35 (**28 sliding / 7 full attention**, `i % 5 == 4` is full) |
+| `num_kv_shared_layers` | **20** — so only **15 layers own a cache** |
+| `num_attention_heads` / `num_key_value_heads` | 8 / **1** |
+| `head_dim` / `global_head_dim` | **256 / 512** |
+| `hidden_size` / `intermediate_size` | 1536 / 6144 |
+| `vocab_size` | 262,144 (tied embeddings) |
+| `sliding_window` | 512 |
+| resident at bf16 | **8.97 GiB** |
+
+**1. "E2B" is not a 2B model.** It is ~2B *effective* against ~5B total, and lands at **8.97 GiB** resident. The `E` prefix is load-bearing — reading `E4B` as "a 4B model" understates its weights by roughly 2x, which is exactly the difference between fitting a 16 GB chip and not.
+
+**2. There are two attention geometries, not one.** Sliding layers run at `head_dim` 256; the seven full-attention layers run at **512**, and that applies to K and V, not just Q. A single `head_dim` does not describe this model — anything that reads one value and applies it to all 35 layers under-counts the full layers by 2x. That is a 17% KV sizing error, and it is one people actually make.
+
+**3. Twenty of the thirty-five layers read someone else's cache.** `first_shared = 35 − 20 = 15`, so layers 0–14 own KV and layers 15–34 share. The mapping is "last preceding layer of the same attention type", and within 0–14 that means **all twenty shared layers resolve to just two source caches** — layer 13 for the sliding ones, layer 14 for the full ones. Twenty layers, two tensors.
+
+**4. KV costs 18 KiB/token, and the boot log will lie to you about why.**
+
+```
+12 sliding cached layers x 1 KV head x 2 (K,V) x 256 x 2 B = 12,288 B
+ 3 full    cached layers x 1 KV head x 2 (K,V) x 512 x 2 B =  6,144 B
+                                                    total  = 18,432 B = 18 KiB/token
+```
+
+Multiply by the measured 321,344 resident tokens and you get **5.52 GiB** — exactly what the engine reports. But the log line describing the cache, `regular_attn_shape=(num_blocks, (64, 1, 2, 256))`, is a **first-wins sample taken from layer 0** — which is sliding, hence 256. It says nothing about layers 4, 9 and 14. On any hybrid model it under-reports. *Size KV from the config geometry and check it against `total_hbm_avail_gb`; never read it off that line.*
+
+**5. One KV head means more chips make things worse, not better.** `num_key_value_heads = 1` is full MQA, and a single head **cannot be sharded**. Runtimes pad `num_kv_heads` up to a multiple of the tensor-parallel size, so at TP=4 you pay **4x the KV memory to store the same head replicated**. On this model a larger topology multiplies the KV cost rather than dividing it. Check `num_key_value_heads` before assuming more chips solve a memory problem.
+
+**6. The heads do not tile the hidden size.** `8 x 256 = 2048` against `hidden_size = 1536`, so the Q projection is rectangular. Any code computing `head_dim = hidden_size / num_heads` gets **192** and is silently wrong.
+
+And one that explains the performance rather than the memory: **4.38 GiB of the 8.97 GiB resident is per-layer embedding tables** (262,144 x 256 x 35), which are *gathered per token, not streamed*. Only ~3.15 GiB actually moves per decode step — the dense transformer plus the 0.75 GiB tied embedding that `lm_head` reads in full. That is why an 8.97 GiB model decodes as fast as it does.
+
+Two more traps worth knowing if you go poking at the checkpoint: the file also contains `audio_tower` and vision layers **with their own independent layer numbering**, so a regex matching `layers\.(\d+)\.` silently collides with them — always anchor on `model.language_model.`. And the QAT exports (`-qat-w4a16-ct`, `-qat-q4_0-unquantized`) **do not load on this stack at all**, partly because they legitimately ship no `k_norm` for the KV-shared layers and the loader demands it anyway.
 
 ### The mental model: one HBM budget, and a part of it nobody governs
 
