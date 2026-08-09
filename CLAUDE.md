@@ -58,7 +58,11 @@ The root `Makefile` only fans out into every rig (`make clean|test|lint|install|
 - **`make install` is a no-op in four of six rigs** — the target exists with no recipe. Only `tpu-vllm-v5e1-2b` actually pip-installs, despite what `README.md` says. Install manually with `pip install -r requirements.txt`.
 - `claude plugin validate .` checks a plugin manifest.
 
-Use the **system `python3`**. Do not create a virtualenv. If a dependency is missing, warn with the `pip install -r requirements.txt` command instead of installing or building an env.
+Use the **system `python3`**, and install into it — `pip install <pkg>` system-wide is the right move
+when a dependency is missing. **Never create a virtualenv.** The constraint is the venv, not the
+install: these rigs deploy as a docker image with system-wide site-packages, so a venv diverges the dev
+environment from the thing that actually runs. Add anything new to the rig's `requirements.txt` so the
+image picks it up too.
 
 ## Generated files — never hand-edit
 
