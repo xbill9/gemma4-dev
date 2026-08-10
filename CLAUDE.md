@@ -14,7 +14,7 @@ One thing deliberately keeps the old shared name: the inf2 rig's AWS `ManagedBy=
 
 **The rigs are siblings, not layers.** Nothing is imported across a rig boundary. They share ancestry and have diverged — do not assume a pattern in one rig holds in another; read the rig you are in. Each rig has its own `CLAUDE.md`; read it before working inside that rig.
 
-Serving rigs: `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-12b`, `tpu-pytorch-v5e1-2b`, `tpu-pytorch-v6e1-2b`, `tpu-pytorch-inf2-2b` (AWS Inferentia2, not GCP), `tpu-vllm-v5e1-2b` (the live-demo rig), `tpu-vllm-v6e1-2b`.
+Serving rigs: `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-12b`, `tpu-pytorch-v5e1-2b`, `tpu-pytorch-v6e1-2b`, `tpu-pytorch-v6e8-2b`, `tpu-pytorch-inf2-2b` (AWS Inferentia2, not GCP), `tpu-vllm-v5e1-2b` (the live-demo rig), `tpu-vllm-v6e1-2b`.
 
 **Artifact rigs — measurements only, and a different thing entirely.** `tpu-jax-v6e1-12b-w4a16`, `tpu-jax-v6e1-26b-q4_0`, `tpu-jax-v6e1-31b-w4a16`, and the five `gpu-vllm-l4-*` rigs have **no `server.py`, no MCP server, no skill, no plugin, no `tpu.env`**, and none is owed. They give results a home that names the hardware they came off, for sizes and chips no serving rig covers. Do not scaffold them into full rigs; do not look for an engine in them — the JAX code stayed in `~/tpu-jax-{12b,26b,31b}` and the harnesses they carry will not run as they stand. `benchmarks/rollup.py` still discovers them, because it globs `*/benchmarks/`. `NAMING.md` has the rule.
 

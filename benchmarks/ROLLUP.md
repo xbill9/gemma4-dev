@@ -13,7 +13,7 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 
 | Report (`run.id`) | Model | Hardware | Deployment | Engine | Sweep | Peak out tok/s | $/M out | Schema | Valid | Carried by |
 |---|---|---|---|---|---|---:|---:|---|---|---|
-| `2026-07-21-gemma4-e2b-v6e1` | google/gemma-4-E2B-it | tpu-v6e×1 | flex-start / gcp | vllm 0.23.1rc1.dev1076+g5c… | 1-D (5 pts) | 2,215 | 0.17 | 1.0 | ok | tpu-jax-v5e1-2b<br>tpu-pytorch-inf2-2b<br>tpu-pytorch-v5e1-12b<br>tpu-pytorch-v5e1-2b<br>tpu-pytorch-v6e1-2b |
+| `2026-07-21-gemma4-e2b-v6e1` | google/gemma-4-E2B-it | tpu-v6e×1 | flex-start / gcp | vllm 0.23.1rc1.dev1076+g5c… | 1-D (5 pts) | 2,215 | 0.17 | 1.0 | ok | tpu-jax-v5e1-2b<br>tpu-pytorch-inf2-2b<br>tpu-pytorch-v5e1-12b<br>tpu-pytorch-v5e1-2b<br>tpu-pytorch-v6e1-2b<br>tpu-pytorch-v6e4-2b<br>tpu-pytorch-v6e8-2b |
 | `2026-08-06-gemma4-e2b-v5e1` | google/gemma-4-E2B-it | tpu-v5e×1 | spot / gcp | vllm 0.26.1rc1.dev125+ga7a… | 2-D (4ctx × 4conc)<br>4 infeasible | 1,382 | 0.12 | 1.1 | ok | tpu-vllm-v5e1-2b<br>tpu-vllm-v6e1-2b |
 
 ## Sweep run directories
@@ -53,18 +53,22 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-12b | `2026-07-25-vllm-sweep-v6e1` | 552 | 539 | 28 | yes | yes |
 | tpu-pytorch-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 552 | 539 | 28 | yes | yes |
 | tpu-pytorch-v6e1-2b | `2026-07-25-vllm-sweep-v6e1` | 552 | 539 | 28 | yes | yes |
+| tpu-pytorch-v6e4-2b | `2026-07-25-vllm-sweep-v6e1` | 552 | 539 | 28 | yes | yes |
+| tpu-pytorch-v6e8-2b | `2026-07-25-vllm-sweep-v6e1` | 552 | 539 | 28 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-08-06-vllm-sweep-v5e1` | 28 | 13 | 0 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-08-07-gpu-mem-util-v5e1` | 3 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-07-kv-quant-v5e1` | 15 | 6 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-07-qwix-int8-v5e1` | 4 | 0 | 0 | yes | **no** |
+| tpu-vllm-v5e1-2b | `2026-08-09-serving-params-v5e1` | 6 | 2 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v6e1-2b | `2026-08-06-vllm-sweep-v5e1` | 16 | 13 | 0 | yes | yes |
 | tpu-vllm-v6e1-2b | `2026-08-07-kv-quant-v5e1` | 7 | 2 | 0 | **no** | **no** |
+| tpu-vllm-v6e1-2b | `2026-08-10-config-validation-v6e1` | 15 | 4 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes | **no** |
 
@@ -85,5 +89,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-12b | 1 | 1 |
 | tpu-pytorch-v5e1-2b | 1 | 1 |
 | tpu-pytorch-v6e1-2b | 1 | 1 |
-| tpu-vllm-v5e1-2b | 1 | 8 |
-| tpu-vllm-v6e1-2b | 1 | 6 |
+| tpu-pytorch-v6e4-2b | 1 | 1 |
+| tpu-pytorch-v6e8-2b | 1 | 1 |
+| tpu-vllm-v5e1-2b | 1 | 9 |
+| tpu-vllm-v6e1-2b | 1 | 7 |

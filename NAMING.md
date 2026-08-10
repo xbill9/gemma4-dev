@@ -265,6 +265,7 @@ Three things that trip people up:
 | `~/gemma4-dev/gpu-vllm-l4-26b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-26B-A4B-it-qat-w4a16-ct` **(no such Hub id — see the rig)** | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-31b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-31B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-pytorch-v5e1-2b` | TPU | PyTorch / `torch_xla` | v5e-1 | 2B | — |
+| `~/gemma4-dev/tpu-pytorch-v6e8-2b` | TPU | PyTorch / `torch_xla` | v6e-8 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-pytorch-v5e1-12b` | TPU | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | **`w4a16` — name stale, see below** |
 | `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |
 | `~/tpu-pytorch-v6e1-2b` | TPU | PyTorch | v6e-1 | 2B | — |
