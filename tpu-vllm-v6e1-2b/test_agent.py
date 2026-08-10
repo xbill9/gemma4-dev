@@ -241,7 +241,10 @@ class TestProvisioningModel(unittest.IsolatedAsyncioTestCase):
 
     def test_spot_flags(self):
         flags = _provisioning_flags("spot")
-        self.assertIn("--spot", flags)
+        # Must be --provisioning-model=spot, never the --spot boolean: the API rejects
+        # --spot with "STANDARD provisioning model is incompatible with spot requests".
+        self.assertIn("--provisioning-model=spot", flags)
+        self.assertNotIn("--spot", flags)
         # gcloud documents --max-run-duration as flex-start only; passing it here is rejected.
         self.assertNotIn("--max-run-duration=4h", flags)
         self.assertNotIn("--provisioning-model=flex-start", flags)
@@ -273,7 +276,9 @@ class TestProvisioningModel(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(ok, msg)
         cmd = mock_run_command.call_args[0][0]
-        self.assertIn("--spot", cmd)
+        # Regression guard: --spot is accepted by gcloud and rejected by the API.
+        self.assertIn("--provisioning-model=spot", cmd)
+        self.assertNotIn("--spot", cmd)
         self.assertNotIn("--max-run-duration=4h", cmd)
         self.assertIn("--valid-until-duration=4h", cmd)
         self.assertIn("--accelerator-type=v6e-1", cmd)

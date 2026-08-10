@@ -266,9 +266,16 @@ def _provisioning_flags(provisioning_model: str) -> list[str]:
     Only flex-start passes --max-run-duration: gcloud documents that flag as flex-start
     only. A spot or on-demand node therefore has no automatic stop — it runs until it is
     preempted or destroyed, so it keeps billing after a demo ends.
+
+    Spot must be requested as --provisioning-model=spot, NOT the --spot boolean. Both
+    flags exist on `queued-resources create` and only the former works: --spot sets the
+    request's spot field while leaving the node spec at its STANDARD default, and the API
+    rejects the pair with "STANDARD provisioning model is incompatible with spot requests"
+    (verified against v6e-1 in us-east5-b, 2026-08-10). It fails at the API, so nothing
+    client-side catches it.
     """
     if provisioning_model == "spot":
-        return ["--spot", "--labels=purpose=spot"]
+        return ["--provisioning-model=spot", "--labels=purpose=spot"]
     if provisioning_model == "on-demand":
         return ["--labels=purpose=on-demand"]
     return ["--provisioning-model=flex-start", "--max-run-duration=4h", "--labels=purpose=flex-start"]

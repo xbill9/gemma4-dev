@@ -159,14 +159,25 @@ one zone that accepted flex-start `v5litepod-1` — is therefore useless here. T
 `us-east5-b` / `us-east5`: it has `v6e-1`, the project holds 512 chips of v6e quota there, and the catalog
 publishes all three provisioning rates for us-east5.
 
-**Which zones accept flex-start for v6e-1 has not been established.** On v5e it was, by attempting
-creation, and the answer was one zone out of 44 — do not carry that result across. What is verified for v6e
-is only that 37 zones report quota, 8 regions publish a `DWS Defined Duration V6e` rate (us-east5,
-us-central1, us-south1, europe-west4, asia-northeast1, asia-southeast1, southamerica-east1,
-southamerica-west1), and fewer still have `v6e-1` hardware. A published rate is not an offer of capacity —
-`europe-west4` quoted a flex-start v5e rate while rejecting `v5litepod-1` at the API. Expect `find_tpu` to
-have to sweep, and expect it to record real failures in `tpu_zones_status.md`, which was reseeded empty for
-v6e (every previous row was an observation about `v5litepod-1`).
+**Provisioning v6e-1 clears three independent gates, and quota is the weakest of them.** Partially mapped
+2026-08-10 by attempting creation; `tpu_zones_status.md` holds the detail and the running results.
+
+1. **Hardware.** 37 zones report quota; only **18** actually offer the `v6e-1` accelerator type. Model-
+   independent. **Google's regions-zones page names only 8 and is a strict subset of the API** — read
+   `gcloud compute tpus accelerator-types list --filter="type=v6e-1"`, not the docs.
+2. **Provisioning model for that type in that zone.** Separate from both quota and hardware. **us-central1-b
+   and us-south1-a have quota, `v6e-1` hardware, and a published `DWS Defined Duration V6e` rate for their
+   region, and still reject flex-start**: `FLEX_START provisioning model is not supported for accelerator
+   type "v6e-1" in location "<zone>"`. Confirmed accepting flex-start: **us-east5-a, us-east5-b,
+   europe-west4-a**. This is the v6e analogue of the v5e one-zone-out-of-44 result, and note europe-west4
+   inverts across generations — it rejected `v5litepod-1` while quoting a rate, and accepts `v6e-1`.
+3. **Capacity right now.** Not a property of the zone and never cached. us-east5-b accepted both spot and
+   flex-start without error and produced nothing across ~70 minutes on 2026-08-10.
+   `WAITING_FOR_RESOURCES` is this gate — it is not a failure and must not be recorded as one.
+
+A published rate is still not an offer of capacity, and now demonstrably not even an offer of the
+*provisioning model*. Only gate 2 belongs in `tpu_zones_status.md` as a `No` row, because the skip logic is
+per-model; gate 1 is recorded there in prose since it applies to every model, and gate 3 never is.
 
 **The Queued Resource path takes three provisioning models.** `_provisioning_flags()` in `server.py` is the
 one place that maps `flex-start` / `spot` / `on-demand` to gcloud flags; every creation tool

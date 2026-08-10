@@ -1,0 +1,44 @@
+{
+  "extracted": {
+    "kv_cache_tokens": 1151744.0,
+    "num_gpu_blocks": null,
+    "total_hbm_used_gb": 8.97,
+    "total_hbm_avail_gb": 19.77,
+    "max_model_len": 32768.0,
+    "block_size": 64.0,
+    "num_kv_cache_groups": 1.0,
+    "num_kv_cache_tensors": 15.0
+  },
+  "checks": [
+    {
+      "check": "max_model_len is 32768 (the tpu.env value, not the 16384 fork default)",
+      "verdict": "PASS",
+      "detail": "read 32,768"
+    },
+    {
+      "check": "block_size derived to 64 at 32768 context",
+      "verdict": "PASS",
+      "detail": "read 64, expected 64"
+    },
+    {
+      "check": "KV pool matches bf16 arithmetic (fp8 did NOT engage)",
+      "verdict": "PASS",
+      "detail": "1,151,744 tokens vs 19.77 GiB avail -> bf16 model off by 0.01%, fp8 model off by 50.0%"
+    },
+    {
+      "check": "weights resident at the bf16 figure (8.97 GiB) \u2014 no quantization engaged",
+      "verdict": "PASS",
+      "detail": "read 8.97 GiB, expected ~8.97"
+    },
+    {
+      "check": "sliding windows still disabled (num_kv_cache_groups=1) \u2014 the 2.9x is still forgone",
+      "verdict": "PASS",
+      "detail": "groups=1, tensors=15 (groups>1 would mean the upstream TODO landed \u2014 a large win)"
+    },
+    {
+      "check": "engine prose mentions fp8 (informational \u2014 prose is not evidence)",
+      "verdict": "UNKNOWN",
+      "detail": "yes \u2014 cross-check against the arithmetic above, this line has lied before"
+    }
+  ]
+}

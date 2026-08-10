@@ -13,13 +13,16 @@ and each rig's `benchmarks/runs/` for what was measured on it.
 | Generation | bf16 | int8 | **fp8** | Notes |
 | :--- | :---: | :---: | :---: | :--- |
 | v5e | yes | yes (2x bf16) | **no** | Google publishes bf16 and Int8 peaks only |
-| v6e (Trillium) | yes | yes (2x bf16) | **no** | same pattern — no published fp8 peak |
+| v6e (Trillium) | yes | yes (2x bf16) | **no** | same pattern — verified 2026-08-10, see below |
 | v7 (Ironwood / TPU7x) | yes | yes | **yes** | first TPU with fp8 in the MXU |
 
 **This is the single most consequential fact for quantization work.** On v5e and v6e:
 
 - **int8 is the only low-precision format with a compute win.** Both generations quote int8 at exactly
   2x their bf16 peak, the signature of a genuinely native MXU path.
+- **The v6e fp8 absence is now confirmed at the source, not inferred.** Google's v6e page lists exactly
+  three peak-compute rows — `bf16: 918 TFLOPs`, `Int8: 1836 TOPs`, and a per-Pod bf16 figure — and **no
+  fp8 row anywhere** (checked 2026-08-10). This was previously read off a second-hand spec set.
 - **fp8 is storage-only.** Values widen back to bf16 before the matmul, so fp8 can buy footprint and
   bandwidth but never FLOPS. A benchmark showing no speedup from fp8 on these chips is the expected
   result, not a misconfiguration.
@@ -33,20 +36,35 @@ a v5e/v6e quantization conclusion forward to Ironwood without rechecking it.**
 | Spec | v5e | v6e (Trillium) | Ratio |
 | :--- | ---: | ---: | ---: |
 | HBM capacity | 16 GB | 32 GB | 2.0x |
-| HBM bandwidth | 800 GiBps | 1,638 GBps | ~1.9x (see units note) |
+| HBM bandwidth | 800 GiBps | 1,638 GBps | **1.907x** — units differ, see note |
 | Peak bf16 | 197 TFLOPs | 918 TFLOPs | 4.66x |
 | Peak Int8 | 393 TOPs | 1,836 TOPs | 4.67x |
-| TensorCores | 1 (4 MXUs, 128x128) | — | |
-| ICI bandwidth | 400 GBps bidirectional, 4 ports | — | |
+| TensorCores | 1 (4 MXUs, 128x128) | 1 (2 MXUs, 256x256 — but see below) | |
+| ICI bandwidth | 400 GBps bidirectional, 4 ports | 800 GBps bidirectional, 4 ports | 2.0x |
 | Single-chip machine type | `ct5lp-hightpu-1t` | `ct6e-standard-1t` | |
+| Single-chip VM | — | 44 vCPU, 176 GB RAM | |
+| Peak bf16 per Pod | — | 234.9 PFLOPs (256 chips) | |
 | On-demand list | ~$1.20 / chip-hr | ~$2.70 / chip-hr | 2.25x |
 
-v5e figures verified against [Google's v5e page](https://docs.cloud.google.com/tpu/docs/v5e) on
-2026-08-07. v6e FLOPS and bandwidth are carried from the same source set via
-`tpu-vllm-v5e1-2b/v5e.md`; v7 fp8 support from Google's TPU7x documentation. Treat the v6e FLOPS and
-bandwidth rows, and all of v7, as less directly verified than v5e. Two v6e rows are now firmer than
-that: `ct6e-standard-1t` is confirmed by a real deployment (see the measured memory below), and the
-on-demand rate was read straight from the Cloud Billing Catalog on 2026-08-07.
+**Both columns are now verified directly against Google**, v5e against
+[the v5e page](https://docs.cloud.google.com/tpu/docs/v5e) on 2026-08-07 and v6e against
+[the v6e page](https://docs.cloud.google.com/tpu/docs/v6e) on 2026-08-10. The v6e FLOPS and bandwidth
+rows were previously carried second-hand via `tpu-vllm-v5e1-2b/v5e.md` and that caveat is now
+withdrawn — every number above matched. MXU dimensions come from
+[the system-architecture page](https://docs.cloud.google.com/tpu/docs/system-architecture-tpu-vm):
+"An MXU is composed of either 256 x 256 (TPU v6e and TPU7x) or 128 x 128 (TPU versions prior to v6e)
+multiply-accumulators in a systolic array." The on-demand rate was read from the Cloud Billing Catalog
+on 2026-08-07; v7 fp8 support is from Google's TPU7x documentation and remains less directly verified.
+
+**The v6e MXU *count* does not survive an arithmetic check — do not build on that row.** Google's v6e
+page states "Each TensorCore has 2 matrix-multiply units (MXU), a vector unit, and a scalar unit."
+Two 256x256 MXUs is 131,072 MACs, exactly 2x v5e's four 128x128 (65,536) — but the published peak is
+**4.66x**, which would need a 2.33x clock increase on top. Four 256x256 MXUs closes it almost exactly:
+262,144 MACs x 2 flops x 1.75 GHz = **917.5 TFLOPs** against a published 918. Google's own launch blog
+says only that they "expanded the size of matrix multiply units (MXUs) and increased the clock speed",
+naming no count. The **918 TFLOPs figure itself is sound** — it cross-checks against the same page's
+234.9 PFLOPs-per-Pod row (918 x 256 = 235.0 PFLOPs). So treat peak compute as reliable and the MXU
+count as unresolved; nothing in this monorepo depends on it.
 
 **Rates are per-region, and the provisioning-model ranking is not fixed.** The $2.70 v6e figure holds
 across the US regions; europe-west4 quotes $2.97 and europe-west2 / asia-northeast1 / asia-south1 quote
@@ -55,8 +73,12 @@ v5e ordering, where spot undercut flex-start. Never assume spot is cheapest; rea
 `estimate_deployment_cost` tool in the vLLM rigs does exactly that and reports nothing rather than
 guessing when no SKU matches.
 
-**Units trap:** Google quotes v5e bandwidth in **GiBps** and v6e in **GBps**. Normalize before
-comparing — the real ratio is ~1.9x, not a clean 2x. Don't quote "2x the bandwidth" as exact.
+**Units trap — confirmed on both pages 2026-08-10.** Google quotes v5e bandwidth as **`800 GiBps`** and
+v6e as **`1638 GBps`**, and the mismatch is real, not a transcription slip: the v5e page uses GiBps for
+HBM while using GBps for ICI on the same table. Normalized, 800 GiBps = **858.99 GB/s**, so the true
+ratio is **1.907x** — against a naive 1638/800 = 2.047x. Google's launch blog saying Trillium "doubled"
+HBM bandwidth is the naive reading. **Don't quote "2x the bandwidth"**; the 7% matters when the
+workload is bandwidth-bound, which decode is.
 
 **Shape trap:** v6e is 2.25x the price for 2x memory, ~1.9x bandwidth, but **4.7x the raw FLOPS**. For a
 decode-bound workload — which is bandwidth-bound, not FLOPS-bound — v5e is priced close to right. The
