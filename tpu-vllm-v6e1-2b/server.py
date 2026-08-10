@@ -679,7 +679,20 @@ spec:
 
 @mcp.tool()
 async def destroy_queued_resource(resource_id: str, zone: str = ZONE) -> str:
-    """Safely deletes a Queued Resource and its node."""
+    """Safely deletes a Queued Resource and its node.
+
+    --force is required, not optional: a queued resource that actually reached ACTIVE owns a
+    node, and the API refuses to delete it while it does —
+    "DeleteQueuedResource is not supported when state is ACTIVE (must be one of
+    [ACCEPTED WAITING_FOR_RESOURCES SUSPENDED FAILED])". Without the flag this tool worked only
+    on resources that never provisioned, i.e. never on the ones worth tearing down, and the
+    failure surfaced as a bare API error (verified against v6e-1 in europe-west4-a, 2026-08-10).
+    --force deletes the node first, which drops the resource to SUSPENDED and lets the delete
+    proceed.
+
+    Teardown of a live node is genuinely slow — ~2 min for a v6e-1 — and --async returns before
+    it finishes, so callers must poll rather than assume the zone is clear on return.
+    """
     cmd = [
         "gcloud",
         "alpha",
@@ -690,6 +703,7 @@ async def destroy_queued_resource(resource_id: str, zone: str = ZONE) -> str:
         resource_id,
         f"--zone={zone}",
         f"--project={PROJECT_ID}",
+        "--force",
         "--async",
         "--quiet",
     ]

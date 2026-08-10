@@ -43,6 +43,7 @@ from server import (  # noqa: E402
     _quota_id_for,
     _resolve_node_id,
     _status_model,
+    destroy_queued_resource,
     estimate_deployment_cost,
     get_help,
     get_metrics,
@@ -265,6 +266,22 @@ class TestProvisioningModel(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(_status_model(" Timed out waiting 3 minutes. "), "flex-start")
         self.assertEqual(_status_model(" [spot] Creation failed. "), "spot")
         self.assertEqual(_status_model(" [on-demand] Creation failed. "), "on-demand")
+
+    @patch("server.run_command", new_callable=AsyncMock)
+    async def test_destroy_passes_force_so_an_ACTIVE_resource_can_be_torn_down(self, mock_run_command):
+        """--force is mandatory: the API refuses to delete a queued resource while it owns a node.
+
+        Without it this tool only ever worked on resources that never provisioned — never on
+        the ones actually worth tearing down.
+        """
+        mock_run_command.return_value = (0, "deleted", "")
+
+        await destroy_queued_resource("qr-test", zone="europe-west4-a")
+
+        cmd = mock_run_command.call_args[0][0]
+        self.assertIn("--force", cmd)
+        self.assertIn("delete", cmd)
+        self.assertIn("--zone=europe-west4-a", cmd)
 
     @patch("server.get_secret", new_callable=AsyncMock)
     @patch("server.run_command", new_callable=AsyncMock)
