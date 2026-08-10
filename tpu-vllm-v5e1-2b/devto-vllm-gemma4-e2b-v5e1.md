@@ -1,6 +1,7 @@
 ---
 title: "Self-hosting a lite agent backend on one TPU: Gemma 4 E2B + vLLM on a v5e-1"
 published: false
+series: Gemma4
 tags: tpu, vllm, llm, gcp
 ---
 
@@ -498,3 +499,16 @@ The three flags that restate a default (`--dtype`, `--kv-cache-dtype`, `--gpu-me
 Test the *whole* configuration, not a change to it. My final recommendation is a config that was never run end-to-end — it's the winning arm plus three pins that *should* be no-ops. Every time I assumed something was a no-op in this project, I was eventually proved wrong.
 
 Untested and plausibly better: `max-model-len 65536` (block_size would go to 128, blocks-per-request stays 512, so it may be free too), `max-num-batched-tokens 8192`, `VLLM_TPU_BUCKET_PADDING_GAP=128`, and **n-gram speculative decoding** — which needs no draft checkpoint and is marked fully passing on TPU, against a workload sitting at 49% of memory bandwidth.
+
+---
+
+## The sequel: is the bigger chip worth it?
+
+<!-- Fill the v6e dev.to URL at publish time; `series: Gemma4` already links the two on dev.to. -->
+
+I ran the same model and the same sweep on a **TPU v6e-1 (Trillium)** — 32 GB of HBM against this chip's 16, and 2.25× the price — in *"Serving Gemma 4 E2B on a TPU v6e-1: what Trillium buys, and what it doesn't."* Four things there bear directly on this article:
+
+- **The `max-model-len 65536` guess above is right, and it's free.** Measured across a 4× range on v6e: 16,384 / 32,768 / 65,536 all land within **0.003%** of the same KV token capacity, because `block_size` scales to hold blocks-per-request at 512. The mechanism is the backend's, not the chip's, so it applies here too.
+- **v6e does not fix fp8.** Trillium has no native fp8 either — Google's v6e page publishes bf16 and Int8 peaks and no fp8 row at all. The engine there logs `Automatically using fp8_e5m2` twenty times on the default path and allocates bf16 regardless, so the 1.000× result in this article was the chip being honest, not this build being broken.
+- **The "keep `clients × context` under ~250,000 tokens" rule in Part 3 is not a memory cliff.** On v6e there is no knee anywhere between 56% and 157% of the pool — `TTFT = −8542 + 265 × concurrency` at R² = 0.999996, with zero preemptions even at 157% occupancy, because the scheduler admission-controls rather than evicts. What I measured here was a queueing curve. Size by the latency you'll accept, not by pool occupancy.
+- **The bigger chip is a narrower win than it looks.** v6e returns ~1.65× on workloads that fit in this chip and ~2.56× on ones that don't, against a 2.25× price. Break-even lands around **270,000 KV tokens**, roughly 84% of this chip's pool — and past it v6e is never more than 19% cheaper per token. If your working set fits in 16 GB, this is still the right chip.
