@@ -1,0 +1,82 @@
+<meta charset="utf-8">
+<title>Medium table survival test</title>
+<style>
+  body { font: 16px/1.6 -apple-system, Segoe UI, Roboto, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; }
+  table { border-collapse: collapse; margin: 1em 0; }
+  th, td { border: 1px solid #bbb; padding: 6px 10px; text-align: left; }
+  th { background: #f2f2f2; }
+  pre { background: #f6f8fa; padding: 12px; overflow-x: auto; border-radius: 6px; }
+  h2 { margin-top: 2em; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  .note { color: #666; font-size: 14px; }
+</style>
+
+<h1>Medium table survival test</h1>
+
+<p>The <em>same</em> five-row table below is rendered four different ways. Paste this whole page into a
+Medium draft, then look at which versions survived. Whichever one reads best is the strategy to use for
+the real article — and you never have to hand-edit again.</p>
+
+<p class="note">Test procedure: select all on this page (Ctrl/Cmd-A), copy, paste into a new Medium
+draft. Medium parses pasted rich text, so this exercises the same path your import does. Delete the
+draft afterwards.</p>
+
+<h2>A — real HTML table (control)</h2>
+<p>If this one survives, you don't need the converter at all: just paste rendered HTML.</p>
+<table>
+  <tr><th>provisioning</th><th>$/chip-hr</th><th>stops itself?</th></tr>
+  <tr><td>3-year commitment</td><td>0.5400</td><td>n/a</td></tr>
+  <tr><td>Spot</td><td>0.5779</td><td>no</td></tr>
+  <tr><td>Flex-start</td><td>0.6000</td><td>yes</td></tr>
+  <tr><td>Reserved / 1-yr</td><td>0.8400</td><td>n/a</td></tr>
+  <tr><td>On-demand</td><td>1.2000</td><td>no</td></tr>
+</table>
+
+<h2>B — raw markdown pipe table (expected to fail)</h2>
+<p>This is what the article contains today. Included so you can see the failure mode for comparison.</p>
+<pre>| provisioning      | $/chip-hr | stops itself? |
+|-------------------|----------:|---------------|
+| 3-year commitment |    0.5400 | n/a           |
+| Spot              |    0.5779 | no            |
+| Flex-start        |    0.6000 | yes           |
+| Reserved / 1-yr   |    0.8400 | n/a           |
+| On-demand         |    1.2000 | no            |</pre>
+
+<h2>C — aligned ASCII in a code block (<code>--tables code</code>)</h2>
+<p>Monospace, keeps the grid exactly. Wide tables scroll rather than wrap.</p>
+<pre>provisioning       $/chip-hr  stops itself?
+-----------------  ---------  -------------
+3-year commitment     0.5400  n/a
+Spot                  0.5779  no
+Flex-start            0.6000  yes
+Reserved / 1-yr       0.8400  n/a
+On-demand             1.2000  no</pre>
+
+<h2>D — list form (<code>--tables list</code>)</h2>
+<p>Native Medium styling, best on mobile, but longer.</p>
+
+<p><strong>3-year commitment</strong></p>
+<ul><li>$/chip-hr: 0.5400</li><li>stops itself?: n/a</li></ul>
+
+<p><strong>Spot</strong></p>
+<ul><li>$/chip-hr: 0.5779</li><li>stops itself?: no</li></ul>
+
+<p><strong>Flex-start</strong></p>
+<ul><li>$/chip-hr: 0.6000</li><li>stops itself?: yes</li></ul>
+
+<p><strong>Reserved / 1-yr</strong></p>
+<ul><li>$/chip-hr: 0.8400</li><li>stops itself?: n/a</li></ul>
+
+<p><strong>On-demand</strong></p>
+<ul><li>$/chip-hr: 1.2000</li><li>stops itself?: no</li></ul>
+
+<h2>What to record</h2>
+<ol>
+  <li>Which of A/C/D is readable in the Medium draft?</li>
+  <li>Does the code block (C) keep its alignment, or does Medium reflow it?</li>
+  <li>Check it on a phone — C is the one most likely to break on narrow screens.</li>
+</ol>
+
+<p>Then: if <strong>A</strong> works, skip the converter and paste rendered HTML. If <strong>C</strong>
+works, run <code>./to-medium.py --tables code</code>. If only <strong>D</strong> works, run
+<code>--tables list</code>. If C and D both work, the default <code>auto</code> already mixes them by
+width.</p>

@@ -16,7 +16,7 @@ tpu  -  vllm  -  v5e1  -  2b  -  q4_0
  │        │       │       └───────── Gemma 4 size:  2b / 4b / 12b / 26b / 31b
  │        │       └───────────────── accelerator + chip count:  v5e1 / v6e1 / v6e4 / inf2
  │        └───────────────────────── serving stack:  vllm / jax / pytorch
- └────────────────────────────────── where it runs:  tpu / gpu / gce
+ └────────────────────────────────── where it runs:  tpu / gpu / gce / cloudrun
 ```
 
 Read `tpu-vllm-v5e1-2b` as: **a Cloud TPU running vLLM in Docker on v5e-1 hardware, serving the 2B Gemma 4
@@ -48,19 +48,52 @@ valid.
 
 ## Slot 1 — platform
 
-| Value | Means |
-| --- | --- |
-| `tpu` | Google Cloud TPU VM or Queued Resource |
-| `gpu` | NVIDIA GPU host, anywhere (GCE, EC2, Cloud Run) |
-| `gce` | Compute Engine with no accelerator — CPU-only serving, tooling, or control-plane rigs |
+**Slot 1 names the control plane that provisions the accelerator** — which API you call to get the hardware,
+not which cloud it sits in.
+
+| Value | Means | Provisioned by |
+| --- | --- | --- |
+| `tpu` | A dedicated accelerator with its own control plane: a Cloud TPU VM or Queued Resource, or AWS Inferentia via Neuron | `gcloud compute tpus tpu-vm` / `queued-resources` |
+| `gce` | A Compute Engine instance, where the accelerator (if any) is a property of the **machine type** | `gcloud compute instances create --machine-type=ct6e-…` |
+| `gpu` | A general-purpose GPU attached to a VM, any cloud | varies (GCE, EC2) |
+| `cloudrun` | A general-purpose GPU attached to cloudrun |  Cloud Run |
 
 These three are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
 slot or recorded in the rig's `tpu.env`. Add a platform value only for a genuinely different execution target.
 
-`platform` is the accelerator family, not the cloud. An Inferentia rig takes `tpu` — it's a dedicated
-inference accelerator attached to a VM, which is the same shape of thing as a TPU rig and is how the existing
-repos are named (`~/tpu-jax-inf2`, `~/tpu-pytorch-inf2-2b`). The part itself lives in the hardware slot as
-`inf2`. Reserve `gpu` for general-purpose GPUs and `gce` for no accelerator at all.
+**`tpu` and `gce` can name the same silicon, and that is the point.** `tpu-vllm-v6e1-2b` and
+`gce-vllm-v6e1-2b` are both one v6e-1 chip serving E2B under vLLM; they differ only in which API provisions
+it. That difference earns a slot because Google is retiring one of them — **the Cloud TPU API is no longer
+under active development, and TPU7x and later are Compute Engine or GKE only** (see `@HARDWARE.md`, which
+holds the per-generation table and the migration mapping). A rig's provisioning path is therefore a fact with
+a shelf life, and the name should carry it.
+
+This revises the older reading of the slot as "the accelerator family, not the cloud" (2026-08-10). Three
+consequences, none of which renames an existing rig:
+
+- **Inferentia keeps `tpu`.** AWS Neuron is its own control plane, which is the same *shape* of thing as the
+  Cloud TPU API, and both existing repos already spell it that way (`~/tpu-jax-inf2`,
+  `~/tpu-pytorch-inf2-2b`). The part lives in the hardware slot as `inf2`. This is the one value where `tpu`
+  does not literally mean the Cloud TPU API.
+- **`gce` still covers CPU-only rigs**, its original meaning — the hardware slot settles which it is.
+  `gce-<runtime>-cpu-<model>` is a CPU rig and `gce-<runtime>-v6e1-<model>` is a TPU-on-Compute-Engine rig,
+  so nothing is ambiguous and no CPU rig would need renaming. (None exists yet.)
+- **`gpu` wins for GPUs even though a GPU is also a machine-type property.** Mechanically an L4 on GCE is a
+  Compute Engine instance and could read as `gce`, but no GPU rig has a second control plane to distinguish,
+  and the hardware slot already carries the SKU. Reserve `gce` for the TPU-on-Compute-Engine case; a GPU rig
+  is `gpu` wherever it runs.
+
+**In practice only v5p, v6e and TPU7x can take `gce`.** Google's Compute Engine machine-types page
+enumerates exactly those three and never mentions v5e, so a `gce-*-v5e1-*` rig is not currently buildable
+and the six v5e rigs stay `tpu`.
+
+Note this is a documented exclusion, **not a verified one**, and the catalog muddies it: `ct5lp-hightpu-1t`
+and friends do exist as machine types in 26 zones, the shared OS image family is named for v5e, and there is
+a Compute Engine v5-lite quota id. All three are explainable by the Cloud TPU API being implemented on
+Compute Engine underneath. An earlier revision of this file argued from the missing `ct5lp-*-tpu` shape;
+that argument was wrong, because the *bare* shapes are the documented creatable ones. `@HARDWARE.md` has the
+evidence table and the one command that would settle it.
+`@HARDWARE.md` has the generation table.
 
 ## Slot 2 — runtime
 
@@ -82,6 +115,7 @@ Accelerator generation plus chip count, punctuation stripped.
 | Value | Means |
 | --- | --- |
 | `v5e1` | TPU v5e, 1 chip |
+| `v5p1` | TPU v5p, 1 chip — only reachable via Compute Engine, see below |
 | `v6e1` | TPU v6e (Trillium), 1 chip |
 | `v6e4` | TPU v6e, 4 chips |
 | `inf2` | AWS Inferentia2 |
@@ -100,12 +134,24 @@ generation (an Inferentia2 rig, not two chips). Chip count for these parts, when
 The older wording for this slot was "`ACCELERATOR_TYPE` with the dash dropped." That holds for most rigs but
 breaks on v5e, where gcloud spells the type `v5litepod-1` — dropping the dash would give `v5litepod1`, and
 every real directory says `v5e1`. **The rule is marketing generation + chip count**, normalizing gcloud's
-`v5litepod` spelling back to `v5e`. Siblings currently disagree on the env value itself
+`v5litepod` spelling back to `v5e`.
+
+**v5p breaks it a second way, and the answer depends on which control plane you use.** v5p slice names in the
+*Cloud TPU API* count TensorCores, and a v5p chip has **two** — so its 4-chip slice is `v5p-8` and `v5p-4`
+does not exist. A `v5p4` directory against a `v5p-8` flag differs by a factor of two, on purpose. v5e's trap
+was a name that looked wrong; that one is a name that looks right and asks for twice the hardware.
+
+**Compute Engine changes the available sizes, not the naming rule.** CE publishes `ct5p-hightpu-1t-tpu`, a
+genuine 1-chip v5p, so `v5p1` *is* a valid rig — `~/gemma4-dev/tpu-vllm-v5p1-2b` is one — even though the
+same rig is unbuildable on the TPU API, whose floor is 4 chips. The slot still means chips; what changed is
+which chip counts you can buy. Either way the rule is the same and this is its sharpest case: **the slot is
+documentation, `tpu.env` is configuration, and no gcloud value is ever derived from the directory name.** Siblings currently disagree on the env value itself
 (`tpu-vllm-v5e1-2b` sets `ACCELERATOR_TYPE=v5litepod-1`, `tpu-pytorch-v5e1-12b` sets `v5e-1`), which is
 exactly why the name can't be derived mechanically from it.
 
-Chip count is *topology*, not tensor-parallel size. `v5e1` is one chip so `TENSOR_PARALLEL_SIZE=1`; they match
-here but are separate settings.
+Chip count is *topology*, not tensor-parallel size. `v5e1` and `v5p1` are one chip each so both set
+`TENSOR_PARALLEL_SIZE=1`; they match there but are separate settings, and a multi-chip rig's TP is a choice
+about sharding rather than a fact the name carries.
 
 ## Slot 4 — model
 
@@ -251,10 +297,13 @@ Three things that trip people up:
 
 | Rig | Platform | Runtime | Hardware | Model | Variant |
 | --- | --- | --- | --- | --- | --- |
+| `~/gemma4-dev/gce-vllm-v6e1-2b` | **Compute Engine instance** (`ct6e-standard-1t`) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — — the A/B twin of `tpu-vllm-v6e1-2b`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-q4_0` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | `q4_0` |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-w4a16` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the `-ct` container is not part of the slot |
+| `~/gemma4-dev/tpu-vllm-v5p1-2b` | **GCE instance** (not the TPU API) | vLLM in Docker | v5p, 1 chip (`ct5p-hightpu-1t-tpu`) | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v6e1-2b` | TPU Queued Resource | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — |
+| `~/gemma4-dev/tpu-vllm-v6e8-2b` | TPU flex-start VM | vLLM in Docker | v6e-8 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-jax-v5e1-2b` | TPU | JAX | v5e-1 | 2B | — |
 | `~/gemma4-dev/tpu-jax-v6e1-12b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-jax-v6e1-26b-q4_0` | TPU | JAX | v6e-1 | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | `q4_0` — **artifact rig**, see below |
@@ -265,7 +314,6 @@ Three things that trip people up:
 | `~/gemma4-dev/gpu-vllm-l4-26b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-26B-A4B-it-qat-w4a16-ct` **(no such Hub id — see the rig)** | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-31b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-31B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-pytorch-v5e1-2b` | TPU | PyTorch / `torch_xla` | v5e-1 | 2B | — |
-| `~/gemma4-dev/tpu-pytorch-v6e8-2b` | TPU | PyTorch / `torch_xla` | v6e-8 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-pytorch-v5e1-12b` | TPU | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | **`w4a16` — name stale, see below** |
 | `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |
 | `~/tpu-pytorch-v6e1-2b` | TPU | PyTorch | v6e-1 | 2B | — |
@@ -279,6 +327,18 @@ files and its `plugin.json`, MCP server key in `.mcp.json` / `.codex/config.toml
 `enabledMcpjsonServers`, skill stem under `.claude/skills/` + `skills/` + `dist/`, the `~/.cache/<rig>/` zone
 file, and the hardcoded `/home/xbill/tpu-pytorch-v5e1-12b/…` paths in `ports/**/*_test.py`. Do it as its own
 commit, not folded into unrelated work.
+
+### Two rigs, one chip: the provisioning A/B
+
+`tpu-vllm-v6e1-2b` and `gce-vllm-v6e1-2b` are deliberately identical in slots 2–4 — same runtime, same
+v6e-1 chip, same E2B checkpoint — and differ only in slot 1. They exist as a matched pair so the two
+provisioning paths can be compared directly: same model, same hardware, same serving flags, two control
+planes. Keep them in step. A change to one that isn't about provisioning (serving flags, `MAX_MODEL_LEN`,
+benchmark harness) should land in both, or the comparison stops being one.
+
+This is rule 3 of [Adding a rig](#adding-a-rig) working as intended — two rigs differing in something no
+slot captured, given a slot rather than a reused name or an abused encoding suffix. It is also the reason
+the encoding slot was **not** used: `-gce` is not a weight format, and slot 5 is one category strictly.
 
 ### Artifact rigs — a rig that serves nothing
 
@@ -363,7 +423,9 @@ project's README and env file, not its directory name.
 
 ## Adding a rig
 
-1. Name the directory from the four mandatory slots.
+1. Name the directory from the four mandatory slots. For slot 1, pick the **control plane you will actually
+   provision through** — `tpu` for the Cloud TPU API, `gce` for a Compute Engine TPU machine type. This is a
+   claim about the code in `server.py`, and a rig that switches paths needs the rename.
 2. Add slot 5 if the weights aren't the reference build — one lowercase token naming the **encoding**
    (`w4a16`, `q4_0`, `int4`), read off `MODEL_NAME`. Not `qat`, not the container, not a runtime flag.
 3. Check the name is unique. Two rigs differing only in something no slot captures (zone, batch settings,

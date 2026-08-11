@@ -9,7 +9,7 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| `2026-07-21-gemma4-e2b-v6e1.json` | google/gemma-4-E2B-it | tpu-v6e×1 | flex-start | ok | tpu-pytorch-inf2-2b, tpu-pytorch-v5e1-12b, tpu-pytorch-v5e1-2b, tpu-pytorch-v6e1-2b, tpu-pytorch-v6e4-2b, tpu-pytorch-v6e8-2b |
+| `2026-07-21-gemma4-e2b-v6e1.json` | google/gemma-4-E2B-it | tpu-v6e×1 | flex-start | ok | tpu-pytorch-inf2-2b, tpu-pytorch-v5e1-12b, tpu-pytorch-v5e1-2b, tpu-pytorch-v6e1-2b, tpu-pytorch-v6e4-2b, tpu-vllm-v6e8-2b |
 
 ## Run directories in this rig
 

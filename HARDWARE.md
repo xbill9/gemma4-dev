@@ -13,6 +13,7 @@ and each rig's `benchmarks/runs/` for what was measured on it.
 | Generation | bf16 | int8 | **fp8** | Notes |
 | :--- | :---: | :---: | :---: | :--- |
 | v5e | yes | yes (2x bf16) | **no** | Google publishes bf16 and Int8 peaks only |
+| v5p | yes | yes | **treat as no** | The v5p page lists bf16 **and FP8 at the same 459 TFLOPs**. Equal peaks buy no compute win even if the path is real, so no quantization conclusion changes. Unmeasured here — see the v5p note below |
 | v6e (Trillium) | yes | yes (2x bf16) | **no** | same pattern — verified 2026-08-10, see below |
 | v7 (Ironwood / TPU7x) | yes | yes | **yes** | first TPU with fp8 in the MXU |
 
@@ -32,6 +33,9 @@ On v7 that inverts: fp8 becomes a compute format and the reasoning above stops a
 a v5e/v6e quantization conclusion forward to Ironwood without rechecking it.**
 
 ## Per-chip specifications
+
+v5p sits in its own table further down — it is a different product line (the "p" scale-up part, not the
+"e" efficiency part), and folding it into a v5e-vs-v6e ratio column would invite exactly the wrong comparison.
 
 | Spec | v5e | v6e (Trillium) | Ratio |
 | :--- | ---: | ---: | ---: |
@@ -141,27 +145,213 @@ Two further cautions when reading memory on this chip, both from the 31B work
   size suggested the 31B's `f32[262144,5376]` lm_head (5.637 GB) was the temp floor; the decode step
   contains the same three instructions at a total temp of 0.146 GB. They are fused, not materialized.
 
-## Spelling: v5e is `v5litepod` to gcloud, v6e is just `v6e`
+## v5p — the scale-up part
 
-| Context | v5e single chip | v6e single chip |
-| :--- | :--- | :--- |
-| Prose, directory names | `v5e-1` / `v5e1` | `v6e-1` / `v6e1` |
-| `ACCELERATOR_TYPE`, gcloud | **`v5litepod-1`** | `v6e-1` |
-| Flex-start runtime version | `v2-alpha-tpuv5-lite` | `v2-alpha-tpuv6e` |
-| `gcloud ... --type` / `--topology` | `v5litepod` / `1x1` | `v6e` / `1x1` |
-| TPU API quota id | `TPUV5sLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPerProjectPerZoneForTPUAPI` |
-| Spot (preemptible) quota id | `TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPreemptiblePerProjectPerZoneForTPUAPI` |
+Sourced from [the v5p page](https://docs.cloud.google.com/tpu/docs/v5p) and the live TPU API on 2026-08-10.
+**Nothing below is measured** — no rig here has booted a v5p yet. `tpu-vllm-v5p1-2b` is the first to target one.
+
+| Spec | v5p | vs v5e |
+| :--- | ---: | ---: |
+| HBM capacity | **95 GiB** | 5.9x |
+| HBM bandwidth | 2,765 GBps | ~3.5x |
+| Peak bf16 | 459 TFLOPs | 2.33x |
+| TensorCores per chip | **2** | 2x |
+| MXUs | 4 per TensorCore | |
+| ICI bandwidth | 1,200 GBps bidirectional | 3.0x |
+| Chips per host | 4 (`ct5p-hightpu-4t`) | |
+| Smallest slice | **2x2x1 — 4 chips, 8 cores** | no 1-chip v5p *in the TPU API* — but see the CE-catalog caveat below |
+| Pod | 8,960 chips; 6,144 max schedulable | |
+
+**Two TensorCores per chip is the fact that leaks into everything else.** It is why the slice is named for
+8 when it holds 4 chips, why the quota metric counts cores rather than chips, and why a chip-count intuition
+carried over from v5e/v6e is wrong by 2x at every step.
+
+**95 GiB per chip changes which constraints bind.** The v5e-1 `--gpu-memory-utilization` ceiling recorded
+above is a 1.26 GiB absolute-headroom failure on a 16 GiB chip; on v5p the same fraction leaves tens of GiB,
+so that result does not transfer. The mechanism — compiled program images live outside the knob's budget —
+still does.
+
+**"v5p is in three zones" and "v5p is in nine zones" are both true and measure different things.** Clarified
+2026-08-10 after the two figures collided. The chip is installed far more widely than this project can reach:
+
+| Set | Count | Zones |
+| :--- | ---: | :--- |
+| **Hardware** — `v5p-8` published by the TPU API | **≥9** | `europe-west1-b`, `-d`, `europe-west4-b`, `us-central1-a`, `us-east1-d`, `us-east5-a`, `-b`, `-c`, `us-south1-a` |
+| **Quota** — a stated `TPUV5PPerProjectPerZoneForTPUAPI` value (128 cores) | 10 | `europe-west4-a`, `-b`, `-c`, `us-central1-a`, `-b`, `-c`, `-f`, `us-east1-b`, `-c`, `us-east5-a` |
+| **Reachable** — the intersection | **3** | `us-central1-a`, `us-east5-a`, `europe-west4-b` |
+| **Flex-start** | **1** | `us-east5-a` |
+
+The two sets barely overlap: the project holds quota in seven zones with no v5p installed, and the chip sits
+in six zones where the project has no stated quota. **Three is the operational number and nine is the
+hardware number** — say which one you mean, because "v5p exists in three zones" is false about the chip and
+true about this project.
+
+```
+gcloud compute tpus accelerator-types list --zone=<zone> --filter="type=v5p-8"
+```
+
+Filter on the **exact slice name**. `v5p-4` does not exist (see the two-TensorCore note above), so a check
+written against the directory spelling matches nothing everywhere and reads as "no v5p anywhere" — the same
+class of silent failure as a stale quota id.
+
+**`europe-west1-c` is the one zone where the two catalogs disagree** — it publishes all four `ct5p-*` machine
+types to Compute Engine while the TPU API reports no v5p accelerator type at all (verified twice, 2026-08-10;
+the zone does carry `v5litepod-*`, so the API itself is answering). Record which catalog a zone finding came
+from.
+
+The Google [regions-zones page](https://docs.cloud.google.com/tpu/docs/regions-zones) names three v5p zones,
+so it matches the *reachable* set by coincidence and understates the hardware set — **the same understatement
+already recorded for v6e**, where the page names 8 against the API's 18. Read the API for both.
+
+## Spelling: v5e is `v5litepod` to gcloud, v6e is just `v6e`, v5p counts cores
+
+**This table is the Cloud TPU API path only** — the one all rigs but `tpu-vllm-v5p1-2b` still use. For the
+Compute Engine spellings (machine types, image family, `compute.googleapis.com` quota ids, UPPERCASE
+provisioning models) see the mapping table above; nothing in the rows below applies there.
+
+| Context | v5e single chip | v6e single chip | v5p smallest slice (4 chips) |
+| :--- | :--- | :--- | :--- |
+| Prose, directory names | `v5e-1` / `v5e1` | `v6e-1` / `v6e1` | `v5p-4` / `v5p4` — no such rig exists; CE's 1-chip shape is `v5p1` |
+| `ACCELERATOR_TYPE`, gcloud | **`v5litepod-1`** | `v6e-1` | **`v5p-8`** |
+| Flex-start runtime version | `v2-alpha-tpuv5-lite` | `v2-alpha-tpuv6e` | **`v2-alpha-tpuv5`** |
+| `gcloud ... --type` / `--topology` | `v5litepod` / `1x1` | `v6e` / `1x1` | `v5p` / `2x2x1` |
+| TPU API quota id | `TPUV5sLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPerProjectPerZoneForTPUAPI` | `TPUV5PPerProjectPerZoneForTPUAPI` |
+| Spot (preemptible) quota id | `TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPreemptiblePerProjectPerZoneForTPUAPI` | `TPUV5PPreemptiblePerProjectPerZoneForTPUAPI` |
+| Quota unit | chips | chips | **cores** — a `v5p-8` draws 8 |
+| Billing catalog family | `TpuV5e` / `DWS Defined Duration V5e` | `TpuV6e` | `TpuV5p` / `DWS Defined Duration V5p` |
 
 **The v5e rename does not generalize.** v6e keeps its marketing name everywhere, and the quota ids drop
 the `Litepod` that the v5e ids carry — so nothing in this table survives a chip retarget by analogy, and
 a stale quota id fails quietly by matching no rows rather than erroring. v6e column verified against the
-live TPU API and Cloud Quotas on 2026-08-07.
+live TPU API and Cloud Quotas on 2026-08-07; v5p column on 2026-08-10.
+
+**Three generations, three different spellings of the same idea, and no two agree.** v5e renames the family
+(`v5litepod`), v6e renames nothing, v5p keeps the family name but changes what the *number* counts. v5p also
+capitalises the generation in its quota ids (`TPUV5P…`) where v5e uses lowercase (`TPUV5s…`), and drops the
+`Litepod` infix entirely. Deriving any of these by analogy produces a plausible string that matches nothing.
 
 "v5e-1" is fine in prose and required in directory names; it is never valid in a gcloud argument. v6e is
 the trap in reverse — the slot value and the gcloud value coincide at `v6e`, but the *directory* spelling
 `v6e1` still is not a gcloud value. `NAMING.md` covers the directory form. Rigs spell `ACCELERATOR_TYPE`
 inconsistently across siblings (`v5litepod-1` vs `v5e-1`) — read the rig's own env file, never copy a
 sibling's.
+
+## Provisioning: the Cloud TPU API is deprecated, and only some chips have a way out
+
+Recorded 2026-08-10. This is a property of the **chip generation**, not of any rig — which generations have a
+second control plane is decided by Google per generation, so it belongs here rather than in a rig's
+`CLAUDE.md`.
+
+[Introduction to Cloud TPU](https://docs.cloud.google.com/tpu/docs/intro-to-tpu) and
+[Cloud TPU resources in Compute Engine](https://docs.cloud.google.com/tpu/docs/tpus-in-compute-engine):
+
+> The Cloud TPU API is no longer under active development. This includes the Google Cloud CLI for the Cloud
+> TPU API and the Cloud Client Libraries for the Cloud TPU API.
+
+Bug fixes and security updates only. **No sunset date is published**, so nothing breaks on a deadline — the
+forcing function is forward-looking: *"New hardware generations, starting with TPU7x (Ironwood), are supported
+only through Compute Engine or GKE."*
+
+### Which generation has which control plane
+
+| Generation | Cloud TPU API (`gcloud compute tpus …`) | Compute Engine (`gcloud compute instances …`) | GCE machine types |
+| :--- | :---: | :---: | :--- |
+| v5e | yes | **no** | — |
+| v5p | yes | yes | `ct5p-hightpu-1t-tpu`, `-2t-tpu`, `-4t` |
+| v6e | yes | yes | `ct6e-standard-1t`, `-4t`, `-8t` (each also as `-…-tpu`) |
+| v7 / TPU7x | **no** | yes | — |
+
+**v5e is the one generation with no exit.** The CE path's own limitations page lists "v5p, v6e, and TPU7x";
+v5e is absent. So `tpu-vllm-v5e1-2b` (the live-demo rig), `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-2b`,
+`tpu-pytorch-v5e1-12b` and the two v5e encoding rigs stay on the deprecated API for as long as they exist.
+v5p and v6e rigs can move; v7 rigs will have no choice.
+
+### Mapping between the two
+
+| Cloud TPU API | Compute Engine |
+| :--- | :--- |
+| `queued-resources create --provisioning-model=flex-start` | `instances create --provisioning-model=FLEX_START` |
+| `--accelerator-type=v6e-1` / `v5p-8` | `--machine-type=ct6e-standard-1t` / `ct5p-hightpu-4t` |
+| `--runtime-version=v2-alpha-tpuv6e` | `--image-family=ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e --image-project=ubuntu-os-accelerator-images` |
+| `--valid-until-duration` (bounds the *request*) | `--request-valid-for-duration` |
+| `--max-run-duration` (flex-start only) | `--max-run-duration` + `--instance-termination-action=DELETE` |
+| spot via `TPUV6EPreemptible…` quota | `--provisioning-model=SPOT` |
+| QR → derived `<resource_id>-node` | the instance **is** the node — no indirection |
+
+`--provisioning-model` on `instances create` takes `FLEX_START | RESERVATION_BOUND | SPOT | STANDARD`, and
+`--request-valid-for-duration` is documented as the FLEX_START wait knob specifically. TPU7x adds an
+allowlist on spot, flex-start, and calendar-mode reservations; **v5p and v6e are not gated**.
+
+**Flex-start works on the CE path** despite [Request TPU Flex-start VMs](https://docs.cloud.google.com/tpu/docs/request-using-flex-start)
+still saying *"You must use the queued resources API to use TPU Flex-start VMs."* That page sits inside the
+deprecated API's own doc set and describes flex-start *within* that API; the Compute Engine
+[provisioning models](https://docs.cloud.google.com/compute/docs/instances/provisioning-models) page lists
+TPU v5p, v6e and TPU7x as flex-start machine series with no such requirement. Treat the TPU-docs sentence as
+unreconciled, not as a constraint.
+
+### The two catalogs are different evidence
+
+The rig-level "three gates" framing (see `tpu-vllm-v6e1-2b/CLAUDE.md`) needs one amendment: **gate 1 now has
+two sources that do not always agree.**
+
+- For v6e they agree exactly — `ct6e-standard-1t` and `ct6e-standard-1t-tpu` are each listed in the **same 18
+  zones** as `v6e-1` in the TPU API, against 37 zones reporting quota.
+- For v5p they disagree in `europe-west1-c` (machine types yes, accelerator type no) — see the v5p table above.
+
+So a migration that swaps `accelerator-types list` for `machine-types list` as its availability check is not a
+like-for-like swap. Gate 2 (provisioning model accepted for that type in that zone) and gate 3 (capacity right
+now) are unchanged, and neither is answered by either catalog.
+
+**There are two machine-type families and what distinguishes them is undocumented.** `ct6e-standard-1t` and
+`ct6e-standard-1t-tpu` are identical in vCPU, memory and zone coverage, differing only in
+`guestAcceleratorType` (`ct6e` vs `tpu-v6e`). v5p publishes `-tpu` shapes at 1, 2 and 4 chips but a bare
+shape only at 4.
+
+**Do not read the bare form as "legacy" — an earlier revision of this file did, and it was wrong.** Google's
+own Compute Engine quickstart creates `--machine-type=ct6e-standard-4t`, the *bare* form, and the CE
+machine-types page documents `ct6e-standard-{1,4,8}t` and `ct5p-hightpu-4t`, all bare. The bare shapes are
+the documented, directly-creatable ones; what the `-tpu` variants are for is not written down anywhere yet
+found. Record the exact string in `tpu.env`; they are not known to be interchangeable.
+
+### Can v5e use the Compute Engine path? Documented no, catalog ambiguous
+
+Corrected 2026-08-10 — an earlier revision of this file called the missing `ct5lp-*-tpu` shape
+"machine-type-level confirmation" that v5e has no CE path. **That reasoning does not hold**, because the bare
+shapes are the creatable ones (above), so a missing `-tpu` variant proves nothing either way.
+
+The honest state of the evidence:
+
+| Signal | Reading |
+| :--- | :--- |
+| CE machine-types page enumerates "TPU7x, TPU v6e, TPU v5p" | **against** — explicit, and `ct5lp` appears nowhere on it |
+| `ct5lp-hightpu-1t` / `-4t` / `-8t` exist, `guestAcceleratorCount: 1`, in **26 zones** | for |
+| Image family is literally `ubuntu-accel-2204-amd64-tpu-**v5e**-v5p-v6e` | for |
+| `TPU-LITE-PODSLICE-V5-per-project-zone` is a **compute.googleapis.com** quota | for |
+
+**The three "for" signals all have one innocent explanation: the Cloud TPU API is itself implemented on
+Compute Engine.** Its TPU VMs *are* GCE instances, booting GCE images and drawing on GCE capacity — so a
+v5e-covering image family, a v5e-shaped CE quota metric, and `ct5lp` machine types in the catalog are all
+exactly what you would see whether or not `gcloud compute instances create` accepts `ct5lp` directly.
+
+So the explicit doc exclusion is the strongest evidence available, and the working answer stays **no**. But
+it is an unattempted claim, not a verified one, and it is **cheap to settle**: one
+`gcloud compute instances create --machine-type=ct5lp-hightpu-1t`. A rejection at validation is free and
+conclusive; an acceptance bills until deleted. Nobody has run it. If it ever is, record the result here — it
+decides whether six v5e rigs have a migration path at all.
+
+**A single-chip v5p exists in the CE catalog** — `ct5p-hightpu-1t-tpu`, 52 vCPU / 112 GB / 1 chip — where the
+TPU API's floor is `v5p-8` at 4 chips. **`tpu-vllm-v5p1-2b` was built on it on 2026-08-10** and is the only
+rig here off the deprecated control plane: `gcloud compute instances` throughout, at
+`TENSOR_PARALLEL_SIZE=1`, which removed that rig's TP=4 KV-replication risk and 4x of its chip bill. Its
+`CLAUDE.md` has the full mapping.
+
+**Listed is still not provisionable** — nothing has attempted creation, so capacity is unproven and so are
+the two settings the TPU API used to supply implicitly and CE makes you state: the **boot disk** (CE defaults
+far too small for the vLLM image plus the model) and **`--scopes`** (TPU VMs defaulted to cloud-platform;
+a plain instance does not, and without it the boot-time Secret Manager fetch fails 30 minutes into its retry
+loop). Those are the likely first failures, not the machine type.
+
+`NAMING.md` now records `v5p1` as a valid slot value — one the TPU API alone could not express.
 
 ## Other targets in this monorepo
 

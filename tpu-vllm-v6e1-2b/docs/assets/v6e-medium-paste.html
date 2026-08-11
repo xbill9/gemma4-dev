@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Serving Gemma 4 E2B on a TPU v6e-1</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/tpu-vllm-v6e1-2b/v6e-cover.jpg" /></p>
+<h1 id="serving-gemma-4-e2b-on-a-tpu-v6e-1">Serving Gemma 4 E2B on a TPU
+v6e-1</h1>
+<p>A Cloud TPU v6e-1 (Trillium) costs <strong>2.25×</strong> a v5e-1 and
+returns <strong>1.62–1.68×</strong> the throughput on workloads that fit
+in a v5e, and <strong>2.32–2.77×</strong> on workloads that do not. Per
+output token that makes v6e <strong>34–39% dearer</strong> in the first
+regime and <strong>3–19% cheaper</strong> in the second — so the case
+for the bigger chip is narrower than the memory ratio suggests, and
+break-even sits at roughly 270,000 KV tokens.</p>
+<p>v6e is not a general upgrade over v5e. It is a
+<strong>memory</strong> upgrade sold at a compute price: 32 GB against
+16, a KV pool of <strong>1,151,744 tokens against 321,376
+(3.6×)</strong>, for <strong>1.907×</strong> the bandwidth. Where the
+extra memory does nothing, the workload pays 2.25× for 1.6×.</p>
+<p>Two findings drive the rest:</p>
+<ul>
+<li><strong>There is no capacity knee at any occupancy tested.</strong>
+<code>TTFT = −8542 + 265 × concurrency</code>, R² =
+<strong>0.999996</strong>, across <strong>56% to 157%</strong> of the KV
+pool, with <code>num_preemptions_total = 0</code> in every cell. A line
+fitted entirely below 100% occupancy predicts 157% to within 0.13%.</li>
+<li><strong>Spot is more expensive than flex-start on this chip</strong>
+— $1.4033 against $1.35/chip-hr in us-east5, reversing the v5e ordering.
+The cheaper option is also the preemption-free one that stops billing by
+itself.</li>
+</ul>
+<p><strong>Configuration:</strong> <code>v6e-1</code>
+(<code>ct6e-standard-1t</code>, one Trillium chip),
+<code>vllm/vllm-tpu:nightly</code>, vLLM
+<code>0.26.1rc1.dev256+gf5bb701fa</code>, tpu-inference JAX backend,
+<code>google/gemma-4-E2B-it</code> at bf16, TP=1,
+<code>max_model_len</code> 32768, <code>max_num_batched_tokens</code>
+4096, <code>kv_cache_dtype=auto</code>, prefix caching on.
+<code>OUTPUT_LEN</code> 128 throughout. v5e-1 comparison figures are
+from the same model and engine family on <code>v5litepod-1</code> and
+are not a controlled A/B — read them as shape, not delta.</p>
+<hr />
+<h2 id="part-1--getting-a-v6e-1-at-all">Part 1 — Getting a v6e-1 at
+all</h2>
+<h3 id="11-the-gcloud-spelling-table">1.1 The gcloud spelling table</h3>
+<p>On v5e, <code>v5e</code> is spelled
+<strong><code>v5litepod</code></strong> to gcloud. On v6e the marketing
+name and the CLI value coincide — which teaches a habit that breaks on
+the next chip.</p>
+<pre><code>Context                     v5e single chip                                     v6e single chip
+--------------------------  --------------------------------------------------  -------------------------------------------
+Prose, directory names      v5e-1 / v5e1                                        v6e-1 / v6e1
+--accelerator-type          v5litepod-1                                         v6e-1
+Flex-start runtime version  v2-alpha-tpuv5-lite                                 v2-alpha-tpuv6e
+--type / --topology         v5litepod / 1x1                                     v6e / 1x1
+TPU API quota id            TPUV5sLitepodPerProjectPerZoneForTPUAPI             TPUV6EPerProjectPerZoneForTPUAPI
+Spot quota id               TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI  TPUV6EPreemptiblePerProjectPerZoneForTPUAPI</code></pre>
+<p><strong>Nothing in that table survives a retarget by
+analogy.</strong> The v6e quota ids drop the <code>Litepod</code> the
+v5e ids carry, and a stale quota id fails <em>quietly</em> — it matches
+no rows rather than erroring, producing a confident "no quota anywhere"
+that is a typo. <code>v6e1</code>, the directory spelling without the
+hyphen, is still not a valid gcloud value even though <code>v6e</code>
+is.</p>
+<h3 id="12-provisioning-clears-three-independent-gates">1.2 Provisioning
+clears three independent gates</h3>
+<p>A creation must pass three separate checks. They fail differently,
+and the one that is easiest to query carries the least information.</p>
+<p><strong>Gate 1 — does the zone have <code>v6e-1</code>
+hardware?</strong> Of 37 zones reporting quota, only <strong>18</strong>
+offer the accelerator type:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> compute tpus accelerator-types list <span class="at">--filter</span><span class="op">=</span><span class="st">&quot;type=v6e-1&quot;</span></span></code></pre></div>
+<p>Google's regions-and-zones page names 8, a strict subset of what the
+API accepts. Read the API. This gate is
+provisioning-model-independent.</p>
+<p><strong>Gate 2 — does that zone offer that provisioning model for
+that accelerator type?</strong> Independent of both quota and hardware,
+and where a published price stops meaning anything.
+<strong>us-central1-b and us-south1-a have v6e-1 hardware, quota, and a
+published <code>DWS Defined Duration V6e</code> rate for their region,
+and both reject flex-start at the API:</strong></p>
+<pre><code>FLEX_START provisioning model is not supported for accelerator type &quot;v6e-1&quot; in location &quot;us-central1-b&quot;</code></pre>
+<p>Confirmed accepting flex-start: <strong>us-east5-a, us-east5-b,
+europe-west4-a</strong>. This is the v6e analogue of the v5e result,
+where flex-start <code>v5litepod-1</code> was accepted in exactly one
+zone out of 44. Note that europe-west4 <strong>inverts across
+generations</strong>: it rejected <code>v5litepod-1</code> while quoting
+a rate for it, and accepts <code>v6e-1</code>.</p>
+<p><strong>Gate 3 — is there free capacity right now?</strong> Reachable
+only after the first two pass, and the one gate that is not a property
+of the zone. Requests in accepting zones sit at
+<code>WAITING_FOR_RESOURCES</code> for tens of minutes to hours before
+capacity is granted. <strong>That state is not a failure</strong> — it
+should not be recorded as one, and the request should not be torn down,
+because flex-start capacity can take up to two hours to come back once
+dropped.</p>
+<blockquote>
+<p>A published rate is not an offer of capacity, and not even an offer
+of the <em>provisioning model</em>. Quota is the first thing most people
+check and the last thing that should reassure them.</p>
+</blockquote>
+<h3 id="13-provision">1.3 Provision</h3>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Flex-start, via the Queued Resource API — the only model that accepts --max-run-duration,</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># i.e. the only one that stops billing on its own.</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> alpha compute tpus queued-resources create gemma4-v6e <span class="dt">\</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--node-id</span><span class="op">=</span>gemma4-v6e-node <span class="at">--zone</span><span class="op">=</span>us-east5-b <span class="dt">\</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">--accelerator-type</span><span class="op">=</span>v6e-1 <span class="at">--runtime-version</span><span class="op">=</span>v2-alpha-tpuv6e <span class="dt">\</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">--provisioning-model</span><span class="op">=</span>flex-start <span class="at">--max-run-duration</span><span class="op">=</span>4h</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Spot — preemptible with ~30s notice, no run limit, and on this chip not the cheap option.</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> alpha compute tpus tpu-vm create gemma4-v6e <span class="dt">\</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">--zone</span><span class="op">=</span>us-east5-b <span class="at">--type</span><span class="op">=</span>v6e <span class="at">--topology</span><span class="op">=</span>1x1 <span class="dt">\</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">--provisioning-model</span><span class="op">=</span>spot <span class="at">--version</span><span class="op">=</span>v2-alpha-tpuv6e</span></code></pre></div>
+<p><code>--max-run-duration</code> is flex-start-only.
+<code>--valid-until-duration</code> bounds the <em>request</em>, not the
+run, so it is shared by all three models. Spot and on-demand nodes bill
+until preempted or deleted.</p>
+<p>The Hugging Face token belongs in Secret Manager, not in the startup
+script — the rendered script is uploaded as <strong>instance
+metadata</strong>, and anything baked into it is readable from the
+instance:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;%s&#39;</span> <span class="st">&quot;hf_xxxxxxxxxxxx&quot;</span> <span class="kw">|</span> <span class="ex">gcloud</span> secrets create hf-token <span class="at">--data-file</span><span class="op">=</span>- <span class="at">--project</span><span class="op">=</span>YOUR_PROJECT</span></code></pre></div>
+<h3 id="14-serve">1.4 Serve</h3>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> docker run <span class="at">-d</span> <span class="at">--name</span> vllm-gemma4 <span class="at">--privileged</span> <span class="at">--net</span><span class="op">=</span>host <span class="dt">\</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-v</span> /dev/shm:/dev/shm <span class="at">--shm-size</span> 10gb <span class="dt">\</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">-v</span> ~/.cache/vllm:/root/.cache/vllm <span class="dt">\</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">-e</span> HF_HOME=/dev/shm <span class="at">-e</span> HF_TOKEN=<span class="st">&quot;</span><span class="va">$(</span><span class="fu">cat</span> ~/.hf_token<span class="va">)</span><span class="st">&quot;</span> <span class="dt">\</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  vllm/vllm-tpu:nightly <span class="dt">\</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  vllm serve google/gemma-4-E2B-it <span class="dt">\</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">--dtype</span> bfloat16 <span class="dt">\</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">--kv-cache-dtype</span> auto <span class="dt">\</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">--max-model-len</span> 32768 <span class="dt">\</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">--max-num-batched-tokens</span> 4096 <span class="dt">\</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">--tensor-parallel-size</span> 1 <span class="dt">\</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">--enable-prefix-caching</span> <span class="dt">\</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">--disable-chunked-mm-input</span> <span class="dt">\</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">--limit-mm-per-prompt</span> <span class="st">&#39;{&quot;image&quot;:4,&quot;audio&quot;:1}&#39;</span> <span class="dt">\</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">--enable-auto-tool-choice</span> <span class="at">--tool-call-parser</span> gemma4 <span class="at">--reasoning-parser</span> gemma4</span></code></pre></div>
+<p>Two deliberate differences from the equivalent v5e configuration:</p>
+<ul>
+<li><strong><code>--gpu-memory-utilization</code> is absent.</strong> On
+v5e, 0.92 was a ceiling: 0.95 died after a 691-second compile while
+loading <code>jit_structured_decode_fn</code>, because compiled XLA
+programs live <em>outside</em> the knob's control. That is a 16 GB
+result with no bearing on 32 GB, and v6e's ceiling is unmeasured, so the
+flag is left underived rather than carrying another chip's limit
+forward.</li>
+<li><strong><code>--max-model-len</code> is 32768</strong>, not the
+16384 typical of v5e-era configs. §2.3 shows it is free.</li>
+</ul>
+<p>Verify against the boot log, not against the flags:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> docker logs <span class="at">-f</span> vllm-gemma4 <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-E</span> <span class="st">&quot;Memory statistics|GPU KV cache size|block_size&quot;</span></span></code></pre></div>
+<pre><code>Memory statistics | total_hbm_limit_gb=31.24GiB | total_hbm_limit_cap_gb=28.74GiB
+                  | total_hbm_used_gb=8.97GiB   | total_hbm_avail_gb=19.77GiB
+GPU KV cache size: 1,151,744 tokens</code></pre>
+<p>Smoke-test on <strong><code>/v1/chat/completions</code></strong>. Raw
+<code>/v1/completions</code> returns an empty string on <code>-it</code>
+models, which looks exactly like a broken deploy and is not.</p>
+<hr />
+<h2 id="part-2--the-chip">Part 2 — The chip</h2>
+<h3 id="21-on-paper">2.1 On paper</h3>
+<pre><code>Spec (per chip)  v5e                     v6e (Trillium)                                      Ratio
+---------------  ----------------------  ----------------------------------  ---------------------
+HBM capacity     16 GB                   32 GB                                                2.0x
+HBM bandwidth    800 GiBps               1,638 GBps                          1.907x — units differ
+Peak bf16        197 TFLOPs              918 TFLOPs                                          4.66x
+Peak Int8        393 TOPs                1,836 TOPs                                          4.67x
+TensorCores      1 (4 MXUs, 128x128)     1 (MXUs 256x256, count unresolved)
+ICI              400 GBps bidi, 4 ports  800 GBps bidi, 4 ports                               2.0x
+Machine type     ct5lp-hightpu-1t        ct6e-standard-1t
+On-demand list   ~$1.20/chip-hr          ~$2.70/chip-hr                                      2.25x</code></pre>
+<p><strong>The units trap costs 7%.</strong> Google quotes v5e HBM
+bandwidth in <strong>GiBps</strong> and v6e in <strong>GBps</strong> —
+on the v5e page, in the same table that uses GBps for ICI. Normalised,
+800 GiBps = 858.99 GB/s, making the true ratio <strong>1.907×</strong>
+rather than the 2.047× obtained by dividing the printed figures. The
+launch-blog claim that Trillium "doubled" HBM bandwidth is the naive
+reading. For bandwidth-bound work — decode is bandwidth-bound — that 7%
+separates a ratio that explains the measurement from one that does
+not.</p>
+<p><strong>The shape trap:</strong> 2.25× the price for 2× memory, ~1.9×
+bandwidth, and <strong>4.7× the raw FLOPS</strong>. The 4.7× only pays
+for prefill-heavy or long-context work that burns the matrix units. For
+pure decode, v5e is priced close to right and v6e is not.</p>
+<p>One row not to build on: Google's v6e page states each TensorCore has
+<strong>2</strong> MXUs, but two 256×256 arrays is exactly 2× v5e's four
+128×128, against a published peak of <strong>4.66×</strong> — which
+would require a 2.33× clock increase on top. Four 256×256 closes it
+almost exactly (262,144 MACs × 2 flops × 1.75 GHz = 917.5 TFLOPs against
+a published 918). The <strong>918 figure is sound</strong>,
+cross-checking against the same page's 234.9 PFLOPs-per-Pod row. Treat
+peak compute as reliable and the MXU count as unresolved.</p>
+<h3 id="22-the-memory-budget">2.2 The memory budget</h3>
+<pre><code>                                     v5e-1      v6e-1
+---------------------  -------------------  ---------
+Total HBM visible                15.75 GiB  31.24 GiB
+Allocation cap         14.49 GiB (at 0.92)  28.74 GiB
+E2B weights, resident             8.97 GiB   8.97 GiB
+KV cache pool                     5.52 GiB  19.77 GiB
+KV tokens                          321,376  1,151,744</code></pre>
+<p><strong>3.58× the KV capacity for 2.25× the price.</strong> The
+weights are identical — E2B costs 8.97 GiB wherever it runs, consuming
+<strong>62% of a v5e's usable budget and 31% of a v6e's</strong>. Every
+byte of the difference goes to KV.</p>
+<p>The arithmetic closes independently on both chips, which is what
+distinguishes a real allocation from a log line: 19.77 GiB ÷ 18,432
+B/token = 1,151,686, within <strong>0.005%</strong> of the measured
+1,151,744. The same division reproduces the v5e figure to 0.06%.</p>
+<h3 id="23-longer-context-is-free">2.3 Longer context is free</h3>
+<pre><code>max_model_len  block_size           KV pool
+-------------  ----------  ----------------
+       16,384          32  1,151,776 tokens
+       32,768          64  1,151,744 tokens
+       65,536         128  1,151,744 tokens</code></pre>
+<p><strong>A 0.003% spread across a 4× range.</strong> The Pallas
+backend derives <code>block_size</code> to hold blocks-per-request
+constant at 512, so doubling the context doubles the page size, halves
+the block count, and arrives at the same token capacity. The same
+behaviour holds on v5e at a quarter of the pool.</p>
+<p><strong>Never set <code>--block-size</code>.</strong> Pinning it
+fights the derivation that keeps long context free.</p>
+<h3 id="24-data-types">2.4 Data types</h3>
+<pre><code>format      native in the MXU?  v5e                     v6e
+----------  ------------------  ----------------------  --------------------------
+bf16        ✅                   baseline                baseline
+int8        ✅ 2x bf16           the only compute win    still the only compute win
+fp8         ❌                   storage/bandwidth only  ❌ — unchanged
+int4 / fp4  ❌                   footprint only          footprint only</code></pre>
+<p>Trillium does not bring fp8. <strong>Google's v6e page publishes
+exactly three peak-compute rows — <code>bf16: 918 TFLOPs</code>,
+<code>Int8: 1836 TOPs</code>, and a per-Pod bf16 figure — and no fp8 row
+anywhere.</strong> The int8 figure being <em>exactly</em> 2× bf16 is the
+signature of a native MXU path; the absent fp8 row is the tell in the
+other direction. <strong>v7/Ironwood is the first TPU with fp8 in the
+matrix units</strong> — no conclusion in this section carries forward to
+it.</p>
+<p>The consequence is observable at boot. With
+<code>--kv-cache-dtype auto</code> — the flag never passed — the engine
+logs this <strong>twenty times</strong>:</p>
+<pre><code>Automatically using fp8_e5m2 for FP8 KV cache on TPU v6e</code></pre>
+<p>…and allocates <code>regular_attn_dtype=bfloat16</code>. The
+arithmetic is not close: 1,151,744 tokens against 19.77 GiB is the
+<strong>bf16</strong> model to 0.01%, while the fp8 model is
+<strong>50%</strong> off. The two hypotheses are far apart, making this
+a discriminator rather than a tolerance argument.</p>
+<p>That is the sixth false fp8 signal recorded on this stack and the
+first on a second silicon generation. On v5e,
+<code>--kv-cache-dtype fp8_e4m3</code> was accepted at the CLI, echoed
+in <code>non-default args</code>, praised by a log line, reported in
+<code>/metrics</code>, and allocated a genuinely
+<code>float8_e4m3fn</code> tensor — five independent signals of success
+— for a <strong>1.000×</strong> capacity ratio, because the KV block
+layout is word-aligned: as the element width halves, the shape goes
+<code>(32,1,2,256) → (32,1,4,256)</code> and the byte count never
+moves.</p>
+<blockquote>
+<p><strong>Verify quantization from the boot allocation arithmetic —
+never from the flag being accepted, and never from engine
+prose.</strong></p>
+</blockquote>
+<p>What v6e plausibly does unblock: on v5e, qwix int8
+<strong>weight</strong> quantization died at
+<code>RESOURCE_EXHAUSTED: HLO temporaries (16.23G) exceeds available HBM (15.75G)</code>,
+short by 0.48 G. v6e has 31.24 GiB, roughly 15 GiB of headroom over that
+same temporary peak. That failure was an HBM ceiling and this chip
+doubles it. Untested, and it fails fast — 2.5–4 minutes if it still does
+not boot.</p>
+<hr />
+<h2 id="part-3--six-properties-of-gemma-4-e2b-that-decide-the-rest">Part
+3 — Six properties of Gemma 4 E2B that decide the rest</h2>
+<p>None of these change with the chip, but their consequences land
+differently on 32 GB.</p>
+<pre><code>field                                      value
+-----------------------------------------  --------------------------------------------
+num_hidden_layers                          35 (28 sliding / 7 full, i % 5 == 4 is full)
+num_kv_shared_layers                       20 — only 15 layers own a cache
+num_attention_heads / num_key_value_heads  8 / 1
+head_dim / global_head_dim                 256 / 512
+hidden_size / intermediate_size            1536 / 6144
+vocab_size                                 262,144 (tied embeddings)
+sliding_window                             512
+resident at bf16                           8.97 GiB</code></pre>
+<p><strong>1. "E2B" is not a 2B model.</strong> ~2B <em>effective</em>
+against ~5B total, landing at <strong>8.97 GiB</strong> resident. The
+<code>E</code> prefix is load-bearing: reading <code>E4B</code> as "a 4B
+model" understates its weights by roughly 2×, exactly the difference
+between fitting a 16 GB chip and not. On v6e this matters less for E2B
+than for what else becomes possible — <strong>E4B fits at bf16 here and
+does not on v5e.</strong></p>
+<p><strong>2. There are two attention geometries.</strong> Sliding
+layers run at <code>head_dim</code> 256; the seven full-attention layers
+run at <strong>512</strong>, applying to K and V, not just Q. Reading a
+single <code>head_dim</code> and applying it to all 35 layers
+under-counts the full layers by 2× — a 17% KV sizing error. It is also
+the root cause of the 2.9× capacity tax in Part 5.</p>
+<p><strong>3. Twenty of the thirty-five layers read another layer's
+cache.</strong> <code>first_shared = 35 − 20 = 15</code>, so layers 0–14
+own KV and 15–34 share. The rule is "last preceding layer of the same
+attention type", and within 0–14 that means <strong>all twenty shared
+layers resolve to two source caches</strong> — layer 13 for the sliding
+ones, layer 14 for the full ones.</p>
+<p><strong>4. KV costs 18 KiB/token, and the boot log misreports
+why.</strong></p>
+<pre><code>12 sliding cached layers × 1 KV head × 2 (K,V) × 256 × 2 B = 12,288 B
+ 3 full    cached layers × 1 KV head × 2 (K,V) × 512 × 2 B =  6,144 B
+                                                    total  = 18,432 B = 18 KiB/token</code></pre>
+<p>The line describing the cache,
+<code>regular_attn_shape=(num_blocks, (64, 1, 2, 256))</code>, is a
+<strong>first-wins sample taken from layer 0</strong>, which is sliding,
+hence 256. It says nothing about layers 4, 9 and 14: <code>count</code>
+increments for all 15 tensors while <code>shape</code> is written once
+and never updated. The allocation is correct; the line is misleading.
+<strong>Size KV from the config geometry and check it against
+<code>total_hbm_avail_gb</code>.</strong></p>
+<p><strong>5. One KV head means more chips make things worse.</strong>
+<code>num_key_value_heads = 1</code> is full MQA, and a single head
+<strong>cannot be sharded</strong> — runtimes pad
+<code>num_kv_heads</code> up to a multiple of the TP size, so at TP=4
+the same head is replicated at <strong>4× the KV memory</strong>. A
+larger topology multiplies this model's KV cost rather than dividing it.
+<strong>The answer to "E2B needs more memory" is a bigger chip, not more
+chips.</strong></p>
+<p><strong>6. The heads do not tile the hidden size.</strong>
+<code>8 × 256 = 2048</code> against <code>hidden_size = 1536</code>, so
+the Q projection is rectangular. Code computing
+<code>head_dim = hidden_size / num_heads</code> gets
+<strong>192</strong> and is silently wrong.</p>
+<p>One further property explains performance rather than memory:
+<strong>4.38 GiB of the 8.97 GiB resident is per-layer embedding
+tables</strong> (262,144 × 256 × 35), which are <em>gathered per token,
+not streamed</em>. Only ~3.15 GiB moves per decode step, which is why an
+8.97 GiB model decodes as fast as it does, and it sets the bandwidth
+floor used in Part 4.</p>
+<hr />
+<h2 id="part-4--results">Part 4 — Results</h2>
+<p>Roles are sized against the v6e pool: <code>control</code> fits both
+chips trivially, <code>bandwidth</code> fits both but moves substantial
+KV per step, <code>v6e_only</code> exceeds v5e's entire pool, and
+<code>long_ctx</code> requires <code>max_model_len &gt; 16384</code> —
+impossible on v5e at any setting.</p>
+<pre><code>   ctx  clients  role       KV needed  v5e tok/s  v6e tok/s  ratio  per-stream  median TTFT
+------  -------  ---------  ---------  ---------  ---------  -----  ----------  -----------
+   128        1  control          256      123.3      202.9  1.65x       202.9        12 ms
+   128        8  control        2,048      738.3    1,195.1  1.62x       149.4        26 ms
+ 1,024       16  control       18,432      896.1    1,508.0  1.68x        94.2       149 ms
+ 4,096       64  bandwidth    270,336      585.9    1,360.0  2.32x        21.3       303 ms
+ 8,192       32  bandwidth    266,240      307.8      758.4  2.46x        23.7       348 ms
+ 8,192       64  v6e_only     532,480      314.4      870.0  2.77x        13.6     1,006 ms
+16,000       32  v6e_only     516,096      166.8      432.6  2.59x        13.5     3,276 ms
+16,000       64  v6e_only   1,032,192      166.7      446.0  2.68x         7.0     8,459 ms
+32,000       16  long_ctx     514,048                 242.6               15.2     2,233 ms
+32,000       32  long_ctx   1,028,096                 229.0                7.2     8,760 ms</code></pre>
+<p>There is correctly no v5e reference for the <code>long_ctx</code>
+cells: that configuration cannot exist on v5e.</p>
+<p><strong>A caution about the 4,096–8,192 band.</strong> Those three
+cells are the most sensitive in the matrix to how a sweep is ordered.
+Run at a shared <code>--seed</code> after a longer-context cell, they
+report <strong>12–19% higher</strong> than they do with a distinct seed
+per cell, while every cell at 128, 1,024, 16,000 and 32,000 tokens moves
+by under 6.3% either way. The figures above are the clean-seed ones.
+Anything quoting this band from a single-seed sweep is quoting the high
+side.</p>
+<h3 id="41-the-asymmetry">4.1 The asymmetry</h3>
+<pre><code>regime                            cells  mean vs v5e
+--------------------------------  -----  -----------
+working set &lt; 10% of v5e&#39;s pool       3        1.65x
+working set &gt;= 83% of v5e&#39;s pool      5        2.56x</code></pre>
+<p>Against a <strong>1.907×</strong> bandwidth ratio and a
+<strong>2.25×</strong> price ratio.</p>
+<p>If v6e were simply faster, every cell would improve by roughly the
+same factor. Control cells move roughly with bandwidth and no more.
+Cells where v5e was over its pool — evicting and recomputing — move
+about 2.6×, because v6e is not doing that work. <strong>On decode
+throughput alone this chip is a poor deal. It pays for capacity, not
+speed</strong> — and note that even the memory-bound mean of 2.56× only
+just clears the 2.25× price ratio.</p>
+<p>Single stream is the cleanest bandwidth read: <strong>TPOT 4.72 ms on
+v6e against 8.02 ms on v5e, 1.70×</strong> on a 1.907× bandwidth ratio.
+Decode moves ~3.15 GiB per step (derived from layer geometry), which at
+1,638 GB/s is a <strong>2.06 ms floor against 4.72 ms measured — 44% of
+peak</strong>, slightly worse utilisation than v5e's 49%. Roughly 2× of
+headroom sits in fixed per-step cost on both chips, not in memory
+bandwidth.</p>
+<p>The <strong>1.65×</strong> control figure sits <em>below</em> the
+bandwidth ratio and is unexplained. The MXU geometry change (4×128×128 →
+256×256, a 4× larger minimum tile) is a plausible cause but is not
+demonstrated; separating it from "small batches do not saturate
+bandwidth" requires a batch-size sweep at fixed short context.</p>
+<h3 id="42-there-is-no-capacity-knee">4.2 There is no capacity knee</h3>
+<p>A widely used v5e rule of thumb — keep <code>clients × context</code>
+under ~78% of the pool — scales to ~900,000 tokens on v6e. Tested
+directly at fixed 16,000 context with only concurrency varying:</p>
+<pre><code>clients  KV needed  % of pool  tok/s  median TTFT  preemptions
+-------  ---------  ---------  -----  -----------  -----------
+     40    645,120        56%  452.7     2,088 ms
+     46    741,888        64%  465.9     3,659 ms
+     52    838,656        73%  470.6     5,273 ms
+     56    903,168        78%  467.7     6,309 ms
+     60    967,680        84%  471.6     7,373 ms
+     64  1,032,192        90%  446.0     8,459 ms            0
+     72  1,161,216       101%  458.5    10,544 ms            0
+     80  1,290,240       112%  459.1    12,689 ms            0
+     96  1,548,288       134%  472.0    16,937 ms            0
+    112  1,806,336       157%  465.5    21,229 ms            0</code></pre>
+<p><strong><code>TTFT = −8542 + 265 × concurrency</code>, R² = 0.999996
+over all ten points.</strong> Throughput is flat at 446.0–472.0 tok/s
+(<strong>5.8%</strong>) across the range. TPOT sits at 66.2–67.4 ms and
+does not move. <code>num_preemptions_total</code> is <strong>0 in every
+cell, including 157% occupancy.</strong></p>
+<p>The line is the most reproducible result in the matrix. Re-measured
+on a separate node, the 90% and 157% points land at
+<strong>+0.18%</strong> and <strong>+0.22%</strong> of what it predicts,
+with zero preemptions in both.</p>
+<p>There is no knee at 78%, none anywhere in 56–157%, and
+<strong>crossing 100% of the pool is not an event</strong>. A line
+fitted entirely below 100% predicts the 157% point to within 0.13%.</p>
+<p><strong>The scheduler admission-controls rather than evicts.</strong>
+It admits what fits and queues the rest, so the working set never
+thrashes. Occupancy alone costs nothing; <em>eviction</em> would, and it
+never engaged. The v5e rule was a queueing curve read as a memory
+cliff.</p>
+<blockquote>
+<p><strong>Size by the latency you will accept, not by pool
+occupancy.</strong> Throughput saturates near concurrency 40, and every
+further concurrent request buys <strong>265 ms of TTFT and nothing
+else</strong>. The pool bounds what is <em>resident</em>; it is not a
+performance threshold.</p>
+</blockquote>
+<h3 id="43-two-benchmarking-traps-on-this-stack">4.3 Two benchmarking
+traps on this stack</h3>
+<p><strong>1. A config can silently fail to take effect, and the obvious
+check can miss it.</strong> vLLM prints <code>max_model_len</code>
+inside a dict repr (<code>'max_model_len': 16384</code>), so a regex
+written for the bare key matches nothing and returns no result rather
+than a mismatch — indistinguishable from a pass unless the check
+distinguishes them. The reliable signal is a <em>different</em> derived
+quantity downstream of the same setting: <code>block_size</code> reads
+32 at 16384 and 64 at 32768. <strong>Verify a setting through two
+independent derivations.</strong></p>
+<p><strong>2. <code>--seed 0</code> plus prefix caching silently couples
+cells.</strong> vLLM defaults to
+<code>enable_prefix_caching=True</code>, and the random dataset is
+deterministic in the seed, so two cells at the same
+<code>input_len</code> draw overlapping prompts and the later one is
+served from cache. A <code>16000×32</code> cell run after
+<code>16000×64</code> took <strong>1,539,904 cache-hit tokens against
+1,536,000 input tokens</strong> — essentially all of it — and its 2,461
+ms TTFT is not comparable to anything.</p>
+<p>That artifact, combined with an unsampled gap between 46% and 89% of
+pool, is enough to manufacture an apparent 3.4× cliff: <strong>two
+points far apart with the lower one artificially fast reads as a
+cliff.</strong> Vary the seed per cell; the knee and overflow sweeps
+above measured <strong>0.0% prefix hits throughout</strong>.</p>
+<hr />
+<h2 id="part-5--why-there-is-no-cliff-and-what-it-costs">Part 5 — Why
+there is no cliff, and what it costs</h2>
+<p>E2B caches 15 of 35 layers: 12 sliding-window at head_dim 256 with a
+512-token window, 3 full-attention at 512. tpu_inference sees two head
+dims, sets <code>disable_sliding_window</code>, and gives
+<strong>every</strong> layer full-length blocks —
+<code>num_kv_cache_groups=1</code>, 15 tensors, confirmed in the boot
+log.</p>
+<p>Allocation and reads therefore diverge:</p>
+<pre><code>                      12 sliding layers               3 full layers
+--------------------  ------------------------------  ---------------------
+allocated             full context — 12,288 B/token   6,144 B/token
+read per decode step  6.29 MB, constant once L &gt; 512  98.3 MB at L = 16,000</code></pre>
+<p>At 16,000 context, <strong>94% of the KV bytes read come from 3 of
+the 15 cached layers.</strong> The pool is charged ~18 KiB/token where
+~6.4 KiB would suffice.</p>
+<p>This does not prevent a cliff — it moves the cliff closer. It is a
+capacity <em>tax</em>, not a latency shield; no cliff appears because
+nothing is ever evicted.</p>
+<p>The tax is worth <strong>2.91×</strong>: at 32,768 context, 576.0
+MiB/seq allocated against 198.0 MiB/seq windowed. The trigger is
+<code>disable_sliding_window = len(head_size_set) &gt; 1</code>, and
+Gemma 4's 256/512 head-dim split trips it <strong>family-wide, at every
+size</strong>. It is gated on an upstream <code>TODO</code> and is not
+settable from the serving side.</p>
+<blockquote>
+<p>That single upstream fix is worth more than every available
+quantization flag combined — 2.91× the effective KV capacity at zero
+quality cost.</p>
+</blockquote>
+<hr />
+<h2 id="part-6--cost">Part 6 — Cost</h2>
+<p>Rates from the Cloud Billing Catalog, per chip-hour:</p>
+<pre><code>model             v5e (us-west4)  v6e (us-east5)  ratio
+----------------  --------------  --------------  -----
+Spot                     $0.5779         $1.4033  2.43x
+Flex-start (DWS)         $0.6000         $1.3500  2.25x
+On-demand                $1.2000         $2.7000  2.25x</code></pre>
+<p><strong>On v6e, spot is dearer than flex-start</strong>, inverting
+the v5e ordering and the advice with it. On v5e, flex-start cost 3.8%
+more and bought preemption-freedom. On v6e flex-start is <strong>both
+cheaper and preemption-free</strong>, and it self-terminates via
+<code>--max-run-duration</code>, which the other two do not. There is no
+trade left to make.</p>
+<p>Two catalog naming traps: flex-start is sold as <strong>"DWS Defined
+Duration"</strong> (Dynamic Workload Scheduler) and drops the
+<code>Tpu</code> prefix (<code>DWS Defined Duration V6e</code>), while
+spot is <code>usageType: Preemptible</code> spelled
+<code>TpuV6e attached to Spot Preemptible VMs</code>. The
+<code>Reserved …</code>, <code>Commitment v1: …</code> and
+<strong><code>Capacity Optimized TpuV6e …</code></strong> SKUs describe
+the same chip in the same region and three are also
+<code>OnDemand</code>, so anchor the match patterns.</p>
+<h3 id="cost-per-million-output-tokens-flex-start-both-sides">Cost per
+million output tokens, flex-start both sides</h3>
+<pre><code>   ctx  clients  KV needed vs v5e pool  v5e @ $0.60  v6e @ $1.35  v6e vs v5e
+------  -------  ---------------------  -----------  -----------  ------------------
+   128        1                   0.1%       $1.352       $1.848  1.37x dearer
+   128        8                   0.6%       $0.226       $0.314  1.39x dearer
+ 1,024       16                     6%       $0.186       $0.249  1.34x dearer
+ 4,096       64                    84%       $0.284       $0.276  0.97x — break-even
+ 8,192       32                    83%       $0.542       $0.494  0.91x — cheaper
+16,000       32                   161%       $0.999       $0.867  0.87x — cheaper
+16,000       64                   321%       $1.000       $0.841  0.84x — cheaper
+ 8,192       64                   166%       $0.530       $0.431  0.81x — cheaper
+32,000       16                                           $1.545  v6e only</code></pre>
+<p><strong>One chip 24/7:</strong> <span
+class="math inline">438/<em>m</em><em>o</em><em>n</em><em>t</em><em>h</em><em>o</em><em>n</em><em>v</em>5<em>e</em><em>f</em><em>l</em><em>e</em><em>x</em> − <em>s</em><em>t</em><em>a</em><em>r</em><em>t</em>, **</span>986/month
+on v6e flex-start**.</p>
+<h3 id="choosing">Choosing</h3>
+<p>The rule follows from the table, and it is a memory question rather
+than a throughput one:</p>
+<blockquote>
+<p><strong>Determine whether the steady-state working set —
+<code>clients × context</code> — exceeds ~270,000 tokens, roughly 84% of
+a v5e's pool. Below that, v5e is 26–29% cheaper per token. Above it, v6e
+is cheaper, but by 3% at the boundary and never by more than
+19%</strong>, because v5e can no longer hold the job and starts
+recomputing it.</p>
+</blockquote>
+<p>Two things follow that the memory ratio alone would not predict.
+<strong>The advantage saturates:</strong> once past the boundary, v6e
+settles at 0.81–0.87× and does not keep improving with working-set size
+— 16,000 × 64 runs at 321% of a v5e pool and is still only 16% cheaper.
+And <strong>break-even is not a comfortable margin.</strong> At 84% of
+pool the two chips are within 3% of each other, which is inside the
+run-to-run spread of the band those cells sit in.</p>
+<p>This is not "v6e for long context". The <code>4096 × 64</code> cell
+is only 4K of context and reaches the boundary anyway, because 64
+clients × 4,096 tokens is 270,336 KV tokens. <strong>Concurrency crosses
+the line as readily as context does.</strong> The threshold is a
+product, which is why the single-stream cell is v6e's worst showing at
+1.37× dearer.</p>
+<p>One effect dominates both columns: moving from a single stream to the
+best-measured concurrent cell is a <strong>7.4× cost reduction per token
+on v6e</strong> ($1.848/1M at 128 ctx × 1 client → $0.249/1M at 1,024
+ctx × 16). That is larger than the 2.25× between the two chips and
+larger than any other effect here. <strong>Tune concurrency before
+shopping for chips.</strong></p>
+<hr />
+<h2 id="limits">Limits</h2>
+<ul>
+<li><strong>Nothing above 157% of pool, and nothing that forces
+preemption.</strong> Every cell was admission-controlled; the eviction
+regime — the condition that would actually produce a cliff — is
+untested.</li>
+<li><strong>The knee sweep varied concurrency at fixed context
+only.</strong> A context sweep at fixed concurrency loads the 3
+full-attention layers differently and is not covered.</li>
+<li><strong>The 1.65× control figure is unexplained</strong>, sitting
+below the bandwidth ratio.</li>
+<li><strong>Single run per cell, on two independent nodes.</strong>
+Every cell in the results table was measured twice, on separate v6e-1
+nodes in different zones. Seven of ten agreed to within 6.3%; the three
+in the 4,096–8,192 band diverged 12–19% and are reported at the
+clean-seed value. No within-node variance figure is established, so a
+difference under ~6% between any two cells here is not a result.</li>
+<li><strong>Cold-boot and compile timings are unmeasured on
+v6e.</strong> The v5e figures — 857 s cold, 685 s of it compilation, 497
+s with the compile cache mounted — describe a mechanism that carries,
+not timings that do. v6e compiles its own kernels.</li>
+<li><strong><code>--gpu-memory-utilization</code> has no established v6e
+ceiling.</strong></li>
+<li><strong>qwix int8 weights, <code>max_model_len 65536</code>,
+<code>max-num-batched-tokens 8192</code>,
+<code>VLLM_TPU_BUCKET_PADDING_GAP=128</code>, and n-gram speculative
+decoding</strong> are untried on this chip.</li>
+<li><strong>Upstream flags E2B's correctness tests as failing</strong> —
+tpu-inference's support table marks <code>gemma-4-E2B-it</code> ✅ unit
+/ ❌ correctness / ❓ performance, while the 26B and 31B pass all three.
+Quality probes on v5e were clean (8/9 byte-identical outputs, 3/3 needle
+retrievals at 2K/8K/14K).</li>
+</ul>
+<hr />
+<h2 id="further-reading">Further reading</h2>
+<ul>
+<li><strong>"Self-hosting a lite agent backend on one TPU: Gemma 4 E2B +
+vLLM on a v5e-1"</strong> — the companion piece, and the source of every
+v5e-1 figure quoted here: the 321,376-token KV pool, the 8.02 ms
+single-stream TPOT, the <code>--gpu-memory-utilization 0.95</code>
+failure at 691 s, the 1.000× fp8 KV result, and the per-cell throughput
+used in the ratio and cost tables. Same model, same engine family, same
+<code>OUTPUT_LEN</code>, one chip generation down.</li>
+<li><a
+href="https://xbill999.medium.com/debugging-deployments-with-gemma-4b-tpu-v6e-1-mcp-and-antigravity-cli-c9846231237a">Debugging
+deployments with Gemma 4 4B, TPU v6e-1, MCP and Antigravity CLI</a> —
+the earlier v6e-1 write-up, covering the MCP tooling and the deploy path
+rather than the serving numbers.</li>
+<li><a href="https://docs.cloud.google.com/tpu/docs/v6e">Cloud TPU
+v6e</a> and <a href="https://docs.cloud.google.com/tpu/docs/v5e">Cloud
+TPU v5e</a> documentation — the source of both spec columns, and of the
+GiBps/GBps units mismatch: the v5e page quotes HBM bandwidth in GiBps
+while the v6e page uses GBps.</li>
+<li><a
+href="https://docs.cloud.google.com/kubernetes-engine/docs/concepts/dws">Dynamic
+Workload Scheduler pricing</a> — flex-start is billed under DWS, which
+is why the SKU is named "DWS Defined Duration V6e" rather than anything
+containing "flex".</li>
+<li><a
+href="https://docs.cloud.google.com/tpu/docs/system-architecture-tpu-vm">TPU
+system architecture</a> — the 256×256-versus-128×128 MXU dimensions
+behind the unresolved MXU-count arithmetic in §2.1.</li>
+</ul>
+<hr />
+<h2 id="appendix-operational-traps">Appendix: operational traps</h2>
+<ul>
+<li><strong>A published price is not an offer of capacity, or even of
+the provisioning model.</strong> Three independent gates; quota is the
+weakest signal and the one most often checked first.</li>
+<li><strong>Google's regions-and-zones page undercounts v6e
+zones</strong> — 8 documented against 18 the API accepts.</li>
+<li><strong><code>WAITING_FOR_RESOURCES</code> is not a
+failure.</strong> Do not record it as one and do not tear the request
+down; flex-start capacity can take two hours to return.</li>
+<li><strong>v6e quota ids drop the <code>Litepod</code> that v5e's
+carry</strong>, and a stale id matches no rows rather than erroring —
+indistinguishable from "no quota anywhere".</li>
+<li><strong><code>/v1/completions</code> returns an empty string on
+<code>-it</code> models.</strong> Use
+<code>/v1/chat/completions</code>.</li>
+<li><strong>Endpoints are not stable.</strong> The external IP changes
+every time the node is recreated.</li>
+<li><strong>Google quotes v5e bandwidth in GiBps and v6e in
+GBps.</strong> Normalise before dividing.</li>
+<li><strong><code>31.24 GiB</code> and <code>33.55 GB</code> are the
+same number.</strong> XLA prints GiB; <code>memory_analysis()</code>
+returns bytes.</li>
+<li><strong>XLA compares temporaries alone against the whole
+chip</strong> and does not subtract resident weights.
+<code>available HBM (31.24G)</code> in an error message is not
+headroom.</li>
+</ul>
+<hr />
+<h2 id="figures">Figures</h2>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/tpu-vllm-v6e1-2b/docs/assets/v6e-asymmetry.png"
+alt="v6e-1 returns 1.62–1.68x on workloads that fit a v5e-1 and 2.32–2.77x on those that do not, against a 2.25x price ratio." />
+<em>v6e-1 returns 1.62–1.68x on workloads that fit a v5e-1 and
+2.32–2.77x on those that do not, against a 2.25x price ratio.</em></p>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/tpu-vllm-v6e1-2b/docs/assets/v6e-no-knee.png"
+alt="Time to first token stays linear from 56% to 157% of the KV pool, with zero preemptions." />
+<em>Time to first token stays linear from 56% to 157% of the KV pool,
+with zero preemptions.</em></p>
+</body>
+</html>

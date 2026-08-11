@@ -1,0 +1,366 @@
+<meta charset="utf-8"><style>body{font:18px/1.7 Georgia,serif;max-width:740px;margin:40px auto;padding:0 20px;color:#222}pre{background:#f6f8fa;padding:14px;overflow-x:auto;border-radius:6px;font:13px/1.45 ui-monospace,Menlo,monospace}code{font:0.9em ui-monospace,Menlo,monospace;background:#f0f0f0;padding:1px 4px;border-radius:3px}pre code{background:none;padding:0}blockquote{border-left:3px solid #ccc;margin-left:0;padding-left:16px;color:#555}</style>
+<h1>Self-hosting a lite agent backend on one TPU chip</h1>
+<p>A single Google Cloud TPU v5e chip — 16 GB of HBM, about $0.58/hour on spot — will serve <code>google/gemma-4-E2B-it</code> under vLLM at <strong>1,496 output tokens/sec</strong> aggregate, with <strong>8.02 ms</strong> per-token latency at single stream and native tool-calling. That is enough to back a fleet of 8–16 concurrent "lite" agents for roughly <strong>$0.107 per million output tokens</strong>.</p>
+<p>This is a build log with numbers. Everything here was measured on the hardware, and the sections that say "I was wrong about this" are the ones worth your time — four of my confident predictions were falsified by the benchmark, and each falsification was more useful than the guess.</p>
+<p><strong>Setup under test:</strong> <code>v5litepod-1</code> (one v5e chip), <code>us-west4-a</code>, <code>vllm/vllm-tpu:nightly</code>, vLLM <code>0.26.1rc1.dev125+ga7a204cc6</code>, tpu-inference JAX backend, <code>google/gemma-4-E2B-it</code> at bf16.</p>
+<hr />
+<h2>Part 1 — Scaffold and run</h2>
+<h3>1.1 Prerequisites</h3>
+<pre><code class="language-bash">gcloud auth login                     # for gcloud subprocess calls
+gcloud auth application-default login # ADC, for the Secret Manager client
+</code></pre>
+<p>Put your Hugging Face token in Secret Manager rather than in a script or an env file — the TPU VM's startup script is stored as instance metadata, and anything you bake in is readable from the instance:</p>
+<pre><code class="language-bash">printf '%s' &quot;hf_xxxxxxxxxxxx&quot; | gcloud secrets create hf-token --data-file=- --project=YOUR_PROJECT
+</code></pre>
+<p><strong>Zone constraint that will waste your afternoon if you miss it:</strong> flex-start <code>v5litepod-1</code> is only accepted in <code>us-west4-a</code>. <code>europe-west4-a</code> and <code>-b</code> reject it at the API with <code>FLEX_START provisioning model is not supported for accelerator type "v5litepod-1"</code>, <em>regardless of quota</em>. Non-zero quota in a zone tells you nothing — the provisioning model is the blocker.</p>
+<h3>1.2 Provision the chip</h3>
+<p>Three provisioning models, three different commands. Note <code>v5e</code> is spelled <strong><code>v5litepod</code></strong> to gcloud — "v5e-1" is fine in prose and is never valid in a CLI argument.</p>
+<pre><code class="language-bash"># Spot — cheapest, preempted with ~30s notice, NO run limit (bills until you delete it)
+gcloud alpha compute tpus tpu-vm create gemma4-v5e \
+  --zone=us-west4-a --type=v5litepod --topology=1x1 \
+  --provisioning-model=spot --version=v2-alpha-tpuv5-lite
+
+# On-demand — full price, no preemption, also unbounded
+gcloud alpha compute tpus tpu-vm create gemma4-v5e \
+  --zone=us-west4-a --type=v5litepod --topology=1x1 \
+  --version=v2-alpha-tpuv5-lite
+</code></pre>
+<p>Flex-start goes through the Queued Resource API instead, and is the only model that accepts <code>--max-run-duration</code>, i.e. the only one that stops billing on its own:</p>
+<pre><code class="language-bash">gcloud alpha compute tpus queued-resources create gemma4-qr \
+  --node-id=gemma4-qr-node --zone=us-west4-a \
+  --accelerator-type=v5litepod-1 --runtime-version=v2-alpha-tpuv5-lite \
+  --provisioning-model=flex-start --max-run-duration=4h
+</code></pre>
+<blockquote>
+<p><strong>Verified 2026-08-09:</strong> this exact command was run — the QR reached <code>ACTIVE</code> with <code>provisioningModel: FLEX_START</code> and <code>maxRunDuration: 14400s</code>, then deleted cleanly. Note there is no dry-run: a create either queues or provisions, and <code>PROVISIONING</code> state cannot be deleted, so you will pay for at least a few minutes if capacity is immediately available.</p>
+<p><strong>Spot and on-demand have no automatic stop.</strong> They bill until preempted or deleted. Set a calendar reminder, or use flex-start. See the cost section — flex-start is only 3.8% more than spot.</p>
+</blockquote>
+<p>Spot draws on a <strong>separate quota</strong> (<code>TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI</code>), not the standard TPU quota. A zone with plenty of on-demand quota can still refuse spot.</p>
+<h3>1.3 Get the token onto the node and start the server</h3>
+<p><code>gcloud compute tpus tpu-vm ssh</code> crashes with <code>ConnectionResetError</code> from some sandboxed environments (it fails inside its own internal API call, while plain gcloud API calls work fine). Direct SSH always works:</p>
+<pre><code class="language-bash">IP=$(gcloud compute tpus tpu-vm describe gemma4-v5e --zone=us-west4-a \
+      --format='value(networkEndpoints[0].accessConfig.externalIp)')
+
+# Pipe the secret straight in — never through a shell variable or a log line
+gcloud secrets versions access latest --secret=hf-token \
+  | ssh -i ~/.ssh/google_compute_engine xbill@$IP 'umask 077; cat &gt; ~/.hf_token'
+
+ssh -i ~/.ssh/google_compute_engine xbill@$IP 'sudo docker pull vllm/vllm-tpu:nightly'
+</code></pre>
+<p>Then start it. This is the configuration the rest of the article defends:</p>
+<pre><code class="language-bash">sudo docker run -d --name vllm-gemma4 --privileged --net=host \
+  -v /dev/shm:/dev/shm --shm-size 10gb \
+  -v ~/.cache/vllm:/root/.cache/vllm \
+  -e HF_HOME=/dev/shm -e HF_TOKEN=&quot;$(cat ~/.hf_token)&quot; \
+  vllm/vllm-tpu:nightly \
+  vllm serve google/gemma-4-E2B-it \
+    --dtype bfloat16 \
+    --kv-cache-dtype auto \
+    --max-model-len 32768 \
+    --max-num-batched-tokens 4096 \
+    --tensor-parallel-size 1 \
+    --gpu-memory-utilization 0.92 \
+    --enable-prefix-caching \
+    --disable-chunked-mm-input \
+    --limit-mm-per-prompt '{&quot;image&quot;:4,&quot;audio&quot;:1}' \
+    --enable-auto-tool-choice --tool-call-parser gemma4 --reasoning-parser gemma4
+</code></pre>
+<p><strong>That <code>-v ~/.cache/vllm:/root/.cache/vllm</code> line is the highest-value thing in this article.</strong> The JAX compile cache lives there (197 MB measured) and is otherwise <em>container-local</em>, destroyed on every <code>docker rm</code>. Compilation is <strong>685 s of the 857 s</strong> cold start. Measured: mounting it cuts a restart to <strong>497 s, a 42% saving</strong>. Without the mount, every restart, flag change and spot preemption repays the full compile.</p>
+<h3>1.4 Verify</h3>
+<p>Cold start is <strong>857 s</strong> (14 min) and <strong>80% of it is XLA compilation, not weight loading</strong> — the 9.54 GiB checkpoint downloads in about 10 seconds. Be patient, and watch the log rather than the clock:</p>
+<pre><code class="language-bash">sudo docker logs -f vllm-gemma4 2&gt;&amp;1 | grep -E &quot;Memory statistics|Init kv-cache|startup complete&quot;
+</code></pre>
+<p>You want to see this, which is the whole memory budget in one line:</p>
+<pre><code>Memory statistics | total_hbm_limit_gb=15.75GiB | total_hbm_limit_cap_gb=14.49GiB
+                  | total_hbm_used_gb=8.97GiB   | total_hbm_avail_gb=5.52GiB
+</code></pre>
+<p>Then smoke-test it. <strong>Use <code>/v1/chat/completions</code>, not <code>/v1/completions</code></strong> — raw completions return an empty string on <code>-it</code> models, which looks exactly like a broken deploy and isn't:</p>
+<pre><code class="language-bash">curl -s localhost:8000/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  &quot;model&quot;:&quot;google/gemma-4-E2B-it&quot;,
+  &quot;messages&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;Say hi in five words.&quot;}]}' | jq -r '.choices[0].message.content'
+</code></pre>
+<h3>1.5 Tear down</h3>
+<pre><code class="language-bash">gcloud compute tpus tpu-vm delete gemma4-v5e --zone=us-west4-a --quiet
+</code></pre>
+<hr />
+<h2>Part 2 — The flags, and what they actually do</h2>
+<h3>The chip: what one v5e actually gives you</h3>
+<pre><code>spec                             v5e, one chip                                     source
+-------------------------------  ------------------------------------------------  -----------------
+HBM capacity                     16 GB nominal · 15.75 GiB visible to the runtime  vendor · measured
+Usable for weights + KV at 0.92  14.49 GiB                                         measured
+HBM bandwidth                    800 GiBps                                         vendor
+Peak bf16                        197 TFLOPS                                        vendor
+Peak int8                        393 TOPS (exactly 2x bf16)                        vendor
+TensorCore                       1, with 4 MXUs (128x128)                          vendor
+ICI                              400 GBps bidirectional, 4 ports                   vendor
+Machine type                     ct5lp-hightpu-1t
+gcloud spelling                  v5litepod-1, runtime v2-alpha-tpuv5-lite          measured
+</code></pre>
+<p>Two unit traps worth knowing before you compare anything. Google quotes <strong>v5e bandwidth in GiBps and v6e in GBps</strong> — normalise before dividing, the real generational ratio is ~1.9x, not a clean 2x. And the "16 GB" capacity figure sits awkwardly next to the 15.75 GiB the runtime reports (15.75 GiB is 16.9 GB), so the vendor number is almost certainly 16 <strong>GiB</strong> loosely written. Size against the measured 15.75 GiB, never the marketing figure.</p>
+<h3>Data types: what the matrix units can actually compute in</h3>
+<p><strong>This single table decides every quantization question on this chip.</strong></p>
+<p><strong>bf16</strong>
+- native in the MXU?: ✅
+- what it buys on v5e: the baseline — everything here runs in it</p>
+<p><strong>int8</strong>
+- native in the MXU?: ✅ <strong>2x bf16 throughput</strong>
+- what it buys on v5e: the <em>only</em> low-precision compute win</p>
+<p><strong>fp8</strong>
+- native in the MXU?: ❌
+- what it buys on v5e: storage and bandwidth only — values widen back to bf16 before the matmul</p>
+<p><strong>int4 / fp4</strong>
+- native in the MXU?: ❌
+- what it buys on v5e: footprint and bandwidth only, then unpack to bf16</p>
+<p>Google publishes bf16 and Int8 peaks for v5e and <strong>no fp8 figure at all</strong>, which is the tell. The practical consequence: <em>a benchmark showing no speedup from fp8 on this chip is the correct result, not a misconfiguration.</em> <strong>v7/Ironwood is the first TPU with fp8 in the MXU</strong> — do not carry any conclusion here forward to it.</p>
+<h3>Quantization: what is actually reachable</h3>
+<p>Gemma 4 exists only as a JAX implementation in this stack, so anything in the torch path is unreachable no matter what the platform advertises. Measured state:</p>
+<p><strong>KV cache, bf16 (<code>auto</code>)</strong>
+- status on this build: ✅ the only one worth running</p>
+<p><strong>KV cache <code>fp8_e4m3</code> / <code>fp8_e5m2</code></strong>
+- status on this build: reachable, <strong>1.000x capacity</strong> — the block layout is word-aligned, so narrowing the element buys padding, not room. ~2% slower</p>
+<p><strong>KV cache <code>int8</code></strong>
+- status on this build: ❌ <strong>rejected by the CLI enum</strong> — never reaches the engine</p>
+<p><strong>KV cache <code>int8_per_token_head</code>, <code>turboquant_*</code>, <code>nvfp4</code>, <code>fp8_inc</code>, <code>fp8_ds_mla</code></strong>
+- status on this build: accepted by the CLI, then <strong>kill the server at boot</strong></p>
+<p><strong>Weights, compressed-tensors w4a16 (Google's QAT format)</strong>
+- status on this build: ❌ <code>NotImplementedError</code> on the JAX path</p>
+<p><strong>Weights, mxfp4</strong>
+- status on this build: ❌ MoE-only; E2B is dense, so there is nothing to attach to</p>
+<p><strong>Weights, qwix PTQ int8/int4</strong>
+- status on this build: ❌ does not boot — the concrete path OOMs on quantization temporaries, the abstract path raises binding weights</p>
+<p><strong>Weights, AWQ / GGUF / q4_0</strong>
+- status on this build: ❌ torch path or absent</p>
+<p><strong>So bf16 is not a choice here, it is the only thing that runs</strong> — and that is the single biggest constraint on the chip. Weights are <strong>8.97 of the 14.49 GiB budget (62%)</strong>, and none of it can be compressed today. Working int8 weights would roughly double the KV pool <em>and</em> buy real FLOPS, since int8 is the one format with a native MXU path. It is blocked upstream, not by configuration, so it is worth re-testing on every image bump.</p>
+<p>One measured consequence of all this: decode moves ~3.15 GiB per step against a <strong>3.94 ms</strong> bandwidth floor, and measures <strong>8.02 ms</strong> — about <strong>49% of peak bandwidth</strong>. <em>(The 3.15 GiB is derived from the model's layer geometry; the 8.02 ms is measured.)</em> The chip is not the bottleneck at any point in this article.</p>
+<h3>The model: six things about Gemma 4 E2B that will catch you out</h3>
+<p>E2B is a strange checkpoint. Almost every intuition from a conventional decoder is wrong here, and the memory arithmetic later in this article only makes sense once these are on the table.</p>
+<pre><code>field                                      value
+-----------------------------------------  ------------------------------------------------------
+num_hidden_layers                          35 (28 sliding / 7 full attention, i % 5 == 4 is full)
+num_kv_shared_layers                       20 — so only 15 layers own a cache
+num_attention_heads / num_key_value_heads  8 / 1
+head_dim / global_head_dim                 256 / 512
+hidden_size / intermediate_size            1536 / 6144
+vocab_size                                 262,144 (tied embeddings)
+sliding_window                             512
+resident at bf16                           8.97 GiB
+</code></pre>
+<p><strong>1. "E2B" is not a 2B model.</strong> It is ~2B <em>effective</em> against ~5B total, and lands at <strong>8.97 GiB</strong> resident. The <code>E</code> prefix is load-bearing — reading <code>E4B</code> as "a 4B model" understates its weights by roughly 2x, which is exactly the difference between fitting a 16 GB chip and not.</p>
+<p><strong>2. There are two attention geometries, not one.</strong> Sliding layers run at <code>head_dim</code> 256; the seven full-attention layers run at <strong>512</strong>, and that applies to K and V, not just Q. A single <code>head_dim</code> does not describe this model — anything that reads one value and applies it to all 35 layers under-counts the full layers by 2x. That is a 17% KV sizing error, and it is one people actually make.</p>
+<p><strong>3. Twenty of the thirty-five layers read someone else's cache.</strong> <code>first_shared = 35 − 20 = 15</code>, so layers 0–14 own KV and layers 15–34 share. The mapping is "last preceding layer of the same attention type", and within 0–14 that means <strong>all twenty shared layers resolve to just two source caches</strong> — layer 13 for the sliding ones, layer 14 for the full ones. Twenty layers, two tensors.</p>
+<p><strong>4. KV costs 18 KiB/token, and the boot log will lie to you about why.</strong></p>
+<pre><code>12 sliding cached layers x 1 KV head x 2 (K,V) x 256 x 2 B = 12,288 B
+ 3 full    cached layers x 1 KV head x 2 (K,V) x 512 x 2 B =  6,144 B
+                                                    total  = 18,432 B = 18 KiB/token
+</code></pre>
+<p>Multiply by the measured 321,344 resident tokens and you get <strong>5.52 GiB</strong> — exactly what the engine reports. But the log line describing the cache, <code>regular_attn_shape=(num_blocks, (64, 1, 2, 256))</code>, is a <strong>first-wins sample taken from layer 0</strong> — which is sliding, hence 256. It says nothing about layers 4, 9 and 14. On any hybrid model it under-reports. <em>Size KV from the config geometry and check it against <code>total_hbm_avail_gb</code>; never read it off that line.</em></p>
+<p><strong>5. One KV head means more chips make things worse, not better.</strong> <code>num_key_value_heads = 1</code> is full MQA, and a single head <strong>cannot be sharded</strong>. Runtimes pad <code>num_kv_heads</code> up to a multiple of the tensor-parallel size, so at TP=4 you pay <strong>4x the KV memory to store the same head replicated</strong>. On this model a larger topology multiplies the KV cost rather than dividing it. Check <code>num_key_value_heads</code> before assuming more chips solve a memory problem.</p>
+<p><strong>6. The heads do not tile the hidden size.</strong> <code>8 x 256 = 2048</code> against <code>hidden_size = 1536</code>, so the Q projection is rectangular. Any code computing <code>head_dim = hidden_size / num_heads</code> gets <strong>192</strong> and is silently wrong.</p>
+<p>And one that explains the performance rather than the memory: <strong>4.38 GiB of the 8.97 GiB resident is per-layer embedding tables</strong> (262,144 x 256 x 35), which are <em>gathered per token, not streamed</em>. Only ~3.15 GiB actually moves per decode step — the dense transformer plus the 0.75 GiB tied embedding that <code>lm_head</code> reads in full. That is why an 8.97 GiB model decodes as fast as it does.</p>
+<p>Two more traps worth knowing if you go poking at the checkpoint: the file also contains <code>audio_tower</code> and vision layers <strong>with their own independent layer numbering</strong>, so a regex matching <code>layers\.(\d+)\.</code> silently collides with them — always anchor on <code>model.language_model.</code>. And the QAT exports (<code>-qat-w4a16-ct</code>, <code>-qat-q4_0-unquantized</code>) <strong>do not load on this stack at all</strong>, partly because they legitimately ship no <code>k_norm</code> for the KV-shared layers and the loader demands it anyway.</p>
+<h3>The mental model: one HBM budget, and a part of it nobody governs</h3>
+<p>Everything else follows from this:</p>
+<pre><code> 15.75 GiB   total HBM on the chip
+×  0.92      --gpu-memory-utilization
+─────────
+ 14.49 GiB   the cap the engine will allocate inside
+−  8.97 GiB  model weights (bf16)
+─────────
+  5.52 GiB   KV cache  →  321,376 tokens at 18 KiB/token
+
+  1.26 GiB   what is left OUTSIDE the cap — compiled XLA programs live here,
+             and gpu_memory_utilization does not govern them
+</code></pre>
+<p>That last line is the trap. I tested <code>--gpu-memory-utilization 0.95</code> expecting a free +8% of KV. The KV pool sized <em>exactly</em> as arithmetic predicted — cap 14.96 GiB, KV 5.99 GiB, <strong>348,864 tokens, +8.6%</strong> — and then XLA died <strong>691 s in</strong>, loading <code>jit_structured_decode_fn</code>:</p>
+<pre><code>RuntimeProgramAllocationFailure: Attempting to reserve 384.11M at the bottom of memory.
+That was not possible. There are 347.33M free, 0B reserved, and 347.33M reservable.
+</code></pre>
+<p>The knob governs weights + KV only; compiled program images come out of the remainder it leaves behind. I have now measured this failure twice, months apart, at different page sizes (32 and 64) — 384.11 M wanted against 346.77 M and 347.33 M free. It is deterministic, not a race.</p>
+<p><strong>0.92 is a ceiling, not a conservative default.</strong> And note the shape of that failure: it costs a full compile to discover — 691 s before it tells you.</p>
+<h3><code>--gpu-memory-utilization 0.92</code></h3>
+<p>Fraction of total HBM the engine may allocate for <strong>weights + KV cache</strong>. Not activations, not compiled programs. 0.95 does not boot on this model/chip/build. 0.93 and 0.94 are untested; the estimated margins are ~291 MB and ~127 MB against a failure that was 37 MB short, so the risk/reward is poor.</p>
+<p>There is also <code>--kv-cache-memory</code> (config field <code>kv_cache_memory_bytes</code>), which pins the pool in <strong>bytes</strong> instead of as a fraction, and skips memory profiling on later boots. Measured-good value on this setup: <code>5923602432</code>.</p>
+<h3><code>--max-model-len 32768</code></h3>
+<p>The maximum context. The surprising part is that <strong>it costs no KV capacity</strong>:</p>
+<pre><code>max-model-len  block_size  blocks/request  KV blocks  KV tokens
+-------------  ----------  --------------  ---------  ---------
+16,384         32          512             10,043     321,376
+32,768         64          512             5,021      321,344
+</code></pre>
+<p>The Pallas backend scales <code>block_size</code> <em>with</em> <code>max_model_len</code> to hold blocks-per-request constant at
+512. Doubling the context doubles the page size, halves the block count, and lands on the same token
+capacity. Measured, both arms.</p>
+<p>And blocks-per-request turns out to predict decode speed:</p>
+<pre><code>blocks/request              c=1 TPOT
+--------------------------  --------
+512 (max-model-len 16384)   8.05 ms
+512 (max-model-len 32768)   8.02 ms
+2048 (a misconfigured arm)  8.32 ms
+</code></pre>
+<p><strong>Corollary: do not set <code>--block-size</code>.</strong> The backend picks it, and pinning 32 would fight the scaling that keeps long context free.</p>
+<h3><code>--max-num-batched-tokens 4096</code></h3>
+<p>The token budget per scheduler step — the chunk size for chunked prefill. Smaller favours inter-token latency (a big prefill chunk stalls every in-flight decode); larger favours time-to-first- token. This is the single most misunderstood flag on TPU, for two reasons.</p>
+<p><strong>Reason 1: the buckets are powers of two.</strong> TPU needs a compiled graph per tensor shape, so vLLM precompiles a ladder — <code>16, 32, 64, … 4096</code> — and rounds your value <strong>up</strong> to the next bucket. Setting 2496 compiles <em>exactly the same ladder</em> as 4096. Each chunk then costs a 4096-shaped kernel while carrying 2496 tokens of work. I tried it: <strong>−24.7% throughput</strong> at 8k/64 with the ITL tail completely unchanged (173.9 → 174.2 ms).</p>
+<p><strong>Reason 2: multimodal sets a hard floor.</strong> With <code>--disable-chunked-mm-input</code>, one multimodal item must fit in a single batch. Go under it and the server refuses to start:</p>
+<pre><code>ValueError: Chunked MM input disabled but max_tokens_per_mm_item (2496)
+is larger than max_num_batched_tokens (2048). Please increase max_num_batched_tokens.
+</code></pre>
+<p>So for this model with <code>{"image":4,"audio":1}</code>: <strong>floor 2496, next bucket 4096</strong>. Every value in (2048, 4096] compiles identically, so the largest one wins. <strong>4096 is optimal in that interval</strong> — not by taste, by construction.</p>
+<h3><code>--max-num-seqs</code> (leave it alone)</h3>
+<p>Maximum concurrent sequences. The default is <strong>256</strong>, and where that comes from is worth knowing, because it is not where you'd look:</p>
+<ul>
+<li><code>SchedulerConfig.DEFAULT_MAX_NUM_SEQS = 128</code> is <strong>dead code on the serve path.</strong></li>
+<li><code>EngineArgs.get_batch_defaults()</code> overrides it from a dict keyed by usage context and gated on device memory: <code>&gt;= 70 GiB</code> → 1024, otherwise → <strong>256</strong>.</li>
+<li>vLLM <em>ships</em> per-chip TPU tuning (V6E 1024 / <strong>V5E 512</strong> / V5P 256 for <code>max_num_batched_tokens</code>)… and it never fires, because <code>get_device_name()</code> returns <code>'TPU V5E'</code> while the code tests <code>chip_name == "V5E"</code>. It also calls <code>get_device_total_memory()</code>, which raises <code>NotImplementedError</code> on tpu-inference and is swallowed by a bare <code>except</code>, so the memory gate reads 0.</li>
+</ul>
+<p>So on a v5e you silently get <strong>generic non-GPU defaults</strong>. I tried capping it to 64 on the theory that 256 over-admits (256 × 16384 = 4.19M KV tokens against 321,376 resident). <strong>It made things worse</strong>, and in any case my benchmark's peak offered load was 64, so the cap never bound. Leave it at 256 unless you are actually seeing preemption in the logs.</p>
+<h3><code>--kv-cache-dtype auto</code></h3>
+<p>Leave this alone, and be suspicious of anyone who tells you otherwise. <code>--kv-cache-dtype fp8_e4m3</code> gives a <strong>1.000x</strong> capacity ratio on this stack. The KV block layout is word-aligned:</p>
+<pre><code>bf16: regular_attn_shape=(num_blocks, (32, 1, 2, 256))  →  32,768 bytes/block/layer
+fp8:  regular_attn_shape=(num_blocks, (32, 1, 4, 256))  →  32,768 bytes/block/layer
+</code></pre>
+<p>The third dimension doubles exactly as the element width halves. Narrowing the element buys padding, not capacity — and costs ~2% throughput. The flag is accepted at the CLI, echoed in <code>non-default args</code>, praised by a log line, reported in <code>/metrics</code>, and allocates a genuinely <code>float8_e4m3fn</code> tensor. <strong>Five independent signals that it worked, and it did nothing.</strong></p>
+<p>I expected <code>--kv-cache-dtype int8</code> to be worse still — reachable, and silently rounding the cache to whole integers because the model hardcodes its K/V scales to <code>1.0</code>. <strong>I tested it and that is wrong on this build:</strong> <code>int8</code> is not in vLLM's CLI enum and is rejected before it reaches any of that (<code>invalid choice: 'int8'</code>). The 16 accepted values are <code>auto, bfloat16, float16, fp8, fp8_ds_mla, fp8_e4m3, fp8_e5m2, fp8_inc, fp8_per_token_head, int4_per_token_head, int8_per_token_head, nvfp4</code> and four <code>turboquant_*</code>. The ones that <em>are</em> accepted but unsupported (<code>int8_per_token_head</code>, <code>turboquant_*</code>, <code>nvfp4</code>, <code>fp8_inc</code>, <code>fp8_ds_mla</code>) fail loudly at boot rather than quietly — so on this build the honest summary is: <strong>fp8 is the trap, because it is the one that appears to work.</strong></p>
+<p><code>auto</code> is not vague here — it means "inherit the model dtype", which <code>--dtype bfloat16</code> pins.</p>
+<h3><code>--tensor-parallel-size 1</code></h3>
+<p>One chip, so this is forced. But it's worth knowing <em>why</em> more chips wouldn't help this model: E2B has <code>num_key_value_heads=1</code> — full MQA. A single KV head <strong>cannot be sharded</strong>; runtimes pad it up to a multiple of the TP size, so at TP=4 you pay 4× the KV memory to store the same head replicated. For this model, more chips multiply KV cost rather than dividing it.</p>
+<h3><code>--disable-chunked-mm-input</code> and <code>--limit-mm-per-prompt</code></h3>
+<p>These are the multimodal contract, and <strong>together they set the 2496-token floor</strong> discussed above. If you don't need images and audio, dropping them lets <code>max-num-batched-tokens</code> reach the 2048 bucket, which is the only route to a lower latency floor on this stack. That is a real trade I'd evaluate before copying this config into a text-only deployment.</p>
+<h3><code>--enable-auto-tool-choice --tool-call-parser gemma4 --reasoning-parser gemma4</code></h3>
+<p>What makes this an <em>agent</em> backend rather than a text box: OpenAI-compatible tool calling, parsed natively. Worth knowing that these pull in structured-decoding machinery — the program that ran out of memory in the 0.95 experiment was <code>jit_structured_decode_fn</code> — so they are not free against that ungoverned 1.26 GiB remainder.</p>
+<h3>Environment variables worth knowing</h3>
+<p>Set with <code>-e</code> on <code>docker run</code>; these come from tpu-inference, not vLLM:</p>
+<p><strong><code>ATTN_BUCKETIZED_NUM_REQS</code></strong>
+- default: <code>False</code>
+- what it does: precompile attention at power-of-two <em>request</em> buckets instead of a single shape at <code>max_num_seqs</code></p>
+<p><strong><code>SLICE_ROPE_CACHE</code></strong>
+- default: <code>False</code>
+- what it does: slice the rotary cache to <code>max_model_len</code> at load — free HBM</p>
+<p><strong><code>NUM_PRECOMPILE_WORKERS</code></strong>
+- default: <code>1</code>
+- what it does: parallel XLA precompilation; compile is 685 s of an 857 s boot</p>
+<p><strong><code>VLLM_TPU_BUCKET_PADDING_GAP</code></strong>
+- default: <code>0</code>
+- what it does: linear bucket increments (use 128) instead of powers of two — the fix for the 2496-pads-to-4096 problem</p>
+<p><strong><code>VLLM_XLA_CHECK_RECOMPILATION</code></strong>
+- default: <code>False</code>
+- what it does: error on a runtime recompile; turn on for one validation boot</p>
+<hr />
+<h2>Part 3 — Results: how many clients, and for what</h2>
+<h3>Throughput and latency, measured</h3>
+<blockquote>
+<p><strong>Provenance.</strong> All 12 cells were measured on the configuration above, <strong>3 repetitions each</strong> (36 runs). Throughput is stable — coefficient of variation ≤3.4%, most ≤1%. The one exception is marked: 128-ctx/16-client <strong>TTFT</strong> has cv 56% across reps, so no point value should be trusted there. An earlier config was re-run as a control and reproduced a previous sweep to the digit (TPOT 8.05/8.08/8.43 ms, KV 5.52 GiB, 10,043 blocks), so the rig itself is stable.</p>
+</blockquote>
+<p>Aggregate output tokens/sec:</p>
+<pre><code>context ↓ / clients →  1      4      16       64
+---------------------  -----  -----  -------  -------
+128                    123.7  433.9  1,152.5  1,496.5
+1,024                  120.4  415.4  991.0    1,258.7
+8,192                  94.2   254.4  399.6    324.3
+</code></pre>
+<p>Median time-to-first-token (ms):</p>
+<pre><code>context ↓ / clients →  1      4      16     64
+---------------------  -----  -----  -----  ------
+128                    15.9   31.8   98.8*  247.3
+1,024                  40.3   51.5   170.1  421.7
+8,192                  289.4  304.2  594.4  11,734
+</code></pre>
+<p>Per-stream tokens/sec (what one user feels):</p>
+<pre><code>context ↓ / clients →  1    4    16  64
+---------------------  ---  ---  --  --
+128                    125  112  76  25
+1,024                  124  109  69  21
+8,192                  119  71   27  10
+</code></pre>
+<h3>The three regimes</h3>
+<p><strong>Short context (≤1K) scales cleanly to 64 clients.</strong> 12.1× the single-stream throughput. This is the regime most agent traffic lives in.</p>
+<p><strong>Long context (8K) peaks at 16 clients and then goes backwards.</strong> 400 → 324 tok/s from 16 to 64, with median TTFT blowing out to 11.7 seconds. The reason is arithmetic: 64 streams × 8,192 tokens = 524,288 KV tokens wanted against <strong>321,376 resident</strong>. Past the KV wall, more clients buy queueing, not throughput.</p>
+<p><strong>Single stream is bandwidth-limited at about half of peak.</strong> Decode moves ~3.15 GiB per step (the model's 4.38 GiB of per-layer embedding tables are <em>gathered</em>, not streamed), which at the v5e's 800 GiBps is a 3.94 ms floor against 8.02 ms measured — <strong>49% of peak</strong>. <em>(That 3.15 GiB is derived from the model's layer geometry, not an instrument reading; the 8.02 ms is measured.)</em>. There is roughly 2× of headroom sitting in fixed per-step cost, not in memory bandwidth.</p>
+<h3>Recommended client counts</h3>
+<pre><code>workload                        context  clients  expected
+------------------------------  -------  -------  --------------------------------------------
+Interactive chat / agent turns  ≤1K      16       991–1,152 tok/s, 99–170 ms TTFT, ~14 ms TPOT
+Max throughput, batch/offline   ≤1K      64       1,259–1,496 tok/s, 247–422 ms TTFT
+RAG / long documents            8K       16       399.6 tok/s, 594 ms TTFT
+Long-context interactive        8K       ≤4       254 tok/s, ~304 ms TTFT
+</code></pre>
+<p><strong>Rule of thumb: keep <code>clients × context &lt; 250,000 tokens</code></strong> — about 78% of the 321,344-token KV pool. Cross it and you're paying in tail latency for throughput you don't get.</p>
+<h3>Why this fits "lite agents" specifically</h3>
+<p>Agent workloads have a shape that suits this chip well:</p>
+<ul>
+<li><strong>Short-to-medium contexts.</strong> A tool-calling turn is a system prompt, a few messages and a schema — usually well under 4K. That is exactly where this config is strongest.</li>
+<li><strong>Bursty, not saturating.</strong> Agents think, call a tool, wait, resume. The 16-client interactive point (63 tok/s per stream, 230 ms TTFT) comfortably backs far more than 16 <em>registered</em> agents.</li>
+<li><strong>Tool calling is native.</strong> <code>--tool-call-parser gemma4</code> gives OpenAI-compatible function calling with no glue.</li>
+<li><strong>Prefix caching is on by default and it works</strong> — measured: re-sending a 4,813-token prefix scored <strong>4,800 cache hits (99.7%)</strong> and cut prefill latency from 0.244 s to 0.033 s (<strong>7.4x</strong>), while a different prefix correctly produced zero new hits. Agents re-send near-identical system prompts constantly, so this is close to free throughput.</li>
+<li><strong>Multimodal for free</strong> — 4 images + 1 audio clip per prompt, within the same 16 GB.</li>
+</ul>
+<p>What it is <em>not</em> good for: long-context batch summarization at high concurrency (the 8K/64 cell is the worst on the chart), or anything needing &gt;321K tokens of live KV.</p>
+<hr />
+<h2>Part 4 — Cost: spot vs flex-start vs reserved</h2>
+<p>Live rates from the Cloud Billing Catalog for <code>us-west4</code>, per chip-hour:</p>
+<pre><code>model                     $/chip-hr  vs spot  stops itself?             preemptible?
+------------------------  ---------  -------  ------------------------  -----------------
+3-year commitment         0.5400     −6.6%    n/a                       no
+Spot                      0.5779     —        no                        yes, ~30 s notice
+Flex-start (DWS)          0.6000     +3.8%    yes (--max-run-duration)  no, once running
+1-year commit / Reserved  0.8400     +45%     n/a                       no
+On-demand                 1.2000     +108%    no                        no
+</code></pre>
+<h3>The result that surprised me: flex-start is the default choice, not spot</h3>
+<p>Spot is only <strong>3.8% cheaper</strong> than flex-start, and that discount is fragile. A preemption costs a full cold start — 857 s, of which 685 s is recompilation — which is <strong>$0.138</strong> of wasted spend at the spot rate. Flex-start's premium is <strong>$0.0221/hour</strong>. So:</p>
+<blockquote>
+<p><strong>Spot beats flex-start only while preemptions are less frequent than every 6.2 h without the cache mount, or every 3.6 h with it.</strong> Measured rebuild cost: $0.1376 cold, $0.0798 warm.</p>
+</blockquote>
+<p>And flex-start <em>stops billing on its own</em> via <code>--max-run-duration</code>, while spot and on-demand run until you remember to delete them. One forgotten weekend on a spot node ($0.58 × 60 h ≈ $35) wipes out months of the 3.8% saving.</p>
+<p><strong>Mount the compile cache and the calculus changes again</strong> — a warm cache turns a preemption from ~18 minutes into ~6, which is exactly why that one <code>-v</code> flag matters more than any tuning flag here.</p>
+<h3>Cost per million output tokens</h3>
+<pre><code>workload             tok/s    spot    flex-start  on-demand
+-------------------  -------  ------  ----------  ---------
+128 ctx, 64 clients  1,496.5  $0.107  $0.111      $0.223
+1K ctx, 64 clients   1,258.7  $0.128  $0.132      $0.265
+1K ctx, 16 clients   991.0    $0.162  $0.168      $0.336
+8K ctx, 16 clients   399.6    $0.402  $0.417      $0.834
+1 client (any ctx)   123.7    $1.298  $1.347      $2.695
+</code></pre>
+<p><strong>Running one chip 24/7:</strong> $422/month on spot, $438 on flex-start, $876 on-demand.</p>
+<p>The headline: <strong>batching is worth more than any pricing decision.</strong> Going from 1 client to 64 at short context is a <strong>12.1× cost reduction per token</strong> — far larger than the 2.08× between on-demand and spot. Tune your concurrency before you shop for discounts.</p>
+<hr />
+<h2>Part 5 — Four things I was confidently wrong about</h2>
+<p>The falsified predictions were the most valuable output of this exercise.</p>
+<p><strong>1. "fp8 KV cache will double capacity."</strong> It gave 1.000x, because the layout is word-aligned. Five independent signals said the flag had worked. Only the block-shape line revealed the truth. <em>Lesson: verify quantization from the boot allocation log, never from the flag being accepted.</em></p>
+<p><strong>2. "0.95 memory utilization is a free 8% of KV."</strong> The KV math was right to 0.03% and the engine died anyway, 13 minutes later, because compiled programs live outside the knob's control. <em>Lesson: a memory knob that doesn't govern all memory will lie to you.</em></p>
+<p><strong>3. "Lowering <code>max-num-batched-tokens</code> to the exact multimodal floor will cut latency."</strong> It cost 24.7% throughput and moved the latency tail by 0.2%, because 2496 and 4096 round to the same compiled bucket. <em>Lesson: on TPU, the shape you get is not the number you typed.</em></p>
+<p><strong>4. "Capping <code>max-num-seqs</code> at 64 will speed up decode."</strong> It didn't, and the arm carrying it was worse on every cell. <em>Lesson: if your benchmark's offered load never reaches the cap, the cap is untested — say so instead of claiming the win.</em></p>
+<p>There's a fifth I haven't been able to fix. The boot log reports <code>Hybrid KV cache layout: num_kv_cache_groups=1</code> — every one of the 15 cached layers gets full-length KV allocation, even though <strong>12 of them are sliding-attention layers windowed at 512 tokens</strong>. Windowing them would be worth <strong>2.8× the KV capacity</strong> at 16K context, at zero quality cost. It's unreachable: tpu-inference disables sliding windows for any model with more than one head dim, and Gemma 4 has two (256 on sliding layers, 512 on full). The source carries a <code>TODO: enable sliding windows once mixed dims support</code>. Worth re-checking on every image bump — it's the largest single win still on the table.</p>
+<hr />
+<h2>Everything above was validated end to end</h2>
+<p>The final configuration was booted from scratch and exercised, not assembled from winning fragments:</p>
+<pre><code>check                             result
+--------------------------------  ----------------------------------------------------------------
+cold boot                         857 s (compile 685 s = 80%)
+warm boot, compile cache mounted  497 s (−42%)
+memory                            14.49 GiB cap / 8.97 weights / 5.52 KV — matches every other arm
+KV capacity                       block_size 64 x 5,021 blocks = 321,344 tokens
+chat completion                   ✅
+tool calling                      ✅ {&quot;name&quot;:&quot;get_weather&quot;,&quot;arguments&quot;:&quot;{\&quot;city\&quot;: \&quot;Paris\&quot;}&quot;}
+multimodal image                  ✅ correctly described a synthetic gradient PNG
+long context                      ✅ 26,016 prompt tokens accepted
+throughput                        12 cells x 3 reps, cv ≤3.4%
+</code></pre>
+<p>The three flags that restate a default (<code>--dtype</code>, <code>--kv-cache-dtype</code>, <code>--gpu-memory-utilization</code>) are <strong>confirmed no-ops by vLLM itself</strong> — they do not appear in the engine's <code>non-default args</code> when passed at these values. They are in the command for auditability, since the real defaults are computed several layers from where they look like they are declared.</p>
+<p><strong>fp8 KV was re-verified on this exact build</strong>, because the original result predated a container rebuild. Same 5,021 blocks, same 5.52 GiB, same 321,344 tokens as bf16 — while the shape goes <code>(64,1,2,256)</code> → <code>(64,1,4,256)</code> and the dtype really is <code>float8_e4m3fn</code>. The first time I measured this the page size was 32; it reproduces at 64, so the word-alignment mechanism is not a block-size artifact.</p>
+<hr />
+<h2>Appendix: gotchas that cost me real time</h2>
+<ul>
+<li><strong><code>/v1/completions</code> returns an empty string on <code>-it</code> models.</strong> Use <code>/v1/chat/completions</code>. An empty benchmark result is expected there, not a broken deploy.</li>
+<li><strong><code>v5e</code> is <code>v5litepod</code> to gcloud.</strong> Accelerator type <code>v5litepod-1</code>, runtime <code>v2-alpha-tpuv5-lite</code>, <code>--type=v5litepod --topology=1x1</code>.</li>
+<li><strong>Don't hardcode the endpoint.</strong> The external IP changes every time the node is recreated.</li>
+<li><strong>Don't trust an image "ID" as a pull target.</strong> <code>sha256:2a4a1f82…</code> from <code>docker images</code> is a config-blob ID, not a manifest digest; <code>docker pull</code> by it fails with <code>unexpected media type</code>. The version string is the better handle — <code>0.26.1rc1.dev125+g**a7a204cc6**</code> embeds vLLM's git SHA, so you can read the exact source your build shipped.</li>
+<li><strong>Upstream flags E2B's correctness tests as failing.</strong> tpu-inference's own support table marks <code>gemma-4-E2B-it</code> ✅ unit / ❌ correctness / ❓ performance, while the 26B and 31B pass all three. My own quality probes were clean (8/9 byte-identical outputs, 3/3 needle retrievals at 2K/8K/14K), but you should know the flag exists.</li>
+<li><strong>The TPU config docs at <code>docs.vllm.ai/en/v0.11.1/configuration/tpu/</code> are excellent and partly stale.</strong> Their headline <code>VLLM_TPU_MOST_MODEL_LEN</code> recommendation no longer exists in either vLLM or tpu-inference. Check the version before you copy.</li>
+</ul>
+<hr />
+<h2>What I'd do differently next time</h2>
+<p>Test the <em>whole</em> configuration, not a change to it. My final recommendation is a config that was never run end-to-end — it's the winning arm plus three pins that <em>should</em> be no-ops. Every time I assumed something was a no-op in this project, I was eventually proved wrong.</p>
+<p>Untested and plausibly better: <code>max-model-len 65536</code> (block_size would go to 128, blocks-per-request stays 512, so it may be free too), <code>max-num-batched-tokens 8192</code>, <code>VLLM_TPU_BUCKET_PADDING_GAP=128</code>, and <strong>n-gram speculative decoding</strong> — which needs no draft checkpoint and is marked fully passing on TPU, against a workload sitting at 49% of memory bandwidth.</p>

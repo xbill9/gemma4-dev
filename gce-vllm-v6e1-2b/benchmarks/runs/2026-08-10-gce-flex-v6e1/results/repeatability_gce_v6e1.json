@@ -1,0 +1,18 @@
+{
+  "arm": "gce-v6e1-32768-repeatability",
+  "purpose": "Noise floor for the GCE-vs-TPU-API comparison. Three back-to-back repeats of the three control cells on the live node, immediately after the main sweep, against a WARM prefix cache.",
+  "model": "google/gemma-4-E2B-it",
+  "accelerator": "tpu-v6e-1",
+  "control_plane": "compute-engine",
+  "zone": "europe-west4-a",
+  "provisioning_model": "flex-start",
+  "instance_name": "gce-vllm-v6e1-2b",
+  "vllm_build": "0.26.1rc1.dev256+gf5bb701fa",
+  "seed": 0,
+  "finding": "Repeatability is 0.01-0.14%, but the same cells measured 3.1-16.5% LOWER in the main sweep against a cold cache. Measurement noise is negligible; cache-state sensitivity is the dominant term and is what forbids attributing the 2% GCE/TPU-API gap to the control plane.",
+  "cells": [
+    {"input_len": 128,  "concurrency": 1,  "output_len": 128, "num_prompts": 16, "reps_out_tok_per_s": [209.26, 209.25, 209.22], "spread_pct": 0.02, "main_sweep_cold_out_tok_per_s": 202.97, "warm_vs_cold_pct": 3.10},
+    {"input_len": 128,  "concurrency": 8,  "output_len": 128, "num_prompts": 24, "reps_out_tok_per_s": [1224.65, 1224.47, 1224.65], "spread_pct": 0.01, "main_sweep_cold_out_tok_per_s": 1127.27, "warm_vs_cold_pct": 8.64},
+    {"input_len": 1024, "concurrency": 16, "output_len": 128, "num_prompts": 48, "reps_out_tok_per_s": [1809.48, 1810.31, 1811.97], "spread_pct": 0.14, "main_sweep_cold_out_tok_per_s": 1553.53, "warm_vs_cold_pct": 16.51}
+  ]
+}
