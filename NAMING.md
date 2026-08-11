@@ -83,16 +83,21 @@ consequences, none of which renames an existing rig:
   and the hardware slot already carries the SKU. Reserve `gce` for the TPU-on-Compute-Engine case; a GPU rig
   is `gpu` wherever it runs.
 
-**In practice only v5p, v6e and TPU7x can take `gce`.** Google's Compute Engine machine-types page
-enumerates exactly those three and never mentions v5e, so a `gce-*-v5e1-*` rig is not currently buildable
-and the six v5e rigs stay `tpu`.
+**Only v5p, v6e and TPU7x can take `gce`, and for v5e that is now verified rather than inferred.**
+`gcloud compute instances create --machine-type=ct5lp-hightpu-1t` was run on 2026-08-11 and rejected at
+validation with `This user agent is not allowed to use the machine type [ct5lp-hightpu-1t]` — free,
+conclusive, nothing created. So a `gce-*-v5e1-*` rig **is not buildable**, and the six v5e rigs stay `tpu`.
 
-Note this is a documented exclusion, **not a verified one**, and the catalog muddies it: `ct5lp-hightpu-1t`
-and friends do exist as machine types in 26 zones, the shared OS image family is named for v5e, and there is
-a Compute Engine v5-lite quota id. All three are explainable by the Cloud TPU API being implemented on
-Compute Engine underneath. An earlier revision of this file argued from the missing `ct5lp-*-tpu` shape;
-that argument was wrong, because the *bare* shapes are the documented creatable ones. `@HARDWARE.md` has the
-evidence table and the one command that would settle it.
+The catalog still muddies this and always will: `ct5lp-hightpu-1t` and friends do exist as machine types in
+26 zones, the shared OS image family is named for v5e, and there is a Compute Engine v5-lite quota id. All
+three are artefacts of the Cloud TPU API and GKE being implemented on Compute Engine underneath — none was
+evidence, and the run settled it. **Do not re-derive a `gce` v5e rig from the catalog.** An earlier revision
+argued the opposite way, from the missing `ct5lp-*-tpu` shape; that argument was also wrong, because the
+*bare* shapes are the documented creatable ones. `@HARDWARE.md` §"Can v5e use the Compute Engine path?" has
+the verbatim error and why its wording rules out zone and quota as explanations.
+
+`gce-vllm-v5e1-2b` exists as the apparatus that settled this, and is the one rig here expected never to
+provision. Keep it, and keep its name.
 `@HARDWARE.md` has the generation table.
 
 ## Slot 2 — runtime

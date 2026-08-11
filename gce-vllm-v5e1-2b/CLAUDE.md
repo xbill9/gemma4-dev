@@ -12,38 +12,59 @@ endpoint on port 8000.
 Created 2026-08-10 by porting `gce-vllm-v6e1-2b` (itself created that day) onto v5e. **Nothing here has
 ever provisioned anything.**
 
-## ⚠️ Read this before spending money: v5e may not have this path at all
+## ⚠️ SETTLED 2026-08-11: v5e does not have this path. This rig cannot provision.
 
-Every other rig in this monorepo serves a chip on a control plane that is known to work for it. This one
-does not. **Whether `gcloud compute instances create --machine-type=ct5lp-hightpu-1t` is accepted is an open
-question, and this rig is the apparatus for settling it** — not a deployment path with a track record.
+**The experiment was run and the answer is no.** `create_tpu_instance` was invoked in `us-west4-a` with
+`FLEX_START` and `MAX_RUN_DURATION=1h`. gcloud rejected it at validation:
 
-The evidence, in full, as of 2026-08-10:
+```
+gcloud compute instances create gce-vllm-v5e1-2b --zone=us-west4-a \
+  --machine-type=ct5lp-hightpu-1t --image-family=ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e \
+  --image-project=ubuntu-os-accelerator-images --provisioning-model=FLEX_START ...
 
-| Signal | Reading |
-| :--- | :--- |
-| Google's [v5e page](https://docs.cloud.google.com/tpu/docs/v5e): *"TPU v5e is supported using Google Kubernetes Engine and the Cloud TPU API"* | **against** — Compute Engine is not named |
-| The CE machine-types page enumerates TPU7x, v6e, v5p; `ct5lp` appears nowhere on it | **against** — explicit |
-| That same v5e page documents `ct5lp-hightpu-1t` as a VM type, 24 vCPU / 48 GB | for |
-| `ct5lp-hightpu-{1,4,8}t` are real machine types in **26 zones**, `us-west4-a` among them | for |
-| Image family is literally `ubuntu-accel-2204-amd64-tpu-**v5e**-v5p-v6e` | for |
-| `TPU-LITE-PODSLICE-V5-per-project-zone` is a **compute.googleapis.com** quota | for |
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+ - This user agent is not allowed to use the machine type [ct5lp-hightpu-1t].
+```
 
-**Every "for" signal has one innocent explanation.** The Cloud TPU API and GKE are both implemented *on*
-Compute Engine: their TPU VMs are GCE instances, booting GCE images, drawing on GCE quota. GKE in
-particular consumes `ct5lp-*` by name when you create a node pool — which is exactly why the machine type
-is documented on a page that does not offer a `gcloud compute instances` path. So all four positives are
-what you would see whether or not `instances create` takes the type directly.
+Nothing was created and nothing billed. **This rig has now done the one job it existed for.** Do not run the
+create again expecting a different result, and do not treat a failure elsewhere in the codebase as a reason
+to retry it.
 
-The working answer is therefore **no**, and it is a documented-but-unattempted no.
+**The error wording is the finding, not just the failure.** It is not "no capacity in this zone" and not a
+quota denial — the two outcomes this rig's own docs said to distinguish. The API surface refuses the machine
+type outright, so:
 
-**It is cheap to settle.** One `create_tpu_instance` (or `make deploy-tpu`) does it: a rejection at
-validation is free and conclusive, an acceptance bills until deleted. When someone runs it, record the
-result in `@../HARDWARE.md` (§"Can v5e use the Compute Engine path?") and `@../NAMING.md` (which currently
-says a `gce-*-v5e1-*` rig "is not currently buildable") — it decides whether **six** v5e rigs have a
-migration path at all. Do not quietly delete either claim; correct it with the evidence.
+- **The zone question is moot.** `us-west4-a` was never reached as a consideration; the same error is
+  expected in all 26 zones publishing `ct5lp-hightpu-1t`. The old worry that a rejection here might be
+  `us-west4-a`-specific does not apply to this error text.
+- **It is v5e-specific, not a project-wide GCE problem.** Same project, same command shape, v6e:
+  `gce-vllm-v6e1-2b  europe-west4-a  ct6e-standard-1t  RUNNING  FLEX_START`. Compute Engine TPU provisioning
+  works in this project. v5e alone is excluded.
+- **"User agent" means the calling surface.** GKE requests `ct5lp-*` by name for a node pool and is allowed
+  to; `gcloud compute instances create` is not. That is why the machine type is documented on a page which
+  offers no `gcloud compute instances` path.
 
-Everything below is written as if the answer is yes, because that is the only way to run the experiment.
+All four "for" signals in the old evidence table had one innocent explanation, and it was the right one. A
+fifth turned up the same day and is worth naming because it looks stronger than it is: the
+[TPU OS images page](https://docs.cloud.google.com/tpu/docs/tpu-os-images) frames
+`ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e` as an image for creating a TPU VM *using Compute Engine*. It never
+names a machine type, never shows an `instances create` example, and never says `ct5lp` — and the family is
+shared with v5p and v6e, which do have the path. **It is not evidence about v5e.**
+
+**A free instance-template probe is not a substitute for the create, and nearly misled this investigation.**
+`gcloud compute instance-templates create --machine-type=ct5lp-hightpu-1t` **succeeds** — while a bogus
+`ct5lp-hightpu-99t` control is correctly rejected with `must provide existing machine type`. So the
+insert-path property validator checks catalog existence only, and passes a machine type that `instances
+create` will refuse. Do not read a template acceptance as a green light.
+
+**Consequence: the six v5e rigs have no migration path off the deprecated Cloud TPU API**, and stay `tpu-*`.
+When that API is sunset, v5e capacity in this project is reachable only through GKE. Recorded in
+`@../HARDWARE.md` (§"Can v5e use the Compute Engine path?") and `@../NAMING.md`.
+
+**Keep this rig and keep its name.** It is the apparatus and the record. Everything below is written as if
+the answer were yes, which is what made the experiment runnable; read it as the design that was tested, not
+as a deployment path. The provisioning machinery is retained deliberately — if Google ever opens `ct5lp` to
+Compute Engine, re-running `create_tpu_instance` is the whole test.
 
 ## Keep the twin in step
 
@@ -269,9 +290,27 @@ away.
 **The boot disk default is 200 GB, and the image default of 10 GB cannot hold the vLLM TPU image.**
 Undersizing fails late, after boot, during the docker pull.
 
-**Pin the image FAMILY, never a dated build.** Images ship roughly weekly and every superseded build goes
-`DEPRECATED`. There is also an older family spelling, `ubuntu-accelerator-2204-amd64-with-tpu-v5e-v5p-v6e` —
-use the `ubuntu-accel-…` form.
+**Pin the image FAMILY, never a dated build.** Images ship roughly weekly — 20 builds of
+`ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e` are published, latest `-v20260803`, and
+`describe-from-family` resolves the current one for you.
+
+Corrected 2026-08-11: this used to say "every superseded build goes `DEPRECATED`". **It does not.** All 20
+builds list `READY` under `--show-deprecated`, and `describe-from-family` returns an empty
+`deprecated.state`. Pinning the family is still right — you just get the newest build automatically rather
+than avoiding a deprecation.
+
+The [TPU OS images page](https://docs.cloud.google.com/tpu/docs/tpu-os-images) publishes exactly two current
+families, and this rig pins the only v5e-capable one:
+
+| Family | Chips | OS / kernel |
+| :--- | :--- | :--- |
+| `ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e` | v6e, v5p, v5e | Ubuntu 22.04 / 6.8 |
+| `ubuntu-accel-2404-amd64-tpu-tpu7x` | TPU7x (Ironwood) only | Ubuntu 24.04 / 6.17 |
+
+Both live in `ubuntu-os-accelerator-images`. There is also an older family spelling,
+`ubuntu-accelerator-2204-amd64-with-tpu-v5e-v5p-v6e`, whose last build is 2026-03-17 — use the
+`ubuntu-accel-…` form. **None of this bears on the v5e question above**: the image is shared with v5p and
+v6e, and the create never got as far as the image.
 
 **v5e publishes no `<name>-tpu` machine-type twin**, unlike v6e (`ct6e-standard-1t-tpu`) and v5p
 (`ct5p-hightpu-1t-tpu`). So there is exactly one string to choose and `MACHINE_TYPE` has no ambiguity to

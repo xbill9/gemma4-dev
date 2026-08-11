@@ -120,8 +120,80 @@ The Compute Engine ids are also asymmetrical, which no amount of analogy from th
 
 | Model | Quota id | Scope |
 | :--- | :--- | :--- |
-| on-demand, flex-start | `TPUS-PER-TPU-FAMILY-per-project-region` | **regional**, dimensioned by `(region, tpu_family=CT6E)` |
-| spot | `PREEMPTIBLE-TPU-V6E-per-project-zone` | **per-zone** |
+| **flex-start** | `PREEMPTIBLE-TPU-V6E-per-project-region`, then the family quota as **fallback** | preemptible pool first |
+| spot | `PREEMPTIBLE-TPU-V6E-per-project-region` | preemptible pool |
+| on-demand (`STANDARD`) | `TPUS-PER-TPU-FAMILY-per-project-region` | **regional**, dimensioned by `(region, tpu_family=CT6E)` |
+
+**Flex-start spends the PREEMPTIBLE quota, not the family quota** — corrected 2026-08-11, an
+earlier version of this file had it the other way round and the error propagated into `tpu.env`
+and a draft article. Google's
+[provisioning models](https://docs.cloud.google.com/compute/docs/instances/provisioning-models)
+page states it in full, and the second sentence is the one people miss:
+
+> When you create a Flex-start VM, preemptible quota is consumed. If your project lacks
+> preemptible quota, then standard quota is consumed.
+
+This is counterintuitive because flex-start is not preemptible in behaviour — once granted it
+runs uninterrupted for up to seven days — so nothing in the flag names hints at it. **This rig
+defaults to flex-start, so `PREEMPTIBLE-TPU-V6E-per-project-region` is what gates it in
+practice — but a region is usable if EITHER pool has room, so never write one off on a single
+listing.** This file has had the mapping wrong twice: first grouping flex-start with on-demand,
+then claiming it spends preemptible and *not* the family quota. Both were wrong.
+
+Do not try to determine this experimentally; a day was spent on that before the docs were found.
+A `FLEX_START` create short of quota is **accepted and queues** rather than erroring, and a
+capacity stockout produces the identical `PENDING`, so the create is not a quota probe.
+
+**The two ids carry opposite defaults**, which is what makes misreading them costly: a region
+absent from the family quota inherits **0**, a region absent from the preemptible quota inherits
+**1536**. Reading only the family listing writes off regions that have ample flex-start headroom.
+The per-zone spelling `PREEMPTIBLE-TPU-V6E-per-project-zone` exists but holds no entries in this
+project — the per-region one has the values.
+
+**Quota held on the Compute Engine path, verified 2026-08-11** (regions publishing `ct6e-standard-1t`):
+
+| region | flex-start / spot | on-demand |
+| :--- | ---: | ---: |
+| europe-west4 + 7 others | 1536 | 32 |
+| us-east1 | 1536 | 32 |
+| us-central1, us-west1 | 1536 | 0 |
+| us-east5 | **32** | 32 |
+| us-east4 | 0 | 0 |
+
+**Do not re-request the denied quotas, and do not try a smaller number.** All five denials were
+retried on 2026-08-11 and denied again, identically and within seconds: us-central1 family,
+us-west1 family, us-east4 family, us-east4 preemptible, and us-east5 preemptible 32 -> 1536.
+Four were then retried at **8 chips instead of 32** and denied again, with no partial grant.
+Three sizes have been tested — 8, 32 and 1536 — and the outcome tracked the REGION every time,
+never the number. These are stable refusals, not transient ones, and the ask size is not the
+variable. Consistent with the denials being capacity-driven: a region with no chips to give has
+none to give at 8 either. In particular us-east5's 32 looks like an error to correct — every other live
+region has 1536 — and it is not. That region gives 32 whatever you ask for, and 32 is 32x what this single-chip
+rig uses.
+
+**QUOTA IS A CEILING, NOT AN ALLOCATION — capacity is the real constraint.** Every zone probed
+on 2026-08-11 held 1536 chips of preemptible quota and four of five had no hardware:
+
+| zone | quota | spot create |
+| :--- | ---: | :--- |
+| europe-west4-a | 1536 | provisioned |
+| us-central1-a | 1536 | `reason: stockout` |
+| us-central1-b | 1536 | provisioned, then stocked out a minute later |
+| us-central1-c | 1536 | `reason: stockout` |
+| us-west1-c | 1536 | `reason: stockout` |
+
+`us-central1-b` is the one to remember: a spot instance came up, was deleted, and a flex-start
+request a minute later was refused for stockout. **Availability moves faster than a controlled
+test can track**, so do not plan around a zone having capacity because it had some earlier.
+A SPOT create is the cheap probe — it fails fast with `reason: stockout` where flex-start queues.
+
+**Grants are a property of the region, not of the number requested.** The identical 0 → 32 ask was
+approved in us-east5 and us-east1 and denied in us-central1, us-west1 and us-east4. Eleven
+requests total: 3 approved, 5 denied, 3 refused at submission for being decreases
+(`FAILED_PRECONDITION: ... decreases effective quota unsafely` — you cannot ask for less than you
+hold, and because the two ids have different defaults, one blanket number is wrong about half the
+time). Every decision returned in seconds. Use `../request-quota.sh`, which reads the current
+value per metric before asking.
 
 There is **no non-preemptible per-zone v6e id at all** — `TPU-V6E-per-project-zone` does not exist, though
 `TPU-V5P-per-project-zone` and `TPU-LITE-PODSLICE-V5-per-project-zone` do. An unset family quota reads

@@ -105,11 +105,25 @@ BOOT_DISK_SIZE_GB = os.getenv("BOOT_DISK_SIZE_GB", "200")
 # and **no stated CT6E value** under Compute Engine.
 TPU_QUOTA_ID = os.getenv("TPU_QUOTA_ID", "TPUV6EPerProjectPerZoneForTPUAPI")
 TPU_SPOT_QUOTA_ID = os.getenv("TPU_SPOT_QUOTA_ID", "TPUV6EPreemptiblePerProjectPerZoneForTPUAPI")
-# What Compute Engine actually meters. Note the asymmetry: on-demand and flex-start draw on a
-# *regional, family-wide* quota dimensioned by (region, tpu_family=CT6E), while spot has its
-# own *per-zone* v6e id. There is no non-preemptible per-zone v6e id at all.
+# What Compute Engine actually meters.
+#
+#   FLEX_START -> GCE_SPOT_QUOTA_ID first, GCE_QUOTA_ID as FALLBACK
+#   SPOT       -> GCE_SPOT_QUOTA_ID  (the preemptible pool)
+#   STANDARD   -> GCE_QUOTA_ID       (regional, family-wide, tpu_family=CT6E)
+#
+# FLEX-START SPENDS THE PREEMPTIBLE QUOTA FIRST AND FALLS BACK TO THE STANDARD ONE. Google's
+# https://docs.cloud.google.com/compute/docs/instances/provisioning-models states it in full:
+#   "When you create a Flex-start VM, preemptible quota is consumed. If your project lacks
+#    preemptible quota, then standard quota is consumed."
+# Counterintuitive, since flex-start is not preemptible in behaviour — once granted it runs
+# uninterrupted. Corrected twice: this file first grouped flex-start with on-demand (wrong),
+# then said it spends preemptible and NOT the family quota (also wrong — the family quota is
+# the documented fallback). A flex-start zone is usable if EITHER pool has room.
+#
+# The preemptible id is used at REGION scope. The per-zone spelling exists but carries no
+# entries in this project; the per-region one holds the values.
 GCE_QUOTA_ID = os.getenv("GCE_QUOTA_ID", "TPUS-PER-TPU-FAMILY-per-project-region")
-GCE_SPOT_QUOTA_ID = os.getenv("GCE_SPOT_QUOTA_ID", "PREEMPTIBLE-TPU-V6E-per-project-zone")
+GCE_SPOT_QUOTA_ID = os.getenv("GCE_SPOT_QUOTA_ID", "PREEMPTIBLE-TPU-V6E-per-project-region")
 GCE_TPU_FAMILY = os.getenv("GCE_TPU_FAMILY", "CT6E")
 TENSOR_PARALLEL_SIZE = int(os.getenv("TENSOR_PARALLEL_SIZE", "1"))
 
@@ -122,6 +136,11 @@ PROVISIONING_MODEL = os.getenv("PROVISIONING_MODEL", "flex-start")
 # How long to wait for flex-start capacity, and how long the VM may run once granted.
 REQUEST_VALID_FOR = os.getenv("REQUEST_VALID_FOR", "2h")
 MAX_RUN_DURATION = os.getenv("MAX_RUN_DURATION", "4h")
+# The reservation RESERVATION_BOUND consumes. Empty by default because this project holds no
+# future reservation; a calendar-mode one is created out of band with
+# `gcloud compute future-reservations create --reservation-mode=CALENDAR`, and is pinned to
+# the zone it was reserved in. Only ever read for provisioning_model='reservation-bound'.
+RESERVATION_NAME = os.getenv("RESERVATION_NAME", "")
 
 # Cloud Billing Catalog service id for Compute Engine, which is where the TPU SKUs live.
 COMPUTE_BILLING_SERVICE_ID = "6F81-5844-456A"
@@ -298,6 +317,7 @@ def _provisioning_flags(
     provisioning_model: str,
     max_run_duration: Optional[str] = None,
     request_valid_for: Optional[str] = None,
+    reservation_name: Optional[str] = None,
 ) -> list[str]:
     """The gcloud flags that select how a Compute Engine instance asks for capacity.
 
@@ -317,7 +337,12 @@ def _provisioning_flags(
       documented as the FLEX_START wait knob specifically — how long to keep asking, not
       how long to run.
     - **RESERVATION_BOUND has no Queued Resource equivalent.** It consumes a calendar or
-      dense-deployment reservation for that reservation's whole duration.
+      dense-deployment reservation for that reservation's whole duration. gcloud accepts the
+      model only when the instance targets a *specific* reservation, and
+      `--reservation-affinity` defaults to `any` — so the model alone is not a complete
+      request and `reservation_name` is effectively required for it. Callers validate that;
+      here a missing name just omits the affinity pair rather than emitting a half-formed
+      `--reservation=`.
 
     Nothing here is verified by a successful creation — see this rig's CLAUDE.md.
     """
@@ -336,7 +361,11 @@ def _provisioning_flags(
     if provisioning_model == "on-demand":
         return ["--provisioning-model=STANDARD", *stop_flags, labelled("on-demand")]
     if provisioning_model == "reservation-bound":
-        return ["--provisioning-model=RESERVATION_BOUND", labelled("reservation-bound")]
+        # No stop flags: the instance runs for the reservation's whole duration by
+        # definition, so a --max-run-duration would contradict the model.
+        reservation = reservation_name or RESERVATION_NAME
+        affinity = ["--reservation-affinity=specific", f"--reservation={reservation}"] if reservation else []
+        return ["--provisioning-model=RESERVATION_BOUND", *affinity, labelled("reservation-bound")]
     return [
         "--provisioning-model=FLEX_START",
         f"--request-valid-for-duration={valid_for}",
@@ -346,7 +375,12 @@ def _provisioning_flags(
 
 
 def _quota_id_for(provisioning_model: str) -> str:
-    """Spot draws on the separate preemptible quota; flex-start and on-demand share TPU_QUOTA_ID."""
+    """Maps a provisioning model to a **Cloud TPU API** quota id (TPU_QUOTA_ID / TPU_SPOT_QUOTA_ID).
+
+    TPU API only — used when reporting the sibling rig's pools. **Do not read this as the
+    Compute Engine rule, which is different**: there, flex-start spends the *preemptible*
+    quota alongside spot, and only on-demand draws on the family quota. See GCE_QUOTA_ID.
+    """
     return TPU_SPOT_QUOTA_ID if provisioning_model == "spot" else TPU_QUOTA_ID
 
 
@@ -431,6 +465,7 @@ async def _create_tpu_instance(
     zone: str,
     provisioning_model: str = PROVISIONING_MODEL,
     machine_type: str = MACHINE_TYPE,
+    reservation_name: Optional[str] = None,
 ) -> tuple[bool, str]:
     """Renders the startup script and issues the `compute instances create` call.
 
@@ -450,6 +485,19 @@ async def _create_tpu_instance(
         return (
             False,
             f"❌ Aborted: unknown provisioning_model '{provisioning_model}'. Use one of {PROVISIONING_MODELS}.",
+        )
+
+    # Caught here rather than at the API: RESERVATION_BOUND without a specific reservation is
+    # rejected server-side after the startup script has already been rendered and uploaded,
+    # and the message you get back does not name the missing flag.
+    if provisioning_model == "reservation-bound" and not (reservation_name or RESERVATION_NAME):
+        return (
+            False,
+            "❌ Aborted: 'reservation-bound' must name the reservation it consumes. Pass "
+            "reservation_name=, or set RESERVATION_NAME in tpu.env. Create one first with "
+            "`gcloud compute future-reservations create <name> --reservation-mode=CALENDAR "
+            "--tpu-version=V6E --chip-count=1 --workload-type=SERVING --planning-status=SUBMITTED "
+            "--require-specific-reservation`, and note it is pinned to the zone it was reserved in.",
         )
 
     # Pre-flight only: confirm the secret exists before spending scarce Flex-start
@@ -479,7 +527,7 @@ async def _create_tpu_instance(
             f"--boot-disk-size={BOOT_DISK_SIZE_GB}GB",
             "--scopes=cloud-platform",
             f"--metadata-from-file=startup-script={script_file}",
-            *_provisioning_flags(provisioning_model),
+            *_provisioning_flags(provisioning_model, reservation_name=reservation_name),
         ]
         if TPU_NETWORK:
             create_cmd.append(f"--network={TPU_NETWORK}")
@@ -508,8 +556,10 @@ async def _create_tpu_instance(
         if "TPUS_PER_TPU_FAMILY" in err or "tpus_per_tpu_family" in err:
             hint = (
                 f" (this is the Compute Engine quota `{GCE_QUOTA_ID}` for family {GCE_TPU_FAMILY} in "
-                f"{REGION} — a *different pool* from the TPU API quota the sibling rig uses, and it is "
-                "unset in us-east5. Request it in the Compute Engine quota page, not the TPU API one.)"
+                f"{REGION} — a *different pool* from the TPU API quota the sibling rig uses. "
+                "Request it on the Compute Engine quota page, not the TPU API one. Note this "
+                "family quota governs on-demand only; flex-start and spot spend "
+                f"`{GCE_SPOT_QUOTA_ID}` instead.)"
             )
         return False, f"❌ Creation failed: {err}{hint}"
 
@@ -517,7 +567,10 @@ async def _create_tpu_instance(
         "flex-start": f"Self-terminates and deletes after {MAX_RUN_DURATION}.",
         "spot": f"⚠️ Preemptible with ~30s notice; also set to delete at {MAX_RUN_DURATION}.",
         "on-demand": f"⚠️ Bills at the full rate; set to delete at {MAX_RUN_DURATION}.",
-        "reservation-bound": "⚠️ Runs for the whole duration of its reservation — no automatic stop.",
+        "reservation-bound": (
+            f"⚠️ Bound to reservation `{reservation_name or RESERVATION_NAME}`; runs for that "
+            "reservation's whole duration — no automatic stop."
+        ),
     }[provisioning_model]
     return True, (
         f"🚀 Instance {instance_name} ({machine_type}) creation initiated in {zone} "
@@ -934,6 +987,7 @@ async def create_tpu_instance(
     zone: str = ZONE,
     provisioning_model: str = PROVISIONING_MODEL,
     machine_type: str = MACHINE_TYPE,
+    reservation_name: str = "",
 ) -> str:
     """Creates a TPU instance on Compute Engine in the given zone. Non-destructive.
 
@@ -944,13 +998,18 @@ async def create_tpu_instance(
     provisioning_model is one of:
       * 'flex-start' (default) — `FLEX_START`, queues for scarce capacity via Dynamic
         Workload Scheduler, then self-deletes at max-run-duration.
-      * 'spot' — `SPOT`, reclaimable with ~30s notice, metered by the separate
-        `PREEMPTIBLE-TPU-V6E-per-project-zone` Compute Engine quota. In us-east5 v6e spot
-        lists *dearer* than flex-start; read `estimate_deployment_cost` rather than
-        assuming.
+      * 'spot' — `SPOT`, reclaimable with ~30s notice. Metered by
+        `PREEMPTIBLE-TPU-V6E-per-project-region`, the same pool flex-start spends. In
+        us-east5 v6e spot lists *dearer* than flex-start; read `estimate_deployment_cost`
+        rather than assuming.
       * 'on-demand' — `STANDARD`, full price, no preemption.
       * 'reservation-bound' — `RESERVATION_BOUND`, consumes a calendar or dense-deployment
-        reservation. **No Queued Resource equivalent** — this model exists only here.
+        reservation. **No Queued Resource equivalent** — this model exists only here. It
+        needs `reservation_name` (or `RESERVATION_NAME` in tpu.env): gcloud accepts the model
+        only alongside `--reservation-affinity=specific`, and a calendar reservation is
+        pinned to the zone it was reserved in, so `zone` has to match it.
+
+    reservation_name is read only for 'reservation-bound' and ignored by every other model.
 
     Note this blocks for up to ~10 minutes on flex-start while gcloud waits for capacity.
     """
@@ -962,10 +1021,12 @@ async def create_tpu_instance(
             return f"✅ Instance {instance_name} already exists in {zone} and is {status}. Nothing created."
         logger.info(f"Instance {instance_name} is {status}. Deleting it so it can be recreated.")
         await destroy_tpu_instance(instance_name, zone=zone)
-        _, msg = await _create_tpu_instance(instance_name, zone, provisioning_model, machine_type)
+        _, msg = await _create_tpu_instance(
+            instance_name, zone, provisioning_model, machine_type, reservation_name or None
+        )
         return f"{msg} (replaced the previous {status} instance of the same name)"
 
-    _, msg = await _create_tpu_instance(instance_name, zone, provisioning_model, machine_type)
+    _, msg = await _create_tpu_instance(instance_name, zone, provisioning_model, machine_type, reservation_name or None)
     return msg
 
 
@@ -1023,13 +1084,23 @@ async def get_zones_with_available_quota(
 
     **The service defaults to `compute.googleapis.com`, not `tpu.googleapis.com`** — that is
     the whole point of this rig. The two control planes meter against different pools and
-    holding one buys you nothing on the other. Verified 2026-08-10: this project holds 512
-    v6e chips in us-east5 under `TPUV6EPerProjectPerZoneForTPUAPI`, and **no stated value**
-    for family CT6E under the Compute Engine quota this path actually consumes.
+    holding one buys you nothing on the other. Verified 2026-08-10: this project held 512
+    v6e chips in us-east5 under `TPUV6EPerProjectPerZoneForTPUAPI` and nothing at all for
+    family CT6E under the Compute Engine quota this path consumes. (us-east5 CT6E has since
+    been granted 32; the point about the pools being disjoint stands.)
 
-    Note the two Compute Engine ids are not symmetrical: on-demand and flex-start draw on a
-    *regional, family-wide* quota dimensioned by (region, tpu_family), while spot has its
-    own *per-zone* v6e id. There is no non-preemptible per-zone v6e id at all.
+    **The two Compute Engine ids split by provisioning model, not by preemptibility of
+    behaviour.** flex-start and spot spend `GCE_SPOT_QUOTA_ID`; only on-demand goes straight
+    to the *regional, family-wide* `GCE_QUOTA_ID` dimensioned by (region, tpu_family).
+
+    **For flex-start the family quota is a documented fallback**, so this tool's answer is a
+    primary-pool answer, not a verdict: "When you create a Flex-start VM, preemptible quota
+    is consumed. If your project lacks preemptible quota, then standard quota is consumed."
+    A flex-start zone is usable if EITHER pool has room, so check both before concluding.
+
+    Their defaults are opposite — a region absent from the family quota inherits 0, one
+    absent from the preemptible quota inherits 1536 — so reading only one listing writes off
+    regions that are in fact usable.
 
     Non-zero quota still does NOT mean the zone will accept the request — it is a ceiling,
     not an offer of capacity. See this rig's CLAUDE.md on the three gates.
@@ -1046,14 +1117,21 @@ async def get_zones_with_available_quota(
         if service.startswith("tpu."):
             quota_id = _quota_id_for(provisioning_model)
         else:
-            quota_id = GCE_SPOT_QUOTA_ID if provisioning_model == "spot" else GCE_QUOTA_ID
+            # flex-start and spot both spend the PREEMPTIBLE pool first; only on-demand
+            # goes straight to the family quota. Reported id is the PRIMARY one — for
+            # flex-start the family quota is a documented fallback, so a zone showing zero
+            # here may still be usable. The caller is told so below.
+            quota_id = GCE_QUOTA_ID if provisioning_model == "on-demand" else GCE_SPOT_QUOTA_ID
     zones = await _get_zones_with_available_quota_list(service, quota_id)
     if not zones:
         return (
             f"No zones/locations found with a non-zero quota limit for `{quota_id}` on `{service}`.\n\n"
             "⚠️ For the Compute Engine ids this is the expected result in regions where the quota has "
             "never been requested — an unset family quota reads the same as a zero one here. It does "
-            "**not** mean the hardware is absent; check `machine-types list` for that."
+            "**not** mean the hardware is absent; check `machine-types list` for that.\n\n"
+            f"⚠️ For **flex-start** this is not a verdict either: `{GCE_SPOT_QUOTA_ID}` is only the "
+            f"pool it draws on *first*, and `{GCE_QUOTA_ID}` is the documented fallback. Check that "
+            "one too before concluding a region is unusable."
         )
 
     output = [f"### 📊 Zones with quota for `{quota_id}` (`{service}`)\n"]
@@ -1143,11 +1221,9 @@ async def find_tpu(
     Finds a zone offering the TPU machine type and attempts to create an instance there until successful.
 
     **The zone source differs from the sibling rig, because it has to.** That rig sweeps
-    zones with non-zero TPU API quota, which is zonal. The Compute Engine quota this path
-    consumes for on-demand and flex-start is *regional* and dimensioned by tpu_family, so it
-    cannot produce a zone list at all — and it is unset in us-east5 besides. So the sweep is
-    driven by where the machine type is published, which is the stronger gate-1 signal
-    anyway.
+    zones with non-zero TPU API quota, which is zonal. Both Compute Engine TPU quotas are
+    *regional*, so neither can produce a zone list. So the sweep is driven by where the
+    machine type is published, which is the stronger gate-1 signal anyway.
 
     provisioning_model is one of 'flex-start' (default), 'spot', 'on-demand', or
     'reservation-bound'. The sweep is non-destructive: it only touches the named resource_id.

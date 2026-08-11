@@ -254,15 +254,45 @@ only through Compute Engine or GKE."*
 
 ### Which generation has which control plane
 
-| Generation | Cloud TPU API (`gcloud compute tpus …`) | Compute Engine (`gcloud compute instances …`) | GCE machine types |
+| Generation | Cloud TPU API (`gcloud compute tpus …`) | Compute Engine (`gcloud compute instances …`) | GCE machine types **published** |
 | :--- | :---: | :---: | :--- |
-| v5e | yes | **no** | — |
+| v5e | yes | **no** (create refused) | `ct5lp-hightpu-1t`, `-4t`, `-8t` — **26 zones, and unusable from this path** |
 | v5p | yes | yes | `ct5p-hightpu-1t-tpu`, `-2t-tpu`, `-4t` |
 | v6e | yes | yes | `ct6e-standard-1t`, `-4t`, `-8t` (each also as `-…-tpu`) |
-| v7 / TPU7x | **no** | yes | — |
+| v7 / TPU7x | **no** | yes | `tpu7x-standard-4t` |
 
-**v5e is the one generation with no exit.** The CE path's own limitations page lists "v5p, v6e, and TPU7x";
-v5e is absent. So `tpu-vllm-v5e1-2b` (the live-demo rig), `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-2b`,
+**The last column is what the catalog publishes, not what you can create.** For v5e those are different
+things, and an earlier version of this table wrote `—` in that cell — which was wrong twice over: the
+machine types do exist, and their existing is not evidence of a path.
+
+**v5e is the one generation with no exit, and this is now measured rather than inferred.** Probed
+2026-08-11 with `instances create --machine-type=ct5lp-hightpu-1t` in `us-east1-b`, a zone that publishes
+the type, deliberately chosen because `TPU_LITE_PODSLICE_V5` there is **0** so the create could not
+succeed even if accepted:
+
+```
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+ - This user agent is not allowed to use the machine type [ct5lp-hightpu-1t].
+```
+
+**That is not a quota error**, which is what a zero-quota zone would otherwise produce, and it is not a
+does-not-exist error either. The type is refused to this caller. The control is the same command shape with
+`ct6e-standard-1t`, which provisioned a live instance the same day.
+
+`ct5lp-*` is in the catalog because **GKE node pools are created with exactly those strings** — that is
+the consumer, and it explains the whole apparent contradiction: a v5e-covering image family
+(`ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e`), a `compute.googleapis.com` v5e quota metric
+(`TPU-LITE-PODSLICE-V5-per-project-zone`), v5e machine types in `machine-types list`, and no
+`instances create` path, all at once. The Cloud TPU API and GKE are themselves built on Compute Engine, so
+CE-shaped artifacts for v5e are expected whether or not `instances create` will take them. **Do not reason
+from catalog presence to creatability for any generation** — check it with a create into a zero-quota zone,
+which costs nothing and settles it.
+
+Note also that v5e publishes **no `-tpu` variant at all**, where v5p and v6e both do. Suggestive, not
+load-bearing: the bare forms are the documented creatable ones for v6e, so bare-vs-`-tpu` does not predict
+creatability and must not be used to argue this point.
+
+So `tpu-vllm-v5e1-2b` (the live-demo rig), `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-2b`,
 `tpu-pytorch-v5e1-12b` and the two v5e encoding rigs stay on the deprecated API for as long as they exist.
 v5p and v6e rigs can move; v7 rigs will have no choice.
 
@@ -313,31 +343,48 @@ machine-types page documents `ct6e-standard-{1,4,8}t` and `ct5p-hightpu-4t`, all
 the documented, directly-creatable ones; what the `-tpu` variants are for is not written down anywhere yet
 found. Record the exact string in `tpu.env`; they are not known to be interchangeable.
 
-### Can v5e use the Compute Engine path? Documented no, catalog ambiguous
+### Can v5e use the Compute Engine path? **No — verified 2026-08-11**
 
-Corrected 2026-08-10 — an earlier revision of this file called the missing `ct5lp-*-tpu` shape
-"machine-type-level confirmation" that v5e has no CE path. **That reasoning does not hold**, because the bare
-shapes are the creatable ones (above), so a missing `-tpu` variant proves nothing either way.
+**Settled by running it.** `gcloud compute instances create --machine-type=ct5lp-hightpu-1t` is rejected at
+validation, before any resource exists:
 
-The honest state of the evidence:
+```
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+ - This user agent is not allowed to use the machine type [ct5lp-hightpu-1t].
+```
 
-| Signal | Reading |
-| :--- | :--- |
-| CE machine-types page enumerates "TPU7x, TPU v6e, TPU v5p" | **against** — explicit, and `ct5lp` appears nowhere on it |
-| `ct5lp-hightpu-1t` / `-4t` / `-8t` exist, `guestAcceleratorCount: 1`, in **26 zones** | for |
-| Image family is literally `ubuntu-accel-2204-amd64-tpu-**v5e**-v5p-v6e` | for |
-| `TPU-LITE-PODSLICE-V5-per-project-zone` is a **compute.googleapis.com** quota | for |
+Run from `gce-vllm-v5e1-2b` in `us-west4-a`, `FLEX_START`, image family
+`ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e`. Nothing was created and nothing billed.
 
-**The three "for" signals all have one innocent explanation: the Cloud TPU API is itself implemented on
-Compute Engine.** Its TPU VMs *are* GCE instances, booting GCE images and drawing on GCE capacity — so a
-v5e-covering image family, a v5e-shaped CE quota metric, and `ct5lp` machine types in the catalog are all
-exactly what you would see whether or not `gcloud compute instances create` accepts `ct5lp` directly.
+**Read the error text carefully — it is the useful part.** It is not "no capacity in this zone" and not a
+quota denial. The API surface refuses the machine type outright, so the rejection says nothing about
+`us-west4-a` and would repeat in all 26 zones. "User agent" here means the calling surface: `instances
+create` is not an allowed consumer of `ct5lp`, while GKE — which requests the same machine type by name for
+a node pool — is.
 
-So the explicit doc exclusion is the strongest evidence available, and the working answer stays **no**. But
-it is an unattempted claim, not a verified one, and it is **cheap to settle**: one
-`gcloud compute instances create --machine-type=ct5lp-hightpu-1t`. A rejection at validation is free and
-conclusive; an acceptance bills until deleted. Nobody has run it. If it ever is, record the result here — it
-decides whether six v5e rigs have a migration path at all.
+**The rejection is v5e-specific, not a project-wide GCE problem.** Same project, same command shape, v6e:
+`gce-vllm-v6e1-2b  europe-west4-a  ct6e-standard-1t  RUNNING  FLEX_START`. So the Compute Engine path is
+live here; v5e alone is excluded from it.
+
+That confirms the documented exclusion, and retires the evidence table this section used to carry. All four
+"for" signals had one innocent explanation and it was the right one — the Cloud TPU API and GKE are both
+implemented *on* Compute Engine, so a v5e-covering image family, a v5e-shaped CE quota metric, `ct5lp` in
+the machine-type catalog, and the OS-images page framing those images as Compute Engine images are all
+exactly what you see whether or not `instances create` accepts `ct5lp`. None of them was evidence.
+
+Two corollaries worth keeping:
+
+- **Catalog presence is not creatability, and the insert-path validator does not distinguish them.** A free
+  `instance-templates create` probe with `--machine-type=ct5lp-hightpu-1t` **succeeds** (a bogus
+  `ct5lp-hightpu-99t` control is correctly rejected with `must provide existing machine type`). So the
+  property validator only checks catalog existence. Do not read a template accepting a machine type as
+  evidence that an instance will.
+- Corrected 2026-08-10 and still true: the missing `ct5lp-*-tpu` shape was never the reason. The bare shapes
+  are the creatable ones (above), so that variant's absence proves nothing either way. The real answer came
+  from running the command.
+
+**The six v5e rigs therefore have no migration path off the deprecated Cloud TPU API**, and stay `tpu-*`.
+When the API is finally sunset, v5e capacity in this project is reachable only through GKE.
 
 **A single-chip v5p exists in the CE catalog** — `ct5p-hightpu-1t-tpu`, 52 vCPU / 112 GB / 1 chip — where the
 TPU API's floor is `v5p-8` at 4 chips. **`tpu-vllm-v5p1-2b` was built on it on 2026-08-10** and is the only

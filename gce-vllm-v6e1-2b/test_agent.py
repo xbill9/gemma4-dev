@@ -278,6 +278,32 @@ class TestProvisioningModel(unittest.IsolatedAsyncioTestCase):
         flags = _provisioning_flags("reservation-bound")
         self.assertFalse(any(f.startswith("--max-run-duration") for f in flags))
 
+    def test_reservation_bound_targets_a_specific_reservation(self):
+        """--reservation-affinity defaults to `any`; RESERVATION_BOUND requires `specific`."""
+        flags = _provisioning_flags("reservation-bound", reservation_name="cal-v6e-1")
+        self.assertIn("--reservation-affinity=specific", flags)
+        self.assertIn("--reservation=cal-v6e-1", flags)
+
+    def test_reservation_name_is_ignored_by_the_other_models(self):
+        """A reservation is only consumable through RESERVATION_BOUND."""
+        for model in ("flex-start", "spot", "on-demand"):
+            flags = _provisioning_flags(model, reservation_name="cal-v6e-1")
+            self.assertFalse(any(f.startswith("--reservation") for f in flags), model)
+
+    def test_no_reservation_name_emits_no_half_formed_flag(self):
+        """An empty --reservation= is a worse failure than an incomplete model gcloud rejects."""
+        flags = _provisioning_flags("reservation-bound")
+        self.assertNotIn("--reservation=", flags)
+        self.assertFalse(any(f.startswith("--reservation-affinity") for f in flags))
+
+    async def test_reservation_bound_without_a_name_aborts_before_gcloud(self):
+        """The server-side rejection lands after the startup script is rendered and uploaded."""
+        with patch("server.run_command", new=AsyncMock()) as run:
+            ok, msg = await server._create_tpu_instance("i", "europe-west4-a", "reservation-bound")
+        self.assertFalse(ok)
+        self.assertIn("reservation", msg.lower())
+        run.assert_not_awaited()
+
     def test_every_model_labels_its_owning_rig(self):
         for model in PROVISIONING_MODELS:
             flags = _provisioning_flags(model)
@@ -585,6 +611,45 @@ class TestNodeDiscovery(unittest.IsolatedAsyncioTestCase):
             await _discover_vllm_node()
 
         self.assertFalse(any("tpu-vm" in c for c in seen), f"discovery must not use tpu-vm: {seen}")
+
+    async def test_flex_start_is_metered_by_the_preemptible_quota(self):
+        """flex-start spends the PREEMPTIBLE pool, not the family quota.
+
+        This is documented, not inferred — the Compute Engine provisioning-models page says
+        "When you create a Flex-start VM, preemptible quota is consumed." It is easy to get
+        backwards because flex-start is not preemptible in behaviour, and this file did have
+        it backwards: flex-start was grouped with on-demand against the family quota. Since
+        this rig DEFAULTS to flex-start, that sent the default path at the wrong metric.
+
+        Only on-demand draws on the family quota.
+        """
+        seen = []
+
+        async def _fake(service, quota_id):
+            seen.append((service, quota_id))
+            return []
+
+        for model, expected in [
+            ("flex-start", server.GCE_SPOT_QUOTA_ID),
+            ("spot", server.GCE_SPOT_QUOTA_ID),
+            ("on-demand", server.GCE_QUOTA_ID),
+        ]:
+            seen.clear()
+            with patch("server._get_zones_with_available_quota_list", new=AsyncMock(side_effect=_fake)):
+                await server.get_zones_with_available_quota(service="compute.googleapis.com", provisioning_model=model)
+            self.assertEqual(seen[-1][1], expected, f"{model} must meter against {expected}")
+
+    async def test_the_preemptible_quota_id_is_region_scoped(self):
+        """The per-zone spelling exists but carries no entries in this project.
+
+        `PREEMPTIBLE-TPU-V6E-per-project-zone` returns a bare default of -1 and no per-zone
+        rows, while the per-region id holds the real values. Defaulting to the per-zone one
+        made every quota lookup return nothing.
+        """
+        self.assertTrue(
+            server.GCE_SPOT_QUOTA_ID.endswith("per-project-region"),
+            f"expected a region-scoped preemptible id, got {server.GCE_SPOT_QUOTA_ID}",
+        )
 
     async def test_no_remote_tool_reaches_the_vm_through_tpu_vm_ssh(self):
         """Discovery was pinned off the TPU API; the SSH tools were not, and had regressed.
