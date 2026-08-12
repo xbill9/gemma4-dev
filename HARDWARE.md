@@ -404,6 +404,72 @@ loop). Those are the likely first failures, not the machine type.
 
 - **v6e-1** — several benchmark artifacts in this repo were measured on v6e and travelled with forks.
   A report's hardware short-name is the hardware *measured*, not the rig hosting the file.
+- **L4** — the five `gpu-vllm-l4-*` artifact rigs. SM 8.9 (Ada), 24 GB. Their serving flags assume
+  native bf16 and fp8; see the T4G section below for why that does not generalize backwards.
+- **T4G** — see below. The only part here whose required build (aarch64 + SM 7.5) is not published.
+
+## T4G — NVIDIA Turing on an Arm host (EC2 G5g)
+
+Served by `gpu-vllm-g5g-2b`. Platform slot `gpu`, hardware slot **`g5g`** — the EC2 instance family
+rather than the GPU SKU, which is the one carve-out in `NAMING.md` to the "slot 3 is the GPU SKU" rule.
+Two reasons, both specific to this part: `t4g` collides with AWS's `t4g.*` Graviton2 **CPU** instances,
+and G5g is the only Graviton+GPU family AWS ships, so the family name maps 1:1 onto Graviton2 + T4G and
+pins the aarch64 host as well — which is half of what breaks here.
+
+**The chip is still a T4G**, and this section is about the chip. Only the directory slot is `g5g`.
+
+| | |
+| --- | --- |
+| Architecture | Turing, **compute capability 7.5** |
+| Memory | 16 GB GDDR6 |
+| Host | AWS Graviton2, **aarch64** |
+| GPUs per instance | 1 on `g5g.xlarge`–`8xlarge`; 2 on `g5g.16xlarge` and `g5g.metal` |
+
+### Native format support — the oldest part in this repo, and it shows
+
+| Format | T4G (SM 7.5) | L4 (SM 8.9), for contrast |
+| --- | :---: | :---: |
+| fp16 | **yes** | yes |
+| bf16 | **no** | yes |
+| fp8 | **no** | yes |
+| int8 | yes (Turing tensor cores) | yes |
+
+**bf16 arrives with Ampere (SM 8.0); fp8 with Ada/Hopper.** T4G predates both. This is the same shape
+of finding as the v5e/v6e rows at the top of this file — *quantization and dtype conclusions do not
+carry forward across generations* — except that here the direction is backwards: every other GPU rig
+in this monorepo targets L4 and hardcodes `--dtype bfloat16 --kv-cache-dtype fp8`, and both of those
+are unavailable one generation earlier. `--dtype bfloat16` on T4G is a hard failure, not a slow path.
+
+FlashAttention also requires SM 8.0+, so the Turing-capable vLLM attention backend is `XFORMERS`.
+
+### The packaging gap: aarch64 and SM 7.5 are not published together
+
+**This is the property that makes T4G unlike every other GPU here, and it is a fact about the
+ecosystem's binaries rather than about the silicon.** Read directly from the published image config of
+`vllm/vllm-openai:v0.27.1` on 2026-08-12 — one manifest list, two platforms:
+
+| Manifest | `NVARCH` | `TORCH_CUDA_ARCH_LIST` | SM 7.5? |
+| --- | --- | --- | :---: |
+| `linux/amd64` | `x86_64` | `7.5 8.0 8.6 8.9 9.0 10.0 12.0` | **yes** |
+| `linux/arm64` | `sbsa` | `8.0 8.7 8.9 9.0 10.0 11.0 12.0` | **no** |
+
+The arm64 build targets the ARM+NVIDIA parts that actually ship at volume — A100, Jetson Orin, GH200,
+Blackwell. T4G is the one combination that falls between the two images, and vLLM's Dockerfile sets
+**no `+PTX`** (deliberately, with a comment explaining that vLLM filters torch's global PTX flag), so
+there is no JIT fallback. The failure is `no kernel image is available for execution on the device`.
+
+The Dockerfile's *default* `torch_cuda_arch_list` does include 7.5 — the release pipeline overrides it
+per platform. So rebuilding the arm64 image with `--build-arg torch_cuda_arch_list=7.5` is the
+supported route, and it is what the rig's `serving='build'` path does.
+
+**One layer below that is not yet verified first-hand.** PyTorch's own aarch64/SBSA CUDA wheels appear
+to be built for 9.0/10.0/12.0, also without 7.5. If that holds, rebuilding vLLM is *necessary but not
+sufficient* and a from-source PyTorch is needed too. The rig's `verify_gpu_arch` tool measures it on a
+live instance (`torch.cuda.get_arch_list()` plus a real matmul) rather than settling it by argument;
+update this section when it runs. Detail in `gpu-vllm-g5g-2b/docs/turing-aarch64-gap.md`.
+
+CUDA 13 is **not** an additional obstacle: 13.0 dropped Maxwell, Pascal and Volta, and Turing survived
+that cut as the new floor. The toolchain can target this GPU; only the shipped binaries do not.
 
 ## inf2 — AWS Inferentia2
 

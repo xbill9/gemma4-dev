@@ -313,6 +313,7 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-jax-v6e1-12b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-jax-v6e1-26b-q4_0` | TPU | JAX | v6e-1 | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | `q4_0` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-jax-v6e1-31b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-31B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
+| `~/gemma4-dev/gpu-vllm-g5g-2b` | **EC2 G5g** (Graviton2 host) | vLLM | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — hardware slot is the instance family, not the GPU SKU; carve-out below |
 | `~/gemma4-dev/gpu-vllm-l4-2b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-4b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-12b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
@@ -390,6 +391,45 @@ heavily (82 report files, 20 unique) that a directory name there is not evidence
 served. Only reports whose own `Model:` and `Endpoint:` lines agreed were migrated — 10 of the 20.
 Filling slot 4 or slot 5 by reading a `~/gemma4-tips` directory name would have produced five rigs
 misattributed at once.
+
+### `g5g` — the one case where a family name beats the GPU SKU
+
+`gpu-vllm-g5g-2b` (added 2026-08-12) is the first `gpu` rig that is a **serving** rig rather than an
+artifact rig, and the first whose hardware is not an L4. Its hardware slot is the **EC2 instance
+family**, which every other rule in this file argues against. This is a deliberate carve-out, decided
+after both readings were written out; **do not "correct" it back to `t4g`.**
+
+The default reading would be `t4g`: the GPU is an NVIDIA **T4G**, slot 3 says "GPU SKU, lowercase, no
+punctuation," and `g5g` is an instance family — the same category as `ec2` and `cloudrun`, which this
+file excludes precisely because they say nothing about the silicon. Two facts beat it:
+
+- **`t4g` is already taken, by CPUs.** AWS ships `t4g.nano`…`t4g.2xlarge`: Graviton2 **burstable CPU**
+  instances with no GPU at all. They sit in the same instance-family namespace as `g5g` — AWS's own
+  Graviton inventory lists `T4g` and `G5g` side by side. So `t4g` is the one GPU SKU whose spelling
+  collides head-on with a well-known GPU-less instance type. `l4` and `a100` have no such problem, and
+  this is why the L4 rigs are not a precedent either way.
+- **`g5g` loses no information, because the family is 1:1 with the silicon.** The usual objection to a
+  family name is that it is lossy — `ec2` could be any chip. G5g is the **only** Graviton+GPU family
+  AWS has ever shipped, and there is no Graviton3 or Graviton4 GPU instance, so `g5g` names exactly
+  one CPU+GPU pairing: Graviton2 + T4G. It is a *more* specific claim than `t4g`, not a vaguer one,
+  because it pins the aarch64 host as well.
+
+That second point is what makes the carve-out earn its keep rather than merely be tolerable. **The
+host architecture is load-bearing on this rig in a way it is on no other.** The reason nothing here
+runs out of the box is that no published CUDA build covers aarch64 *and* SM 7.5 together
+(`@HARDWARE.md`). A slot value naming only the GPU would describe the half of the problem that is not
+the problem.
+
+Two limits on how far this generalizes:
+
+- **This does not reopen the cloud slot.** Cloud provider is still not a slot, and `ec2`, `cloudrun`
+  and `gce` are still not values for slot 3. What earns `g5g` its place is the 1:1 mapping to silicon,
+  which no cloud name has.
+- **It does not license a family name whenever one exists.** If AWS ever ships a second Graviton+GPU
+  family, `g5g` stops being 1:1 and the rig needs revisiting. Record that here if it happens.
+
+The chip keeps its own name everywhere it is the chip under discussion — `@HARDWARE.md`'s section is
+headed T4G, and so is the rig's `tpu.env`. Only the slot is `g5g`.
 
 **Predates the scheme — not counter-examples:**
 
