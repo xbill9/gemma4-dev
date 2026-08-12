@@ -34,6 +34,11 @@ coverage.xml
 # Local env config (non-secret, but machine-specific)
 .env
 
+# Live AWS credentials written by save-aws-creds.sh (mode 0600).
+# save-aws-creds.sh refuses to write anywhere inside a git work tree that is not
+# ignored, so removing this line does not just risk a leak — it breaks the script.
+.aws_creds
+
 # Build artifacts
 dist/
 

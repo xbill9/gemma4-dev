@@ -104,6 +104,27 @@ Never hardcode an AMI id here; resolve it at launch.
 - `verify_model_health` uses `/v1/chat/completions`. Raw `/v1/completions` returns an empty
   completion on `-it` models, so an empty body there is not evidence of a broken deploy.
 
+## AWS credentials
+
+`server.py` uses the standard boto3 provider chain, so whatever `aws sts get-caller-identity`
+resolves is what the rig gets. **When credentials expire, refresh them with
+`./save-aws-creds.sh`**, which re-exports the active credentials to `.aws_creds` at mode 0600.
+
+Three things about it that are easy to get wrong:
+
+- **It snapshots credentials, it does not mint them.** `aws configure export-credentials`
+  fails outright on an expired SSO session, so re-authenticate first (`aws sso login`) and
+  then run the script. Its error message says this; the failure otherwise reads as a broken
+  script rather than an expired login.
+- **It refuses to write anywhere inside a git work tree that is not gitignored.** `.aws_creds`
+  is in this rig's `.gitignore` for exactly that reason. Never remove that line and never
+  reach for `FORCE=1` — the guard is the thing keeping live keys out of a commit.
+- **Nothing in this rig reads `.aws_creds` automatically.** The script's closing message
+  ("the Makefile will now use these") is inherited from the legacy `~/gemma4-tips-aws` tree,
+  whose Makefile loaded the file; this rig's does not. The snapshot is for exporting into a
+  shell or handing to a container. For `server.py` itself the provider chain is enough, and
+  `AWS_PROFILE` is the supported way to pick a profile.
+
 ## Commands
 
 Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v`. They are

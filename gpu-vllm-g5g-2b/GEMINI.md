@@ -67,6 +67,19 @@ which boot fine on a G5g with no GPU. **Never hardcode an AMI id.**
 - `verify_model_health` uses `/v1/chat/completions` — raw `/v1/completions` returns an empty
   completion on `-it` models.
 
+## AWS credentials
+
+`server.py` uses the standard boto3 provider chain. **When credentials expire, refresh with
+`./save-aws-creds.sh`**, which re-exports the active credentials to `.aws_creds` (mode 0600).
+
+- It snapshots, it does not mint. `aws configure export-credentials` fails on an expired SSO
+  session — re-authenticate (`aws sso login`) first, or the failure looks like a broken script.
+- It refuses to write to a non-gitignored path inside a work tree. `.aws_creds` is gitignored
+  here for that reason; never remove that line, never use `FORCE=1`.
+- Nothing in this rig reads `.aws_creds` automatically — the script's "the Makefile will now
+  use these" message is inherited from `~/gemma4-tips-aws` and does not apply. Use
+  `AWS_PROFILE` to select a profile for `server.py`.
+
 ## Commands
 
 Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v`. Fully
