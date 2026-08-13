@@ -30,7 +30,10 @@ Gemma4 model has heterogeneous head dimensions
 
 Gemma 4's global-attention layers are **512-wide**; only FA4 or Triton support heterogeneous
 head dims; FA4 is unavailable so Triton is **forced** and cannot be overridden. Triton at
-`head_size=512` wants ~96 KiB of shared memory per block and **Turing has 64 KiB**. This is
+`head_size=512` wants ~96 KiB of shared memory per block. **Turing allows 64 KiB per block at
+most** — and only if the kernel opts in via the dynamic shared-memory attribute; the default
+static limit is 48 KiB, which is what `shared_memory_per_block` reports. Ampere and later have
+164 KiB+. This is
 the intersection of this model and this chip — not a packaging problem.
 
 **A patch to `vllm/v1/attention/ops/triton_unified_attention.py` clamps the KV tile on

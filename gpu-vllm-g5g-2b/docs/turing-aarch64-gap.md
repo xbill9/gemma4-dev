@@ -72,7 +72,11 @@ The chain, and every link is required:
    `FLEX_ATTENTION` changed nothing.
 4. Triton's unified-attention kernel at `head_size=512` needs **~96 KiB** of shared memory
    per block.
-5. **Turing has 64 KiB per block.** Ampere and later have 164 KiB+.
+5. **Turing allows 64 KiB per block at most**, and only if the kernel opts in via the dynamic
+   shared-memory attribute. The *default* static limit is 48 KiB — what
+   `torch.cuda.get_device_properties().shared_memory_per_block` reports. Ampere and later have
+   164 KiB+. Cite the 64 KiB figure only with that qualifier; a reader who checks torch will
+   otherwise conclude the doc is wrong.
 
 So this is the intersection of *this model* and *this chip*, not a packaging problem at all.
 Any model with 512-wide heads hits it on any pre-Ampere GPU.

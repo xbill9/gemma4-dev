@@ -77,7 +77,9 @@ forcing TRITON_ATTN backend.
 Gemma 4's global-attention layers are **512-wide** (sliding are 256 — matches `MODELS.md`).
 Only FA4 or Triton support heterogeneous head dims; FA4 is unavailable, so Triton is forced.
 At `head_size=512` the Triton unified-attention kernel wants ~96 KiB of shared memory per
-block. **Turing has 64 KiB; Ampere and later have 164 KiB+.** Triton refuses outright.
+block. **Turing allows 64 KiB per block at most**, and only if the kernel opts in via the
+dynamic shared-memory attribute; the default static limit is 48 KiB. Ampere and later have
+164 KiB+. Triton refuses outright.
 
 The fix applied here clamps the KV tile until Q + K/V tiles fit, and drops the software
 pipeline to one stage, only on pre-Ampere devices — patched into
