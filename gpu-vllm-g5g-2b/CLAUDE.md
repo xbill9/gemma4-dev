@@ -134,8 +134,13 @@ Never hardcode an AMI id here; resolve it at launch.
 - Termination is permanent, and here it also destroys the locally built SM 7.5 image with
   the root volume — the next launch rebuilds from source. Weigh stop against terminate.
 - Never hardcode an endpoint; `get_endpoint` resolves it from the instance.
-- `verify_model_health` uses `/v1/chat/completions`. Raw `/v1/completions` returns an empty
-  completion on `-it` models, so an empty body there is not evidence of a broken deploy.
+- `verify_model_health` uses `/v1/chat/completions`, because raw `/v1/completions` skips the
+  chat template and is unreliable on `-it` models. **Measured here 2026-08-12, and it does
+  not match the symptom the monorepo `CLAUDE.md` describes:** raw completions returned
+  `': ok: ok: ok: ok: ok: ok: ok: ok'` — degenerate repetition, 16 tokens — not the empty
+  body documented for the TPU rigs. Either way it is not evidence about deploy health, but
+  do not health-check by testing for an empty response: on this rig you would get a
+  non-empty body full of garbage and call it fine.
 
 ## AWS credentials
 

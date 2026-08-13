@@ -100,8 +100,10 @@ which boot fine on a G5g with no GPU. **Never hardcode an AMI id.**
 - Launches default to spot. Surface capacity errors rather than silently retrying.
 - Termination is permanent and destroys the locally built SM 7.5 image with the root volume.
 - Never hardcode an endpoint; `get_endpoint` resolves it from the instance.
-- `verify_model_health` uses `/v1/chat/completions` — raw `/v1/completions` returns an empty
-  completion on `-it` models.
+- `verify_model_health` uses `/v1/chat/completions`; raw `/v1/completions` skips the chat
+  template and is unreliable on `-it` models. Measured here: it returns degenerate repetition
+  (`': ok: ok: ok...'`), **not** the empty body the monorepo doc describes — so never
+  health-check by testing for an empty response.
 
 ## AWS credentials
 
