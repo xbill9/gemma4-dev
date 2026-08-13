@@ -103,10 +103,25 @@ _G5G_SIZES = {
     "g5g.metal": (2, 128),
 }
 
-# MODELS.md: E2B is 9.5 GiB of bf16 weights (8.97 measured). Staging that through
-# host RAM does not fit g5g.xlarge's 8 GiB, so the smallest size is rejected for
-# this model rather than left to OOM-kill the container at load time.
-_MIN_HOST_RAM_GB = 16
+# Host RAM below this needs a swapfile before the model will load. Measured
+# 2026-08-13 on g5g.xlarge (7,757 MiB usable): loading E2B fails with
+#
+#   RuntimeError: unable to mmap 10246621918 bytes from model.safetensors:
+#   Cannot allocate memory (12)
+#
+# and systemd crash-loops on it. The failure is the *mapping*, not residency --
+# the kernel declines to map a 10.2 GB file against 7.5 GiB of RAM and no swap,
+# before a single page is faulted in. Adding swap fixes it outright: 16 GiB of
+# swap took the same instance to a healthy endpoint at 44.24 tok/s, which is
+# indistinguishable from the 4xlarge's 43.1 (decode is GPU-bandwidth-bound, so
+# vCPU count barely matters once the weights are resident).
+#
+# This rig previously *rejected* g5g.xlarge on the theory that 8 GiB "cannot
+# stage 9.5 GiB of weights". The conclusion was right and the reason was wrong,
+# and the fix is swap rather than a bigger instance -- the same remedy
+# tpu-pytorch-inf2-2b applies for its neff load.
+_SWAP_BELOW_HOST_RAM_GB = 16
+_SWAP_GB = 16
 
 
 def _session():
@@ -134,15 +149,16 @@ def _host_memory_gb(instance_type: str) -> int:
     return _G5G_SIZES.get(instance_type, (0, 0))[1]
 
 
+def _needs_swap(instance_type: str) -> bool:
+    """True when host RAM is too small to mmap the checkpoint without swap."""
+    return 0 < _host_memory_gb(instance_type) < _SWAP_BELOW_HOST_RAM_GB
+
+
 def _validate_instance_type(instance_type: str) -> None:
+    """Only the size list is enforced. Small hosts are supported, not rejected --
+    `_user_data` provisions a swapfile for them (see `_SWAP_BELOW_HOST_RAM_GB`)."""
     if not _is_g5g(instance_type):
         raise ValueError(f"instance_type must be one of {', '.join(sorted(_G5G_SIZES))}")
-    if _host_memory_gb(instance_type) < _MIN_HOST_RAM_GB:
-        raise ValueError(
-            f"{instance_type} has {_host_memory_gb(instance_type)} GiB of host RAM; "
-            f"E2B stages 9.5 GiB of weights and needs at least {_MIN_HOST_RAM_GB} GiB. "
-            "Use g5g.2xlarge or larger."
-        )
 
 
 def _tensor_parallel_size(instance_type: str) -> int:
@@ -184,9 +200,23 @@ def _user_data(model: str, instance_type: str, serving: str = "build") -> str:
     flags = _serve_flags(model, instance_type)
     gpus = _gpu_count(instance_type)
 
-    common = """#!/usr/bin/env bash
+    swap = ""
+    if _needs_swap(instance_type):
+        # Without this the model never loads: the kernel refuses to mmap the
+        # 10.2 GB checkpoint on a sub-16 GiB host with no swap, and systemd
+        # crash-loops on it. Idempotent, and survives reboot via fstab.
+        swap = f"""if ! swapon --show --noheadings 2>/dev/null | grep -q /swapfile; then
+  fallocate -l {_SWAP_GB}G /swapfile
+  chmod 600 /swapfile
+  mkswap -q /swapfile
+  swapon /swapfile
+  grep -q /swapfile /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+"""
+
+    common = f"""#!/usr/bin/env bash
 set -euxo pipefail
-systemctl enable --now docker
+{swap}systemctl enable --now docker
 mkdir -p /opt/vllm-g5g
 """
 

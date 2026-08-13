@@ -75,12 +75,24 @@ class G5gTopologyTests(unittest.TestCase):
         self.assertEqual(server._tensor_parallel_size("g5g.2xlarge"), 1)
         self.assertEqual(server._tensor_parallel_size("g5g.16xlarge"), 2)
 
-    def test_xlarge_rejected_for_host_ram(self):
-        # E2B is 9.5 GiB of weights (MODELS.md); 8 GiB of host RAM cannot stage
-        # them. Rejecting here beats an OOM-kill twenty minutes into a boot.
-        with self.assertRaises(ValueError) as ctx:
-            server._validate_instance_type("g5g.xlarge")
-        self.assertIn("host RAM", str(ctx.exception))
+    def test_xlarge_is_supported_with_swap(self):
+        # Measured 2026-08-13: g5g.xlarge serves E2B at 44.24 tok/s *with* a
+        # swapfile. Without swap the kernel refuses to mmap the 10.2 GB
+        # checkpoint ("Cannot allocate memory") and systemd crash-loops. So the
+        # small size is supported, not rejected -- but its user data must carry
+        # the swapfile.
+        server._validate_instance_type("g5g.xlarge")   # must not raise
+        self.assertTrue(server._needs_swap("g5g.xlarge"))
+        text = server._user_data("google/gemma-4-E2B-it", "g5g.xlarge", serving="build")
+        self.assertIn("mkswap", text)
+        self.assertIn("swapon /swapfile", text)
+        self.assertIn("/etc/fstab", text)
+
+    def test_larger_sizes_get_no_swapfile(self):
+        for size in ("g5g.2xlarge", "g5g.4xlarge", "g5g.16xlarge"):
+            self.assertFalse(server._needs_swap(size), size)
+            text = server._user_data("google/gemma-4-E2B-it", size, serving="build")
+            self.assertNotIn("mkswap", text)
 
     def test_non_g5g_rejected(self):
         for bad in ("g6.xlarge", "inf2.xlarge", "g5g.unknown"):
@@ -181,9 +193,14 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertIn("MarketType=spot", run(server.get_deployment_config()))
         self.assertNotIn("MarketType=spot", run(server.get_deployment_config(spot=False)))
 
-    def test_config_rejects_xlarge_and_non_g5g(self):
-        for bad in ("g5g.xlarge", "g6.xlarge"):
-            self.assertTrue(run(server.get_deployment_config(instance_type=bad)).startswith("❌"))
+    def test_config_rejects_non_g5g_only(self):
+        # g5g.xlarge is supported now (it gets a swapfile), so only genuinely
+        # wrong instance families should be refused.
+        self.assertTrue(run(server.get_deployment_config(instance_type="g6.xlarge")).startswith("❌"))
+        ok = run(server.get_deployment_config(instance_type="g5g.xlarge"))
+        self.assertFalse(ok.startswith("❌"))
+        encoded = ok.split("--user-data '", 1)[1].split("'", 1)[0]
+        self.assertIn("mkswap", base64.b64decode(encoded).decode())
 
 
 class RepoHygieneTests(unittest.TestCase):
