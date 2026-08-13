@@ -145,6 +145,36 @@ Never hardcode an AMI id here; resolve it at launch.
   do not health-check by testing for an empty response: on this rig you would get a
   non-empty body full of garbage and call it fine.
 
+## There is a prebuilt AMI — use it, do not rebuild
+
+**`ami-0b44b90b3d02430ee`** (`gpu-vllm-g5g-2b-sm75-vllm0272rc0-80g-v2`, us-east-1, 80 GiB).
+Built 2026-08-12/13 and smoke-tested on a fresh `g5g.xlarge`. It carries the ~67-minute
+from-source build, so launching from it turns a multi-hour provision into ~4 minutes.
+
+Contents: ARM64 DLAMI PyTorch 2.12 base · CUDA 13.2 toolkit · Rust · vLLM v0.27.2rc0 built
+for `TORCH_CUDA_ARCH_LIST=7.5` · **the Turing shared-memory patch** · the E2B model cache
+(`HF_HUB_OFFLINE=1`, so no download and no HF token at boot) · vLLM compile cache ·
+`vllm.service` and `vllm-swap.service`. `/opt/BUILD_INFO.md` on the image repeats all of it.
+
+- **The Turing patch is not upstream.** It lives in the image's `/opt/vllm-src` only. Any
+  vLLM upgrade must reapply it or the engine will not start.
+- **Swap is created at boot by `vllm-swap.service`, not baked** — a 16 GiB file in the image
+  would be 16 GiB of snapshot for something `mkswap` makes in seconds.
+- Storage is **~$2/month** (39.2 GiB of written blocks; EBS bills blocks, not the 80 GiB
+  nominal). Do not move it to the Archive tier — restore takes 24–72 h.
+- Do not keep an instance stopped as a "faster start": an idle 80 GiB volume is ~$6.40/month,
+  three times the AMI, and start still pays the full ~180 s engine init.
+
+Startup, measured: boot to SSM ~50–70 s, then engine init **177–184 s** on `g5g.xlarge`
+against **129 s** on a 32 GiB host. The ~50 s delta is loading the 9.5 GiB checkpoint through
+swap. `g5g.2xlarge` (16 GiB) needs no swapfile and buys that time back for ~$0.10/h.
+
+An earlier 300 GiB AMI was deregistered on 2026-08-13 after being cloned onto an 80 GiB
+volume. **The clone's first attempt did not boot**: the initramfs finds root by `PARTUUID`
+(`/proc/cmdline` → `root=PARTUUID=…`), and `sgdisk --new` mints a fresh one. Preserving the
+filesystem UUID and the `cloudimg-rootfs` label is *not* enough — stamp the partition GUID
+with `sgdisk --partition-guid=` too.
+
 ## AWS credentials
 
 `server.py` uses the standard boto3 provider chain, so whatever `aws sts get-caller-identity`

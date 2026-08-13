@@ -108,6 +108,22 @@ which boot fine on a G5g with no GPU. **Never hardcode an AMI id.**
   (`': ok: ok: ok...'`), **not** the empty body the monorepo doc describes — so never
   health-check by testing for an empty response.
 
+## There is a prebuilt AMI — use it, do not rebuild
+
+**`ami-0b44b90b3d02430ee`** (us-east-1, 80 GiB). Carries the ~67-minute from-source build, so
+a launch is ~4 minutes instead of hours: CUDA 13.2, vLLM v0.27.2rc0 for `sm_75`, **the Turing
+shared-memory patch**, the E2B model cache (`HF_HUB_OFFLINE=1`), `vllm.service` and
+`vllm-swap.service`.
+
+- The Turing patch is **not upstream** — reapply on any vLLM upgrade or the engine won't start.
+- Swap is created at boot, not baked into the image.
+- ~$2/month (EBS bills written blocks, not the 80 GiB nominal). Not the Archive tier: restore
+  takes 24–72 h. Not a stopped instance: that's ~$6.40/month and still pays full engine init.
+- Startup: ~50–70 s to SSM, then 177–184 s engine init on `g5g.xlarge` (129 s on a 32 GiB
+  host — the delta is loading 9.5 GiB through swap).
+- Cloning it smaller needs `sgdisk --partition-guid=` as well as the filesystem UUID and
+  label: the initramfs boots by `PARTUUID`, and a fresh one leaves the AMI unbootable.
+
 ## AWS credentials
 
 `server.py` uses the standard boto3 provider chain. **When credentials expire, refresh with
