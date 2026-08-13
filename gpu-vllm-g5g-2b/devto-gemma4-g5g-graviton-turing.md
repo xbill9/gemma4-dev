@@ -4,7 +4,7 @@ published: false
 description: "A field report on serving Gemma 4 E2B under vLLM on AWS G5g — the only aarch64 + SM 7.5 hardware there is. No published build covers that combination, AWS quietly solves half of it, and the thing that actually blocks you is 64 KiB of shared memory."
 tags: aws, vllm, cuda, machinelearning
 # canonical_url: https://your-blog.example/gemma4-g5g          # set if republished from your own site
-# cover_image: https://.../cover.png                           # 1000x420 recommended
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/devto-cover.jpg
 # series: "Gemma-4 on odd accelerators"
 ---
 
