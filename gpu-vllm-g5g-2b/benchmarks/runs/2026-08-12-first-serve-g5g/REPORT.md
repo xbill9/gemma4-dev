@@ -37,6 +37,26 @@ comparison.
 | vLLM | **v0.27.2rc0** → `0.27.2rc1.dev0+g7f7a32cfe`, built from source for `TORCH_CUDA_ARCH_LIST=7.5` |
 | Serving flags | `--dtype float16 --kv-cache-dtype auto --max-model-len 16384 --gpu-memory-utilization 0.90 --max-num-seqs 8 --tensor-parallel-size 1` |
 
+## Memory, measured
+
+**GDDR6, not HBM** — the only accelerator in this monorepo that isn't. Canonical home for these
+is `HARDWARE.md`; repeated here because they were taken in this run.
+
+| | Value |
+| --- | ---: |
+| Capacity (`nvidia-smi` / torch) | 15,360 MiB / 14,913 MiB |
+| Bus, clock | 256-bit, 5,001 MHz |
+| Theoretical peak | 320.1 GB/s |
+| **Streaming read** | **277.0 GB/s** (87% of peak) |
+| Copy (r+w) / in-place scale | 234.3 / 232.3 GB/s (73%) |
+
+Decode is bandwidth-bound, so **277 GB/s is the ceiling that matters**, not 320. Roughly a third
+of v5e's 858.99 GB/s and a sixth of v6e's 1,638 — which is the honest frame for 43 tok/s.
+
+**Shared memory is two numbers.** 49,152 B (48 KiB) is the default static per-block limit torch
+reports; 65,536 B (64 KiB) is the opt-in ceiling via the dynamic shared-memory attribute, and
+what Triton measures against. Both are real; cite the 64 KiB figure only with the qualifier.
+
 ## The blocker, and the patch
 
 The packaging gap this rig was created for is **not** what stops it. The real wall:

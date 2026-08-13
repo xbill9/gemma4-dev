@@ -418,12 +418,56 @@ pins the aarch64 host as well — which is half of what breaks here.
 
 **The chip is still a T4G**, and this section is about the chip. Only the directory slot is `g5g`.
 
+All figures below **measured on the part** 2026-08-12 (`g5g.4xlarge`, driver 595.71.05), not
+read off a spec sheet. Run recorded in `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-12-first-serve-g5g/`.
+
 | | |
 | --- | --- |
 | Architecture | Turing, **compute capability 7.5** |
-| Memory | 16 GB GDDR6 |
+| SMs | 40 |
 | Host | AWS Graviton2, **aarch64** |
 | GPUs per instance | 1 on `g5g.xlarge`–`8xlarge`; 2 on `g5g.16xlarge` and `g5g.metal` |
+
+### Memory: GDDR6, not HBM — the only part in this file that isn't
+
+**Every other accelerator here has HBM. This one does not**, and it is the first thing to reset
+when carrying TPU intuition across. GDDR6 on a 256-bit bus, and the bandwidth gap that follows is
+the single most important number for decode work.
+
+| | Value | Note |
+| --- | ---: | --- |
+| Capacity, `nvidia-smi` | **15,360 MiB** | not the 16 GB the marketing says |
+| Capacity, visible to torch | 14,913 MiB | what you actually size against |
+| Bus width | 256-bit | |
+| Memory clock | 5,001 MHz | |
+| **Theoretical peak** | **320.1 GB/s** | 5.001 GHz x 256 bit / 8 x 2 (DDR) — reproduces the published 320 |
+| **Measured, streaming read** | **277.0 GB/s** | 87% of peak — the realistic decode ceiling |
+| **Measured, copy (r+w)** | 234.3 GB/s | 73% of peak |
+| **Measured, in-place scale** | 232.3 GB/s | 73% of peak |
+
+**Quote 277 GB/s, not 320.** Decode is bandwidth-bound, so the achieved streaming-read figure is
+the bound that matters. Against the TPU rows at the top of this file: v5e is 800 GiBps
+(**858.99 GB/s** normalized) and v6e is 1,638 GB/s, so T4G has roughly **a third of v5e's
+bandwidth and a sixth of v6e's**. That is the honest frame for its ~43 tok/s on E2B — it is a
+bandwidth-limited part behaving like one, not a broken deployment.
+
+### Shared memory: 48 KiB by default, 64 KiB if a kernel asks
+
+This is the quirk that actually blocked Gemma 4, and **the two numbers are both real**:
+
+| | Bytes | |
+| --- | ---: | --- |
+| Default static limit per block | **49,152** (48 KiB) | what `torch.cuda.get_device_properties().shared_memory_per_block` reports |
+| Opt-in maximum per block | **65,536** (64 KiB) | reachable via the dynamic shared-memory attribute; what Triton measures against |
+| Ampere and later, for contrast | 164 KiB+ | |
+
+So a kernel that needs more than 48 KiB must opt in, and it still cannot exceed 64 KiB. Triton's
+unified-attention kernel asks for **98,304 bytes** at `head_size=512` — Gemma 4's global-attention
+width — and is refused with `OutOfResources ... Hardware limit: 65536`. There is no flag for this;
+the tile sizes have to come down. `gpu-vllm-g5g-2b/docs/turing-aarch64-gap.md` carries the patch.
+
+**Do not cite 64 KiB as "the shared memory per block" without the qualifier.** A reader who checks
+torch will see 48 KiB and conclude the doc is wrong.
 
 ### Native format support — the oldest part in this repo, and it shows
 

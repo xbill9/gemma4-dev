@@ -159,7 +159,12 @@ Read that as a chain, because every link is load-bearing:
 
 ## 64 KiB is the whole problem
 
-Turing has 64 KiB of shared memory per block. Ampere and later have 164 KiB and up. So:
+Turing's shared memory is two numbers, and both are real. The **default** static limit per block
+is 48 KiB — that is what `torch.cuda.get_device_properties().shared_memory_per_block` reports,
+49,152 bytes. A kernel that needs more has to opt in through the dynamic shared-memory
+attribute, and even then it tops out at **64 KiB**. Ampere and later have 164 KiB and up.
+
+Triton opts in, so it is measuring against the 64 KiB ceiling. It still does not fit:
 
 ```
 triton.runtime.errors.OutOfResources: out of resource: shared memory,
@@ -240,6 +245,14 @@ finish_reason: stop      usage: 19 prompt / 32 completion / 51 total
 | Concurrency at 16k context | 20.12x |
 | GPU memory while serving | 13,501 / 15,360 MiB |
 | Engine init | 76.4 s, graph capture 17 s |
+| Memory bandwidth, measured | 277.0 GB/s read · 234.3 GB/s copy (320.1 theoretical) |
+
+Before reading too much into 43 tok/s, note what the memory does. The T4G has **GDDR6, not
+HBM** — 256-bit bus at 5,001 MHz, so 320 GB/s theoretical. I measured **277 GB/s** on a
+streaming read (87% of peak) and 234 GB/s on a read-modify-write. Decode is bandwidth-bound,
+so 277 is the real ceiling. For scale, a TPU v5e is about 859 GB/s normalized and a v6e about
+1,638 — this part has roughly a third of one and a sixth of the other. It is a bandwidth-limited
+card behaving like a bandwidth-limited card.
 
 Single run, single stream, no repeats and no variance figure. One sample per cell, and taken
 with the clamped tiles, so it is a floor rather than a characterisation. My Inferentia port
