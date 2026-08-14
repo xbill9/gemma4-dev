@@ -1,7 +1,7 @@
 ---
 title: "Running Gemma 4 on EC2 G5g: Graviton2, Turing, and a kernel that would not fit"
 published: false
-description: "A field report on serving Gemma 4 E2B under vLLM on AWS G5g — the only aarch64 + SM 7.5 hardware there is. No published build covers that combination, AWS quietly solves half of it, and the thing that actually blocks you is 64 KiB of shared memory."
+description: "Serving Gemma 4 E2B under vLLM on AWS G5g, the only aarch64 + SM 7.5 hardware there is. No published build covers it — and 64 KiB of shared memory is the real blocker."
 tags: aws, vllm, cuda, machinelearning
 # canonical_url: https://your-blog.example/gemma4-g5g          # set if republished from your own site
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/devto-cover.jpg
@@ -17,10 +17,10 @@ wrong before I had a box.*
 | | |
 |---|---|
 | Model | `google/gemma-4-E2B-it` (reference bf16 release) |
-| Hardware | AWS EC2 `g5g.4xlarge` — Graviton2 + 1x NVIDIA T4G, compute capability **7.5**, 15,360 MiB |
-| Base image | Deep Learning ARM64 AMI OSS Nvidia Driver GPU PyTorch 2.12 (Ubuntu 24.04) |
-| Software | torch 2.12.0+cu132 · CUDA 13.2 · vLLM v0.27.2rc0 built from source for `sm_75` |
-| Result | **43.1 tok/s** single-stream greedy, 329,579-token KV cache — after one patch to vLLM |
+| Hardware | `g5g.4xlarge` — Graviton2 + 1x NVIDIA T4G (SM **7.5**, 15,360 MiB) |
+| Base image | Deep Learning ARM64 AMI, PyTorch 2.12 (Ubuntu 24.04) |
+| Software | torch 2.12.0+cu132 · CUDA 13.2 · vLLM v0.27.2rc0 from source (`sm_75`) |
+| Result | **43.1 tok/s** single stream · 329,579-token KV cache · one vLLM patch |
 
 ---
 
@@ -34,8 +34,8 @@ the only hardware that is aarch64 *and* compute capability 7.5, and almost nobod
 a build for that combination.
 
 I put a rig on one anyway. **The packaging problem was the quick part.** Everything after it
-— a compiler that was not there, a version floor I did not expect, and 32 KiB of shared
-memory — took far longer, because none of it fails where you are looking.
+— a compiler that was not there, a version floor I did not expect, and a 64 KiB shared-memory
+ceiling — took far longer, because none of it fails where you are looking.
 
 ## No published build covers aarch64 and SM 7.5 together
 
@@ -73,7 +73,7 @@ The rest of the ecosystem splits the same way. Check before you plan anything:
 |---|---|---|
 | `vllm/vllm-openai` arm64 | no | Current. Never had it. |
 | `nvcr.io/nvidia/pytorch` arm64 | through 24.10 | Dropped by 24.12. |
-| `drikster80/vllm-aarch64` | yes | Abandoned Sept 2024. vLLM 0.6.1, far too old for Gemma 4. |
+| `drikster80/vllm-aarch64` | yes | Abandoned Sept 2024, vLLM 0.6.1. Too old. |
 | PyPI torch aarch64 | no | Built for 9.0 / 10.0 / 12.0. |
 | **AWS ARM64 GPU DLAMI** | **yes** | Maintained. PyTorch 2.2 through 2.12. |
 
@@ -122,8 +122,9 @@ wrong about it.
 It builds fine. It then dies on model load:
 
 ```
-transformers.integrations.heterogeneity.configuration_utils.AmbiguousGlobalPerLayerAttributeError:
-'head_dim' is a per-layer attribute and may vary across layers.
+transformers.integrations.heterogeneity.configuration_utils.
+AmbiguousGlobalPerLayerAttributeError: 'head_dim' is a per-layer
+attribute and may vary across layers.
 ```
 
 Gemma 4's `head_dim` is not one number, and current `transformers` refuses to hand out a
@@ -184,8 +185,10 @@ if current_platform.get_device_capability()[0] < 8:
     _smem_budget = 60000
     _esz = q.element_size()
     def _fits(t): return (BLOCK_M + 2 * t) * head_size * _esz <= _smem_budget
-    while TILE_SIZE_PREFILL > 16 and not _fits(TILE_SIZE_PREFILL): TILE_SIZE_PREFILL //= 2
-    while TILE_SIZE_DECODE  > 16 and not _fits(TILE_SIZE_DECODE):  TILE_SIZE_DECODE  //= 2
+    while TILE_SIZE_PREFILL > 16 and not _fits(TILE_SIZE_PREFILL):
+        TILE_SIZE_PREFILL //= 2
+    while TILE_SIZE_DECODE > 16 and not _fits(TILE_SIZE_DECODE):
+        TILE_SIZE_DECODE //= 2
     launch_num_stages = 1
 ```
 
@@ -214,12 +217,12 @@ would keep if I kept nothing else.
 | What I wrote | What the box said |
 |---|---|
 | PyTorch aarch64 lacks `sm_75` | AWS DLAMI has it, on both versions I checked |
-| bfloat16 is a hard failure here | Torch upconverts; vLLM logs `Casting torch.bfloat16 to torch.float16` and proceeds |
+| bfloat16 fails outright | Torch upconverts; vLLM casts bf16→fp16 and proceeds |
 | The backend is XFORMERS | `TRITON_ATTN`, forced, not selectable |
-| `VLLM_ATTENTION_BACKEND` picks it | Not a recognised variable. I had shipped dead config. |
-| w4a16 needs sm80+ Marlin | The build compiled `sm75_kernel_float16_u4b8_float16.cu.o` |
+| `VLLM_ATTENTION_BACKEND` picks it | Not a recognised variable — dead config |
+| w4a16 needs sm80+ Marlin | Build compiled `sm75_kernel_float16_u4b8_float16.cu.o` |
 | The GPU has 16 GB | 15,360 MiB |
-| `/v1/completions` returns an empty body | It returns `': ok: ok: ok: ok'` — garbage, not silence |
+| `/v1/completions` returns nothing | Garbage instead: `': ok: ok: ok: ok'` |
 
 That last one has teeth. If you health-check by testing for an empty response, this endpoint
 passes while producing nonsense. Use `/v1/chat/completions` and read the text.
@@ -263,13 +266,13 @@ different harness on different silicon and I would not put the two in one table.
 
 | Symptom | Cause |
 |---|---|
-| `no kernel image is available` | Stock arm64 image. No 7.5, no PTX. Build from source. |
-| `OutOfResources: shared memory` | Turing's 64 KiB against a 512-wide head. Clamp the tiles. |
+| `no kernel image is available` | Stock arm64 image — no 7.5, no PTX. Build it. |
+| `OutOfResources: shared memory` | Turing's 64 KiB vs a 512-wide head. Clamp tiles. |
 | `AmbiguousGlobalPerLayerAttributeError` | vLLM older than v0.27.2rc0. |
 | `No module named 'setuptools_rust'` | Missing Rust toolchain for `vllm-rs`. |
-| `nvcc: not found` | PyTorch DLAMI has no toolkit. Install `cuda-toolkit-13-2` (sbsa). |
-| `Unknown vLLM environment variable` | You set `VLLM_ATTENTION_BACKEND`. It does nothing. |
-| Healthy endpoint, nonsense output | You checked `/v1/completions`. Use chat completions. |
+| `nvcc: not found` | No toolkit in the DLAMI. Add `cuda-toolkit-13-2` (sbsa). |
+| `Unknown vLLM environment variable` | You set `VLLM_ATTENTION_BACKEND`. Ignored. |
+| Healthy endpoint, nonsense output | You used `/v1/completions`. Use chat. |
 
 ## The short version
 
@@ -278,11 +281,12 @@ carries `sm_75`. Add `cuda-toolkit-13-2` from the sbsa repo and a Rust toolchain
 image ships neither. Build vLLM v0.27.2rc0 or newer from source with
 `TORCH_CUDA_ARCH_LIST=7.5` and `use_existing_torch.py`, and patch the Triton attention kernel
 to fit Turing's shared memory before you try to start it. Serve with `--dtype float16` and
-`--kv-cache-dtype auto`.
+`--kv-cache-dtype auto` — Turing has no fp8 datapath, so the fp8 KV cache that is standard
+advice on L4 and A10G buys you nothing here.
 
-Nothing here failed loudly, and nothing failed where I was looking. The packaging gap I built
-the rig around was already solved by AWS; the thing that actually stopped me was 32 KiB of
-shared memory and a model whose global attention heads are twice as wide as its sliding ones.
+Everything failed loudly. Nothing failed where I was looking. The packaging gap I built the
+rig around was already solved by AWS; what actually stopped me was Turing's 64 KiB shared-memory
+ceiling and a model whose global attention heads are twice as wide as its sliding ones.
 Hardware this far off the mainstream will keep producing that shape of surprise — the fix is
 not to reason harder about it, but to get to a box sooner and let it tell you.
 

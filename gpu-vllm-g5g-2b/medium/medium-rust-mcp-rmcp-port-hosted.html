@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Build an MCP server in Rust with rmcp: a walk-through 🦀</title>
+  <meta name="description" content="Step-by-step: scaffolding a real MCP server in Rust with the official rmcp SDK — tools, JSON schemas, AWS calls, stdio transport, testing the protocol by hand, and wiring it into Claude Code." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<header id="title-block-header" hidden>
+<h1 class="title">Build an MCP server in Rust with rmcp: a walk-through
+🦀</h1>
+</header>
+<p><img src="images/header-rust-mcp-rmcp.jpg" /></p>
+<p>This tutorial walks through building an <strong>MCP server in
+Rust</strong> with <a
+href="https://crates.io/crates/rmcp"><code>rmcp</code></a>, the official
+Model Context Protocol Rust SDK.</p>
+<p>The example is a real one: a devops agent that manages <strong>AWS
+EC2 G5g</strong> instances — Graviton2 boxes with NVIDIA T4G GPUs —
+serving Gemma 4 under vLLM. It launches instances, drives them over SSM,
+and health-checks the model. There's an existing Python version, so at
+the end we can put the two side by side.</p>
+<p>Follow along and you'll have a working, registerable MCP server.
+🦀</p>
+<hr />
+<h4 id="why-rust-for-this">Why Rust for this?</h4>
+<p>Worth answering properly, because the weak version of the argument is
+easy to make and easy to demolish — and the real one is better
+anyway.</p>
+<p><strong>Start with what it isn't: these tools are I/O bound.</strong>
+Every one is an AWS API call — <code>describe_instances</code>,
+<code>send_command</code>, polling SSM — so 100–500 ms of network per
+call. The caller's language contributes nothing measurable there. Anyone
+selling you a Rust rewrite on raw speed for this workload is selling
+something.</p>
+<p>Three claims that don't hold, so nobody has to make them in the
+comments:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-rust-mcp-rmcp-port-table-1.png"
+alt="table" /></p>
+<p>What actually justifies it, for this codebase:</p>
+<p><strong>1. It's a fleet, not a server.</strong> This monorepo has
+<strong>16 rigs</strong>, each with its own MCP server. That changes the
+units:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-rust-mcp-rmcp-port-table-2.png"
+alt="table" /></p>
+<p>A gigabyte of resident Python to expose sixteen tool lists is a real
+cost.</p>
+<p><strong>2. No shared interpreter.</strong> These rigs install
+system-wide — no virtualenvs, by policy — so all sixteen share one
+Python. Sixteen servers with independently drifting <code>boto3</code>
+and <code>mcp</code> pins in one interpreter is a standing conflict
+risk. A static binary has no such coupling; each rig pins whatever it
+likes in its own <code>Cargo.lock</code>.</p>
+<p><strong>3. The schema can't drift from the code.</strong> More on
+this at Step 3, but it's the one that survives longest:
+<code>schemars</code> generates the tool schema from the same struct the
+handler destructures.</p>
+<p>So: <strong>distribution and correctness, not speed.</strong> ✅ If
+you have one MCP server and it works, this is not a reason to rewrite
+it.</p>
+<hr />
+<h4 id="how-does-this-all-fit-together">How does this all fit
+together?</h4>
+<p>Two halves. The agent and the MCP server run on your machine; the GPU
+box is remote, and it has <strong>no inbound SSH</strong> — everything
+goes through the AWS APIs.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-rust-mcp-rmcp-port-diagram-1.png"
+alt="diagram" /></p>
+<p>The agent never talks to the GPU box directly. It calls a tool; the
+tool calls <strong>EC2</strong> to manage the instance's lifecycle, or
+<strong>SSM Run Command</strong> to execute something on it. That's what
+lets the box run with no inbound rules at all — which is the main reason
+this is worth building as a server rather than a pile of shell
+scripts.</p>
+<p>(The <code>[RUST]</code> on the right is incidental here — vLLM ships
+its own optional Rust frontend. This article is entirely about the
+<code>[RUST]</code> on the left: the agent that drives the box.)</p>
+<hr />
+<h4 id="what-is-mcp-in-one-paragraph">What is MCP, in one
+paragraph?</h4>
+<p><strong>Model Context Protocol</strong> is how an AI agent discovers
+and calls your tools. Your server advertises a list of tools with JSON
+Schemas; the client (Claude Code, an IDE, whatever) calls them over
+JSON-RPC 2.0. Transport is usually <strong>stdio</strong> — the client
+spawns your binary and talks over stdin/stdout.</p>
+<p>That last detail matters for the Rust pitch: if the client spawns
+your process on every session, <strong>process startup is a user-visible
+cost</strong>.</p>
+<hr />
+<h4 id="step-1--scaffold">Step 1 — Scaffold</h4>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> new <span class="at">--bin</span> rust-mcp <span class="at">--name</span> gpu-vllm-g5g-2b-mcp</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> rust-mcp</span></code></pre></div>
+<p>Now the dependencies. <strong>Feature flags are the thing to get
+right here</strong> — <code>cargo add rmcp</code> on its own compiles
+fine and gives you almost nothing:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> add rmcp <span class="at">--features</span> server,macros,transport-io</span></code></pre></div>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-rust-mcp-rmcp-port-table-3.png"
+alt="table" /></p>
+<p>The crate also ships <code>client</code>, <code>auth</code>,
+<code>elicitation</code>, <code>transport-streamable-http-server</code>
+and more, all off by default. Add them when you need them.</p>
+<p>Then the rest:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> add tokio <span class="at">--features</span> rt-multi-thread,macros,process,time</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> add serde serde_json anyhow schemars</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> add aws-config aws-sdk-ec2 aws-sdk-ssm aws-sdk-secretsmanager</span></code></pre></div>
+<p>Resulting <code>Cargo.toml</code>:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode toml"><code class="sourceCode toml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">[package]</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="dt">name</span> <span class="op">=</span> <span class="st">&quot;gpu-vllm-g5g-2b-mcp&quot;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="dt">version</span> <span class="op">=</span> <span class="st">&quot;0.1.0&quot;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="dt">edition</span> <span class="op">=</span> <span class="st">&quot;2024&quot;</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a><span class="kw">[dependencies]</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a><span class="dt">rmcp</span> <span class="op">=</span> <span class="op">{ </span><span class="dt">version</span><span class="op"> =</span> <span class="st">&quot;3.1.2&quot;</span><span class="op">, </span><span class="dt">features</span><span class="op"> =</span> <span class="op">[</span><span class="st">&quot;server&quot;</span><span class="op">,</span> <span class="st">&quot;macros&quot;</span><span class="op">,</span> <span class="st">&quot;transport-io&quot;</span><span class="op">] }</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a><span class="dt">tokio</span> <span class="op">=</span> <span class="op">{ </span><span class="dt">version</span><span class="op"> =</span> <span class="st">&quot;1.53.1&quot;</span><span class="op">, </span><span class="dt">features</span><span class="op"> =</span> <span class="op">[</span><span class="st">&quot;rt-multi-thread&quot;</span><span class="op">,</span> <span class="st">&quot;macros&quot;</span><span class="op">,</span> <span class="st">&quot;process&quot;</span><span class="op">,</span> <span class="st">&quot;time&quot;</span><span class="op">] }</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="dt">aws-config</span> <span class="op">=</span> <span class="st">&quot;1.10.1&quot;</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="dt">aws-sdk-ec2</span> <span class="op">=</span> <span class="st">&quot;1.246.0&quot;</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a><span class="dt">aws-sdk-ssm</span> <span class="op">=</span> <span class="st">&quot;1.118.0&quot;</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a><span class="dt">serde</span> <span class="op">=</span> <span class="st">&quot;1.0.229&quot;</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a><span class="dt">serde_json</span> <span class="op">=</span> <span class="st">&quot;1.0.151&quot;</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a><span class="dt">schemars</span> <span class="op">=</span> <span class="st">&quot;1.2.2&quot;</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="dt">anyhow</span> <span class="op">=</span> <span class="st">&quot;1.0.104&quot;</span></span></code></pre></div>
+<hr />
+<h4 id="mag_right-tip-where-the-canonical-examples-live">🔎 Tip: where
+the canonical examples live</h4>
+<p><code>rmcp</code> moves fast, and rendered docs lag. The
+<strong>vendored tests on your own disk</strong> are compiled against
+the exact version you resolved:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> ~/.cargo/registry/src/<span class="pp">*</span>/rmcp-3.1.2/tests/</span></code></pre></div>
+<p><code>tests/test_tool_macros.rs</code> is a complete, working server
+in about 60 lines. When an API question comes up, that file answers it
+faster and more reliably than anything else. ⚡</p>
+<hr />
+<h4 id="step-2--the-server-struct">Step 2 — The server struct</h4>
+<p>An rmcp server is a struct that owns a <code>ToolRouter</code>:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">rmcp::</span><span class="op">{</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    ErrorData<span class="op">,</span> ServerHandler<span class="op">,</span> ServiceExt<span class="op">,</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="pp">handler::server::</span><span class="op">{</span><span class="pp">router::tool::</span>ToolRouter<span class="op">,</span> <span class="pp">wrapper::</span>Parameters<span class="op">},</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    <span class="pp">model::</span><span class="op">{</span>CallToolResult<span class="op">,</span> ContentBlock<span class="op">,</span> Implementation<span class="op">,</span> ServerCapabilities<span class="op">,</span> ServerInfo<span class="op">},</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    tool<span class="op">,</span> tool_handler<span class="op">,</span> tool_router<span class="op">,</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    <span class="pp">transport::</span>stdio<span class="op">,</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="op">};</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">schemars::</span>JsonSchema<span class="op">;</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="kw">use</span> <span class="pp">serde::</span><span class="op">{</span>Deserialize<span class="op">,</span> Serialize<span class="op">};</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Clone</span><span class="at">)]</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> G5gServer <span class="op">{</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>    tool_router<span class="op">:</span> ToolRouter<span class="op">&lt;</span><span class="dt">Self</span><span class="op">&gt;,</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<hr />
+<h4 id="step-3--describe-your-inputs-as-types">Step 3 — Describe your
+inputs as types</h4>
+<p>This is the part that sold me on the whole exercise. Your tool's
+input is a plain struct, and <strong><code>schemars</code> turns it into
+the JSON Schema the agent sees</strong> — doc comments and all:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>derive<span class="at">(</span><span class="bu">Debug</span><span class="op">,</span> Serialize<span class="op">,</span> Deserialize<span class="op">,</span> JsonSchema<span class="at">)]</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">struct</span> InstanceId <span class="op">{</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="co">/// EC2 instance id, e.g. `i-0123456789abcdef0`.</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    instance_id<span class="op">:</span> <span class="dt">String</span><span class="op">,</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>That doc comment becomes the field's <code>description</code> in the
+tool schema. Rename the field and the schema follows. The compiler
+checks the type your handler destructures. There is no second artifact
+to keep in sync. ✅</p>
+<hr />
+<h4 id="step-4--write-the-tools">Step 4 — Write the tools</h4>
+<p><code>#[tool_router]</code> on the impl block, <code>#[tool]</code>
+on each method:</p>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>tool_router<span class="at">(</span>router <span class="op">=</span> tool_router<span class="at">)]</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> G5gServer <span class="op">{</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">fn</span> new() <span class="op">-&gt;</span> <span class="dt">Self</span> <span class="op">{</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>        <span class="dt">Self</span> <span class="op">{</span> tool_router<span class="op">:</span> <span class="dt">Self</span><span class="pp">::</span>tool_router() <span class="op">}</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>tool<span class="at">(</span>description <span class="op">=</span> <span class="st">&quot;List EC2 instances tagged ManagedBy=gpu-vllm-g5g-2b.&quot;</span><span class="at">)]</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="kw">async</span> <span class="kw">fn</span> list_g5g_instances(<span class="op">&amp;</span><span class="kw">self</span>) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span>CallToolResult<span class="op">,</span> ErrorData<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> conf <span class="op">=</span> <span class="pp">aws_config::</span>defaults(<span class="pp">aws_config::BehaviorVersion::</span>latest())</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>region(<span class="pp">aws_config::Region::</span>new(<span class="st">&quot;us-east-1&quot;</span>))</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>load()</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span><span class="kw">await</span><span class="op">;</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> ec2 <span class="op">=</span> <span class="pp">aws_sdk_ec2::Client::</span>new(<span class="op">&amp;</span>conf)<span class="op">;</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> resp <span class="op">=</span> <span class="cf">match</span> ec2<span class="op">.</span>describe_instances()</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>filters(<span class="pp">Filter::</span>builder()</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>                <span class="op">.</span>name(<span class="st">&quot;tag:ManagedBy&quot;</span>)<span class="op">.</span>values(<span class="st">&quot;gpu-vllm-g5g-2b&quot;</span>)<span class="op">.</span>build())</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>            <span class="op">.</span>send()<span class="op">.</span><span class="kw">await</span></span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>        <span class="op">{</span></span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>            <span class="cn">Ok</span>(r) <span class="op">=&gt;</span> r<span class="op">,</span></span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>            <span class="cn">Err</span>(e) <span class="op">=&gt;</span> <span class="cf">return</span> ok(<span class="pp">format!</span>(<span class="st">&quot;❌ describe_instances failed: {e}&quot;</span>))<span class="op">,</span></span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>        <span class="op">};</span></span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> <span class="kw">mut</span> rows <span class="op">=</span> <span class="dt">Vec</span><span class="pp">::</span>new()<span class="op">;</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> res <span class="kw">in</span> resp<span class="op">.</span>reservations() <span class="op">{</span></span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a>            <span class="cf">for</span> inst <span class="kw">in</span> res<span class="op">.</span>instances() <span class="op">{</span></span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>                rows<span class="op">.</span>push(<span class="pp">format!</span>(<span class="st">&quot;| `{}` | {} | {} |&quot;</span><span class="op">,</span></span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>                    inst<span class="op">.</span>instance_id()<span class="op">.</span>unwrap_or(<span class="st">&quot;?&quot;</span>)<span class="op">,</span></span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>                    inst<span class="op">.</span>instance_type()<span class="op">.</span>map(<span class="op">|</span>t<span class="op">|</span> t<span class="op">.</span>as_str())<span class="op">.</span>unwrap_or(<span class="st">&quot;?&quot;</span>)<span class="op">,</span></span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a>                    inst<span class="op">.</span>state()<span class="op">.</span>and_then(<span class="op">|</span>s<span class="op">|</span> s<span class="op">.</span>name())</span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>                        <span class="op">.</span>map(<span class="op">|</span>n<span class="op">|</span> n<span class="op">.</span>as_str())<span class="op">.</span>unwrap_or(<span class="st">&quot;unknown&quot;</span>)<span class="op">,</span></span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a>                ))<span class="op">;</span></span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a>            <span class="op">}</span></span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a>        <span class="op">}</span></span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>        ok(<span class="pp">format!</span>(<span class="st">&quot;📡 Instances</span><span class="sc">\n\n</span><span class="st">| id | type | state |</span><span class="sc">\n</span><span class="st">|---|---|---|</span><span class="sc">\n</span><span class="st">{}&quot;</span><span class="op">,</span></span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>                   rows<span class="op">.</span>join(<span class="st">&quot;</span><span class="sc">\n</span><span class="st">&quot;</span>)))</span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>Tools that take arguments wrap them in
+<code>Parameters&lt;T&gt;</code>:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>    <span class="at">#[</span>tool<span class="at">(</span>description <span class="op">=</span> <span class="st">&quot;Terminate a G5g instance. Permanent — destroys the root volume.&quot;</span><span class="at">)]</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">async</span> <span class="kw">fn</span> terminate_g5g_instance(</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>        <span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>        Parameters(args)<span class="op">:</span> Parameters<span class="op">&lt;</span>InstanceId<span class="op">&gt;,</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>    ) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span>CallToolResult<span class="op">,</span> ErrorData<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>        <span class="co">// …</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span></code></pre></div>
+<p>And a small helper, since every tool returns the same shape:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> ok(text<span class="op">:</span> <span class="dt">String</span>) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span>CallToolResult<span class="op">,</span> ErrorData<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    <span class="cn">Ok</span>(<span class="pp">CallToolResult::</span>success(<span class="pp">vec!</span>[<span class="pp">ContentBlock::</span>text(text)]))</span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<hr />
+<h4 id="step-5--implement-serverhandler">Step 5 — Implement
+ServerHandler</h4>
+<p><code>#[tool_handler]</code> wires the router in, so you never write
+a dispatch <code>match</code>:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>tool_handler<span class="at">(</span>router <span class="op">=</span> <span class="kw">self</span><span class="op">.</span>tool_router<span class="at">)]</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="kw">impl</span> ServerHandler <span class="cf">for</span> G5gServer <span class="op">{</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">fn</span> get_info(<span class="op">&amp;</span><span class="kw">self</span>) <span class="op">-&gt;</span> ServerInfo <span class="op">{</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>        <span class="kw">let</span> <span class="kw">mut</span> info <span class="op">=</span> <span class="pp">ServerInfo::</span>new(</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>            <span class="pp">ServerCapabilities::</span>builder()<span class="op">.</span>enable_tools()<span class="op">.</span>build()</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>        )<span class="op">;</span></span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>        info<span class="op">.</span>server_info <span class="op">=</span> <span class="pp">Implementation::</span>new(</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;gpu-vllm-g5g-2b&quot;</span><span class="op">,</span> <span class="pp">env!</span>(<span class="st">&quot;CARGO_PKG_VERSION&quot;</span>)</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>        )<span class="op">;</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>        info<span class="op">.</span>instructions <span class="op">=</span> <span class="cn">Some</span>(</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>            <span class="st">&quot;Devops agent for AWS EC2 G5g (Graviton2 + NVIDIA T4G) serving Gemma 4 </span><span class="sc">\</span></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a><span class="st">             under vLLM. Remote administration goes through SSM; there is no inbound SSH.&quot;</span></span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>                <span class="op">.</span>to_string()<span class="op">,</span></span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>        )<span class="op">;</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>        info</span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>💡 These model structs are <code>#[non_exhaustive]</code>, so use the
+constructors (<code>ServerInfo::new</code>,
+<code>Implementation::new</code>) and then assign fields — a struct
+literal won't compile, even with <code>..Default::default()</code>.</p>
+<hr />
+<h4 id="step-6--main">Step 6 — main</h4>
+<p>Four lines:</p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span><span class="pp">tokio::</span>main<span class="at">]</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="kw">async</span> <span class="kw">fn</span> main() <span class="op">-&gt;</span> <span class="pp">anyhow::</span><span class="dt">Result</span><span class="op">&lt;</span>()<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> service <span class="op">=</span> <span class="pp">G5gServer::</span>new()<span class="op">.</span>serve(stdio())<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    service<span class="op">.</span>waiting()<span class="op">.</span><span class="kw">await</span><span class="op">?;</span></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>    <span class="cn">Ok</span>(())</span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> build <span class="at">--release</span></span></code></pre></div>
+<hr />
+<h4 id="step-7--test-the-protocol-by-hand">Step 7 — Test the protocol by
+hand</h4>
+<p>An MCP server is a protocol implementation, so test it with a
+protocol transcript. Three JSON-RPC lines on stdin — no client
+required:</p>
+<div class="sourceCode" id="cb14"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;%s\n&#39;</span> <span class="dt">\</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2026-07-28&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;probe&quot;,&quot;version&quot;:&quot;0&quot;}}}&#39;</span> <span class="dt">\</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/initialized&quot;}&#39;</span> <span class="dt">\</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a><span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/list&quot;,&quot;params&quot;:{}}&#39;</span> <span class="dt">\</span></span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:3,&quot;method&quot;:&quot;tools/call&quot;,&quot;params&quot;:{&quot;name&quot;:&quot;get_help&quot;,&quot;arguments&quot;:{}}}&#39;</span> <span class="dt">\</span></span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a><span class="kw">|</span> <span class="ex">./target/release/gpu-vllm-g5g-2b-mcp</span></span></code></pre></div>
+<pre><code>initialize OK: gpu-vllm-g5g-2b 0.1.0 proto 2026-07-28
+tools/list OK: 9 tools -&gt; get_deployment_config, get_endpoint, get_help,
+  list_g5g_instances, run_remote, start_g5g_instance, stop_g5g_instance,
+  terminate_g5g_instance, verify_model_health
+tools/call get_help OK</code></pre>
+<p>🟢 rmcp 3.1.2 negotiates the <strong>2026-07-28</strong> spec version
+by default.</p>
+<p>Keep this snippet. It's the fastest way to tell "my server is broken"
+from "my client config is broken."</p>
+<hr />
+<h4 id="step-8--register-it">Step 8 — Register it</h4>
+<p>Point your MCP client at the binary. For Claude Code,
+<code>.mcp.json</code>:</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;gpu-vllm-g5g-2b&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;/abs/path/to/rust-mcp/target/release/gpu-vllm-g5g-2b-mcp&quot;</span><span class="fu">,</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;env&quot;</span><span class="fu">:</span> <span class="fu">{</span> <span class="dt">&quot;AWS_REGION&quot;</span><span class="fu">:</span> <span class="st">&quot;us-east-1&quot;</span> <span class="fu">}</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p>The server name prefixes every tool —
+<code>mcp__gpu-vllm-g5g-2b__list_g5g_instances</code> — so name it after
+the thing it manages, especially if you run several.</p>
+<p>Credentials come from the standard AWS provider chain, so whatever
+<code>aws sts get-caller-identity</code> resolves is what the server
+gets. Set <code>AWS_PROFILE</code> to pick one.</p>
+<hr />
+<h4 id="tests-worth-writing">Tests worth writing</h4>
+<p>The interesting assertions aren't about the code, they're about the
+<strong>machine</strong>. Turing has no bf16 datapath and no fp8, so the
+serving flags must differ from every L4-class box — exactly the sort of
+thing that silently reverts when someone copies a flag set from a
+neighbour:</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode rust"><code class="sourceCode rust"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>test<span class="at">]</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> serve_flags_are_turing_shaped() <span class="op">{</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">let</span> f <span class="op">=</span> serve_flags(<span class="st">&quot;google/gemma-4-E2B-it&quot;</span><span class="op">,</span> <span class="st">&quot;g5g.2xlarge&quot;</span>)<span class="op">;</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="pp">assert!</span>(f<span class="op">.</span>contains(<span class="st">&quot;--dtype float16&quot;</span>)<span class="op">,</span> <span class="st">&quot;Turing has no bf16 datapath&quot;</span>)<span class="op">;</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="pp">assert!</span>(f<span class="op">.</span>contains(<span class="st">&quot;--kv-cache-dtype auto&quot;</span>)<span class="op">,</span> <span class="st">&quot;Turing has no fp8 datapath&quot;</span>)<span class="op">;</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>    <span class="pp">assert!</span>(<span class="op">!</span>f<span class="op">.</span>contains(<span class="st">&quot;attention-backend&quot;</span>))<span class="op">;</span>   <span class="co">// not a real vLLM v0.27 variable</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a><span class="at">#[</span>test<span class="at">]</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a><span class="kw">fn</span> unknown_types_are_rejected_and_never_need_swap() <span class="op">{</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    <span class="pp">assert!</span>(validate_instance_type(<span class="st">&quot;t4g.2xlarge&quot;</span>)<span class="op">.</span>is_err())<span class="op">;</span>  <span class="co">// burstable CPU box, no GPU</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>    <span class="pp">assert!</span>(<span class="op">!</span>needs_swap(<span class="st">&quot;t4g.2xlarge&quot;</span>))<span class="op">;</span>                      <span class="co">// 0 GiB must not read as &quot;tiny&quot;</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="op">}</span></span></code></pre></div>
+<p>That second one earns its keep: <code>host_memory_gb</code> returns
+<code>0</code> for an unknown instance type, and a naive
+<code>ram &lt; 16</code> would decide an unrecognised machine needs a
+swapfile.</p>
+<pre><code>running 5 tests
+test result: ok. 5 passed; 0 failed; finished in 0.00s</code></pre>
+<hr />
+<h4 id="snake-vs-crab--the-scoreboard">🐍 vs 🦀 — the scoreboard</h4>
+<p>Cold start measured the way a client experiences it: spawn the
+process, send <code>initialize</code> + <code>initialized</code> +
+<code>tools/list</code>, stop the clock when the tool list comes back.
+Seven runs, median.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-rust-mcp-rmcp-port-table-4.png"
+alt="table" /></p>
+<p><strong>185x on cold start</strong> — but per the section up top,
+resist quoting that on its own. One server spawned once a session, 460
+ms, nobody notices. It only becomes a number worth having when you
+multiply it by sixteen rigs, and even then it's the <strong>12 MB vs 83
+MB</strong> row that does the heavier lifting.</p>
+<p>Read the rest honestly too. 241 resolved packages against 34 means
+the static binary is <strong>not</strong> a smaller supply chain, just
+the same one audited in <code>Cargo.lock</code>. The port covers 9 tools
+to Python's 15 — the provisioning path (cloud-init rendering, AMI
+resolution, spot options) is the fiddly half and isn't ported. And 5 m
+28 s of clean build against an interpreter that starts instantly is a
+real cost while you're iterating. 📊</p>
+<hr />
+<h4 id="so-worth-it">So, worth it?</h4>
+<p>For a single MCP server that already works: <strong>no</strong>.
+Don't rewrite it.</p>
+<p>For sixteen of them sharing one system Python, shipped to machines
+that shouldn't need a Python environment at all: yes — and note that
+neither half of that sentence is about speed. It's a packaging
+answer.</p>
+<p>The part that'll still be true next year is <code>schemars</code>.
+The tool schema the agent sees is generated from the same struct the
+handler destructures, checked by the compiler, documented by the doc
+comments on its fields. In the Python version the schema, the runtime
+types and the docs are three artifacts that agree by convention — and go
+quiet when they stop agreeing.</p>
+<p>The 462 ms is a bonus. The schema not being able to lie about the
+code is the reason. ✅</p>
+<hr />
+<h4 id="cheat-sheet">Cheat sheet</h4>
+<div class="sourceCode" id="cb19"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># scaffold</span></span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> new <span class="at">--bin</span> my-mcp <span class="kw">&amp;&amp;</span> <span class="bu">cd</span> my-mcp</span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> add rmcp <span class="at">--features</span> server,macros,transport-io</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> add tokio <span class="at">--features</span> rt-multi-thread,macros</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> add serde serde_json schemars anyhow</span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a><span class="co"># canonical examples for YOUR resolved version</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ls</span> ~/.cargo/registry/src/<span class="pp">*</span>/rmcp-<span class="pp">*</span>/tests/test_tool_macros.rs</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a><span class="co"># build + smoke test</span></span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> build <span class="at">--release</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a><span class="bu">printf</span> <span class="st">&#39;%s\n&#39;</span> <span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2026-07-28&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;p&quot;,&quot;version&quot;:&quot;0&quot;}}}&#39;</span> <span class="dt">\</span></span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>              <span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/initialized&quot;}&#39;</span> <span class="dt">\</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>              <span class="st">&#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/list&quot;,&quot;params&quot;:{}}&#39;</span> <span class="dt">\</span></span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>  <span class="kw">|</span> <span class="ex">./target/release/my-mcp</span></span></code></pre></div>
+<p>Four macros to remember: <code>#[tool_router]</code> on the impl,
+<code>#[tool]</code> on each method, <code>#[tool_handler]</code> on the
+<code>ServerHandler</code> impl, <code>Parameters&lt;T&gt;</code> around
+your input struct.</p>
+<hr />
+<p><em>Rust 1.97.1, rmcp 3.1.2, aws-sdk-ec2 1.246.0, edition 2024.
+Startup measured on the dev host — it's a comparison of two MCP servers,
+not a hardware result. Single machine, seven runs per side, median
+reported.</em></p>
+</body>
+</html>
