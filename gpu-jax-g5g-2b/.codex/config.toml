@@ -1,0 +1,24 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The path is relative to the project directory, as in .mcp.json;
+# never pin an absolute cwd, which is how the inf2 rig ended up pointing at a directory that
+# does not exist.
+[mcp_servers.gpu-vllm-g5g-2b]
+command = "python3"
+args = [".claude/skills/gpu-vllm-g5g-2b-management/mcp/server.py"]
+
+[mcp_servers.gpu-vllm-g5g-2b.env]
+AWS_REGION = "us-east-1"
+MODEL_NAME = "google/gemma-4-E2B-it"
+INSTANCE_TYPE = "g5g.2xlarge"
+MCP_SERVER_NAME = "gpu-vllm-g5g-2b"
+
+# Launching costs money and the build path runs for hours; terminating destroys the locally
+# built SM 7.5 image with the root volume. Gate the state-changing tools.
+[mcp_servers.gpu-vllm-g5g-2b.tools.create_g5g_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-vllm-g5g-2b.tools.terminate_g5g_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-vllm-g5g-2b.tools.stop_g5g_instance]
+approval_mode = "approve"

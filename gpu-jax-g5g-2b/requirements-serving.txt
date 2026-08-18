@@ -1,0 +1,17 @@
+# Serving dependencies, installed ON the G5g instance by cloud-init.
+#
+# Not installed locally: jax[cuda12] resolves to aarch64 CUDA wheels for a T4G.
+# server.py's _SERVING_REQUIREMENTS is the source of truth for what the bootstrap
+# actually installs; this file mirrors it and a test asserts they match.
+#
+# jax[cuda12] pulls CUDA from pip (cublas, cudnn, cuda-runtime, cusolver all
+# publish aarch64 wheels), so the DLAMI only has to supply the driver.
+# Requires Python >= 3.12.
+jax[cuda12]
+fastapi
+uvicorn
+pydantic
+transformers
+safetensors
+huggingface_hub
+numpy
