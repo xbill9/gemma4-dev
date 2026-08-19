@@ -123,6 +123,7 @@ Accelerator generation plus chip count, punctuation stripped.
 | `v5p1` | TPU v5p, 1 chip — only reachable via Compute Engine, see below |
 | `v6e1` | TPU v6e (Trillium), 1 chip |
 | `v6e4` | TPU v6e, 4 chips |
+| `v6e8` | TPU v6e, 8 chips — one host on both control planes (`v6e-8` / `ct6e-standard-8t`) |
 | `inf2` | AWS Inferentia2 |
 
 For `gpu` platforms the slot takes the GPU SKU — `l4`, `t4`, `a100` — same rule: lowercase, no punctuation.
@@ -303,6 +304,7 @@ Three things that trip people up:
 | Rig | Platform | Runtime | Hardware | Model | Variant |
 | --- | --- | --- | --- | --- | --- |
 | `~/gemma4-dev/gce-vllm-v6e1-2b` | **Compute Engine instance** (`ct6e-standard-1t`) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — — the A/B twin of `tpu-vllm-v6e1-2b`, see below |
+| `~/gemma4-dev/gce-vllm-v6e8-2b` | **Compute Engine instance** (`ct6e-standard-8t`) | vLLM in Docker | v6e-8 | `gemma-4-E2B-it` | — — forked from `gce-vllm-v6e1-2b` and retargeted to eight chips 2026-08-19; the A/B twin of `tpu-vllm-v6e8-2b` |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-q4_0` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | `q4_0` |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-w4a16` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the `-ct` container is not part of the slot |
@@ -310,6 +312,7 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-vllm-v6e1-2b` | TPU Queued Resource | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v6e8-2b` | TPU flex-start VM | vLLM in Docker | v6e-8 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-jax-v5e1-2b` | TPU | JAX | v5e-1 | 2B | — |
+| `~/gemma4-dev/tpu-jax-v6e1-2b` | **GCE instance** (`ct6e-standard-1t`) | JAX | v6e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | — — **slot 1 is a deliberate exception, see below** |
 | `~/gemma4-dev/tpu-jax-v6e1-12b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-jax-v6e1-26b-q4_0` | TPU | JAX | v6e-1 | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | `q4_0` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-jax-v6e1-31b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-31B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
@@ -324,6 +327,18 @@ Three things that trip people up:
 | `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |
 | `~/tpu-pytorch-v6e1-2b` | TPU | PyTorch | v6e-1 | 2B | — |
 | `~/tpu-pytorch-inf2-2b` | Inferentia (slot `tpu`) | PyTorch | inf2 | 2B | — |
+
+### The one rig whose slot 1 does not follow the rule
+
+`~/gemma4-dev/tpu-jax-v6e1-2b` provisions **only** through Compute Engine — it holds no
+queued-resource tools at all — so by the letter of slot 1 it should be `gce-jax-v6e1-2b`, exactly as its
+`gce-vllm-v6e1-2b` sibling is. The directory name was kept on 2026-08-18 by an explicit decision, with
+the trade-off understood.
+
+This is recorded rather than quietly tolerated, and it is **not a precedent**. The rule stands: a new
+Compute-Engine-provisioned TPU rig takes `gce`. Do not cite this row as evidence that `tpu` may name a
+Compute Engine rig, and do not "correct" that rig's `server.py` to match its name — the name is the
+exception and the code is right. Its own `CLAUDE.md` says the same.
 
 Adding slot 5 makes exactly one existing name stale: **`tpu-pytorch-v5e1-12b` serves 4-bit weights and should
 be `tpu-pytorch-v5e1-12b-w4a16`.** It has no full-precision sibling, so nothing is broken today and the

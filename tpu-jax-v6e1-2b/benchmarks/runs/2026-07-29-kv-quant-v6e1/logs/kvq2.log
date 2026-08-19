@@ -1,0 +1,68 @@
+test_int8_cache_is_about_half_of_bfloat16 (tests.test_quantized_kv.CacheLayoutTest.test_int8_cache_is_about_half_of_bfloat16) ... ok
+test_quantized_entries_carry_scales_and_bf16_does_not (tests.test_quantized_kv.CacheLayoutTest.test_quantized_entries_carry_scales_and_bf16_does_not) ... ok
+test_dtype_classification (tests.test_quantized_kv.QuantizeKVTest.test_dtype_classification) ... ok
+test_round_trip_is_close (tests.test_quantized_kv.QuantizeKVTest.test_round_trip_is_close) ... ok
+test_zero_rows_do_not_produce_a_zero_or_nan_scale (tests.test_quantized_kv.QuantizeKVTest.test_zero_rows_do_not_produce_a_zero_or_nan_scale) ... ok
+test_fp8_no_longer_raises_on_promotion (tests.test_quantized_kv.QuantizedDecodeTest.test_fp8_no_longer_raises_on_promotion) ... ok
+test_int8_is_more_accurate_than_the_fp8_formats (tests.test_quantized_kv.QuantizedDecodeTest.test_int8_is_more_accurate_than_the_fp8_formats)
+Ranking, not absolute error — a scale bug would shuffle this order. ... ok
+test_quantized_decode_tracks_bfloat16 (tests.test_quantized_kv.QuantizedDecodeTest.test_quantized_decode_tracks_bfloat16) ... ok
+test_raw_int8_without_scales_would_have_been_wrong (tests.test_quantized_kv.QuantizedDecodeTest.test_raw_int8_without_scales_would_have_been_wrong)
+Guards the silent-failure mode: no-scale int8 must NOT look correct. ... ok
+test_multi_query_grouped (tests.test_quantized_kv.ScaleFactorizationTest.test_multi_query_grouped) ... ok
+test_no_grouping (tests.test_quantized_kv.ScaleFactorizationTest.test_no_grouping) ... ok
+test_single_kv_head (tests.test_quantized_kv.ScaleFactorizationTest.test_single_kv_head) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 25.753s
+
+OK
+===TPU_UNIT_DONE===
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2314.31it/s]
+
+########## KV cache = bf16 ##########
+loaded 6.56 GB in 3.6s
+  Q: What is 2+2?
+  A: '4\n<end_of_turn>'   [2 tok/s, length]
+  Q: The capital of France is
+  A: 'Paris'   [147 tok/s, length]
+  Q: Name three colours.
+  A: 'I am Gemma 4, a large language model developed by Google DeepMind.\n\nHere are three colors:\n1'   [147 tok/s, length]
+  Q: Explain gravity in one sentence.
+  A: 'Gravity is a fundamental force of nature that attracts any two objects with mass, causing them to exert a pull on each other'   [147 tok/s, length]
+
+########## KV cache = int8 ##########
+loaded 6.56 GB in 3.4s
+  Q: What is 2+2?
+  A: '4\n<end_of_turn>'   [2 tok/s, length]
+  Q: The capital of France is
+  A: 'Paris'   [142 tok/s, length]
+  Q: Name three colours.
+  A: 'I am Gemma 4, a Large Language Model developed by Google DeepMind.\n\nHere are three colors:\n1'   [142 tok/s, length]
+  Q: Explain gravity in one sentence.
+  A: 'Gravity is a fundamental force of nature that attracts any two objects with mass, causing them to be drawn toward each other.'   [142 tok/s, length]
+
+########## KV cache = fp8_e4m3 ##########
+loaded 6.56 GB in 3.4s
+  Q: What is 2+2?
+  A: '4\n<end_of_turn>'   [2 tok/s, length]
+  Q: The capital of France is
+  A: 'Paris'   [141 tok/s, length]
+  Q: Name three colours.
+  A: 'I am Gemma 4, a Large Language Model developed by Google DeepMind.\n\nHere are three colors:\n1'   [142 tok/s, length]
+  Q: Explain gravity in one sentence.
+  A: 'Gravity is a fundamental force of nature that attracts any two objects with mass, causing them to exert a pull on each other'   [142 tok/s, length]
+
+########## KV cache = fp8_e5m2 ##########
+loaded 6.56 GB in 3.4s
+  Q: What is 2+2?
+  A: '4\n<end_of_turn>'   [2 tok/s, length]
+  Q: The capital of France is
+  A: 'Paris'   [141 tok/s, length]
+  Q: Name three colours.
+  A: 'I am Gemma 4, a large language model developed by Google DeepMind.\n\nHere are three colors:\n1'   [141 tok/s, length]
+  Q: Explain gravity in one sentence.
+  A: 'Gravity is a fundamental force of nature that attracts any two objects with mass.\n<end_of'   [141 tok/s, length]
+
+KVQ2_DONE

@@ -1,0 +1,19 @@
+weights 6.62 GB | KV 9216 elements/token (18.00 KiB/token bf16, 9.07 KiB int8)
+reference: 32 GB HBM at 1640 GB/s
+
+  bf16 ctx  512 B  512:   23.90 ms | KV  4.83 GB | moved 11.45 GB |   479.2 GB/s =  29.2% of peak | roofline   6.98 ms
+  bf16 ctx  512 B 1296:   61.11 ms | KV 12.23 GB | moved 18.85 GB |   308.4 GB/s =  18.8% of peak | roofline  11.49 ms
+  bf16 ctx 8192 B   32:   21.20 ms | KV  4.83 GB | moved 11.45 GB |   540.1 GB/s =  32.9% of peak | roofline   6.98 ms
+  bf16 ctx 8192 B   87:   52.77 ms | KV 13.14 GB | moved 19.75 GB |   374.4 GB/s =  22.8% of peak | roofline  12.05 ms
+  int8 ctx  512 B  512:   19.37 ms | KV  2.44 GB | moved  9.05 GB |   467.3 GB/s =  28.5% of peak | roofline   5.52 ms
+  int8 ctx  512 B 2432:   73.83 ms | KV 11.57 GB | moved 18.19 GB |   246.3 GB/s =  15.0% of peak | roofline  11.09 ms
+  int8 ctx 8192 B   32:   13.16 ms | KV  2.44 GB | moved  9.05 GB |   687.9 GB/s =  41.9% of peak | roofline   5.52 ms
+  int8 ctx 8192 B  172:   58.44 ms | KV 13.09 GB | moved 19.71 GB |   337.2 GB/s =  20.6% of peak | roofline  12.02 ms
+
+--- where HBM goes at the measured ceiling ---
+  bf16 ctx  512 B 1296: weights 6.62 + KV 12.23 = 18.85 GB of 32  -> 13.15 GB unaccounted (temporaries) = 41%
+  bf16 ctx 8192 B   87: weights 6.62 + KV 13.14 = 19.75 GB of 32  -> 12.25 GB unaccounted (temporaries) = 38%
+  int8 ctx  512 B 2432: weights 6.62 + KV 11.57 = 18.19 GB of 32  -> 13.81 GB unaccounted (temporaries) = 43%
+  int8 ctx 8192 B  172: weights 6.62 + KV 13.09 = 19.71 GB of 32  -> 12.29 GB unaccounted (temporaries) = 38%
+
+ROOFLINE_DONE

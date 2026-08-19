@@ -1,0 +1,106 @@
+
+########## cache dtype = bfloat16 ##########
+  ctx=512
+    B=  256 ok   step   14.22 ms   KVtok    131,072
+    B=  512 ok   step   23.79 ms   KVtok    262,144
+    B=  768 ok   step   33.96 ms   KVtok    393,216
+    B= 1024 ok   step   47.56 ms   KVtok    524,288
+    B= 1536 OOM
+  -> ctx=   512: max B 1024, KV tokens 524,288
+  ctx=2048
+    B=  128 ok   step   21.41 ms   KVtok    262,144
+    B=  256 ok   step   40.09 ms   KVtok    524,288
+    B=  384 OOM
+  -> ctx=  2048: max B 256, KV tokens 524,288
+  ctx=8192
+    B=   32 ok   step   21.22 ms   KVtok    262,144
+    B=   64 ok   step   39.14 ms   KVtok    524,288
+    B=   96 OOM
+  -> ctx=  8192: max B 64, KV tokens 524,288
+  ctx=32768
+    B=    8 ok   step   20.98 ms   KVtok    262,144
+    B=   16 ok   step   39.20 ms   KVtok    524,288
+    B=   24 OOM
+  -> ctx= 32768: max B 16, KV tokens 524,288
+  BUDGET bfloat16: min 524,288  max 524,288  spread 0.0%
+
+########## cache dtype = int8 ##########
+  ctx=512
+    B=  256 ok   step   12.45 ms   KVtok    131,072
+    B=  512 ok   step   19.40 ms   KVtok    262,144
+    B=  768 ok   step   27.15 ms   KVtok    393,216
+    B= 1024 ok   step   35.35 ms   KVtok    524,288
+    B= 1536 ok   step   52.46 ms   KVtok    786,432
+    B= 2048 ok   step   64.44 ms   KVtok  1,048,576
+    B= 3072 OOM
+  -> ctx=   512: max B 2048, KV tokens 1,048,576
+  ctx=2048
+    B=  128 ok   step   15.19 ms   KVtok    262,144
+    B=  256 ok   step   23.00 ms   KVtok    524,288
+    B=  384 ok   step   35.50 ms   KVtok    786,432
+    B=  512 ok   step   44.93 ms   KVtok  1,048,576
+    B=  768 OOM
+  -> ctx=  2048: max B 512, KV tokens 1,048,576
+  ctx=8192
+    B=   32 ok   step   13.11 ms   KVtok    262,144
+    B=   64 ok   step   21.91 ms   KVtok    524,288
+    B=   96 ok   step   30.65 ms   KVtok    786,432
+    B=  128 ok   step   41.75 ms   KVtok  1,048,576
+    B=  192 OOM
+  -> ctx=  8192: max B 128, KV tokens 1,048,576
+  ctx=32768
+    B=    8 ok   step   13.65 ms   KVtok    262,144
+    B=   16 ok   step   21.74 ms   KVtok    524,288
+    B=   24 ok   step   30.79 ms   KVtok    786,432
+    B=   32 ok   step   41.33 ms   KVtok  1,048,576
+    B=   48 OOM
+  -> ctx= 32768: max B 32, KV tokens 1,048,576
+  BUDGET int8: min 1,048,576  max 1,048,576  spread 0.0%
+
+########## cache dtype = float8_e4m3fn ##########
+  ctx=512
+    B=  256 ok   step   14.13 ms   KVtok    131,072
+    B=  512 ok   step   25.87 ms   KVtok    262,144
+    B=  768 ok   step   40.03 ms   KVtok    393,216
+    B= 1024 ok   step   52.31 ms   KVtok    524,288
+    B= 1536 ok   step   75.91 ms   KVtok    786,432
+    B= 2048 ok   step   96.93 ms   KVtok  1,048,576
+    B= 3072 OOM
+  -> ctx=   512: max B 2048, KV tokens 1,048,576
+  ctx=2048
+    B=  128 ok   step   20.67 ms   KVtok    262,144
+    B=  256 ok   step   39.47 ms   KVtok    524,288
+    B=  384 ok   step   58.28 ms   KVtok    786,432
+    B=  512 ok   step   75.86 ms   KVtok  1,048,576
+    B=  768 OOM
+  -> ctx=  2048: max B 512, KV tokens 1,048,576
+  ctx=8192
+    B=   32 ok   step   18.69 ms   KVtok    262,144
+    B=   64 ok   step   37.92 ms   KVtok    524,288
+    B=   96 ok   step   53.42 ms   KVtok    786,432
+    B=  128 ok   step   71.82 ms   KVtok  1,048,576
+    B=  192 OOM
+  -> ctx=  8192: max B 128, KV tokens 1,048,576
+  ctx=32768
+    B=    8 ok   step   18.50 ms   KVtok    262,144
+    B=   16 ok   step   37.31 ms   KVtok    524,288
+    B=   24 ok   step   53.44 ms   KVtok    786,432
+    B=   32 ok   step   70.71 ms   KVtok  1,048,576
+    B=   48 OOM
+  -> ctx= 32768: max B 32, KV tokens 1,048,576
+  BUDGET float8_e4m3fn: min 1,048,576  max 1,048,576  spread 0.0%
+
+########## prefill peak memory vs chunk length ##########
+    B       S   temps GB   total GB
+    8     128       2.24       8.86
+    8     256       4.40      11.01
+    8     512       8.75      15.37
+    8    1024      17.39      24.01
+    8    2048      23.85      30.47
+   32     128       8.68      15.30
+   32     256      17.38      24.00
+   32     512      23.21      29.83
+   32    1024  analysis failed: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the 
+   32    2048  analysis failed: RESOURCE_EXHAUSTED: Ran out of memory on HBM, the 
+
+FINAL_RUN_DONE

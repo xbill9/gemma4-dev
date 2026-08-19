@@ -1,0 +1,45 @@
+/usr/bin/python3.13: No module named pytest
+===TPUTESTS_DONE===
+
+########## KV cache = bf16 ##########
+  FAILED: [Errno 104] Connection reset by peer
+
+########## KV cache = int8 ##########
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2725.05it/s]
+  FAILED: invalid literal for int() with base 10: 'W'
+
+########## KV cache = fp8_e4m3 ##########
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2407.75it/s]
+  FAILED: invalid literal for int() with base 10: 'W'
+
+########## KV cache = fp8_e5m2 ##########
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2732.45it/s]
+  FAILED: invalid literal for int() with base 10: 'W'
+
+### decode ceiling, cache=bfloat16 (ctx=512) ###
+  B=  512  step   23.91 ms  agg   21410.9 tok/s  KVtok   262,144
+  B= 1024  FAILED: RESOURCE_EXHAUSTED: E0100: RuntimeBufferAllocationFailure:
+  -> max B 512 | KV tokens 262,144
+
+### decode ceiling, cache=bfloat16 (ctx=8192) ###
+  B=   32  step   21.32 ms  agg    1500.7 tok/s  KVtok   262,144
+  B=   64  step   39.36 ms  agg    1626.2 tok/s  KVtok   524,288
+  B=   96  FAILED: RESOURCE_EXHAUSTED: E0100: RuntimeBufferAllocationFailure:
+  -> max B 64 | KV tokens 524,288
+
+### decode ceiling, cache=int8 (ctx=512) ###
+  B=  512  step   19.66 ms  agg   26047.7 tok/s  KVtok   262,144
+  B= 1024  step   35.66 ms  agg   28713.0 tok/s  KVtok   524,288
+  B= 1536  step   51.62 ms  agg   29754.8 tok/s  KVtok   786,432
+  B= 2048  FAILED: RESOURCE_EXHAUSTED: E0100: RuntimeBufferAllocationFailure:
+  -> max B 1536 | KV tokens 786,432
+
+### decode ceiling, cache=int8 (ctx=8192) ###
+  B=   32  step   13.41 ms  agg    2386.4 tok/s  KVtok   262,144
+  B=   64  step   22.16 ms  agg    2888.7 tok/s  KVtok   524,288
+  B=   96  step   31.26 ms  agg    3071.4 tok/s  KVtok   786,432
+  B=  128  step   42.30 ms  agg    3025.9 tok/s  KVtok 1,048,576
+  B=  192  FAILED: RESOURCE_EXHAUSTED: E0100: RuntimeBufferAllocationFailure:
+  -> max B 128 | KV tokens 1,048,576
+
+KVQ_DONE

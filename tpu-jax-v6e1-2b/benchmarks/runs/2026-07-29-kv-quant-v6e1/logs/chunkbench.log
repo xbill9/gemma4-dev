@@ -1,0 +1,68 @@
+........
+----------------------------------------------------------------------
+Ran 8 tests in 26.075s
+
+OK
+===CHUNK_UNIT_DONE===
+
+### ctx=2048 one-shot cache=bfloat16 ###
+  B=   8  OOM
+  -> max B None
+
+### ctx=2048 chunk=512 cache=bfloat16 ###
+  B=   8  prefill   1919.3 ms
+  B=  16  prefill   1742.8 ms
+  B=  32  OOM
+  -> max B 16
+
+### ctx=2048 chunk=256 cache=bfloat16 ###
+  B=   8  prefill   1898.6 ms
+  B=  16  prefill   2078.8 ms
+  B=  32  prefill   2203.3 ms
+  B=  64  OOM
+  -> max B 32
+
+### ctx=2048 chunk=128 cache=bfloat16 ###
+  B=   8  prefill   1789.7 ms
+  B=  16  prefill   2231.2 ms
+  B=  32  prefill   2687.3 ms
+  B=  64  prefill   3881.8 ms
+  B= 128  OOM
+  -> max B 64
+
+### ctx=2048 one-shot cache=int8 ###
+  B=   8  OOM
+  -> max B None
+
+### ctx=2048 chunk=512 cache=int8 ###
+  B=   8  prefill   2013.7 ms
+  B=  16  prefill   1946.4 ms
+  B=  32  OOM
+  -> max B 16
+
+### ctx=2048 chunk=256 cache=int8 ###
+  B=   8  prefill   2080.2 ms
+  B=  16  prefill   2281.2 ms
+  B=  32  prefill   2263.0 ms
+  B=  64  OOM
+  -> max B 32
+
+### ctx=2048 chunk=128 cache=int8 ###
+  B=   8  prefill   1901.9 ms
+  B=  16  prefill   2335.1 ms
+  B=  32  prefill   3073.1 ms
+  B=  64  prefill   4316.6 ms
+  B= 128  OOM
+  -> max B 64
+
+cache      mode          max B   prefill ms
+bfloat16   one-shot       None            -
+bfloat16   chunk512         16       1742.8
+bfloat16   chunk256         32       2203.3
+bfloat16   chunk128         64       3881.8
+int8       one-shot       None            -
+int8       chunk512         16       1946.4
+int8       chunk256         32       2263.0
+int8       chunk128         64       4316.6
+
+CHUNKBENCH_DONE

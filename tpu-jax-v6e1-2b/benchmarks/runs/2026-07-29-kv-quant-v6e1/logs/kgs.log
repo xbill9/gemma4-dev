@@ -1,0 +1,70 @@
+
+==========================================================================
+### 0-calibrate
+==========================================================================
+  sum 2 GB:   1.411 ms ->  1417.2 GB/s (86.4% of published)
+  sum 4 GB:   3.957 ms ->  1010.9 GB/s (61.6% of published)
+  calibrated ceiling: 1417.2 GB/s
+
+==========================================================================
+### 1-donation
+==========================================================================
+
+  -- copying --
+    ctx  2048:    8.39 ms | (delta too small to slope)
+    ctx  4096:   13.51 ms | marginal   236.0 GB/s =  16.7% of calibrated
+    ctx  8192:   21.16 ms | marginal   315.5 GB/s =  22.3% of calibrated
+
+  -- donated --
+    ctx  2048:   12.50 ms | (delta too small to slope)
+    ctx  4096:   14.36 ms | (delta too small to slope)
+    ctx  8192:   17.41 ms | marginal   794.0 GB/s =  56.0% of calibrated
+
+  copying 275.7 GB/s -> donated 794.0 GB/s  = 2.88x
+  H2 predicts a clear rise. A flat result refutes it.
+
+==========================================================================
+### 2-attention-isolated
+==========================================================================
+  B= 32 ctx= 4096:   0.245 ms |  0.13 GB read |   547.0 GB/s =  38.6% of calibrated
+  B= 64 ctx= 4096:   0.321 ms |  0.27 GB read |   837.2 GB/s =  59.1% of calibrated
+  B= 32 ctx= 8192:   0.318 ms |  0.27 GB read |   843.5 GB/s =  59.5% of calibrated
+
+==========================================================================
+### 3-overheads
+==========================================================================
+  mask construction alone :   0.127 ms
+  attention with mask     :   0.307 ms
+  attention without mask  :   0.308 ms  -> mask costs -0.001 ms inside attention
+
+==========================================================================
+### 4-profile
+==========================================================================
+  $profiler.py:307 trace                                     n=    2 tot=   408.63 ms ( 21.6%)
+  $contextlib.py:145 __exit__                                n=    1 tot=   387.53 ms ( 20.5%)
+  $profiler.py:271 stop_trace                                n=    1 tot=   387.52 ms ( 20.5%)
+  jit_step(14630925261731794669)                             n=   10 tot=   201.26 ms ( 10.6%)
+  $api.py:2666 block_until_ready                             n=   10 tot=   200.99 ms ( 10.6%)
+  PjitFunction(step)                                         n=   20 tot=    21.61 ms (  1.1%)
+  $contextlib.py:136 __enter__                               n=    1 tot=    21.11 ms (  1.1%)
+  $profiler.py:151 start_trace                               n=    1 tot=    21.10 ms (  1.1%)
+  PjRtCApiLoadedExecutable::Execute                          n=   10 tot=     5.98 ms (  0.3%)
+  PJRT_LoadedExecutable_Execute                              n=   10 tot=     5.83 ms (  0.3%)
+  CommonPjRtLoadedExecutable::Execute (jit_step)             n=   10 tot=     5.71 ms (  0.3%)
+  CommonPjRtLoadedExecutable::ExecuteHelperOnSingleDevice    n=   10 tot=     5.69 ms (  0.3%)
+  fusion.141                                                 n=   10 tot=     5.44 ms (  0.3%)
+  copy.1564                                                  n=   10 tot=     4.78 ms (  0.3%)
+  copy.1565                                                  n=   10 tot=     4.30 ms (  0.2%)
+  copy.1555                                                  n=   10 tot=     3.80 ms (  0.2%)
+  copy.1554                                                  n=   10 tot=     3.73 ms (  0.2%)
+  copy.1544                                                  n=   10 tot=     3.69 ms (  0.2%)
+  copy.1545                                                  n=   10 tot=     3.69 ms (  0.2%)
+  fusion.8                                                   n=   10 tot=     3.40 ms (  0.2%)
+
+==========================================================================
+  PASS  0-calibrate              
+  PASS  1-donation               
+  PASS  2-attention-isolated     
+  PASS  3-overheads              
+  PASS  4-profile                
+KERNEL_GAP_SUITE_DONE

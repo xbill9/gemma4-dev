@@ -1,0 +1,59 @@
+ARCHIVED RECORD — NOT A RUNNABLE SCRIPT
+=======================================
+Deliberately stored as .txt with no shebang and no execute bit: this is the
+script that ran on jax-bench-v6e1 on 2026-07-28, kept verbatim so the published
+numbers are traceable to what produced them. It is BROKEN and must not be reused.
+
+What was wrong with it:
+  * no `set -e`, so failures did not stop the script;
+  * `pip install --break-system-packages` against pip 22.0.2, which predates that
+    flag, so the install failed;
+  * it printed its "TPU environment ready" marker anyway, on the failure path.
+The VM therefore reported ready with no JAX installed; the stack was installed by
+hand afterwards (Python 3.13.14, jax 0.11.0, libtpu 0.0.44.1).
+
+The maintained replacement fixes all three and additionally asserts that
+jax.devices() actually sees a TPU before printing the ready marker:
+  .claude/skills/tpu-management/mcp/startup_script_jax_template.sh
+rendered by server.py's _get_jax_startup_script() for workload="jax".
+
+--- verbatim as-run content follows ---
+# ARCHIVED AS-RUN — DO NOT REUSE.
+#
+# This is the script that actually ran on jax-bench-v6e1 on 2026-07-28, kept
+# verbatim as a record. It is BROKEN: it has no `set -e`, and its pip step used
+# --break-system-packages against a pip (22.0.2) too old to support the flag, so
+# the install failed and it printed its "ready" marker anyway. The JAX stack on
+# that VM was installed by hand afterwards.
+#
+# The fixed, maintained version is:
+#   .claude/skills/tpu-management/mcp/startup_script_jax_template.sh
+# rendered by server.py's _get_jax_startup_script() for workload="jax".
+# Minimal JAX-on-TPU startup: no docker, no vLLM, no HF token.
+# Mirrors its log to /dev/console so progress is visible over the serial port
+# even when SSH is blocked.
+exec > >(tee -a /var/log/jax-startup.log | tee /dev/console) 2>&1
+set -x
+
+echo "JAX-BOOTLOADER: start $(date -Is)"
+
+export DEBIAN_FRONTEND=noninteractive
+for i in $(seq 1 30); do
+  apt-get update -y && break || { echo "apt retry $i"; sleep 10; }
+done
+apt-get install -y python3-pip python3-venv || true
+
+# libtpu + JAX TPU wheels. --break-system-packages: Ubuntu 22.04 marks the
+# system interpreter as externally managed; this repo's standard is no venvs.
+pip3 install --break-system-packages --upgrade pip
+pip3 install --break-system-packages "jax[tpu]==0.11.0" \
+  -f https://storage.googleapis.com/jax-releases/libtpu_releases.html \
+  || pip3 install --break-system-packages "jax[tpu]" \
+     -f https://storage.googleapis.com/jax-releases/libtpu_releases.html
+
+python3 - <<'PY'
+import jax
+print("JAX", jax.__version__, "devices:", jax.devices())
+PY
+
+echo "JAX-BOOTLOADER: TPU environment ready."
