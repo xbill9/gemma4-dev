@@ -9,7 +9,7 @@ SKILL_DIR  := .claude/skills/$(SKILL_NAME)
 PLUGIN_DIR := skills/$(SKILL_NAME)
 DIST_DIR   := dist
 
-.PHONY: all help clean test lint install deploy init skill skill-install skill-package
+.PHONY: all help clean test lint install deploy init skill skill-install skill-package medium
 
 all: help
 
@@ -24,6 +24,7 @@ help:
 	@echo "  make skill         - refresh $(SKILL_NAME) snapshots"
 	@echo "  make skill-install - refresh + copy to ~/.claude/skills"
 	@echo "  make skill-package - refresh + build dist/$(SKILL_NAME)-skill.zip"
+	@echo "  make medium        - render medium-*.md to paste-ready HTML"
 	@echo "  make init TARGET=/path/to/project [ARGS='--region us-east-1']"
 	@echo "========================================================="
 	@echo "Serving here is a pip install, not a build: jax[cuda12] publishes"
@@ -58,7 +59,12 @@ clean:
 # Medium strips markdown tables and reflows monospace, so tables and ASCII
 # diagrams are rendered to PNG and inlined as data: URIs. Open the -embed.html
 # in a browser, Select All, Copy, paste into the Medium editor.
-
+medium:
+	@rm -rf medium
+	@for f in medium-*.md; do python3 make-medium.py "$$f" medium; done
+	@echo "---------------------------------------------------------"
+	@echo "Open in a browser, Ctrl-A, Ctrl-C, paste into Medium:"
+	@ls -1 medium/*-embed.html 2>/dev/null | sed 's/^/  /'
 
 init: skill
 	@if [ -z "$(TARGET)" ] && ! echo "$(ARGS)" | grep -q -- --global; then \

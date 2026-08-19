@@ -3,9 +3,6 @@ title: "Serving Gemma 4 on a Turing GPU with no build at all: pure JAX instead o
 published: false
 description: "The same G5g hardware, the same checkpoint, no from-source build, no CUDA toolkit, no Rust, and no kernel patch. jax[cuda12] ships aarch64 wheels that already carry sm_75. It costs 3.5x throughput."
 tags: aws, jax, cuda, machinelearning
-# canonical_url: https://your-blog.example/gemma4-g5g-pure-jax   # set if republished from your own site
-# cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-jax-g5g-2b/devto-cover.jpg  # add devto-cover.jpg + push first
-# series: "Gemma-4 on odd accelerators"
 ---
 
 *A field report on serving Google's Gemma 4 E2B on AWS EC2 **G5g** — Graviton2 (aarch64)
@@ -25,10 +22,13 @@ it is working.*
 
 ---
 
-I have a rig serving Gemma 4 E2B on G5g under vLLM. Getting there took a from-source build
+If you have ever been told a GPU is "unsupported" by a serving stack, this is what that
+sentence actually costs, measured both ways on the same box.
+
+I have a rig serving Gemma 4 E2B on AWS G5g under vLLM. Getting there took a from-source build
 with `TORCH_CUDA_ARCH_LIST=7.5`, a CUDA toolkit the image does not ship, a Rust toolchain it
 does not ship either, and a patch to `triton_unified_attention.py` that is not upstream and
-lives on exactly one EBS volume. It serves at 43.1 tok/s. I wrote all of that up.
+lives on exactly one EBS volume. It serves at 43.1 tok/s.
 
 The obvious question afterwards was whether any of it was necessary. vLLM's problem on this
 hardware is not really vLLM — it is that the fast path through it, for this model, is a
