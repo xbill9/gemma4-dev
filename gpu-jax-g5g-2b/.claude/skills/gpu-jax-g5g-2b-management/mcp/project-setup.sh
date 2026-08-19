@@ -6,12 +6,17 @@ err() { echo "error: $*" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_STEM="gpu-vllm-g5g-2b-management"
+# Derived, never a literal: the skill name carries the rig directory (NAMING.md).
+# A hardcoded stem here survived the vllm->jax fork and pointed .mcp.json at a
+# skill path that does not exist -- and failed the lookup below outright.
+SKILL_STEM="$(basename "$SCRIPT_DIR")-management"
 if [ -f "$SCRIPT_DIR/.claude/skills/$SKILL_STEM/SKILL.md" ]; then
   SKILL_SRC="$SCRIPT_DIR/.claude/skills/$SKILL_STEM"
   DEFAULT_SERVER_NAME="$(basename "$SCRIPT_DIR")"   # ...which is the rig directory
 elif [ -f "$SCRIPT_DIR/../SKILL.md" ]; then
+  # Unzipped bundle: this script sits at <skill>/mcp/, so the parent is the skill.
   SKILL_SRC="$(cd "$SCRIPT_DIR/.." && pwd)"
+  SKILL_STEM="$(basename "$SKILL_SRC")"
   DEFAULT_SERVER_NAME=""                            # no rig dir here; see TARGET_DIR below
 else
   err "cannot locate the bundled skill"
@@ -47,7 +52,7 @@ while [ $# -gt 0 ]; do
       echo "                            cannot stage E2B's 9.5 GiB of weights)"
       echo "  --server-name NAME       MCP server name; the key it is registered under, which"
       echo "                           prefixes every tool as mcp__<name>__create_g5g_instance."
-      echo "                           (default: the rig directory, gpu-vllm-g5g-2b)"
+      echo "                           (default: the rig directory, gpu-jax-g5g-2b)"
       echo "  --skip-deps              Skip the dependency import check"
       exit 0 ;;
     -*) err "unknown option: $1" ;;

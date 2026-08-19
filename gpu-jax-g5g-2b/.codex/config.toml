@@ -2,23 +2,28 @@
 # same entry point, same env. The path is relative to the project directory, as in .mcp.json;
 # never pin an absolute cwd, which is how the inf2 rig ended up pointing at a directory that
 # does not exist.
-[mcp_servers.gpu-vllm-g5g-2b]
+[mcp_servers.gpu-jax-g5g-2b]
 command = "python3"
-args = [".claude/skills/gpu-vllm-g5g-2b-management/mcp/server.py"]
+args = [".claude/skills/gpu-jax-g5g-2b-management/mcp/server.py"]
 
-[mcp_servers.gpu-vllm-g5g-2b.env]
+[mcp_servers.gpu-jax-g5g-2b.env]
 AWS_REGION = "us-east-1"
 MODEL_NAME = "google/gemma-4-E2B-it"
 INSTANCE_TYPE = "g5g.2xlarge"
-MCP_SERVER_NAME = "gpu-vllm-g5g-2b"
+MCP_SERVER_NAME = "gpu-jax-g5g-2b"
 
-# Launching costs money and the build path runs for hours; terminating destroys the locally
-# built SM 7.5 image with the root volume. Gate the state-changing tools.
-[mcp_servers.gpu-vllm-g5g-2b.tools.create_g5g_instance]
+# Launching costs money, and a spot instance can be reclaimed under you. Gate the
+# state-changing tools.
+#
+# Termination is NOT expensive here the way it is on the vLLM sibling: this rig builds
+# nothing, so a relaunch costs a pip install and the model download, not a 67-minute
+# compile plus an unlanded Triton patch. Gated anyway — it is still destructive, and a
+# one-time spot instance cannot be stopped, only terminated.
+[mcp_servers.gpu-jax-g5g-2b.tools.create_g5g_instance]
 approval_mode = "approve"
 
-[mcp_servers.gpu-vllm-g5g-2b.tools.terminate_g5g_instance]
+[mcp_servers.gpu-jax-g5g-2b.tools.terminate_g5g_instance]
 approval_mode = "approve"
 
-[mcp_servers.gpu-vllm-g5g-2b.tools.stop_g5g_instance]
+[mcp_servers.gpu-jax-g5g-2b.tools.stop_g5g_instance]
 approval_mode = "approve"

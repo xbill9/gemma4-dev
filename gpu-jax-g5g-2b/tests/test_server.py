@@ -155,6 +155,19 @@ class UserDataTests(unittest.TestCase):
         text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
         self.assertIn("ExecStart=/usr/bin/python3.12", text)
 
+    def test_execstart_is_repointed_at_the_installed_interpreter(self):
+        # MEASURED 2026-08-19 on i-063d52c913140b787: the DLAMI already ships
+        # /usr/local/bin/python3.12, which precedes /usr/bin on PATH. install.sh
+        # calls bare `python3.12`, so jax landed in /usr/local, while the unit's
+        # hardcoded ExecStart=/usr/bin/python3.12 crash-looped on
+        # ModuleNotFoundError -- AFTER the install reported success, because the
+        # verify step resolves through PATH too.
+        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        self.assertIn('PY_BIN="$(command -v python3.12)"', text)
+        self.assertIn("ExecStart=$PY_BIN", text)
+        # The rewrite has to happen after the install, not in the unit template.
+        self.assertLess(text.index("install_runtime\nverify_gpu"), text.index("PY_BIN="))
+
     def test_token_comes_from_secrets_manager_not_user_data(self):
         # User data is readable from instance metadata by anything on the box.
         text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")

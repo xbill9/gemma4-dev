@@ -108,6 +108,13 @@ JAX_COMPILATION_CACHE_DIR = os.getenv("JAX_COMPILATION_CACHE_DIR", "/opt/jax-cac
 _SERVING_REQUIREMENTS = (
     "fastapi", "uvicorn", "pydantic", "transformers",
     "safetensors", "huggingface_hub", "numpy",
+    # jinja2 is NOT optional here despite not being imported anywhere in this
+    # rig: transformers renders the chat template through it, and every serving
+    # path goes through apply_chat_template. Without it /health returns 200 and
+    # every /v1/chat/completions returns 500 -- measured 2026-08-19. transformers
+    # does not pull it in, and it memoizes the availability check at import, so
+    # installing it late needs a service restart.
+    "jinja2",
 )
 
 # Where the serving payload lands on the instance.
@@ -345,6 +352,23 @@ PYCHECK
 
 install_runtime
 verify_gpu
+
+# Point the unit at the interpreter that actually received the packages.
+#
+# MEASURED 2026-08-19: the DLAMI already carries /usr/local/bin/python3.12, which
+# precedes /usr/bin on PATH, so `python3.12` above installs jax into
+# /usr/local/lib/python3.12/site-packages while a hardcoded
+# ExecStart=/usr/bin/python3.12 gets the deadsnakes interpreter and dies with
+# `ModuleNotFoundError: No module named 'jax'` -- after the install has already
+# reported success, because verify_gpu resolves through PATH too.
+#
+# Rewritten here rather than in the unit template because the resolution can only
+# happen after install_runtime has run. Still an absolute path, so systemd is
+# happy and ExecStart never depends on the service's PATH.
+PY_BIN="$(command -v python{JAX_PYTHON_VERSION})"
+sed -i "s|^ExecStart=[^ ]*|ExecStart=$PY_BIN|" /etc/systemd/system/{SERVICE_NAME}.service
+systemctl daemon-reload
+
 touch {APP_DIR}/INSTALL_DONE
 INSTEOF
 chmod 700 {APP_DIR}/install.sh
@@ -683,14 +707,26 @@ async def verify_gpu_arch(instance_id: str) -> str:
     asks JAX rather than torch: the DLAMI's torch carries sm_75 already (measured
     2026-08-12), which says nothing about jaxlib.
     """
+    # The reduction accumulates in float32 on purpose. The exact result,
+    # 256**3 = 16,777,216, is far past float16's 65,504 max, so summing in
+    # float16 overflows to inf and the check can NEVER pass -- on any device.
+    # Measured 2026-08-19 on a T4G that was in fact healthy: every element of
+    # x @ x was exactly 256.0 and the fp32 sum was exact, while this line
+    # reported False. Do not "simplify" the dtype= away.
+    #
+    # platform is printed on its own labelled line because the CPU-fallback
+    # verdict below matches on it; folding it into the device line made that
+    # branch unreachable.
     probe = (
         "import jax, jax.numpy as jnp;"
         "d = jax.devices()[0];"
         "print('jax:', jax.__version__);"
-        "print('device:', d, d.platform);"
+        "print('device:', d);"
+        "print('platform:', d.platform);"
         "print('capability:', getattr(d, 'compute_capability', None));"
         "x = jnp.ones((256, 256), jnp.float16);"
-        "print('fp16 matmul ok:', float((x @ x).sum()) == 256.0 * 256.0 * 256.0)"
+        "y = x @ x;"
+        "print('fp16 matmul ok:', float(y.sum(dtype=jnp.float32)) == 256.0 ** 3)"
     )
     py = f"python{JAX_PYTHON_VERSION}"
     command = (
@@ -708,7 +744,7 @@ async def verify_gpu_arch(instance_id: str) -> str:
             )
         elif "fp16 matmul ok: True" in output:
             verdict = "\n\n✅ JAX reached the GPU and a real fp16 matmul executed."
-        elif "cpu" in output and "platform" in output:
+        elif "platform: cpu" in output:
             verdict = (
                 "\n\n❌ JAX fell back to CPU. Either the DLAMI has no NVIDIA driver "
                 "(AWS ships driverless ARM64 DLAMIs that boot fine here), or the "

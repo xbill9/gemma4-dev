@@ -38,7 +38,10 @@ class DevicePolicyTests(unittest.TestCase):
         for cc, expected in (((7, 5), jnp.float16), ((8, 0), jnp.bfloat16),
                              ((8, 9), jnp.bfloat16), ((7, 0), jnp.float16)):
             with self.subTest(cc=cc):
-                self._with_capability(cc, lambda: self.assertIs(
+                # expected is bound as a default: _with_capability calls body()
+                # inside this iteration, so late binding never misfires here, but
+                # ruff's B023 is a gate and the explicit bind costs nothing.
+                self._with_capability(cc, lambda expected=expected: self.assertIs(
                     M._default_compute_dtype(), expected))
 
     def test_env_override_is_honoured_and_validated(self):
