@@ -259,7 +259,7 @@ build, a CUDA toolkit, a Rust toolchain, and an unlanded patch to a
 Triton kernel. The JAX path takes a <code>pip install</code> and five
 minutes. Then it serves at a third of the speed, and three separate
 things lie to you about whether it is working.</em></p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-1.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-jax-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-1.png"
 alt="table" /></p>
 <hr />
 <p>If you have ever been told a GPU is "unsupported" by a serving stack,
@@ -412,7 +412,7 @@ zones to get one instance</h2>
 <p>Before any of the software mattered, capacity did. G5g is a 2020
 instance family that never got a successor, and the spot pools show
 it:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-2.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-jax-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-2.png"
 alt="table" /></p>
 <p>Worth knowing: the error AWS returned in <code>us-east-1b</code>
 recommended trying <code>us-east-1a</code>, which had refused the
@@ -542,7 +542,7 @@ engine pads to static buckets, and why a benchmark harness that does not
 warm up will understate this rig by more than a factor of two.</p>
 <p>Measured end-to-end from my laptop, five runs, 17-token prompt and 64
 completion tokens:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-3.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-jax-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-3.png"
 alt="table" /></p>
 <p>A 0.02 tok/s spread across five runs. Whatever else is true, it is
 not noisy.</p>
@@ -550,7 +550,7 @@ not noisy.</p>
 against 43</h2>
 <p>Here is the comparison the whole exercise was for. Same instance
 family, same GPU, same checkpoint, single stream:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-4.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-jax-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-4.png"
 alt="table" /></p>
 <p>Roughly 3.5x. Be careful how much weight you put on that ratio: the
 vLLM figure was obtained with reduced Triton tiles on a patched kernel,
@@ -587,7 +587,7 @@ you can actually reason about beats being fast on one where the next
 model shape puts you back in someone else's kernel.</p>
 <h2 id="troubleshooting-quick-reference">Troubleshooting quick
 reference</h2>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-5.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-jax-g5g-2b/medium/img/medium-gemma4-g5g-pure-jax-table-5.png"
 alt="table" /></p>
 <h2 id="the-short-version">The short version</h2>
 <p>Take the ARM64 GPU DLAMI and <code>pip install 'jax[cuda12]'</code> —
