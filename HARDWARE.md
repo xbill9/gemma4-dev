@@ -325,7 +325,10 @@ The rig-level "three gates" framing (see `tpu-vllm-v6e1-2b/CLAUDE.md`) needs one
 two sources that do not always agree.**
 
 - For v6e they agree exactly — `ct6e-standard-1t` and `ct6e-standard-1t-tpu` are each listed in the **same 18
-  zones** as `v6e-1` in the TPU API, against 37 zones reporting quota.
+  zones** as `v6e-1` in the TPU API, against 37 zones reporting quota. **Re-read 2026-08-19: the machine-type
+  side is now 19 zones**, and all six `ct6e-standard-{1,4,8}t[-tpu]` shapes publish in the same 19. The
+  accelerator-type side was not re-counted, so whether the two still agree exactly is unverified — the
+  machine-type list is the one that moved.
 - For v5p they disagree in `europe-west1-c` (machine types yes, accelerator type no) — see the v5p table above.
 
 So a migration that swaps `accelerator-types list` for `machine-types list` as its availability check is not a
