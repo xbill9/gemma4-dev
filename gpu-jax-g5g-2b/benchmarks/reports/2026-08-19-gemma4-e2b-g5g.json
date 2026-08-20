@@ -1,0 +1,174 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-19-gemma4-e2b-g5g",
+    "date": "2026-08-19",
+    "operator": "xbill",
+    "source": "gpu-jax-g5g-2b",
+    "notes": "First serve for this rig. Single stream, one sample per cell, no repeats. Warm measurements only; cold figures recorded separately in the run REPORT.md. Instance terminated after the run."
+  },
+  "hardware": {
+    "accelerator": "nvidia-t4g",
+    "chips": 1,
+    "topology": "single-device",
+    "hbm_gb_per_chip": 15.0,
+    "machine_type": "g5g.2xlarge",
+    "host": {
+      "cloud": "aws",
+      "zone": "us-east-1c",
+      "provisioning": "spot",
+      "instance_name": "i-063d52c913140b787",
+      "max_run_duration_hours": 2.25
+    },
+    "pricing": {
+      "currency": "USD",
+      "rate_per_chip_hour": 0.369,
+      "source": "aws ec2 describe-spot-price-history, us-east-1c, g5g.2xlarge, 2026-08-19 (one T4G on this size, so per-chip equals per-instance)"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "parameters_b": 2,
+    "weights_dtype": "float16",
+    "quantization": "none",
+    "kv_cache_dtype": "float16",
+    "max_model_len": 8192,
+    "architecture_notes": "Reference bf16 release, cast to float16 at load. Turing (SM 7.5) has no bf16 datapath and no fp8; the port selects float16 from the live compute capability. The fused W4A16 Pallas kernel is refused at startup here: it needs 550 KiB-1.1 MiB of shared memory per block against Turing's 64 KiB opt-in ceiling."
+  },
+  "software": {
+    "engine": "pure-jax",
+    "version": "jax 0.11.1 / jaxlib 0.11.1 / jax-cuda12-plugin 0.11.1",
+    "backend": "xla-gpu",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "--model",
+      "google/gemma-4-E2B-it",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+      "--kv-cache-dtype",
+      "auto",
+      "--quant-mode",
+      "fp16",
+      "--max-model-len",
+      "8192"
+    ],
+    "container_image": "none (systemd unit on ami-077792d0bb6a000b8, CUDA from pip wheels)"
+  },
+  "throughput": {
+    "workload": {
+      "tool": "manual (urllib, /v1/chat/completions)",
+      "dataset": "fixed prompt",
+      "input_len": 17,
+      "output_len": 64,
+      "num_prompts": 5,
+      "runs_per_point": 5,
+      "noise_floor_pct": 0.2
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 17,
+        "output_len": 64,
+        "status": "ok",
+        "output_tok_per_s": 12.0,
+        "total_tok_per_s": 15.19,
+        "per_stream_tok_per_s": 12.0,
+        "ttft_ms": {
+          "median": 131.0
+        },
+        "tpot_ms": {
+          "median": 80.0
+        },
+        "raw": {
+          "wall_s": [
+            5.34,
+            5.33,
+            5.33,
+            5.33,
+            5.33
+          ],
+          "tok_per_s": [
+            11.99,
+            12.01,
+            12.0,
+            12.0,
+            12.01
+          ],
+          "server_gauge_decode_tok_per_s": 12.5,
+          "note": "End-to-end from a remote client, includes prefill and HTTP. Warm; see cold_start in startup.notes."
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 16,
+        "output_len": 1,
+        "status": "ok",
+        "output_tok_per_s": 3.92,
+        "ttft_ms": {
+          "median": 151.6
+        },
+        "raw": {
+          "note": "Health-check shape: 16-token prompt, single-token reply 'ok', 0.255 s round trip. Recorded because it is the cell verify_model_health exercises."
+        }
+      },
+      {
+        "concurrency": 8,
+        "status": "infeasible",
+        "error": "Engine is single-sequence (max_num_seqs=1); no continuous batching exists to measure."
+      },
+      {
+        "concurrency": 1,
+        "input_len": 8192,
+        "output_len": 64,
+        "status": "infeasible",
+        "error": "Not run. First-serve validation only exercised a 17-token prompt; no context sweep was attempted."
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 15.0,
+    "weights_gib": 8.62,
+    "notes": "13,573 of 15,360 MiB in use while serving; engine reported 9.26 GB of parameters loaded. kv_cache_gib and resident_kv_tokens are deliberately absent: this engine allocates a static per-sequence cache as ordinary JAX arrays inside XLA_PYTHON_CLIENT_MEM_FRACTION=0.90, so there is no engine-managed KV pool and the vLLM-style resident-token figure has no equivalent. The ceiling is max_model_len x max_num_seqs = 8192 x 1. Memory bandwidth was not measured in this run."
+  },
+  "startup": {
+    "time_to_healthy_s": 160,
+    "engine_init_s": 158.8,
+    "notes": "Boot to SSM ~30 s. Wheel install ~5 min (no build, no CUDA toolkit, no Rust). Weight load 158.8 s cold; ~80 s on restart with the JAX compilation cache warm. First request after init cost 7,372.5 ms of prefill against 131.0 ms warm (56x) and 4.6 tok/s decode against 12.5 (2.7x) -- XLA compiling per shape bucket. Warm up before recording anything."
+  },
+  "cost": {
+    "per_m_output_tokens": [
+      {
+        "operating_point": "single-stream",
+        "output_tok_per_s": 12.0,
+        "usd": 8.54
+      }
+    ],
+    "notes": "Derived from $0.369/hr spot at 12.0 output tok/s sustained single-stream. Single stream only -- this figure does not amortize across concurrent requests, because this engine cannot serve them. Total instance spend for the session was ~$0.83."
+  },
+  "issues": [
+    {
+      "summary": "verify_gpu_arch reported 'fp16 matmul ok: False' on a healthy GPU: the probe summed a float16 matrix in float16, and the exact result 256^3 = 16,777,216 exceeds float16's 65,504 maximum, so the reduction overflowed to inf on any device. Fixed by accumulating in float32.",
+      "status": "fixed"
+    },
+    {
+      "summary": "The systemd unit ran /usr/bin/python3.12 while the bootstrap installed jax into /usr/local/bin/python3.12, which precedes it on PATH. Crash-looped on ModuleNotFoundError after the install reported success, because the post-install verification also resolved through PATH. install.sh now rewrites ExecStart to the resolved interpreter.",
+      "status": "fixed"
+    },
+    {
+      "summary": "jinja2 was missing from the serving requirements. /health returned 200 while every /v1/chat/completions returned 500, because transformers renders chat templates through Jinja and does not depend on it. transformers memoizes the availability check at import, so a late install needs a service restart.",
+      "status": "fixed"
+    },
+    {
+      "summary": "Spot capacity was refused in us-east-1a and us-east-1b before succeeding in us-east-1c. AWS's InsufficientInstanceCapacity message recommended us-east-1a, which had refused the identical request 90 seconds earlier -- that guidance reflects on-demand capacity and is not spot-aware.",
+      "status": "workaround"
+    }
+  ],
+  "notes": [
+    "The comparison figure of 43.1 tok/s belongs to gpu-vllm-g5g-2b's 2026-08-12 run on g5g.4xlarge, not to this rig. Same silicon and checkpoint, but different instance size, context (16,384 vs 8,192), concurrency ceiling (max_num_seqs 8 vs 1), and a patched Triton kernel with reduced tiles. Directional only.",
+    "Do not compare against the ~44 tok/s that gemma4-tips-aws records for E2B on one Inferentia core: different harness, different silicon.",
+    "This rig requires no from-source build, no CUDA toolkit, no Rust toolchain, and no kernel patch -- the whole reason it exists next to the vLLM rig on identical hardware."
+  ]
+}
