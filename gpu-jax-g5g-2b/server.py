@@ -95,11 +95,13 @@ MAX_NUM_SEQS = int(os.getenv("MAX_NUM_SEQS", "1"))
 XLA_PYTHON_CLIENT_MEM_FRACTION = os.getenv("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.90")
 
 # jax 0.11 requires Python >= 3.12 and Ubuntu 22.04 (the DLAMI base) ships 3.10,
-# so the bootstrap installs a 3.12 interpreter rather than using the system one.
+# so the bootstrap installs its own interpreter rather than using the system one.
+# Pinned to the newest stable CPython, not the minimum jax accepts: 3.12 left
+# bugfix support on 2025-04-02 and is security-only.
 # Installing into the DLAMI's own PyTorch environment is deliberately avoided —
 # it ships its own CUDA libraries and jax[cuda12] brings its own.
-JAX_PIP_SPEC = os.getenv("JAX_PIP_SPEC", "jax[cuda12]")
-JAX_PYTHON_VERSION = os.getenv("JAX_PYTHON_VERSION", "3.12")
+JAX_PIP_SPEC = os.getenv("JAX_PIP_SPEC", "jax[cuda13]")
+JAX_PYTHON_VERSION = os.getenv("JAX_PYTHON_VERSION", "3.14")
 JAX_COMPILATION_CACHE_DIR = os.getenv("JAX_COMPILATION_CACHE_DIR", "/opt/jax-cache")
 
 # What cloud-init installs on the instance, beyond JAX_PIP_SPEC. Kept here rather
@@ -320,16 +322,50 @@ cat >{APP_DIR}/install.sh <<'INSTEOF'
 #!/usr/bin/env bash
 set -euxo pipefail
 
-# jax >= 0.11 needs Python 3.12; the Ubuntu 22.04 DLAMI base ships 3.10.
+# jax >= 0.11 needs Python >= 3.12; the Ubuntu 22.04 DLAMI base ships 3.10.
+# We install the newest stable line, not the floor -- see JAX_PYTHON_VERSION.
 install_runtime() {{
   export DEBIAN_FRONTEND=noninteractive
-  apt-get update -y
-  apt-get install -y software-properties-common
+  # Three apt hazards, all of which fail the install AND hide it: INSTALL_DONE is
+  # never touched, so get_install_progress reports "INSTALL IN PROGRESS"
+  # indefinitely instead of surfacing an error.
+  #
+  # 1. DPkg::Lock::Timeout is not optional. unattended-upgrades runs on every
+  #    fresh Ubuntu instance and holds the dpkg frontend lock for minutes;
+  #    apt-get then exits 100 immediately rather than waiting. Observed
+  #    2026-08-20 on a running G5g.
+  # 2. Acquire timeouts are not optional either, and cover a DIFFERENT failure:
+  #    a wedged mirror, where apt holds the lists lock itself and nothing is
+  #    blocking it. Without these, apt waits forever rather than erroring.
+  # 3. The regional EC2 mirror can be broken while the canonical one is healthy,
+  #    so a hard failure against it is worth one retry elsewhere -- see
+  #    fallback_mirror.
+  APT_OPTS="-o DPkg::Lock::Timeout=600 -o Acquire::Retries=3"
+  APT_OPTS="$APT_OPTS -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
+
+  # MEASURED 2026-08-21 on i-08639f402a3c3e76b: us-east-1.ec2.ports.ubuntu.com
+  # returned 503 over IPv4 and resolved to AAAA records only, on a host with no
+  # IPv6 address and no IPv6 default route. apt-get update wedged for 12 minutes
+  # at the very first step -- before deadsnakes, before jax. Repointing at
+  # ports.ubuntu.com completed the same update in seconds.
+  fallback_mirror() {{
+    echo "apt: regional mirror failed; falling back to ports.ubuntu.com" >&2
+    sed -i -E 's|https?://[a-z0-9.-]+\.ec2\.ports\.ubuntu\.com|http://ports.ubuntu.com|g' \
+      /etc/apt/sources.list
+    apt-get $APT_OPTS update -y
+  }}
+
+  apt_run() {{
+    apt-get $APT_OPTS "$@" || {{ fallback_mirror; apt-get $APT_OPTS "$@"; }}
+  }}
+
+  apt_run update -y
+  apt_run install -y software-properties-common
   add-apt-repository -y ppa:deadsnakes/ppa
-  apt-get update -y
-  apt-get install -y {py} {py}-venv {py}-dev
+  apt_run update -y
+  apt_run install -y {py} {py}-venv {py}-dev
   curl -sS https://bootstrap.pypa.io/get-pip.py | {py}
-  # jax[cuda12] pulls CUDA from pip wheels (aarch64 published for all of them),
+  # The jax extra pulls CUDA from pip wheels (aarch64 published for all of them),
   # so the DLAMI only supplies the driver. No CUDA toolkit, no compiler, no Rust.
   {py} -m pip install --upgrade pip setuptools wheel
   {py} -m pip install --upgrade '{JAX_PIP_SPEC}'
@@ -355,10 +391,11 @@ verify_gpu
 
 # Point the unit at the interpreter that actually received the packages.
 #
-# MEASURED 2026-08-19: the DLAMI already carries /usr/local/bin/python3.12, which
-# precedes /usr/bin on PATH, so `python3.12` above installs jax into
-# /usr/local/lib/python3.12/site-packages while a hardcoded
-# ExecStart=/usr/bin/python3.12 gets the deadsnakes interpreter and dies with
+# MEASURED 2026-08-19 (on 3.12, but the hazard is not version-specific): the
+# DLAMI may already carry an interpreter of the same version under /usr/local/bin,
+# which precedes /usr/bin on PATH, so the bare `python{JAX_PYTHON_VERSION}` above
+# installs jax into /usr/local/lib/... while a hardcoded
+# ExecStart=/usr/bin/python{JAX_PYTHON_VERSION} gets the deadsnakes one and dies with
 # `ModuleNotFoundError: No module named 'jax'` -- after the install has already
 # reported success, because verify_gpu resolves through PATH too.
 #
@@ -588,7 +625,7 @@ async def create_g5g_instance(
 ) -> str:
     """Launch one tagged G5g instance using the latest regional ARM64 DLAMI.
 
-    Cloud-init installs Python 3.12 and jax[cuda12] from wheels and asserts JAX
+    Cloud-init installs the configured Python and jax spec from wheels, asserts JAX
     sees the GPU. It does NOT start serving: the payload is this rig's own
     source, so deploy it with deploy_jax_server once the install finishes.
     Spot is the default; pass spot=False for on-demand.

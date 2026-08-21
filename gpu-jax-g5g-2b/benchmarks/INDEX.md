@@ -10,9 +10,11 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
 | `2026-08-19-gemma4-e2b-g5g.json` | google/gemma-4-E2B-it | nvidia-t4g×1 | spot | ok | — |
+| `2026-08-21-cuda13-py314-g5g.json` | google/gemma-4-E2B-it | nvidia-t4g×1 | spot | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
 | `2026-08-19-first-serve-g5g` | 1 | 0 | 0 | yes |
+| `2026-08-21-cuda13-py314-g5g` | 1 | 0 | 0 | yes |

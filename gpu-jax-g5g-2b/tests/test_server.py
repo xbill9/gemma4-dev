@@ -133,8 +133,12 @@ class TuringConstraintTests(unittest.TestCase):
 
 class UserDataTests(unittest.TestCase):
     def test_install_is_wheels_not_a_build(self):
+        # Derived from JAX_PIP_SPEC, never a literal: a hardcoded "jax[cuda12]"
+        # here turns a routine CUDA-line bump into a test edit, which is friction
+        # against the standing preference for latest versions. The claim under
+        # test is "we install the configured spec from wheels", not which spec.
         text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
-        self.assertIn("jax[cuda12]", text)
+        self.assertIn(server.JAX_PIP_SPEC, text)
         self.assertNotIn("docker build", text)
         self.assertNotIn("git clone", text)
         # cloud-init must not block on the install.
@@ -142,18 +146,24 @@ class UserDataTests(unittest.TestCase):
         self.assertIn("INSTALL_DONE", text)
         self.assertShellParses(text)
 
-    def test_python_312_is_installed_because_jax_requires_it(self):
-        # jax >= 0.11 declares requires-python >= 3.12; Ubuntu 22.04 ships 3.10,
-        # so using the DLAMI's system python would fail at pip install time.
+    def test_a_modern_python_is_installed_because_jax_requires_it(self):
+        # jax >= 0.11 declares requires-python >= 3.12 and Ubuntu 22.04 ships
+        # 3.10, so the DLAMI's system python would fail at pip install time.
+        # Asserted against JAX_PYTHON_VERSION rather than a literal so the
+        # interpreter can be moved forward without editing tests.
         text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
         self.assertIn("deadsnakes", text)
-        self.assertIn("python3.12", text)
+        self.assertIn(f"python{server.JAX_PYTHON_VERSION}", text)
+        self.assertGreaterEqual(
+            tuple(int(x) for x in server.JAX_PYTHON_VERSION.split(".")), (3, 12),
+            "jax >= 0.11 requires Python 3.12 or newer",
+        )
 
     def test_systemd_execstart_is_absolute(self):
         # systemd refuses a relative ExecStart, and the unit would fail to load
         # with a message that says nothing about the interpreter.
         text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
-        self.assertIn("ExecStart=/usr/bin/python3.12", text)
+        self.assertIn(f"ExecStart=/usr/bin/python{server.JAX_PYTHON_VERSION}", text)
 
     def test_execstart_is_repointed_at_the_installed_interpreter(self):
         # MEASURED 2026-08-19 on i-063d52c913140b787: the DLAMI already ships
@@ -163,7 +173,7 @@ class UserDataTests(unittest.TestCase):
         # ModuleNotFoundError -- AFTER the install reported success, because the
         # verify step resolves through PATH too.
         text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
-        self.assertIn('PY_BIN="$(command -v python3.12)"', text)
+        self.assertIn(f'PY_BIN="$(command -v python{server.JAX_PYTHON_VERSION})"', text)
         self.assertIn("ExecStart=$PY_BIN", text)
         # The rewrite has to happen after the install, not in the unit template.
         self.assertLess(text.index("install_runtime\nverify_gpu"), text.index("PY_BIN="))

@@ -12,21 +12,27 @@ slot with them.
 Gemma 4 port (`ports/gemma4/`) driven by `jax_engine.py` behind an OpenAI-compatible FastAPI
 server (`jax_openai_server.py`), run under systemd — **not docker**.
 
-## Nothing here has served yet
+## This rig has served
 
-**This rig has no measurements of its own.** `benchmarks/` holds only the synced `README.md`
-and `serving-report.schema.json`; there is no `runs/` and no `reports/`. Every serving number
-you might want is either absent or belongs to a sibling.
+**Twice, and both runs are its own.** `benchmarks/runs/2026-08-19-first-serve-g5g/` is the
+first serve; `benchmarks/runs/2026-08-21-cuda13-py314-g5g/` repeats it on the CUDA 13 /
+Python 3.14 stack. The headline is **~12 tok/s single-stream** on `g5g.2xlarge`.
 
-What *is* verified (2026-08-18, against PyPI and by inspecting the plugin binary) is that the
-runtime can install: `jaxlib`, `jax-cuda12-plugin` and `jax-cuda12-pjrt` publish
-`manylinux_2_27_aarch64` wheels, the PJRT plugin's arch tables carry `sm_75` with a floor of
-SM 6.0, and every CUDA dependency (cublas, cudnn, cuda-runtime, cusolver) publishes aarch64
-wheels. **That is not a served token.** `tpu.env` marks each value MEASURED or PREDICTED;
-respect the split and do not quote a PREDICTED number as a result.
+Two things that still hold and are easy to lose:
 
-`verify_gpu_arch` is the cheapest way to convert the top of that list into evidence — it runs
-a real fp16 matmul on the device rather than checking that a flag was accepted.
+- **Most numbers you might want are still absent or belong to a sibling.** Two prompts, one
+  concurrency, one context. `tpu.env` still marks values MEASURED or PREDICTED; respect the
+  split and do not quote a PREDICTED number as a result. The KV-ceiling estimate in
+  particular remains PREDICTED — the serving runs did not test it.
+- **Installability is not a served token.** `jaxlib` and the CUDA plugins publishing
+  `manylinux_2_27_aarch64` wheels, and the PJRT arch tables carrying `sm_75` with an SM 6.0
+  floor (verified 2026-08-18), were never the same claim as "it serves".
+
+`verify_gpu_arch` remains the cheapest way to convert the install into evidence — it runs a
+real fp16 matmul on the device rather than checking that a flag was accepted.
+
+**Warm up before recording anything.** Cold prefill measured **56x** slower than warm on
+2026-08-19; a harness that skips warm-up understates this rig by more than 2x on decode.
 
 ## Why the hardware slot is `g5g` and not `t4g`
 
@@ -317,8 +323,18 @@ and it gained a `gpu-jax-g5g-2b` entry on 2026-08-18.
 
 ## Measurement
 
-**This rig has no measurements.** Not "few" — none. When the first one lands, it goes in
-`benchmarks/runs/<date>-<what>-g5g/`, where `<hw-short>` equals the hardware slot.
+**This rig has two measurements**, both its own, in `benchmarks/runs/<date>-<what>-g5g/`
+where `<hw-short>` equals the hardware slot:
+
+| Run | Decode | Note |
+| --- | ---: | --- |
+| `2026-08-19-first-serve-g5g` | 12.5 tok/s | First serve. CUDA 12 / Python 3.12. |
+| `2026-08-21-cuda13-py314-g5g` | 12.4 tok/s | CUDA 13 / Python 3.14, same AMI. |
+
+**The CUDA 13 / 3.14 bump is performance-neutral** — it buys currency, not speed. Compare the
+two on the `tpu_jax_decode_tokens_per_second` gauge, not end-to-end tok/s: the same prompt
+returned 64 completion tokens in one run and 53 in the other, and end-to-end wall includes
+prefill and HTTP, so the token count moves it.
 
 `benchmarks/README.md` and `serving-report.schema.json` are **synced copies** —
 `make benchmarks-sync` at the monorepo root overwrites them, so edit the root originals, never

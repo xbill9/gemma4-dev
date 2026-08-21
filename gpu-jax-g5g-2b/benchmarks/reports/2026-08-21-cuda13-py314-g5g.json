@@ -1,0 +1,146 @@
+{
+ "schema_version": "1.1",
+ "run": {
+  "id": "2026-08-21-cuda13-py314-g5g",
+  "date": "2026-08-21",
+  "operator": "xbill",
+  "source": "gpu-jax-g5g-2b",
+  "notes": "CUDA 13 + Python 3.14 bump. Same AMI, instance size, checkpoint and serving flags as 2026-08-19-first-serve-g5g, so the runtime is the only variable. Warm measurements only, single stream, no repeats beyond the 5 timed runs. Result is performance-neutral."
+ },
+ "hardware": {
+  "accelerator": "nvidia-t4g",
+  "chips": 1,
+  "topology": "single-device",
+  "hbm_gb_per_chip": 15.0,
+  "machine_type": "g5g.2xlarge",
+  "host": {
+   "cloud": "aws",
+   "zone": "us-east-1d",
+   "provisioning": "spot",
+   "instance_name": "i-08639f402a3c3e76b",
+   "max_run_duration_hours": 2.25
+  },
+  "pricing": {
+   "currency": "USD",
+   "rate_per_chip_hour": 0.395,
+   "source": "aws ec2 describe-spot-price-history, us-east-1d, g5g.2xlarge, 2026-08-21 (one T4G on this size, so per-chip equals per-instance)"
+  }
+ },
+ "model": {
+  "id": "google/gemma-4-E2B-it",
+  "family": "gemma-4",
+  "parameters_b": 2,
+  "weights_dtype": "float16",
+  "quantization": "none",
+  "kv_cache_dtype": "float16",
+  "max_model_len": 8192,
+  "architecture_notes": "Reference bf16 release, cast to float16 at load. Turing (SM 7.5) has no bf16 datapath and no fp8; the port selects float16 from the live compute capability. The fused W4A16 Pallas kernel is refused at startup here: it needs 550 KiB-1.1 MiB of shared memory per block against Turing's 64 KiB opt-in ceiling."
+ },
+ "software": {
+  "engine": "pure-jax",
+  "version": "jax 0.11.1 / jaxlib 0.11.1 / jax-cuda13-plugin 0.11.1 / jax-cuda13-pjrt 0.11.1 on Python 3.14.6",
+  "backend": "xla-gpu",
+  "tensor_parallel_size": 1,
+  "serve_args": [
+   "--model",
+   "google/gemma-4-E2B-it",
+   "--host",
+   "0.0.0.0",
+   "--port",
+   "8000",
+   "--kv-cache-dtype",
+   "auto",
+   "--quant-mode",
+   "fp16",
+   "--max-model-len",
+   "8192"
+  ],
+  "container_image": "none (systemd unit on ami-077792d0bb6a000b8, CUDA 13 from pip wheels: nvidia-cublas 13.6.1.10, nvidia-cuda-runtime 13.3.29, nvidia-cudnn-cu13 9.24.0.43)"
+ },
+ "throughput": {
+  "workload": {
+   "tool": "manual (urllib, /v1/chat/completions)",
+   "dataset": "fixed prompt",
+   "input_len": 20,
+   "output_len": 53,
+   "num_prompts": 5,
+   "runs_per_point": 5,
+   "noise_floor_pct": 0.2
+  },
+  "sweep": [
+   {
+    "concurrency": 1,
+    "input_len": 20,
+    "output_len": 53,
+    "status": "ok",
+    "output_tok_per_s": 11.78,
+    "total_tok_per_s": 16.22,
+    "per_stream_tok_per_s": 11.78,
+    "tpot_ms": {
+     "median": 84.9
+    },
+    "raw": {
+     "wall_s": [
+      4.5,
+      4.5,
+      4.5,
+      4.5,
+      4.5
+     ],
+     "tok_per_s": [
+      11.78,
+      11.77,
+      11.77,
+      11.79,
+      11.79
+     ],
+     "decode_gauge_tok_per_s": 12.4
+    }
+   }
+  ]
+ },
+ "memory": {
+  "usable_hbm_gib": 15.0,
+  "weights_gib": 8.62,
+  "notes": "13,581 of 15,360 MiB in use while serving (13,573 on 2026-08-19); engine reported 9.26 GB of parameters loaded. kv_cache_gib and resident_kv_tokens are deliberately absent: this engine allocates a static per-sequence cache as ordinary JAX arrays inside XLA_PYTHON_CLIENT_MEM_FRACTION=0.90, so there is no engine-managed KV pool. Memory bandwidth was not measured in this run."
+ },
+ "startup": {
+  "time_to_healthy_s": 162,
+  "engine_init_s": 160.4,
+  "notes": "Boot to SSM ~35 s. Wheel install ~4 min once apt was working -- but the first attempt wedged 12 min on a 503 from us-east-1.ec2.ports.ubuntu.com; see issues. Weight load 160.4 s cold. First request after init took 18.06 s end-to-end for 53 tokens against 4.50 s warm (4.0x) -- XLA compiling per shape bucket. TTFT was not isolated in this run, so the baseline's 56x prefill ratio was not re-measured. Warm up before recording anything."
+ },
+ "cost": {
+  "per_m_output_tokens": [
+   {
+    "operating_point": "single-stream",
+    "output_tok_per_s": 11.78,
+    "usd": 9.32
+   }
+  ],
+  "notes": "Derived from $0.395/hr spot at 11.78 output tok/s sustained single-stream. Higher than the 2026-08-19 figure of $8.54 because of the AZ spot price ($0.395 in us-east-1d vs $0.369 in us-east-1c), not because the runtime got slower -- the decode gauge is flat at 12.4 vs 12.5 tok/s. Single stream only; this engine cannot serve concurrent requests."
+ },
+ "issues": [
+  {
+   "summary": "apt-get update wedged for 12 minutes at the first bootstrap step. us-east-1.ec2.ports.ubuntu.com returned 503 over IPv4 and resolved to AAAA records only, on a host with no IPv6 address and no IPv6 default route. Not lock contention: apt held the lists lock itself and nothing blocked it, so DPkg::Lock::Timeout did not apply. Canonical ports.ubuntu.com answered 200 in 0.45 s. install.sh now sets Acquire::http::Timeout and Acquire::Retries and falls back to the canonical mirror.",
+   "status": "fixed"
+  },
+  {
+   "summary": "The stall was invisible: get_install_progress reported INSTALL IN PROGRESS for the full 12 minutes with the log mtime frozen, because INSTALL_DONE is the only completion signal and nothing checks for staleness.",
+   "status": "fixed"
+  },
+  {
+   "summary": "Spot capacity refused in us-east-1c and us-east-1b before us-east-1d accepted -- the second consecutive run requiring an AZ walk.",
+   "status": "workaround"
+  },
+  {
+   "summary": "The loader logs 'Loading W4A16 QAT weights into JAX' while serving fp16. Cosmetic but misleading; argv passes --quant-mode fp16 and jax_engine resolves fp16 correctly. Stale log string in the load path.",
+   "status": "open"
+  }
+ ],
+ "notes": [
+  "The CUDA 13 / Python 3.14 bump is performance-neutral. Decode gauge 12.4 tok/s against 12.5 on 2026-08-19; GPU memory +8 MiB; weight load +1.0%. Cite it as currency, not speed.",
+  "The end-to-end tok/s rows are NOT a clean comparison against 2026-08-19 and should not be read as a regression: the same prompt produced 53 completion tokens here against 64 there (both finish_reason stop), and usage.prompt_tokens came back 20 against 17. End-to-end wall includes prefill and HTTP, so token count moves it. The decode gauge is the like-for-like number.",
+  "Every version predicted by the 2026-08-20 `pip install --dry-run` in tpu.env held exactly on hardware, including the unsuffixed CUDA 13 package naming and the cudnn/nccl exceptions.",
+  "The comparison figure of 43.1 tok/s belongs to gpu-vllm-g5g-2b, not to this rig. Directional only -- different instance size, context, concurrency ceiling and a patched Triton kernel."
+ ]
+}
