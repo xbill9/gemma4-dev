@@ -268,6 +268,13 @@ profile_decode.py tests`, then `bash -n` on **four** shell scripts (`project-set
 `set_env.sh`, `save-aws-creds.sh`). **A new top-level module is silently unlinted until it is
 added to that list** — `profile_decode.py` sat outside it and was red for a day. `ports/` is excluded on purpose — see above.
 
+**`deploy_jax_server` ships the SKILL SNAPSHOT, not the working tree.** `server.py` resolves
+the payload next to itself, and the MCP server runs from `.claude/skills/…/mcp/`, so editing
+`ports/gemma4/jax_e_model.py` and deploying ships the *previous* `make skill` output with no
+warning — the deploy reports success and the instance runs stale code. Cost one full
+measure-and-conclude cycle on 2026-08-24 before the md5s were compared. **Always `make skill`
+before `deploy_jax_server`.**
+
 `make skill` regenerates the snapshots under `.claude/skills/` and `skills/`. **Eight files
 are generated**, not just the MCP control plane: `server.py`, `project-setup.sh`, both
 requirements files, **and the whole serving payload** (`jax_openai_server.py`,
@@ -353,7 +360,7 @@ tok/s for the same config warmed at the shape it was measured at.
 
 ## A silent correctness bug in the shared port
 
-**`docs/padding-window-eviction.md` — FIXED 2026-08-24, verified on CPU, NOT re-run on a T4G.**
+**`docs/padding-window-eviction.md` — FIXED 2026-08-24, verified on CPU and on a T4G.**
 Nothing in the mechanism is Turing-specific, which is what made a CPU reproduction possible.
 `tpu-jax-v5e1-2b` is **still unfixed**: that copy of `jax_e_model.py` has diverged (1,570 lines
 against 1,842 here, so they are NOT byte-identical and "shared therefore affected" is not a
@@ -405,12 +412,55 @@ seen bucket, amortised by the persistent compilation cache.
 four-layer random model on CPU (three sliding layers at `window=8`, one full-attention) and
 asserts the generated tokens are identical at pad 0, 4, 8 and 28. Against the pre-fix port that
 test reproduces the reported signature exactly: every pad at or above the window returns the
-*same* degenerate sequence, with a token repeated four times running. **No G5g instance has
-been launched since the fix** — the 1,515-token hardware repro has not been re-run.
+*same* degenerate sequence, with a token repeated four times running.
+
+**Confirmed on a T4G 2026-08-24** by forcing the OLD power-of-two ladder back in, so
+`pad_len >= 512` is reproduced rather than avoided: 1,515 tokens at pad 533 and 3,515 at pad
+581 — both of which looped on 2026-08-23 — now return coherent continuations. That is what
+establishes the store fix rather than the ladder as the remedy. TPU remains untested.
 
 `tpu_jax_degenerate_responses_total` still counts occurrences; it is observational, changes
 neither the response nor the status code, and is kept because it does not depend on eviction
 being the only cause.
+
+## bf16 weights are the transient nobody could name
+
+**`docs/bf16-weights-on-turing.md` — measured 2026-08-24. Root cause confirmed, NOT fixed.**
+
+The unexplained per-request transients in `larger-models-on-t4g.md` are **dtype conversions**,
+not dense-materialised quantised weights. The loader stores every float parameter as
+**bfloat16** while `COMPUTE_DTYPE` here is **float16**, so XLA converts in front of every use
+and the converted copy is a transient the size of the weight. The prefill HLO names it:
+`f32[262144,1536] wrapped_convert` — 1.50 GiB, the LM-head weight, where 1536 is E2B's
+`hidden_size`, not a sequence length. `embed_tokens_per_layer` at bf16[262144,8960] = 4.375 GiB
+accounts for the "4.52 GiB" figure.
+
+Two things make this diagnosable rather than a guess, and both are worth keeping:
+
+- **The transient is FLAT in the prompt bucket** — 1.504 GiB at 512 and at 1,536, 1.742 GiB at
+  4,096. Quadratic would be attention scores, linear an activation. `profile_prefill.py
+  --sweep` exists to make exactly that distinction, off `compiled.memory_analysis()` and the
+  optimized HLO, and it never has to let the allocation succeed.
+- **It is the same conversion `profile_decode.py` measured as 55% of decode time** the day
+  before. One cause, two symptoms, two tools.
+
+**Do not "just" change the loader default to `COMPUTE_DTYPE`.** It is one line, it is correct,
+and all three placements of the resulting cast were tried on hardware and are worse than the
+convert: on-device OOMs (source and destination resident together), host-side at shard load is
+unusably slow (`ml_dtypes` casts are not vectorised — E2B's 4.7 GB table did not finish in 10
+minutes on Graviton2), and building the tree on the host under `jax.default_device(cpu)` then
+placing it cannot find a contiguous 4.38 GiB block even ordered largest-first. The untried
+direction is a `view(uint16)` bit-twiddle, which is what bf16→f16 actually is.
+
+**`ml_dtypes.bfloat16` is an extension dtype**: `dtype.kind` is `'V'` and
+`np.issubdtype(bf16, np.floating)` is **False**. A `kind == "f"` guard converts float16 and
+float32, which need nothing, and silently skips bf16, which is the only dtype that needs it.
+
+**What did land:** `prefill_with_kv_cache` selects the last real token *before* the LM head
+(`logits_at`) instead of computing `[B, S, vocab]` and slicing one row. Confirmed in the HLO —
+no sequence-sized logits tensor at bucket 4,096 — and it lifted the dense ceiling: the dense
+checkpoint now serves 1,515 and 3,515 tokens, where `larger-models-on-t4g.md` bracketed it at
+(115, 2015].
 
 ## Measurement
 

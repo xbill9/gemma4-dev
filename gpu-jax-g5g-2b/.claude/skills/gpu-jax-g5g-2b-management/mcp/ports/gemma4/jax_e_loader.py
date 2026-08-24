@@ -10,6 +10,7 @@ from typing import Dict, Any
 import jax.numpy as jnp
 
 
+
 # Gemma 4 E2B ships as a multimodal checkpoint: the text decoder lives under
 # `model.language_model.` alongside `model.audio_tower.` / vision towers. Older
 # text-only exports use a bare `model.` prefix. Detect rather than assume — the
@@ -60,6 +61,14 @@ def convert_safetensors_to_jax_params(
     missing: list = []
 
     def get_arr(key: str, default_dtype=jnp.bfloat16):
+        # bfloat16, NOT COMPUTE_DTYPE, and that is a known cost rather than an
+        # oversight. On a pre-Ampere GPU the compute dtype is float16, so storing
+        # bf16 makes XLA insert a convert in front of every use -- MEASURED
+        # 2026-08-24 on a T4G as a 1.50 GiB `wrapped_convert` transient on the LM
+        # head, and previously as 55% of decode time. Switching the default here
+        # is correct and does NOT work yet: the cast has to happen somewhere, and
+        # both places tried are worse than the convert. See
+        # docs/bf16-weights-on-turing.md before changing it.
         if key in raw_weights:
             arr = raw_weights[key]
             if not isinstance(arr, jnp.ndarray):

@@ -311,6 +311,15 @@ class JaxGemmaEngine:
         # proportionally more — and `raw` is held for the entire conversion because
         # the parameter tree aliases its arrays. Filtering here is the difference
         # between peak RSS tracking the text weights and tracking the whole file.
+        # NOTE: the checkpoint ships bf16 and this chip computes in float16, so
+        # every use of a weight pays a convert (see docs/bf16-weights-on-turing.md).
+        # Casting here, as each shard lands, is the right PLACE for the fix -- it
+        # frees each bf16 source immediately -- but `ndarray.astype(float16)` on
+        # ml_dtypes bfloat16 is unusably slow on Graviton2: E2B's 4.7 GB PLE table
+        # did not finish in 10 minutes (measured 2026-08-24). Casting on the device
+        # instead OOMs, because source and destination are resident together.
+        # Neither is shippable, so the weights stay bf16 for now and the convert
+        # stays. Do NOT reintroduce either half without measuring both.
         skipped_bytes = 0
         for shard in shards:
             part = load_file(os.path.join(path, shard))
@@ -325,6 +334,15 @@ class JaxGemmaEngine:
             logger.info("skipped %.2f GB of non-text tower weights",
                         skipped_bytes / 1e9)
 
+        # NOT wrapped in `jax.default_device(cpu)`, deliberately. Building the tree
+        # on the host and placing it at the end is the obviously correct shape for
+        # this code and it does NOT work here: measured 2026-08-24, device_put of
+        # the finished 9.26 GB tree fails to find a contiguous 4.38 GiB block for
+        # `embed_tokens_per_layer` inside a 14.07 GB budget, and ordering the puts
+        # largest-first does not rescue it either. Letting the conversion allocate
+        # on the device as it goes lands the same bytes without the fragmentation.
+        # The dtype cast that used to make this matter now happens on the host at
+        # shard-load time above, so nothing is doubled here any more.
         self.params = convert_safetensors_to_jax_params(
             raw,
             num_layers=self.config.num_hidden_layers,

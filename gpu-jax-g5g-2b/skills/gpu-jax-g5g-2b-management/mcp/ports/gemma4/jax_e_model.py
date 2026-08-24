@@ -1095,6 +1095,7 @@ class Gemma4EModelJAX:
         sliding_attention_mask: Optional[jax.Array] = None,
         chunked_prefill: bool = False,
         cache_valid: Optional[jax.Array] = None,
+        logits_at: Optional[jax.Array] = None,
     ):
         B, S = input_ids.shape
 
@@ -1210,6 +1211,18 @@ class Gemma4EModelJAX:
 
         # Final RMSNorm
         h = rms_norm_jax(h, params.get("final_norm"), eps=self.config.rms_norm_eps)
+
+        # Take the rows the caller actually wants BEFORE the LM head. Prefill needs
+        # exactly one row per sequence — the last real token — but computing the
+        # head over all S positions materializes [B, S, vocab], which at E2B's
+        # 262,144-wide vocabulary is 1.50 GiB of f32 for a 1,536-token bucket and
+        # 4.0 GiB at 4,096. MEASURED 2026-08-24 on a T4G: that allocation is what
+        # made a 1,515-token prompt OOM on the dense checkpoint, at a size the
+        # OOM message reported and could not name. It is also S times the FLOPs of
+        # the largest matmul in the model, thrown away immediately afterwards.
+        if logits_at is not None:
+            h = jnp.take_along_axis(
+                h, jnp.asarray(logits_at, jnp.int32)[:, None, None], axis=1)
 
         # Output LM Head (tied embeddings scaled by 1/sqrt(hidden_size)).
         # At decode this streams the entire [vocab, hidden] table from HBM for a
@@ -1412,6 +1425,15 @@ def quantize_ple_table(params: Dict[str, jax.Array], bits: int = 8,
     # step against 60 ms resident — the only symptom, since nothing errors.
     src_devices = getattr(tbl, "devices", lambda: set())()
     home = next(iter(src_devices), None)
+    # Move the table to the host ONCE, before slicing it. `tbl[start:stop]` is
+    # evaluated on whatever device owns `tbl`, so slicing a device-resident table
+    # allocates a device buffer per chunk -- the loop below said "device_put(...,
+    # cpu)" and still ran every slice on the accelerator, which is the opposite of
+    # what the comment above claims. On E4B that surfaced as an OOM inside
+    # `jit_dynamic_slice` while quantizing (docs/larger-models-on-t4g.md), i.e.
+    # the one step that exists to REDUCE device memory could not run for want of
+    # it. Cost is a single D2H copy of a table that is about to be discarded.
+    tbl = jax.device_put(tbl, cpu)
     rows_per_chunk = max(1, (1 << 26) // (LD * 4))       # ~256 MB of float32
     q_chunks, s_chunks = [], []
     for start in range(0, V, rows_per_chunk):
@@ -1532,19 +1554,18 @@ def prefill_with_kv_cache(
     sliding_mask = (make_prefill_causal_mask(prompt_valid, window=window)
                     if window is not None else None)
 
+    # Logits at the last REAL token of each row -- selected BEFORE the LM head, not
+    # after. Slicing afterwards computes [B, S, vocab] to keep [B, 1, vocab].
+    prompt_lens = prompt_valid.sum(axis=1).astype(jnp.int32)          # [B]
     logits, caches = model(
         prompt_ids, params, position_ids,
         attention_mask=mask, quant_mode=quant_mode,
         kv_caches=caches, cache_slot=jnp.int32(0),
         sliding_attention_mask=sliding_mask,
         cache_valid=prompt_valid,
+        logits_at=prompt_lens - 1,
     )
-
-    # Logits at the last REAL token of each row
-    prompt_lens = prompt_valid.sum(axis=1).astype(jnp.int32)          # [B]
-    last_logits = jnp.take_along_axis(
-        logits, (prompt_lens - 1)[:, None, None], axis=1
-    )[:, 0, :]                                                        # [B, V]
+    last_logits = logits[:, 0, :]                                     # [B, V]
 
     valid = jnp.concatenate(
         [prompt_valid, jnp.zeros((B, max_new_tokens), dtype=jnp.bool_)], axis=1

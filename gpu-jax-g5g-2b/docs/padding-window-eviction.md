@@ -1,6 +1,6 @@
 # Right-padding evicts real tokens from the sliding-window KV ring
 
-**Status: FIXED 2026-08-24, verified end-to-end on CPU, NOT yet re-run on a T4G.**
+**Status: FIXED 2026-08-24, verified end-to-end on CPU and on a T4G.**
 Root cause measured 2026-08-23 on `i-02f74ac9b944576c5` (g5g.2xlarge, T4G). Nothing in the
 mechanism is chip-specific — which is what made a CPU reproduction possible, see "The fix".
 
@@ -214,10 +214,26 @@ The property asserted is **padding invariance**: the generated tokens must not d
 much the prompt was padded. That is stronger than "does not loop" and it is what the old code
 violated.
 
-**Still not verified on hardware.** No G5g instance has been launched since the fix, so the
-1,515-token prompt from "Reproducing" below has not been re-run on a T4G, and neither has
-anything on TPU. The CPU test exercises the layout and the arithmetic, at a window of 8 rather
-than 512, in fp32 rather than fp16.
+**Confirmed on hardware 2026-08-24**, `i-02f74…` replaced by `i-0bca12be1046b5faf`
+(g5g.2xlarge, T4G, fp16, `window_kv=True`, real `sliding_window=512`). The check forces the
+OLD power-of-two ladder back in, so `pad_len >= 512` is reproduced rather than avoided — which
+is what isolates the cache-store fix from the ladder:
+
+| ladder | tokens | bucket | pad | result |
+| --- | ---: | ---: | ---: | --- |
+| new | 1,515 | 1,536 | 21 | ok |
+| new | 3,515 | 3,584 | 69 | ok |
+| **old** | **1,515** | **2,048** | **533** | **ok** — looped on 2026-08-23 |
+| old | 1,595 | 2,048 | 453 | ok (was ok before too) |
+| **old** | **3,515** | **4,096** | **581** | **ok** — looped on 2026-08-23 |
+
+So the ladder really is only defence in depth; the store fix is what removes the failure.
+
+Two caveats on that table. The prompt is repeated filler ("The quick brown fox…"), so
+"coherent" means the model resumes the pattern mid-sentence — ` dog.The quick brown fox…`,
+with correct word boundaries and punctuation, against the 2026-08-23 signature of
+`TheTheTheThe` with no spaces at all. A non-repetitive prompt would be a sharper test. And
+nothing here was run on TPU, so `tpu-jax-v5e1-2b` remains untested and unfixed.
 
 **The TPU rig is not fixed.** `tpu-jax-v5e1-2b` has its own diverged copy of
 `jax_e_model.py` (1,570 lines against 1,842 here) and nothing here touched it.
