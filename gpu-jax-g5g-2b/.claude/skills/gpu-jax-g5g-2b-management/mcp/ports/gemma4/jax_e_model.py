@@ -803,36 +803,72 @@ def eager_attention_jax(
     return jnp.matmul(attn_probs, value)
 
 
-def _ring_store(k_buf: jax.Array, v_buf: jax.Array, k: jax.Array, v: jax.Array):
+def _ring_store(k_buf: jax.Array, v_buf: jax.Array, k: jax.Array, v: jax.Array,
+                real_len: Optional[jax.Array] = None):
     """Store a prefill's K/V into ring buffers that may be shorter than the prompt.
 
     Position p lives at slot ``p % buf_len``. When the prompt is longer than the
-    buffer (a windowed sliding layer), only the last ``buf_len`` positions are kept,
-    written as at most two contiguous slices — the split point is static, so this
-    stays jit-friendly.
+    buffer (a windowed sliding layer), only the last ``buf_len`` positions are kept.
+
+    `real_len` [B] is the unpadded prompt length. Pass it whenever the prompt was
+    right-padded to a bucket — see `_ring_store_one` for why omitting it is a
+    silent correctness bug rather than a rounding error.
     """
-    return _ring_store_one(k_buf, k), _ring_store_one(v_buf, v)
+    return _ring_store_one(k_buf, k, real_len), _ring_store_one(v_buf, v, real_len)
 
 
-def _ring_store_one(buf: jax.Array, val: jax.Array) -> jax.Array:
+def _ring_store_one(buf: jax.Array, val: jax.Array,
+                    real_len: Optional[jax.Array] = None) -> jax.Array:
     """Ring-store a single [B, H, S, X] tensor. See `_ring_store`.
 
     Split out so the per-token scale buffers of a quantized cache — same leading
     axes, X=1 instead of head_dim — reuse the identical slot arithmetic.
+
+    WHY `real_len` EXISTS. `val` is the *padded* prompt: the server right-pads to a
+    static bucket, so positions ``[real_len, S)`` are pad tokens. Keeping "the last
+    buf_len positions of val" therefore keeps the last buf_len positions of the
+    PADDING once ``S - real_len >= buf_len``, evicting every real token from the
+    ring. Measured 2026-08-23 on a T4G: 28 of E2B's 35 layers then attended to a
+    fully masked window and the model emitted "TheTheThe..." while the server
+    recorded status="success" (docs/padding-window-eviction.md). Masking cannot
+    repair it — `make_ring_decode_mask` correctly reports those slots invalid, which
+    is precisely the failure.
+
+    With `real_len`, slot j holds the most recent REAL position p < real_len with
+    ``p % buf_len == j``, so the invariant "ring slot == position % buf_len" holds
+    over real positions only and no pad K/V ever enters the cache. Slots with no
+    such position keep the buffer's zeros and stay masked.
+
+    `real_len=None` preserves the old padded-space behaviour, for callers whose
+    `val` carries no padding (chunked prefill writes real tokens only).
     """
     buf_len = buf.shape[2]
     S = val.shape[2]
-    if S <= buf_len:
-        return jax.lax.dynamic_update_slice(buf, val.astype(buf.dtype), (0, 0, 0, 0))
+    if real_len is None:
+        if S <= buf_len:
+            return jax.lax.dynamic_update_slice(buf, val.astype(buf.dtype), (0, 0, 0, 0))
+        start = S - buf_len             # first position we keep
+        off = start % buf_len           # its ring slot
+        head = buf_len - off            # positions written at slots off..buf_len-1
+        tail = val[:, :, start:, :]
+        out = jax.lax.dynamic_update_slice(buf, tail[:, :, :head, :].astype(buf.dtype), (0, 0, off, 0))
+        if off:
+            out = jax.lax.dynamic_update_slice(out, tail[:, :, head:, :].astype(buf.dtype), (0, 0, 0, 0))
+        return out
 
-    start = S - buf_len                 # first position we keep
-    off = start % buf_len               # its ring slot
-    head = buf_len - off                # positions written at slots off..buf_len-1
-    tail = val[:, :, start:, :]
-    out = jax.lax.dynamic_update_slice(buf, tail[:, :, :head, :].astype(buf.dtype), (0, 0, off, 0))
-    if off:
-        out = jax.lax.dynamic_update_slice(out, tail[:, :, head:, :].astype(buf.dtype), (0, 0, 0, 0))
-    return out
+    # Gather form. `real_len` is traced, so the two-slice trick above (whose split
+    # point must be static) does not apply; a gather of buf_len rows out of S is
+    # negligible beside the prefill that produced them.
+    B = val.shape[0]
+    n = jnp.asarray(real_len, jnp.int32).reshape(B, 1)                  # [B, 1]
+    j = jnp.arange(buf_len, dtype=jnp.int32)[None, :]                   # [1, buf_len]
+    # Largest p < real_len with p % buf_len == j; negative when the ring never
+    # reached slot j (a prompt shorter than the buffer).
+    pos = j + buf_len * jnp.floor_divide(n - 1 - j, buf_len)            # [B, buf_len]
+    keep = pos >= 0
+    idx = jnp.clip(pos, 0, S - 1)
+    gathered = jnp.take_along_axis(val, idx[:, None, :, None], axis=2)  # [B, H, buf_len, X]
+    return jnp.where(keep[:, None, :, None], gathered.astype(buf.dtype), buf)
 
 
 class Gemma4EAttentionJAX:
@@ -864,6 +900,7 @@ class Gemma4EAttentionJAX:
         kv_cache: Optional[Tuple[jax.Array, jax.Array]] = None,
         cache_slot: Optional[jax.Array] = None,
         chunked: bool = False,
+        cache_valid: Optional[jax.Array] = None,
     ) -> Tuple[jax.Array, Optional[Tuple[jax.Array, jax.Array]]]:
         B, S, _ = hidden_states.shape
         kv_out_override = None
@@ -945,11 +982,16 @@ class Gemma4EAttentionJAX:
                     # Prefill attends over the freshly computed bf16 K/V, so the
                     # quantized copy goes to the cache only — no scales are applied
                     # to this pass's attention, and no round-trip error enters it.
-                    new_k, new_v = _ring_store(k_buf, v_buf, k_q, v_q)
+                    # real_len keeps the bucket padding OUT of the ring. Without
+                    # it a prompt padded by >= buf_len evicts every real token —
+                    # see _ring_store_one.
+                    real_len = (cache_valid.sum(axis=1).astype(jnp.int32)
+                                if cache_valid is not None else None)
+                    new_k, new_v = _ring_store(k_buf, v_buf, k_q, v_q, real_len)
                     if quantized:
                         kv_out_override = (new_k, new_v,
-                                           _ring_store_one(k_scale_buf, k_s),
-                                           _ring_store_one(v_scale_buf, v_s))
+                                           _ring_store_one(k_scale_buf, k_s, real_len),
+                                           _ring_store_one(v_scale_buf, v_s, real_len))
                     else:
                         kv_out_override = (new_k, new_v)
 
@@ -1052,6 +1094,7 @@ class Gemma4EModelJAX:
         cache_slot: Optional[jax.Array] = None,
         sliding_attention_mask: Optional[jax.Array] = None,
         chunked_prefill: bool = False,
+        cache_valid: Optional[jax.Array] = None,
     ):
         B, S = input_ids.shape
 
@@ -1125,6 +1168,7 @@ class Gemma4EModelJAX:
                 kv_cache=kv_caches.get(i) if kv_caches is not None else None,
                 cache_slot=cache_slot,
                 chunked=chunked_prefill,
+                cache_valid=cache_valid,
             )
             # Gemma applies post_attention_layernorm to the attention OUTPUT before
             # the residual add, not as a pre-norm for the MLP. Getting this wrong
@@ -1493,6 +1537,7 @@ def prefill_with_kv_cache(
         attention_mask=mask, quant_mode=quant_mode,
         kv_caches=caches, cache_slot=jnp.int32(0),
         sliding_attention_mask=sliding_mask,
+        cache_valid=prompt_valid,
     )
 
     # Logits at the last REAL token of each row
@@ -1647,6 +1692,16 @@ def generate_with_kv_cache(
     temperature <= 0, on-chip top-k sampling otherwise. Returns [B, max_new_tokens].
     """
     B, S = prompt_ids.shape
+    if B != 1:
+        # The decode slot is a scalar shared by every row, and since the pad-gap
+        # fix that slot is the row's REAL length rather than the common bucket —
+        # which only coincides across rows when B == 1. Making this work for B > 1
+        # needs a per-row scatter in the attention cache write, not just here.
+        # Both engines in this tree serve MAX_NUM_SEQS=1, so this raises rather
+        # than silently reintroducing the padded-space slot it replaced.
+        raise NotImplementedError(
+            f"generate_with_kv_cache supports batch size 1, got {B}; "
+            "per-row decode slots are not implemented")
     if prng_key is None:
         prng_key = jax.random.PRNGKey(0)
 
@@ -1663,8 +1718,11 @@ def generate_with_kv_cache(
 
     for t in range(max_new_tokens - 1):
         prng_key, sample_key = jax.random.split(prng_key)
+        # Decode into the real position, NOT bucket + t. The bucket-derived slot
+        # left the pad gap [real_len, S) inside the cache and made the ring's slot
+        # arithmetic count padding as history — see _ring_store_one.
         caches, valid, last_logits = step(
-            params, caches, valid, tok, prompt_lens + t, jnp.int32(S + t)
+            params, caches, valid, tok, prompt_lens + t, prompt_lens[0] + jnp.int32(t)
         )
         tok = onchip_sample_tpu_v6e_jax(last_logits, sample_key, temperature=temperature, top_k=top_k)
         tokens.append(tok)
@@ -1733,7 +1791,24 @@ class HardwareProfile:
     optimal_k_tile: int
     optimal_n_tile: int
     native_bf16: bool
-    static_sequence_buckets: Tuple[int, ...] = (64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384)
+    #: Ladder of static prompt lengths. Steps of 128 above 256, NOT powers of two.
+    #:
+    #: A pure power-of-two ladder pads by up to B/2 — 2,047 tokens of padding on a
+    #: 4,096 bucket. That is not merely wasteful: pad K/V is written into the
+    #: sliding layers' KV ring, and once `pad_len` reaches `sliding_window` the ring
+    #: holds nothing but padding (measured 2026-08-23, see
+    #: docs/padding-window-eviction.md — the model emits a token loop and the server
+    #: records it as a success). This ladder caps padding at 127 for every length,
+    #: which keeps it below every sliding_window Gemma 4 declares (E2B: 512) with
+    #: margin, and preserves ~385 of the 512 ring slots for real context.
+    #:
+    #: The bucket write path is fixed independently (`_ring_store_one` stores only
+    #: real positions), so this is defence in depth rather than the whole remedy.
+    #: Cost is one extra compile per newly seen bucket, amortised by the persistent
+    #: compilation cache.
+    static_sequence_buckets: Tuple[int, ...] = (
+        (64, 128, 256) + tuple(range(384, 16384 + 1, 128))
+    )
 
     @classmethod
     def get_nearest_bucket(cls, seq_len: int) -> int:

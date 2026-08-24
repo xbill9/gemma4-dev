@@ -257,16 +257,16 @@ Three things about it that are easy to get wrong:
 
 ## Commands
 
-Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v` (47 tests,
-all passing as of 2026-08-18). They are fully offline — no AWS, no network, no GPU — and pin
+Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v` (76 tests,
+all passing as of 2026-08-24). They are fully offline — no AWS, no network, no GPU — and pin
 the facts above: the Turing dtype constraints, the arm64+driver AMI filter, the host-RAM
 floor, the shared-memory ceiling, that the token never reaches user data, that `tpu.env` and
 `server.py` still agree, and that no `VLLM_*`/`TORCH_CUDA*` key survived the fork.
 
 `make lint` runs `ruff check server.py refresh_skill.py jax_engine.py jax_openai_server.py
-tests`, then `bash -n` on **four** shell scripts (`project-setup.sh`, `init.sh`, `set_env.sh`,
-`save-aws-creds.sh`). **A new top-level module is silently unlinted until it is added to that
-list.** `ports/` is excluded on purpose — see above.
+profile_decode.py tests`, then `bash -n` on **four** shell scripts (`project-setup.sh`, `init.sh`,
+`set_env.sh`, `save-aws-creds.sh`). **A new top-level module is silently unlinted until it is
+added to that list** — `profile_decode.py` sat outside it and was red for a day. `ports/` is excluded on purpose — see above.
 
 `make skill` regenerates the snapshots under `.claude/skills/` and `skills/`. **Eight files
 are generated**, not just the MCP control plane: `server.py`, `project-setup.sh`, both
@@ -321,6 +321,97 @@ This rig has no `.claude-plugin/marketplace.json` of its own, which only matters
 published standalone. The marketplace `/plugin` actually reads is the **monorepo root** copy,
 and it gained a `gpu-jax-g5g-2b` entry on 2026-08-18.
 
+## How large a model this rig will serve
+
+**`docs/larger-models-on-t4g.md` — measured 2026-08-23. E2B is the ceiling today.**
+
+| Model | Loads? | Serves? | Blocker |
+| --- | --- | --- | --- |
+| E2B QAT + `ple_bits=4` | yes | **yes** | — 3.05 GB, 13.5 tok/s |
+| E4B QAT | **no** | — | OOM 5.25 GiB *during load* |
+| 12B QAT | yes (8.15 GB) | **no** | OOM 12.61 GiB *per request* |
+| 26B A4B | — | — | **no w4a16 export exists (404)**; 15.27 GiB > budget |
+| 31B | — | — | ~15.5 GB int4 > budget |
+
+Three things worth keeping:
+
+- **The budget is 14.07 GB on every G5g size.** The engine is single-device and the payload
+  contains no sharding primitives at all, so the second T4G on `16xlarge`/`metal` idles.
+  A bigger instance buys host RAM, not device memory.
+- **E4B and 12B fail on TRANSIENT allocations, not resident weights.** Both fit comfortably.
+  That is a tractable class of problem, unlike 26B/31B which are hard-blocked on residency.
+  The transients (4.52 / 5.25 / 12.61 GiB) scale with model size and are **unidentified** —
+  finding them is what stands between this rig and both larger models.
+- **`MODELS.md`'s int4 column under-predicts by 19%** (E2B measured 3.054 GB vs 2.58 GB) —
+  it quarters everything, but `embed_tokens` stays bf16 and the scales cost extra. Its bf16
+  column over-predicts by 9%.
+
+**`max_tokens` is part of the compiled shape** (`max_new_tokens` is a `static_argnames`
+entry), so warming up at a different `max_tokens` than you measure leaves the measured request
+cold. Measured here as a 4x error: 3.4 tok/s warmed at 32 and measured at 48, against 13.5
+tok/s for the same config warmed at the shape it was measured at.
+
+## A silent correctness bug in the shared port
+
+**`docs/padding-window-eviction.md` — FIXED 2026-08-24, verified on CPU, NOT re-run on a T4G.**
+Nothing in the mechanism is Turing-specific, which is what made a CPU reproduction possible.
+`tpu-jax-v5e1-2b` is **still unfixed**: that copy of `jax_e_model.py` has diverged (1,570 lines
+against 1,842 here, so they are NOT byte-identical and "shared therefore affected" is not a
+valid argument), every ingredient is present in it, and nothing here touched it.
+
+Right-padding to a power-of-two bucket writes pad K/V into the sliding layers' 512-slot KV
+ring, **evicting the real tokens**. At `pad_len >= 512` the ring holds only padding, 28 of
+E2B's 35 layers attend to an entirely masked window, and the model emits a token loop that
+the server records as `status="success"`.
+
+Three things that are easy to get wrong about it:
+
+- **It is not a long-context bug.** A 1,415-token prompt fails and a 4,055-token prompt
+  succeeds. Padding is the variable; length only makes large padding likely. Predicting
+  `pad_len >= 512` scored 14/14 across two buckets.
+- **It is not numerical.** `bfloat16` (emulated through fp32 on Turing, so strictly more
+  headroom) reproduces the failure table byte-for-byte.
+- **The existing guard in `make_ring_decode_mask` does not cover it.** That docstring
+  documents the pad gap and correctly stops the model *attending to* pad K/V. It does not
+  stop pad K/V *evicting* real K/V from a ring shorter than the padding.
+
+- **It is decided at the first decode step, not progressively.** Generated tokens refill the
+  ring, so pad=407 stays coherent through 600 generated tokens while pad=2035 loops from the
+  first token. Guaranteeing `pad_len < 512` therefore *prevents* the failure rather than
+  postponing it, which is why the bucket ladder is worth having as well.
+
+**The fix is an invariant: a cache index is an absolute real position, and padding never
+occupies an index a real position uses.** Three changes carry it — `_ring_store_one` takes
+`real_len` and gathers only real positions into the ring, `cache_valid` is threaded through
+`Gemma4EModelJAX.__call__` so prefill can supply it, and decode writes at `prompt_len + t`
+rather than `bucket + t`. `make_ring_decode_mask` and `make_decode_mask` are **unchanged** and
+stay correct under it.
+
+Two things about that worth keeping:
+
+- **Gating the prefill write on `prompt_valid` alone would NOT have fixed it**, despite the
+  write-up originally saying so. It removes pad K/V from the ring's *contents* but leaves the
+  pad indices in the cache's *coordinate space*, and the mask then rejects those slots anyway.
+  Masking cannot repair a layout problem; the gap had to be removed, not skipped.
+- **`B > 1` now raises `NotImplementedError`** rather than silently reverting to a shared
+  bucket slot. A row's real length only coincides with the bucket at `B == 1`, and both engines
+  here serve `MAX_NUM_SEQS=1`.
+
+`static_sequence_buckets` also changed, as defence in depth: `(64, 128, 256)` plus 128-steps to
+16384, so worst-case padding is **127 tokens** instead of `B/2`. Costs one compile per newly
+seen bucket, amortised by the persistent compilation cache.
+
+**Verified as padding invariance, not as "does not loop".** `tests/test_engine.py` builds a
+four-layer random model on CPU (three sliding layers at `window=8`, one full-attention) and
+asserts the generated tokens are identical at pad 0, 4, 8 and 28. Against the pre-fix port that
+test reproduces the reported signature exactly: every pad at or above the window returns the
+*same* degenerate sequence, with a token repeated four times running. **No G5g instance has
+been launched since the fix** — the 1,515-token hardware repro has not been re-run.
+
+`tpu_jax_degenerate_responses_total` still counts occurrences; it is observational, changes
+neither the response nor the status code, and is kept because it does not depend on eviction
+being the only cause.
+
 ## Measurement
 
 **This rig has two measurements**, both its own, in `benchmarks/runs/<date>-<what>-g5g/`
@@ -361,12 +452,20 @@ The registration files were repaired on 2026-08-18. Still stale:
 
 - **`README.md`** — titled `gpu-vllm-g5g-2b` and describes the vLLM runtime throughout.
 - **`AGENTS.md`, `GEMINI.md`** — same, byte-identical vLLM copies.
-- **`jax_openai_server.py`'s module docstring** — says "on TPU v6e-1" and advertises the
-  `-qat-w4a16-ct` checkpoint with BF16 activations. The code below it is correct; only the
-  docstring is from the TPU rig.
 - **Monorepo `NAMING.md` and `README.md`** — have no entry for `gpu-jax-g5g-2b` at all, and
   `NAMING.md`'s `g5g` carve-out names only the vLLM rig. (The root `marketplace.json` does
   have one.)
-- **`make lint` is red on a pre-existing `B023`** in `tests/test_engine.py:42` — a lambda
-  closing over the `expected` loop variable. Harmless in fact, because the lambda is invoked
-  inside the same iteration, but it fails the gate.
+
+Cleared 2026-08-23, listed here because the *class* of error keeps recurring — TPU-rig prose
+describing precision this chip cannot run:
+
+- `jax_openai_server.py`'s module docstring claimed "TPU v6e-1", the `-qat-w4a16-ct`
+  checkpoint and BF16 activations. It now points at `/health` and the
+  `tpu_jax_precision_info` series instead of naming a precision at all.
+- The load banner printed **"Loading W4A16 QAT weights"** unconditionally while loading the
+  dense fp16 checkpoint — so `get_jax_logs` told an operator the box had done the one thing
+  this rig refuses to do.
+- `/health` reported `weights="bf16"` and a hardcoded `activations="bfloat16"` on a chip with
+  no bf16 datapath, and echoed the *requested* KV dtype (`auto`) rather than what it resolved
+  to. All three now come off `ENGINE.precision_info()`.
+- `make lint`'s `B023` in `tests/test_engine.py:42` is fixed; the gate is green.

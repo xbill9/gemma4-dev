@@ -23,9 +23,58 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import server  # noqa: E402
 
+# Spelled out rather than read from server, so that a change to the served
+# checkpoint or the default size shows up as a test edit rather than passing
+# vacuously against whatever the module happens to hold.
+MODEL = "google/gemma-4-E2B-it"
+DEFAULT_SIZE = "g5g.2xlarge"
+SWAP_SIZE = "g5g.xlarge"        # the one size small enough to need a swapfile
+
+# The eight files refresh_skill.py snapshots into both skill copies: the MCP
+# control plane *and* the serving payload, because an installed skill still has
+# to be able to run deploy_jax_server.
+SKILL_SOURCES = (
+    "server.py", "project-setup.sh", "requirements.txt",
+    "requirements-serving.txt", "jax_openai_server.py", "jax_engine.py",
+    "ports/gemma4/jax_e_loader.py", "ports/gemma4/jax_e_model.py",
+)
+
 
 def run(coro):
     return asyncio.run(coro)
+
+
+def user_data(instance_type=DEFAULT_SIZE, model=MODEL):
+    return server._user_data(model, instance_type)
+
+
+def user_data_from_config(config):
+    """Pull the cloud-init script back out of a get_deployment_config rendering."""
+    encoded = config.split("--user-data '", 1)[1].split("'", 1)[0]
+    return base64.b64decode(encoded).decode()
+
+
+def tpu_env():
+    values = {}
+    for line in (ROOT / "tpu.env").read_text().splitlines():
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            values[key] = value
+    return values
+
+
+class BashSyntaxMixin:
+    """`bash -n` assertions, shared by the rendered-script and repo-file tests."""
+
+    def assertShellParses(self, text, label="rendered script"):
+        proc = subprocess.run(
+            ["bash", "-n", "/dev/stdin"], input=text, text=True, capture_output=True
+        )
+        self.assertEqual(proc.returncode, 0, f"{label}: {proc.stderr}")
+
+    def assertScriptParses(self, path):
+        proc = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, f"{path.name}: {proc.stderr}")
 
 
 class ToolCatalogTests(unittest.TestCase):
@@ -39,7 +88,7 @@ class ToolCatalogTests(unittest.TestCase):
             "stop_g5g_instance", "terminate_g5g_instance", "verify_gpu_arch",
             "deploy_jax_server", "get_install_progress", "get_jax_logs",
             "get_endpoint", "verify_model_health", "query_model", "save_hf_token",
-            "check_g5g_quotas", "get_deployment_config", "get_help",
+            "check_g5g_quotas", "get_deployment_config", "get_help", "get_metrics",
         }
         self.assertEqual(set(self.tools), expected)
 
@@ -49,20 +98,24 @@ class ToolCatalogTests(unittest.TestCase):
         }
         self.assertEqual(destructive, {"stop_g5g_instance", "terminate_g5g_instance"})
         for name, tool in self.tools.items():
-            self.assertTrue(tool.title, name)
-            self.assertTrue(tool.description, name)
-            self.assertIsNotNone(tool.annotations, name)
+            with self.subTest(tool=name):
+                self.assertTrue(tool.title)
+                self.assertTrue(tool.description)
+                self.assertIsNotNone(tool.annotations)
 
     def test_launch_defaults_to_spot(self):
         for name in ("create_g5g_instance", "get_deployment_config"):
-            schema = self.tools[name].inputSchema["properties"]
-            self.assertTrue(schema["spot"]["default"], name)
-            # There is no `serving` mode here: nothing is built, so there is no
-            # stock-vs-build choice the vLLM sibling has to offer.
-            self.assertNotIn("serving", schema, name)
+            with self.subTest(tool=name):
+                schema = self.tools[name].inputSchema["properties"]
+                self.assertTrue(schema["spot"]["default"])
+                # There is no `serving` mode here: nothing is built, so there is
+                # no stock-vs-build choice the vLLM sibling has to offer.
+                self.assertNotIn("serving", schema)
 
 
 class G5gTopologyTests(unittest.TestCase):
+    """Instance-shape policy: which sizes exist, and what each one implies."""
+
     def test_sizes_match_the_aws_product_page(self):
         expected = {
             "g5g.xlarge": (1, 8),
@@ -73,36 +126,31 @@ class G5gTopologyTests(unittest.TestCase):
             "g5g.metal": (2, 128),
         }
         for instance_type, (gpus, ram) in expected.items():
-            self.assertTrue(server._is_g5g(instance_type))
-            self.assertEqual(server._gpu_count(instance_type), gpus)
-            self.assertEqual(server._host_memory_gb(instance_type), ram)
+            with self.subTest(instance_type=instance_type):
+                self.assertTrue(server._is_g5g(instance_type))
+                self.assertEqual(server._gpu_count(instance_type), gpus)
+                self.assertEqual(server._host_memory_gb(instance_type), ram)
 
     def test_tensor_parallel_follows_gpu_count(self):
         self.assertEqual(server._tensor_parallel_size("g5g.2xlarge"), 1)
         self.assertEqual(server._tensor_parallel_size("g5g.16xlarge"), 2)
 
-    def test_xlarge_is_supported_with_swap(self):
+    def test_every_size_is_supported_and_only_the_smallest_needs_swap(self):
         # Measured 2026-08-13: g5g.xlarge serves E2B at 44.24 tok/s *with* a
         # swapfile. Without swap the kernel refuses to mmap the 10.2 GB
         # checkpoint ("Cannot allocate memory") and systemd crash-loops. So the
         # small size is supported, not rejected -- but its user data must carry
-        # the swapfile.
-        server._validate_instance_type("g5g.xlarge")   # must not raise
-        self.assertTrue(server._needs_swap("g5g.xlarge"))
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.xlarge")
-        self.assertIn("mkswap", text)
-        self.assertIn("swapon /swapfile", text)
-        self.assertIn("/etc/fstab", text)
-
-    def test_larger_sizes_get_no_swapfile(self):
+        # the swapfile. UserDataTests asserts the rendered swap block itself.
+        server._validate_instance_type(SWAP_SIZE)   # must not raise
+        self.assertTrue(server._needs_swap(SWAP_SIZE))
         for size in ("g5g.2xlarge", "g5g.4xlarge", "g5g.16xlarge"):
-            self.assertFalse(server._needs_swap(size), size)
-            text = server._user_data("google/gemma-4-E2B-it", size)
-            self.assertNotIn("mkswap", text)
+            with self.subTest(instance_type=size):
+                server._validate_instance_type(size)
+                self.assertFalse(server._needs_swap(size))
 
     def test_non_g5g_rejected(self):
         for bad in ("g6.xlarge", "inf2.xlarge", "g5g.unknown"):
-            with self.assertRaises(ValueError):
+            with self.subTest(instance_type=bad), self.assertRaises(ValueError):
                 server._validate_instance_type(bad)
 
 
@@ -113,31 +161,132 @@ class TuringConstraintTests(unittest.TestCase):
         self.assertEqual(server.DTYPE, "float16")
 
     def test_kv_cache_is_not_fp8(self):
-        argv = server._serve_argv("google/gemma-4-E2B-it", "g5g.2xlarge")
+        argv = server._serve_argv(MODEL, DEFAULT_SIZE)
         self.assertIn("--kv-cache-dtype auto", argv)
         self.assertNotIn("fp8", argv)
 
     def test_quant_mode_matches_the_dense_checkpoint(self):
         # QUANT_MODE is a claim about MODEL_NAME, not about the chip. A w4a16
         # mode against a dense checkpoint loads garbage rather than failing.
-        argv = server._serve_argv(server.MODEL_NAME, "g5g.2xlarge")
+        argv = server._serve_argv(server.MODEL_NAME, DEFAULT_SIZE)
         self.assertIn("--quant-mode fp16", argv)
         self.assertNotIn("w4a16", server.MODEL_NAME)
 
     def test_no_tensor_parallel_flag_is_emitted(self):
         # The JAX engine is single-device. Emitting a TP flag would imply a
         # sharding this rig does not do.
-        argv = server._serve_argv("google/gemma-4-E2B-it", "g5g.16xlarge")
+        argv = server._serve_argv(MODEL, "g5g.16xlarge")
         self.assertNotIn("tensor-parallel", argv)
 
 
-class UserDataTests(unittest.TestCase):
+class DegeneracyGuardTests(unittest.TestCase):
+    """The serving stack counted a token loop as status="success"."""
+
+    @staticmethod
+    def _looks_degenerate():
+        # jax_openai_server imports jax at module scope and jax is a SERVING
+        # dependency, not a control-plane one, so the module cannot be imported
+        # here. Exec just this one pure function instead of skipping the test.
+        src = (ROOT / "jax_openai_server.py").read_text()
+        body = src.split("def looks_degenerate")[1].split("\ndef _record")[0]
+        ns = {}
+        exec("def looks_degenerate" + body, ns)  # pure function from our own repo
+        return ns["looks_degenerate"]
+
+    def test_catches_both_degenerate_shapes_observed_on_hardware(self):
+        f = self._looks_degenerate()
+        # MEASURED 2026-08-23 on this rig at 2,615-3,515 prompt tokens.
+        self.assertTrue(f("The" * 40))
+        # MEASURED on the vLLM sibling and recorded in the monorepo CLAUDE.md.
+        self.assertTrue(f(": ok" * 20))
+        self.assertTrue(f("ok " * 30))
+
+    def test_does_not_fire_on_good_output(self):
+        # A false positive would discredit a real benchmark result, so the
+        # guard is deliberately conservative -- these must all pass through.
+        f = self._looks_degenerate()
+        for good in (
+            "The quick brown fox repeatedly jumps over a lazy dog.",
+            "The three primary colours are: 1. Red 2. Yellow 3. Blue",
+            "391",
+            "Le chat est sur la table.",
+            "yes yes yes yes yes but actually the answer depends on the context here",
+            "",
+        ):
+            with self.subTest(text=good[:30]):
+                self.assertFalse(f(good))
+
+    def test_short_replies_are_not_judged(self):
+        # verify_model_health asks for a single word; judging that would make
+        # the guard fire on the rig's own health check.
+        self.assertFalse(self._looks_degenerate()("ok " * 10))
+
+    def test_counter_is_exposed_and_does_not_change_status(self):
+        text = (ROOT / "jax_openai_server.py").read_text()
+        self.assertIn("tpu_jax_degenerate_responses_total", text)
+        # It must remain observational: a degenerate reply is still returned to
+        # the caller and still counted a success, so this cannot mask a real
+        # regression in the success/failure split.
+        self.assertIn('METRICS["successful_requests"] += 1', text)
+
+
+class QuantKnobTests(unittest.TestCase):
+    """The engine always supported these; the rig could not reach them."""
+
+    def _argv(self, **env):
+        saved = {k: getattr(server, k) for k in env}
+        for k, v in env.items():
+            setattr(server, k, v)
+        try:
+            return server._serve_argv(server.MODEL_NAME, "g5g.2xlarge")
+        finally:
+            for k, v in saved.items():
+                setattr(server, k, v)
+
+    def test_ple_bits_is_always_emitted(self):
+        # Emitted even at the 0 default, so the serving command records the
+        # choice instead of deferring to the server's own default.
+        self.assertIn("--ple-bits 0", self._argv(PLE_BITS=0))
+        self.assertIn("--ple-bits 4", self._argv(PLE_BITS=4))
+
+    def test_int8_lm_head_is_a_flag_not_a_value(self):
+        self.assertIn("--int8-lm-head", self._argv(INT8_LM_HEAD=True))
+        self.assertNotIn("--int8-lm-head", self._argv(INT8_LM_HEAD=False))
+
+    def test_prefill_chunk_size_is_omitted_when_unset(self):
+        # Unset must mean one-shot prefill, the previous behaviour -- not a
+        # chunk size of 0, which would be a different and broken request.
+        self.assertNotIn("--prefill-chunk-size", self._argv(PREFILL_CHUNK_SIZE=""))
+        self.assertIn("--prefill-chunk-size 1024", self._argv(PREFILL_CHUNK_SIZE="1024"))
+
+    def test_serving_process_accepts_every_flag_the_rig_emits(self):
+        # The rig and the server are separate files and drifted before: the
+        # server grew --ple-bits and _serve_argv never learned to pass it.
+        text = (ROOT / "jax_openai_server.py").read_text()
+        argv = self._argv(PLE_BITS=4, INT8_LM_HEAD=True, PREFILL_CHUNK_SIZE="1024")
+        for token in argv.split():
+            if token.startswith("--"):
+                self.assertIn(f'"{token}"', text, f"{token} is emitted but not accepted")
+
+    def test_load_engine_defaults_are_not_the_tpu_rigs(self):
+        # kv_dtype="bf16" raises on pre-Ampere and quant_mode="w4a16" against a
+        # dense checkpoint loads garbage. Latent only because the CLI always
+        # passes both explicitly.
+        text = (ROOT / "jax_openai_server.py").read_text()
+        signature = text.split("def load_engine(", 1)[1].split(")", 1)[0]
+        self.assertNotIn('"bf16"', signature)
+        self.assertNotIn('"w4a16"', signature)
+
+
+class UserDataTests(BashSyntaxMixin, unittest.TestCase):
+    """The rendered cloud-init script, which installs the runtime and nothing else."""
+
     def test_install_is_wheels_not_a_build(self):
         # Derived from JAX_PIP_SPEC, never a literal: a hardcoded "jax[cuda12]"
         # here turns a routine CUDA-line bump into a test edit, which is friction
         # against the standing preference for latest versions. The claim under
         # test is "we install the configured spec from wheels", not which spec.
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        text = user_data()
         self.assertIn(server.JAX_PIP_SPEC, text)
         self.assertNotIn("docker build", text)
         self.assertNotIn("git clone", text)
@@ -151,7 +300,7 @@ class UserDataTests(unittest.TestCase):
         # 3.10, so the DLAMI's system python would fail at pip install time.
         # Asserted against JAX_PYTHON_VERSION rather than a literal so the
         # interpreter can be moved forward without editing tests.
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        text = user_data()
         self.assertIn("deadsnakes", text)
         self.assertIn(f"python{server.JAX_PYTHON_VERSION}", text)
         self.assertGreaterEqual(
@@ -162,8 +311,7 @@ class UserDataTests(unittest.TestCase):
     def test_systemd_execstart_is_absolute(self):
         # systemd refuses a relative ExecStart, and the unit would fail to load
         # with a message that says nothing about the interpreter.
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
-        self.assertIn(f"ExecStart=/usr/bin/python{server.JAX_PYTHON_VERSION}", text)
+        self.assertIn(f"ExecStart=/usr/bin/python{server.JAX_PYTHON_VERSION}", user_data())
 
     def test_execstart_is_repointed_at_the_installed_interpreter(self):
         # MEASURED 2026-08-19 on i-063d52c913140b787: the DLAMI already ships
@@ -172,7 +320,7 @@ class UserDataTests(unittest.TestCase):
         # hardcoded ExecStart=/usr/bin/python3.12 crash-looped on
         # ModuleNotFoundError -- AFTER the install reported success, because the
         # verify step resolves through PATH too.
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        text = user_data()
         self.assertIn(f'PY_BIN="$(command -v python{server.JAX_PYTHON_VERSION})"', text)
         self.assertIn("ExecStart=$PY_BIN", text)
         # The rewrite has to happen after the install, not in the unit template.
@@ -180,7 +328,7 @@ class UserDataTests(unittest.TestCase):
 
     def test_token_comes_from_secrets_manager_not_user_data(self):
         # User data is readable from instance metadata by anything on the box.
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        text = user_data()
         self.assertIn("secretsmanager get-secret-value", text)
         self.assertNotIn("hf_", text.lower().replace("hf_token", ""))
 
@@ -189,22 +337,24 @@ class UserDataTests(unittest.TestCase):
         # values — so leaving xtrace on would print the token into
         # /var/log/cloud-init-output.log, which is the exact exposure that
         # keeping it out of user data is meant to prevent.
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        text = user_data()
         fetch = text.index("secretsmanager get-secret-value")
         self.assertIn("set +x", text[:fetch])
         self.assertLess(text[:fetch].rindex("set +x"), fetch)
         self.assertIn("set -x", text[fetch:])
 
     def test_env_file_is_locked_down_before_the_token_lands(self):
-        text = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        text = user_data()
         self.assertLess(text.index("chmod 600 /opt/jax-g5g/env"), text.index("HF_TOKEN="))
 
-    def test_small_hosts_get_swap_and_large_ones_do_not(self):
-        small = server._user_data("google/gemma-4-E2B-it", "g5g.xlarge")
-        large = server._user_data("google/gemma-4-E2B-it", "g5g.4xlarge")
-        self.assertIn("mkswap", small)
-        self.assertNotIn("mkswap", large)
-        self.assertShellParses(small)
+    def test_swapfile_is_rendered_only_for_the_small_host(self):
+        small = user_data(SWAP_SIZE)
+        for fragment in ("mkswap", "swapon /swapfile", "/etc/fstab"):
+            self.assertIn(fragment, small)
+        self.assertShellParses(small, SWAP_SIZE)
+        for size in ("g5g.2xlarge", "g5g.4xlarge", "g5g.16xlarge"):
+            with self.subTest(instance_type=size):
+                self.assertNotIn("mkswap", user_data(size))
 
     def test_serving_requirements_match_the_mirror_file(self):
         # A drifted pair is invisible until a serve fails on a missing import.
@@ -216,11 +366,83 @@ class UserDataTests(unittest.TestCase):
         expected = set(server._SERVING_REQUIREMENTS) | {server.JAX_PIP_SPEC}
         self.assertEqual(listed, expected)
 
-    def assertShellParses(self, text):
-        proc = subprocess.run(
-            ["bash", "-n", "/dev/stdin"], input=text, text=True, capture_output=True
-        )
-        self.assertEqual(proc.returncode, 0, proc.stderr)
+
+class MetricsParsingTests(unittest.TestCase):
+    """_parse_prom is pure, so the interesting parts pin offline."""
+
+    EXPOSITION = "\n".join([
+        "# HELP tpu_jax_precision_info Dtypes and quantisation resolved on device",
+        "# TYPE tpu_jax_precision_info gauge",
+        'tpu_jax_precision_info{model="google/gemma-4-E2B-it",compute_dtype="float16",'
+        'quant_mode="fp16",kv_cache_dtype="float16",kv_cache_requested="auto",'
+        'ple_bits="0",int8_lm_head="false",pre_ampere="true"} 1',
+        "",
+        'tpu_jax_requests_total{model="google/gemma-4-E2B-it",status="success"} 3',
+        'tpu_jax_requests_total{model="google/gemma-4-E2B-it",status="failed"} 0',
+        'tpu_jax_decode_tokens_per_second{model="google/gemma-4-E2B-it"} 12.3',
+        'tpu_jax_hbm_used_bytes{device="cuda:0"} 9299057152',
+        "",
+    ])
+
+    def setUp(self):
+        self.samples, self.precision, self.model = server._parse_prom(self.EXPOSITION)
+
+    def test_served_checkpoint_survives_parsing(self):
+        # The model label is dropped from every row as noise; if it were not
+        # hoisted out first, a metrics transcript could not be checked against
+        # MODEL_NAME -- which is the whole point of quoting one.
+        self.assertEqual(self.model, "google/gemma-4-E2B-it")
+
+    def test_precision_is_split_out_not_rendered_as_a_number(self):
+        # The info series carries its payload in labels and a constant value of
+        # 1, so leaving it among the samples would print a meaningless "1" row.
+        self.assertNotIn("tpu_jax_precision_info", "".join(self.samples))
+        self.assertEqual(self.precision["compute_dtype"], "float16")
+        self.assertEqual(self.precision["kv_cache_dtype"], "float16")
+        self.assertEqual(self.precision["kv_cache_requested"], "auto")
+        self.assertEqual(self.precision["quant_mode"], "fp16")
+        self.assertEqual(self.precision["pre_ampere"], "true")
+
+    def test_distinguishing_labels_are_kept(self):
+        # status= genuinely separates two series; dropping it would collide them.
+        self.assertEqual(self.samples['tpu_jax_requests_total{status="success"}'], 3.0)
+        self.assertEqual(self.samples['tpu_jax_requests_total{status="failed"}'], 0.0)
+        self.assertEqual(self.samples["tpu_jax_decode_tokens_per_second"], 12.3)
+        self.assertEqual(self.samples['tpu_jax_hbm_used_bytes{device="cuda:0"}'], 9299057152.0)
+
+    def test_comments_and_blank_lines_are_ignored(self):
+        self.assertFalse([k for k in self.samples if k.startswith("#")])
+
+    def test_empty_exposition_yields_nothing(self):
+        samples, precision, model = server._parse_prom("")
+        self.assertEqual((samples, precision, model), ({}, {}, None))
+
+
+class ServedPrecisionTests(unittest.TestCase):
+    """Turing resolves dtypes the TPU lineage never has to consider."""
+
+    def test_health_does_not_hardcode_bfloat16(self):
+        # jax_openai_server used to report activations="bfloat16" and weights
+        # ="bf16" unconditionally -- inherited from the TPU rig and impossible on
+        # a chip with no bf16 datapath. Both must come off the engine now.
+        text = (ROOT / "jax_openai_server.py").read_text()
+        self.assertNotIn('"activations": "bfloat16"', text)
+        self.assertIn("precision_info()", text)
+
+    def test_load_banner_does_not_claim_w4a16(self):
+        # This rig serves the DENSE checkpoint. A banner claiming W4A16 QAT
+        # weights describes the one thing the rig refuses to do, and would send
+        # an operator hunting a problem that is not there.
+        text = (ROOT / "jax_openai_server.py").read_text()
+        self.assertNotIn("Loading W4A16 QAT weights", text)
+
+    def test_engine_reports_resolved_not_requested(self):
+        # "auto" is the configured default for both; reporting it back would say
+        # nothing about what the device actually got.
+        text = (ROOT / "jax_engine.py").read_text()
+        self.assertIn("def precision_info", text)
+        for key in ("compute_dtype", "kv_cache_dtype", "kv_cache_requested", "quant_mode"):
+            self.assertIn(f'"{key}"', text)
 
 
 class PayloadTests(unittest.TestCase):
@@ -229,7 +451,8 @@ class PayloadTests(unittest.TestCase):
     def test_payload_files_exist_and_are_found(self):
         root = Path(server._payload_root())
         for rel in server._PAYLOAD_FILES:
-            self.assertTrue((root / rel).is_file(), rel)
+            with self.subTest(path=rel):
+                self.assertTrue((root / rel).is_file())
 
     def test_payload_is_deterministic(self):
         # Idempotent redeploys depend on this: same sources, same bytes.
@@ -243,21 +466,58 @@ class PayloadTests(unittest.TestCase):
         self.assertLess(size, 80_000, f"payload base64 is {size} bytes")
 
 
+class DeployRestartTests(unittest.TestCase):
+    """A redeploy has to replace the running process, not just the files."""
+
+    def _command(self, restart):
+        captured = {}
+
+        async def fake_ssm(instance_id, command, timeout=300):
+            captured["command"] = command
+            return "ActiveState=active"
+
+        original = server._ssm
+        server._ssm = fake_ssm
+        try:
+            run(server.deploy_jax_server(instance_id="i-test", restart=restart))
+        finally:
+            server._ssm = original
+        return captured["command"]
+
+    def test_redeploy_restarts_rather_than_enable_now(self):
+        # MEASURED 2026-08-23 on i-02f74ac9b944576c5: `systemctl enable --now` is
+        # a no-op against an already-running unit, so a redeploy shipped the new
+        # files and left the OLD process serving. `is-active` then printed
+        # "active" and the tool reported success. Verified by /health still
+        # returning the pre-deploy payload 17 minutes after the redeploy.
+        command = self._command(restart=True)
+        self.assertIn(f"systemctl restart {server.SERVICE_NAME}", command)
+        self.assertNotIn("enable --now", command)
+
+    def test_restart_reports_something_that_can_disprove_staleness(self):
+        # "active" is true of the stale process too. The start timestamp and PID
+        # are what let an operator tell a fresh process from the old one.
+        command = self._command(restart=True)
+        self.assertIn("ExecMainStartTimestamp", command)
+        self.assertIn("MainPID", command)
+
+    def test_restart_false_touches_no_units(self):
+        command = self._command(restart=False)
+        self.assertNotIn("systemctl", command)
+
+
 class DeploymentConfigTests(unittest.TestCase):
     def test_config_is_offline_and_decodable(self):
-        result = run(server.get_deployment_config(instance_type="g5g.2xlarge"))
+        result = run(server.get_deployment_config(instance_type=DEFAULT_SIZE))
         self.assertIn("aws ec2 run-instances", result)
-        encoded = result.split("--user-data '", 1)[1].split("'", 1)[0]
-        script = base64.b64decode(encoded).decode()
-        self.assertIn("#!/usr/bin/env bash", script)
+        self.assertIn("#!/usr/bin/env bash", user_data_from_config(result))
 
     def test_config_resolves_ami_via_ssm_parameter(self):
         # Two independent requirements, and a name filter only pins one of them.
         # arm64: the legacy tips-tree rigs hardcode an x86_64 DLAMI id that
         # cannot boot on Graviton2. NVIDIA driver: AWS also ships ARM64 DLAMIs
         # for Graviton CPU inference, which boot fine on a G5g with no GPU.
-        result = run(server.get_deployment_config())
-        self.assertIn("aws ssm get-parameter", result)
+        self.assertIn("aws ssm get-parameter", run(server.get_deployment_config()))
         self.assertIn("/arm64/", server.DLAMI_SSM_PARAMETER)
         self.assertIn("nvidia-driver-gpu", server.DLAMI_SSM_PARAMETER)
 
@@ -278,43 +538,36 @@ class DeploymentConfigTests(unittest.TestCase):
     def test_config_rejects_non_g5g_only(self):
         # g5g.xlarge is supported now (it gets a swapfile), so only genuinely
         # wrong instance families should be refused.
-        self.assertTrue(run(server.get_deployment_config(instance_type="g6.xlarge")).startswith("❌"))
-        ok = run(server.get_deployment_config(instance_type="g5g.xlarge"))
+        rejected = run(server.get_deployment_config(instance_type="g6.xlarge"))
+        self.assertTrue(rejected.startswith("❌"))
+        ok = run(server.get_deployment_config(instance_type=SWAP_SIZE))
         self.assertFalse(ok.startswith("❌"))
-        encoded = ok.split("--user-data '", 1)[1].split("'", 1)[0]
-        self.assertIn("mkswap", base64.b64decode(encoded).decode())
+        self.assertIn("mkswap", user_data_from_config(ok))
 
 
-class RepoHygieneTests(unittest.TestCase):
+class RepoHygieneTests(BashSyntaxMixin, unittest.TestCase):
     def test_shell_scripts_parse(self):
         for script in ("project-setup.sh", "init.sh", "set_env.sh"):
-            proc = subprocess.run(
-                ["bash", "-n", str(ROOT / script)], capture_output=True, text=True
-            )
-            self.assertEqual(proc.returncode, 0, f"{script}: {proc.stderr}")
+            with self.subTest(script=script):
+                self.assertScriptParses(ROOT / script)
 
     def test_tpu_env_agrees_with_server_defaults(self):
         # The directory name is a claim about tpu.env (NAMING.md). This asserts
         # the env file and the server actually agree, so the claim stays true.
-        values = {}
-        for line in (ROOT / "tpu.env").read_text().splitlines():
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                values[key] = value
-        self.assertEqual(values["MODEL_NAME"], server.MODEL_NAME)
-        self.assertEqual(values["INSTANCE_TYPE"], server.INSTANCE_TYPE)
-        self.assertEqual(values["DTYPE"], server.DTYPE)
-        self.assertEqual(values["KV_CACHE_DTYPE"], server.KV_CACHE_DTYPE)
-        self.assertEqual(values["QUANT_MODE"], server.QUANT_MODE)
-        self.assertEqual(values["JAX_PIP_SPEC"], server.JAX_PIP_SPEC)
-        self.assertEqual(values["JAX_PYTHON_VERSION"], server.JAX_PYTHON_VERSION)
-        self.assertEqual(values["SERVICE_NAME"], server.SERVICE_NAME)
-        self.assertEqual(int(values["JAX_PORT"]), server.JAX_PORT)
-        self.assertEqual(int(values["MAX_MODEL_LEN"]), server.MAX_MODEL_LEN)
+        values = tpu_env()
+        for key in (
+            "MODEL_NAME", "INSTANCE_TYPE", "DTYPE", "KV_CACHE_DTYPE", "QUANT_MODE",
+            "JAX_PIP_SPEC", "JAX_PYTHON_VERSION", "SERVICE_NAME",
+            "XLA_PYTHON_CLIENT_MEM_FRACTION", "PREFILL_CHUNK_SIZE",
+        ):
+            with self.subTest(key=key):
+                self.assertEqual(values[key], getattr(server, key))
+        for key in ("JAX_PORT", "MAX_MODEL_LEN", "PLE_BITS"):
+            with self.subTest(key=key):
+                self.assertEqual(int(values[key]), getattr(server, key))
         self.assertEqual(
-            values["XLA_PYTHON_CLIENT_MEM_FRACTION"], server.XLA_PYTHON_CLIENT_MEM_FRACTION
+            int(values["TENSOR_PARALLEL_SIZE"]), server._gpu_count(server.INSTANCE_TYPE)
         )
-        self.assertEqual(int(values["TENSOR_PARALLEL_SIZE"]), server._gpu_count(server.INSTANCE_TYPE))
 
     def test_no_vllm_config_survives(self):
         # This rig was forked from the vLLM one. A leftover VLLM_* key would be
@@ -336,19 +589,26 @@ class RepoHygieneTests(unittest.TestCase):
         # what happened during the t4g->g5g rename. Guard both copies.
         stem = f"{ROOT.name}-management"
         for prefix in (f".claude/skills/{stem}", f"skills/{stem}"):
-            skill = ROOT / prefix / "SKILL.md"
-            self.assertTrue(skill.is_file(), f"{prefix}/SKILL.md is missing")
-            text = skill.read_text()
-            self.assertIn(f"name: {stem}", text, f"{prefix}/SKILL.md has a stale name")
-            for source in (
-                "server.py", "project-setup.sh", "requirements.txt",
-                "requirements-serving.txt", "jax_openai_server.py", "jax_engine.py",
-                "ports/gemma4/jax_e_loader.py", "ports/gemma4/jax_e_model.py",
-            ):
-                self.assertTrue(
-                    filecmp.cmp(ROOT / source, ROOT / prefix / "mcp" / source, shallow=False),
-                    f"{prefix}/mcp/{source} is stale — run `make skill`",
+            with self.subTest(copy=prefix):
+                skill = ROOT / prefix / "SKILL.md"
+                self.assertTrue(skill.is_file(), f"{prefix}/SKILL.md is missing")
+                self.assertIn(
+                    f"name: {stem}", skill.read_text(),
+                    f"{prefix}/SKILL.md has a stale name",
                 )
+            # subTest keeps the loop going past a failure, so the wiped-directory
+            # case this test exists to catch would reach filecmp.cmp and bury the
+            # one useful message under a FileNotFoundError per source file.
+            if not (ROOT / prefix / "mcp").is_dir():
+                continue
+            for source in SKILL_SOURCES:
+                snapshot = ROOT / prefix / "mcp" / source
+                with self.subTest(copy=prefix, source=source):
+                    self.assertTrue(snapshot.is_file(), f"{snapshot} is missing — run `make skill`")
+                    self.assertTrue(
+                        filecmp.cmp(ROOT / source, snapshot, shallow=False),
+                        f"{prefix}/mcp/{source} is stale — run `make skill`",
+                    )
 
 
 if __name__ == "__main__":

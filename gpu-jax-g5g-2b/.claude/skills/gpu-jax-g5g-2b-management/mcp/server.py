@@ -16,9 +16,11 @@ wants ~96 KiB of shared memory against Turing's 64 KiB ceiling.
 
 The JAX path sidesteps all four:
 
-  * jaxlib, jax-cuda12-plugin and jax-cuda12-pjrt publish aarch64 wheels, and
-    every CUDA dependency (cublas, cudnn, cuda-runtime, cusolver) does too — so
-    pip supplies CUDA and the DLAMI only has to supply the driver. No build.
+  * jaxlib and the jax-cuda plugin/pjrt pair publish aarch64 wheels, and every
+    CUDA dependency (cublas, cudnn, cuda-runtime, cusolver) does too — so pip
+    supplies CUDA and the DLAMI only has to supply the driver. No build.
+    (Named without a CUDA major on purpose: JAX_PIP_SPEC has already moved 12→13,
+    and the claim is about aarch64 wheels existing, not about which line.)
   * The plugin's arch tables carry sm_75 and its floor is SM 6.0.
   * Attention here is ordinary XLA, not a hand-tiled Triton kernel, so there is
     no per-block shared-memory ceiling to hit and no patch to carry.
@@ -28,9 +30,12 @@ W4A16 Pallas kernel is tiled for TPU VMEM and needs 550 KiB - 1.1 MiB per block,
 so it cannot run on Turing either. This rig therefore serves the dense reference
 checkpoint at float16. See docs/turing-aarch64-gap.md and tpu.env.
 
-NOTHING BELOW HAS BEEN MEASURED ON HARDWARE YET. The wheel/arch facts above were
-verified against PyPI and by inspecting the plugin binary; that is not the same
-as a served token.
+THIS RIG HAS SERVED, AND THE NUMBERS ARE ITS OWN: 12.4-12.5 tok/s decode on
+g5g.2xlarge across the two runs under benchmarks/runs/ (a spot-check on
+2026-08-23 read 12.3, unrecorded). The wheel/arch facts above are separately
+verified — installability was never the same claim as a served token, and both
+now hold. Warm up before recording anything: cold decode measures several times
+slower, and cold prefill far worse again.
 """
 
 import asyncio
@@ -88,6 +93,29 @@ KV_CACHE_DTYPE = os.getenv("KV_CACHE_DTYPE", "auto")
 QUANT_MODE = os.getenv("QUANT_MODE", "fp16")
 MAX_MODEL_LEN = int(os.getenv("MAX_MODEL_LEN", "8192"))
 MAX_NUM_SEQS = int(os.getenv("MAX_NUM_SEQS", "1"))
+
+# Quantisation knobs the engine has always supported and this rig could not reach:
+# _serve_argv never emitted them, so the only way to use them was to hand-edit the
+# systemd unit. MEASURED 2026-08-23 on a T4G, same prompt, warm:
+#
+#   dense fp16                      9.26 GB weights, 12.4 tok/s
+#   QAT w4a16, ple_bits=0           6.56 GB weights, OOMs on EVERY request
+#   QAT w4a16, ple_bits=4           3.05 GB weights, 13.5 tok/s
+#
+# w4a16 alone does not work here: every request dies allocating 4.52 GiB beside
+# 6.56 GB of resident weights. That allocation is NOT identified -- it is not a
+# dequantised Linear (largest measures 0.005 GB dequantised); the nearest tensor
+# is the unquantised PLE table at 4.698 GB, which is close but not equal. What is
+# certain is the remedy: ple_bits=4 shrinks that table 4x (measured saving
+# 3.505 GB) and the pair then works, so treat them as a pair on this chip.
+PLE_BITS = int(os.getenv("PLE_BITS", "0"))
+INT8_LM_HEAD = os.getenv("INT8_LM_HEAD", "").lower() in ("1", "true", "yes")
+
+# Prefill temporaries are LINEAR in the prompt tokens admitted in one pass, a flat
+# ~2.13 MB/token (jax_engine). One-shot prefill therefore OOMs at
+# (free HBM / 2.13 MB) tokens -- measured 2,015 dense and 5,015 quantised, both
+# within ~10% of the formula. Empty = one-shot, the previous behaviour.
+PREFILL_CHUNK_SIZE = os.getenv("PREFILL_CHUNK_SIZE", "")
 
 # JAX preallocates this fraction of device memory at first use. NOT the same
 # knob as vLLM's --gpu-memory-utilization: there is no engine-managed KV pool
@@ -220,15 +248,24 @@ def _serve_argv(model: str, instance_type: str) -> str:
     carries packed int4 weights and a dense export does not. QUANT_MODE=fp16 in
     tpu.env because MODEL_NAME there is the dense reference build.
 
+    --ple-bits is always emitted, including the 0 default, so the serving command
+    records the choice rather than leaving it to the server's own default. On this
+    chip it is not an independent knob: w4a16 needs ple_bits=4 to fit at all.
+
     There is no tensor-parallel flag: the JAX engine is single-device. On the
     two-GPU sizes the second T4G idles, which _tensor_parallel_size() reports
     but nothing acts on yet.
     """
-    return (
+    argv = (
         f"--model {model} --host 0.0.0.0 --port {JAX_PORT} "
         f"--kv-cache-dtype {KV_CACHE_DTYPE} --quant-mode {QUANT_MODE} "
-        f"--max-model-len {MAX_MODEL_LEN}"
+        f"--max-model-len {MAX_MODEL_LEN} --ple-bits {PLE_BITS}"
     )
+    if INT8_LM_HEAD:
+        argv += " --int8-lm-head"
+    if PREFILL_CHUNK_SIZE:
+        argv += f" --prefill-chunk-size {PREFILL_CHUNK_SIZE}"
+    return argv
 
 
 # The serving payload. These are this rig's own files, shipped to the instance
@@ -350,8 +387,7 @@ install_runtime() {{
   # ports.ubuntu.com completed the same update in seconds.
   fallback_mirror() {{
     echo "apt: regional mirror failed; falling back to ports.ubuntu.com" >&2
-    sed -i -E 's|https?://[a-z0-9.-]+\.ec2\.ports\.ubuntu\.com|http://ports.ubuntu.com|g' \
-      /etc/apt/sources.list
+    sed -i -E 's|https?://[a-z0-9.-]+[.]ec2[.]ports[.]ubuntu[.]com|http://ports.ubuntu.com|g' /etc/apt/sources.list
     apt-get $APT_OPTS update -y
   }}
 
@@ -803,6 +839,11 @@ async def deploy_jax_server(instance_id: str, restart: bool = True) -> str:
 
     Idempotent: the tarball is built deterministically, so redeploying unchanged
     sources writes identical bytes.
+
+    With restart=True the unit is RESTARTED, not merely started. `enable --now`
+    is a no-op against an already-running unit, so it shipped new files and left
+    the old process serving them -- and `is-active` then reported "active", which
+    reads as success. Every redeploy silently served stale code.
     """
     try:
         payload = _payload_tar_b64()
@@ -813,7 +854,15 @@ async def deploy_jax_server(instance_id: str, restart: bool = True) -> str:
             f"ls -R {APP_DIR}/app | head -20"
         )
         if restart:
-            command += f"; systemctl enable --now {SERVICE_NAME} && systemctl is-active {SERVICE_NAME}"
+            # `restart` starts a stopped unit and replaces a running one, so it is
+            # correct on both the first deploy and every redeploy. Report the PID
+            # and start time as well: "active" alone cannot distinguish a fresh
+            # process from the one that was already there.
+            command += (
+                f"; systemctl enable {SERVICE_NAME} >/dev/null 2>&1"
+                f"; systemctl restart {SERVICE_NAME}"
+                f"; systemctl show {SERVICE_NAME} -p ActiveState -p MainPID -p ExecMainStartTimestamp"
+            )
         output = await _ssm(instance_id, command, timeout=600)
         return (
             f"✅ Deployed {len(_PAYLOAD_FILES)} files ({len(payload) // 1024} KiB base64) "
@@ -906,14 +955,30 @@ async def verify_model_health(instance_id: str) -> str:
 
 
 @mcp.tool(title="Query model", annotations=READ_ONLY)
-async def query_model(instance_id: str, prompt: str, max_tokens: int = 256) -> str:
-    """Send a chat completion to the served model."""
+async def query_model(
+    instance_id: str, prompt: str, max_tokens: int = 256, stats: bool = True
+) -> str:
+    """Send a chat completion to the served model.
+
+    With stats=True (the default) the reply carries the token counts the server
+    already reports in `usage`, the wall time, and the tok/s they imply.
+
+    That rate is END-TO-END for a single request: it includes prefill and the
+    HTTP round trip, so it reads lower than decode throughput and is not the
+    number to benchmark on. Prefer get_metrics, whose decode gauge is what both
+    benchmark reports compare against.
+
+    It is also meaningless on a cold engine. MEASURED 2026-08-21: the first
+    request after init took 18.06 s against 4.50 s warm for the same prompt,
+    because XLA compiles per shape bucket. Warm up before believing a number.
+    """
     try:
         endpoint = await get_endpoint(instance_id)
         if not endpoint.startswith("📡"):
             return endpoint
         base = endpoint.strip("📡 `")
         async with httpx.AsyncClient(timeout=120) as client:
+            started = time.perf_counter()
             response = await client.post(
                 f"{base}/chat/completions",
                 json={
@@ -922,7 +987,123 @@ async def query_model(instance_id: str, prompt: str, max_tokens: int = 256) -> s
                     "max_tokens": max_tokens,
                 },
             )
-        return response.json()["choices"][0]["message"]["content"]
+            wall = time.perf_counter() - started
+        body = response.json()
+        choice = body["choices"][0]
+        text = choice["message"]["content"]
+        if not stats:
+            return text
+        usage = body.get("usage") or {}
+        completion = usage.get("completion_tokens") or 0
+        rate = f"{completion / wall:.2f} tok/s" if completion and wall > 0 else "n/a"
+        return (
+            f"{text}\n\n---\n"
+            f"📡 {completion} completion + {usage.get('prompt_tokens', 0)} prompt tokens "
+            f"in {wall:.2f}s — {rate} end-to-end "
+            f"(finish: {choice.get('finish_reason')})"
+        )
+    except Exception as exc:
+        return _error(exc)
+
+
+def _parse_prom(text: str) -> tuple[dict, dict, str | None]:
+    """Split a Prometheus exposition into (samples, precision labels, model).
+
+    Pure and offline so the tests can pin it without a served endpoint — the
+    rendering below is the part that needs one, the parsing is not.
+    """
+    samples, precision, served_model = {}, {}, None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        series, _, raw = line.rpartition(" ")
+        try:
+            value = float(raw)
+        except ValueError:
+            continue
+        name, _, labels = series.partition("{")
+        tags = {}
+        for part in labels.rstrip("}").split(","):
+            key, sep, val = part.partition("=")
+            if sep:
+                tags[key] = val.strip('"')
+        # The model label rides on every series and is identical across them, so
+        # it is noise per row — but it is the only record of WHICH checkpoint
+        # produced these numbers, so hoist it out rather than drop it. A
+        # get_metrics transcript has to be checkable against MODEL_NAME.
+        served_model = tags.pop("model", None) or served_model
+        if name == "tpu_jax_precision_info":
+            precision = tags
+            continue
+        rendered = ",".join(f'{k}="{v}"' for k, v in sorted(tags.items()))
+        samples[f"{name}{{{rendered}}}" if rendered else name] = value
+    return samples, precision, served_model
+
+
+@mcp.tool(title="Get serving metrics", annotations=READ_ONLY)
+async def get_metrics(instance_id: str) -> str:
+    """Read the JAX server's Prometheus metrics, including the decode gauge.
+
+    `tpu_jax_decode_tokens_per_second` is the like-for-like throughput figure
+    both of this rig's benchmark reports compare on, because it times decode
+    alone. query_model's rate also carries prefill and the HTTP round trip, so
+    the two do not agree and the gauge is the one to quote.
+
+    The gauge describes the LAST request only — it is not an average, and it is
+    worthless straight after init, when XLA is still compiling. The counters
+    below it are cumulative since the process started.
+    """
+    try:
+        endpoint = await get_endpoint(instance_id)
+        if not endpoint.startswith("📡"):
+            return endpoint
+        base = endpoint.strip("📡 `")
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(base.replace("/v1", "/metrics"))
+        if response.status_code != 200:
+            return f"❌ /metrics returned {response.status_code} — is {SERVICE_NAME} serving?"
+
+        samples, precision, served_model = _parse_prom(response.text)
+        if not samples:
+            return "❌ /metrics returned 200 but exposed no samples."
+
+        lines = [f"### Serving metrics on `{instance_id}`", ""]
+        if served_model:
+            lines += [f"Served checkpoint: `{served_model}`", ""]
+        if precision:
+            # The resolved dtypes, not the requested ones. On Turing these differ
+            # from every sibling rig's, and "auto" hides which way it went.
+            kv, want = precision.get("kv_cache_dtype"), precision.get("kv_cache_requested")
+            kv_shown = f"{kv} (requested `{want}`)" if want and want != kv else kv
+            lines += [
+                "| Precision | Resolved |",
+                "| --- | --- |",
+                f"| Compute dtype | **{precision.get('compute_dtype')}** |",
+                f"| Quant mode | **{precision.get('quant_mode')}** |",
+                f"| KV cache dtype | **{kv_shown}** |",
+                f"| PLE bits | {precision.get('ple_bits')} |",
+                f"| int8 lm_head | {precision.get('int8_lm_head')} |",
+                f"| Pre-Ampere (no bf16/fp8) | {precision.get('pre_ampere')} |",
+                "",
+            ]
+        lines += ["| Metric | Value |", "| --- | ---: |"]
+        for key in sorted(samples):
+            value = samples[key]
+            shown = f"{value:.2f}" if value % 1 else f"{int(value)}"
+            lines.append(f"| `{key}` | {shown} |")
+
+        completions = samples.get("tpu_jax_completion_tokens_total", 0.0)
+        latency = samples.get("tpu_jax_latency_seconds_sum", 0.0)
+        if completions and latency:
+            lines += [
+                "",
+                f"Cumulative mean: **{completions / latency:.2f} tok/s** over "
+                f"{int(completions)} completion tokens in {latency:.1f}s. That average "
+                "includes every cold and warm request since start, so it is a "
+                "lower bound on warm decode, not a measurement of it.",
+            ]
+        return "\n".join(lines)
     except Exception as exc:
         return _error(exc)
 
@@ -992,8 +1173,12 @@ needs 550 KiB - 1.1 MiB of shared memory per block against Turing's 64 KiB, so
 this rig serves the dense reference checkpoint. `check_w4a16_fits_scoped_memory`
 refuses at startup rather than at the first token.
 
-**Nothing here has been measured on hardware yet.** The wheel and arch facts were
-verified against PyPI and the plugin binary; that is not a served token.
+**This rig has served, and the numbers are its own.** 12.4-12.5 tok/s decode on
+`g5g.2xlarge` in the two runs recorded under `benchmarks/runs/`; an unrecorded
+spot-check on 2026-08-23 read 12.3. Quote the server's
+`tpu_jax_decode_tokens_per_second` gauge (see `get_metrics`), not an end-to-end
+rate: end-to-end carries prefill and the HTTP round trip. Warm up first — cold
+decode measures several times slower, and cold prefill far worse than that.
 
 Order of operations: `create_g5g_instance` → `get_install_progress` →
 `verify_gpu_arch` → `deploy_jax_server` → `get_jax_logs` → `verify_model_health`.

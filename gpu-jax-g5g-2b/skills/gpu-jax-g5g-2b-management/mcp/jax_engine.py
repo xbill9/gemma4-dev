@@ -473,9 +473,15 @@ class JaxGemmaEngine:
             if step_idx == max_new_tokens - 1:
                 break
 
+            # Decode into the real position, NOT bucket_s + step_idx. The
+            # bucket-derived slot left the prompt's pad gap inside the cache, and
+            # for a windowed sliding layer that meant the KV ring's slot arithmetic
+            # treated padding as history: at pad_len >= sliding_window the ring held
+            # nothing else and the model emitted a token loop with status="success"
+            # (measured 2026-08-23, docs/padding-window-eviction.md).
             caches, valid, last_logits = self._decode_step(
                 self.params, caches, valid, tok,
-                prompt_lens + step_idx, jnp.int32(bucket_s + step_idx),
+                prompt_lens + step_idx, jnp.int32(prompt_len + step_idx),
             )
         decode_ms = (time.perf_counter() - decode_start) * 1000.0
 
@@ -522,4 +528,25 @@ class JaxGemmaEngine:
             "weight_bytes": self.weight_bytes,
             "hbm_bytes_in_use": (stats or {}).get("bytes_in_use", 0),
             "hbm_bytes_limit": (stats or {}).get("bytes_limit", 0),
+        }
+
+    def precision_info(self) -> dict[str, Any]:
+        """The dtypes and quantisation this engine actually RESOLVED on this device.
+
+        Every value here is read back off the engine rather than off config, because
+        the two legitimately disagree: `quant_mode="auto"` resolves from the
+        checkpoint, `kv_cache_dtype="auto"` follows the device's compute dtype, and
+        PLE quantisation rewrites `quant_mode` to "fp16" once the weights are dense.
+        Reporting the requested value would hide exactly the substitutions that
+        matter on a chip whose supported formats differ from the TPU this port
+        came from.
+        """
+        return {
+            "compute_dtype": jnp.dtype(COMPUTE_DTYPE).name,
+            "quant_mode": self.quant_mode,
+            "kv_cache_dtype": jnp.dtype(self.cache_dtype).name,
+            "kv_cache_requested": self.kv_cache_dtype_name,
+            "ple_bits": self.ple_bits,
+            "int8_lm_head": self.int8_lm_head,
+            "pre_ampere": IS_PRE_AMPERE,
         }

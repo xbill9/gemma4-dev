@@ -11,11 +11,17 @@ Provision and operate **EC2 G5g** (AWS Graviton2 host + NVIDIA **T4G** GPU) serv
 This is the JAX sibling of `gpu-vllm-g5g-2b`. Same hardware, different runtime, and the
 runtime is the whole point.
 
-## Nothing here has been measured yet
+## What has been measured
 
-This rig has **no measurements of its own**. The packaging facts below were verified against
-PyPI and by inspecting the CUDA plugin binary; that is not the same as a served token. Do not
-quote any number here as a result, and do not attribute a sibling's numbers to it.
+This rig **has served, and the numbers below are its own**: 12.4-12.5 tok/s decode on
+`g5g.2xlarge` in the two runs recorded under `benchmarks/runs/` (an unrecorded spot-check
+on 2026-08-23 read 12.3). Quote the server's own
+`tpu_jax_decode_tokens_per_second` gauge (`get_metrics`) rather than an end-to-end rate,
+which also carries prefill and the HTTP round trip. **Warm up before recording anything** —
+cold decode measures several times slower, and cold prefill far worse again.
+
+Still do not attribute a sibling's numbers to this rig. The vLLM sibling's ~43-44 tok/s is
+the same silicon under a different runtime and is not a baseline this rig inherits.
 
 ## Start here, every time
 

@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""OpenAI-Compatible FastAPI Server for pure JAX Gemma 4 on TPU v6e-1.
+"""OpenAI-Compatible FastAPI Server for pure JAX Gemma 4.
 
 Generation runs entirely on the pure-JAX engine in ``jax_engine.py`` (no
 PyTorch, no torch_xla) against a static KV cache, so every streamed token
 attends to the full history.
 
-Configured with:
-- Model: google/gemma-4-E2B-it-qat-w4a16-ct (W4A16 QAT)
-- Precision: W4 weights, BF16 activations, BF16/FP8 KV cache
+This file is shared with the TPU rig, so it does NOT hardcode a chip, a
+checkpoint, or a precision: the engine resolves those from the device and the
+weights, and reports what it actually got via ``ENGINE.precision_info()``. The
+header here used to claim "TPU v6e-1", a "-qat-w4a16-ct" checkpoint and "BF16
+activations" -- all three wrong on the G5g rig, whose T4G has no bf16 datapath
+at all and which serves the dense reference build.
+
+- Precision: reported at runtime by GET /health and the
+  ``tpu_jax_precision_info`` series on GET /metrics. Read it there, not here.
 - Endpoints:
   - GET  /health
   - GET  /metrics  (Prometheus format metrics)
@@ -66,9 +72,10 @@ METRICS = {
     "total_latency_seconds": 0.0,
     "last_tokens_per_second": 0.0,
     "last_prefill_ms": 0.0,
+    "degenerate_responses": 0,
 }
 
-app = FastAPI(title="Pure JAX Gemma 4 W4A16 QAT Server on TPU v6e-1")
+app = FastAPI(title="Pure JAX Gemma 4 Server")
 
 
 class ChatMessage(BaseModel):
@@ -132,13 +139,33 @@ def fetch_hf_token():
 
 def load_engine(
     model_id: str,
-    kv_dtype: str = "bf16",
-    quant_mode: str = "w4a16",
+    kv_dtype: str = "auto",
+    quant_mode: str = "auto",
     max_model_len: int = 4096,
     local_dir: str | None = None,
     ple_bits: int = 0,
     int8_lm_head: bool = False,
+    prefill_chunk_size: int | None = None,
+    window_kv: bool | None = None,
 ):
+    """Load the engine. Defaults are "auto", NOT the TPU rig's bf16/w4a16.
+
+    Those literals were inherited from the TPU rig and are wrong on any chip
+    without a bf16 datapath: kv_dtype="bf16" reaches resolve_cache_dtype, which
+    raises on pre-Ampere, and quant_mode="w4a16" against a dense checkpoint
+    loads garbage rather than failing. Latent so far only because the CLI always
+    passes both explicitly -- so a second caller was one keyword away from the
+    bug. "auto" resolves each from the device and the checkpoint.
+
+    prefill_chunk_size bounds prefill temporaries, which JaxGemmaEngine documents
+    as LINEAR in the prompt tokens admitted in one pass at ~2.13 MB/token -- a
+    figure measured on v6e-1, NOT on GPU. One-shot prefill does OOM: measured
+    2026-08-23 on a T4G, dense served 115 tokens and failed at 2,015, quantised
+    served 3,515 and failed at 5,015. Those are brackets, not thresholds, and both
+    failures land BELOW what the formula predicts (2,262 and 5,174), so it
+    over-predicts capacity. Do not size a deployment from it. None keeps the old
+    one-shot behaviour.
+    """
     global ENGINE, TOKENIZER, MODEL_ID, KV_CACHE_DTYPE
     MODEL_ID, KV_CACHE_DTYPE = model_id, kv_dtype
     fetch_hf_token()
@@ -150,7 +177,11 @@ def load_engine(
     print(f"Loading tokenizer: {model_id}")
     TOKENIZER = AutoTokenizer.from_pretrained(model_id)
 
-    print(f"Loading W4A16 QAT weights into JAX: {model_id}")
+    # Say what is actually being loaded. This line used to read "Loading W4A16 QAT
+    # weights" unconditionally — inherited from the TPU rig, which serves the
+    # -qat-w4a16-ct export. On this rig the checkpoint is dense fp16, so that line
+    # told an operator the box had done the one thing this rig refuses to do.
+    print(f"Loading weights into JAX: {model_id} (quant_mode={quant_mode})")
     t0 = time.perf_counter()
     engine = JaxGemmaEngine(
         model_id=model_id,
@@ -159,6 +190,8 @@ def load_engine(
         max_model_len=max_model_len,
         ple_bits=ple_bits,
         int8_lm_head=int8_lm_head,
+        prefill_chunk_size=prefill_chunk_size,
+        window_kv=window_kv,
     )
     engine.load(local_dir=local_dir)
     engine.bos_token_id = getattr(TOKENIZER, "bos_token_id", None)
@@ -199,8 +232,35 @@ def _require_ready():
         raise HTTPException(status_code=503, detail="JAX engine is loading")
 
 
-def _record(stats: GenerationStats, elapsed: float):
+def looks_degenerate(text: str) -> bool:
+    """Heuristic: did the model emit a token loop rather than an answer?
+
+    MEASURED 2026-08-23: a prompt whose bucket padding reaches 512 makes the model
+    emit "TheTheThe..." while the server records status="success" -- worse than a
+    500, because nothing in the metrics, the health check or the benchmark harness
+    could tell it from a good answer. (The mechanism, KV-ring eviction starving
+    the 28 sliding layers, is inferred; see docs/padding-window-eviction.md. The
+    counter here does not depend on that being the right explanation.)
+
+    Deliberately conservative: it fires on a whole response collapsing to one or
+    two distinct tokens, not on merely repetitive prose, because a false positive
+    here would discredit a real result. It is a smoke alarm, not a quality score,
+    and it does NOT change the response or the status code.
+    """
+    body = (text or "").strip()
+    if len(body) <= 40:
+        return False
+    words = body.split()
+    if len(words) >= 8 and len(set(words)) <= 2:
+        return True
+    # Catches runs with no whitespace at all, e.g. "TheTheThe..."
+    return len(set(body.replace(" ", ""))) <= 6
+
+
+def _record(stats: GenerationStats, elapsed: float, text: str | None = None):
     METRICS["successful_requests"] += 1
+    if text is not None and looks_degenerate(text):
+        METRICS["degenerate_responses"] += 1
     METRICS["prompt_tokens_total"] += stats.prompt_tokens
     METRICS["completion_tokens_total"] += stats.completion_tokens
     METRICS["total_latency_seconds"] += elapsed
@@ -224,6 +284,7 @@ def _sse_stream(prompt_ids, req, req_id: str, object_name: str, t0: float):
 
     is_chat = object_name == "chat.completion.chunk"
     stats: GenerationStats | None = None
+    pieces: list[str] = []
     for item in ENGINE.generate_stream(
         prompt_ids,
         max_new_tokens=req.max_tokens or 128,
@@ -235,10 +296,11 @@ def _sse_stream(prompt_ids, req, req_id: str, object_name: str, t0: float):
             stats = item
             break
         text = TOKENIZER.decode([item], skip_special_tokens=True)
+        pieces.append(text)
         yield emit({"delta": {"content": text}} if is_chat else {"text": text})
 
     if stats is not None:
-        _record(stats, time.time() - t0)
+        _record(stats, time.time() - t0, "".join(pieces))
         finish = stats.finish_reason
     else:
         finish = "stop"
@@ -249,28 +311,74 @@ def _sse_stream(prompt_ids, req, req_id: str, object_name: str, t0: float):
 @app.get("/health")
 def health():
     ready = ENGINE is not None and ENGINE.is_ready
-    return {
+    payload = {
         "status": "ok" if ready else "loading",
         "backend": "jax",
         "device": str(ENGINE.device) if ready else None,
         "model": MODEL_ID,
-        "precision": {
-            "weights": "w4_int4" if ready and ENGINE.quant_mode == "w4a16" else "bf16",
-            "activations": "bfloat16",
-            "kv_cache": KV_CACHE_DTYPE,
-        },
     }
+    if not ready:
+        return payload
+    # Read precision back off the engine. This block used to hardcode
+    # activations="bfloat16" and weights="bf16" — both inherited from the TPU
+    # rig and both impossible on Turing, which has no bf16 datapath at all. It
+    # also reported the REQUESTED kv dtype, hiding what "auto" resolved to.
+    info = ENGINE.precision_info()
+    payload["precision"] = {
+        "weights": "w4_int4" if info["quant_mode"] == "w4a16" else info["compute_dtype"],
+        "activations": info["compute_dtype"],
+        "kv_cache": info["kv_cache_dtype"],
+        "kv_cache_requested": info["kv_cache_requested"],
+        "quant_mode": info["quant_mode"],
+        "ple_bits": info["ple_bits"],
+        "int8_lm_head": info["int8_lm_head"],
+        "pre_ampere": info["pre_ampere"],
+    }
+    return payload
 
 
 @app.get("/metrics", response_class=PlainTextResponse)
 def metrics():
-    mem = ENGINE.memory_stats() if (ENGINE and ENGINE.is_ready) else {}
-    device = str(ENGINE.device) if (ENGINE and ENGINE.is_ready) else "unknown"
+    ready = ENGINE is not None and ENGINE.is_ready
+    mem = ENGINE.memory_stats() if ready else {}
+    device = str(ENGINE.device) if ready else "unknown"
+    info = ENGINE.precision_info() if ready else {}
+    # Prometheus "info" convention: the labels carry the payload, the value is
+    # always 1. Emitted only when the engine is up, because before that every
+    # dtype would be a guess about config rather than a fact about the device.
+    precision = (
+        [
+            "# HELP tpu_jax_precision_info Dtypes and quantisation resolved on device",
+            "# TYPE tpu_jax_precision_info gauge",
+            "tpu_jax_precision_info{"
+            + ",".join(
+                [
+                    f'model="{MODEL_ID}"',
+                    f'compute_dtype="{info["compute_dtype"]}"',
+                    f'quant_mode="{info["quant_mode"]}"',
+                    f'kv_cache_dtype="{info["kv_cache_dtype"]}"',
+                    f'kv_cache_requested="{info["kv_cache_requested"]}"',
+                    f'ple_bits="{info["ple_bits"]}"',
+                    f'int8_lm_head="{str(info["int8_lm_head"]).lower()}"',
+                    f'pre_ampere="{str(info["pre_ampere"]).lower()}"',
+                ]
+            )
+            + "} 1",
+            "",
+        ]
+        if ready
+        else []
+    )
     lines = [
+        *precision,
         "# HELP tpu_jax_requests_total Total HTTP requests processed by JAX TPU server",
         "# TYPE tpu_jax_requests_total counter",
         f'tpu_jax_requests_total{{model="{MODEL_ID}",status="success"}} {METRICS["successful_requests"]}',
         f'tpu_jax_requests_total{{model="{MODEL_ID}",status="failed"}} {METRICS["failed_requests"]}',
+        "",
+        "# HELP tpu_jax_degenerate_responses_total Responses that collapsed to a token loop",
+        "# TYPE tpu_jax_degenerate_responses_total counter",
+        f'tpu_jax_degenerate_responses_total{{model="{MODEL_ID}"}} {METRICS["degenerate_responses"]}',
         "",
         "# HELP tpu_jax_prompt_tokens_total Total prompt tokens processed",
         "# TYPE tpu_jax_prompt_tokens_total counter",
@@ -355,8 +463,8 @@ def chat_completions(req: ChatCompletionRequest):
             eos_token_ids=_eos_ids(),
         )
         elapsed = time.time() - t0
-        _record(stats, elapsed)
         text = TOKENIZER.decode(tokens, skip_special_tokens=True)
+        _record(stats, elapsed, text)
 
         return {
             "id": req_id,
@@ -410,8 +518,8 @@ def text_completions(req: CompletionRequest):
             eos_token_ids=_eos_ids(),
         )
         elapsed = time.time() - t0
-        _record(stats, elapsed)
         text = TOKENIZER.decode(tokens, skip_special_tokens=True)
+        _record(stats, elapsed, text)
 
         return {
             "id": req_id,
@@ -451,10 +559,27 @@ if __name__ == "__main__":
     parser.add_argument(
         "--int8-lm-head", action="store_true",
         help="Quantize the LM head to int8. NOT numerics-preserving.")
+    parser.add_argument(
+        "--window-kv", dest="window_kv", default=None,
+        choices=["auto", "on", "off"],
+        help="Ring-buffer KV for sliding layers. Default auto = on whenever "
+             "max_model_len > sliding_window (verified: True at 8192 vs 512). "
+             "MEASURED 2026-08-23 with it on: a prompt whose bucket padding reaches "
+             "512 makes the model emit a token loop. Ring eviction is the inferred "
+             "mechanism; 'off' is untested and exists so it can be compared.")
+    parser.add_argument(
+        "--prefill-chunk-size", type=int,
+        default=(int(os.environ["PREFILL_CHUNK_SIZE"])
+                 if os.environ.get("PREFILL_CHUNK_SIZE") else None),
+        help="Split prefill into chunks of this many tokens. One-shot prefill OOMs "
+             "on long prompts (measured: dense failed at 2,015 tokens, quantised at "
+             "5,015). Unset = one-shot (previous behaviour).")
     args = parser.parse_args()
 
     load_engine(
         args.model, args.kv_cache_dtype, args.quant_mode,
         args.max_model_len, args.local_dir, args.ple_bits, args.int8_lm_head,
+        args.prefill_chunk_size,
+        {"auto": None, "on": True, "off": False}[args.window_kv or "auto"],
     )
     uvicorn.run(app, host=args.host, port=args.port)
