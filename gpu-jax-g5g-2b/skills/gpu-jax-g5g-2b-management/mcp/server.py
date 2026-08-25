@@ -40,6 +40,7 @@ slower, and cold prefill far worse again.
 
 import asyncio
 import base64
+import hashlib
 import logging
 import os
 import time
@@ -297,12 +298,39 @@ def _payload_root() -> str:
     )
 
 
+def _payload_digest(root: str | None = None) -> str:
+    """Content digest of the serving payload, as a short hex build id.
+
+    Computed over the payload FILE CONTENTS rather than over the tarball, which
+    keeps it non-circular: the digest is written into the tarball, so hashing the
+    tarball itself could not work.
+
+    This is the fix for a documented failure. `deploy_jax_server` resolves its
+    payload next to server.py, and the MCP server runs from the skill snapshot,
+    so on 2026-08-24 a deploy shipped the PREVIOUS `make skill` output, reported
+    success, and the instance ran stale code — costing a full measure-and-conclude
+    cycle before md5s were compared by hand. The server now reports this id on
+    /health, so the comparison is one call instead of a manual hunt.
+    """
+    root = root or _payload_root()
+    digest = hashlib.sha256()
+    for rel in sorted(_PAYLOAD_FILES):
+        digest.update(rel.encode())
+        with open(os.path.join(root, rel), "rb") as fh:
+            digest.update(fh.read())
+    return digest.hexdigest()[:12]
+
+
 def _payload_tar_b64() -> str:
     """tar.gz of the serving payload, base64-encoded, built deterministically.
 
     mtime and uid/gid are zeroed so the same sources always produce the same
     string — that is what makes `deploy_jax_server` idempotent and lets a
     redeploy be a no-op you can detect.
+
+    A PAYLOAD_SHA stamp rides along so the running server can report which
+    payload it is executing. It is derived from the same file contents, so it
+    does not disturb determinism.
     """
     import io as _io
     import tarfile
@@ -316,6 +344,11 @@ def _payload_tar_b64() -> str:
             info.uname = info.gname = ""
             with open(os.path.join(root, rel), "rb") as fh:
                 tar.addfile(info, fh)
+        stamp = _payload_digest(root).encode()
+        info = tarfile.TarInfo("PAYLOAD_SHA")
+        info.size, info.mtime, info.uid, info.gid, info.mode = len(stamp), 0, 0, 0, 0o644
+        info.uname = info.gname = ""
+        tar.addfile(info, _io.BytesIO(stamp))
     return base64.b64encode(buf.getvalue()).decode()
 
 
@@ -448,6 +481,7 @@ chmod 700 {APP_DIR}/install.sh
 
 cat >{APP_DIR}/env <<ENVEOF
 MODEL_NAME={model}
+RIG_NAME={MANAGED_BY}
 KV_CACHE_DTYPE={KV_CACHE_DTYPE}
 QUANT_MODE={QUANT_MODE}
 MAX_MODEL_LEN={MAX_MODEL_LEN}
@@ -542,6 +576,14 @@ async def _instances(name: str | None = None, states: list[str] | None = None):
     return [i for r in response.get("Reservations", []) for i in r.get("Instances", [])]
 
 
+# AWS caps each of StandardOutputContent and StandardErrorContent returned by
+# get_command_invocation at 24,000 characters. Past that the content is silently
+# truncated — which for get_jax_logs means reading a partial journal and
+# concluding the error is not there. Detected rather than assumed: we compare
+# against the cap and say so.
+_SSM_OUTPUT_CAP = 24_000
+
+
 async def _ssm(instance_id: str, command: str, timeout: int = 300) -> str:
     ssm = _client("ssm")
     response = await _call(
@@ -552,6 +594,12 @@ async def _ssm(instance_id: str, command: str, timeout: int = 300) -> str:
         TimeoutSeconds=timeout,
     )
     command_id = response["Command"]["CommandId"]
+    # Logged at issue time so an invocation that later times out is still
+    # findable in the console. Previously the id was bound here and discarded on
+    # every failure path, leaving nothing to look up — and on timeout the command
+    # is still RUNNING on the box.
+    logger.info("ssm send_command id=%s instance=%s timeout=%ds",
+                command_id, instance_id, timeout)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -566,17 +614,41 @@ async def _ssm(instance_id: str, command: str, timeout: int = 300) -> str:
                 continue
             raise
         if result["Status"] in {"Success", "Failed", "TimedOut", "Cancelled"}:
-            output = (
-                result.get("StandardOutputContent", "") + result.get("StandardErrorContent", "")
-            ).strip()
+            stdout = result.get("StandardOutputContent", "")
+            stderr = result.get("StandardErrorContent", "")
+            output = (stdout + stderr).strip()
+            truncated = (
+                len(stdout) >= _SSM_OUTPUT_CAP or len(stderr) >= _SSM_OUTPUT_CAP
+            )
+            if truncated:
+                logger.warning("ssm output truncated id=%s", command_id)
+                output += (
+                    f"\n\n[!] OUTPUT TRUNCATED by SSM at {_SSM_OUTPUT_CAP} characters. "
+                    f"This is a partial result — an error may be missing from it. "
+                    f"Re-run with a smaller tail, or fetch the full output with "
+                    f"`aws ssm get-command-invocation --command-id {command_id} "
+                    f"--instance-id {instance_id}`."
+                )
             if result["Status"] != "Success":
-                raise RuntimeError(f"SSM {result['Status']}: {output}")
+                raise RuntimeError(
+                    f"SSM {result['Status']} (command-id {command_id}): {output}"
+                )
             return output
         await asyncio.sleep(2)
-    raise TimeoutError(f"SSM command did not finish in {timeout}s")
+    raise TimeoutError(
+        f"SSM command did not finish in {timeout}s. It is STILL RUNNING on "
+        f"{instance_id}; poll it with command-id {command_id}."
+    )
 
 
 def _error(exc: Exception) -> str:
+    """Render an exception for the MCP client, and put the traceback in the log.
+
+    The 18 tool bodies that call this all discard the stack: the client sees one
+    line and stderr had nothing at all. logger.exception here covers every call
+    site at once — server.py does configure logging, so this actually emits.
+    """
+    logger.exception("tool call failed: %s", exc)
     if isinstance(exc, ClientError):
         detail = exc.response.get("Error", {})
         return f"❌ AWS {detail.get('Code', 'error')}: {detail.get('Message', exc)}"
@@ -671,8 +743,9 @@ async def create_g5g_instance(
         if await _instances(name):
             return f"❌ A managed instance named `{name}` already exists."
         ec2 = _client("ec2")
+        ami_id = await _resolve_ami(ec2)
         args = {
-            "ImageId": await _resolve_ami(ec2),
+            "ImageId": ami_id,
             "InstanceType": instance_type,
             "MinCount": 1,
             "MaxCount": 1,
@@ -708,9 +781,16 @@ async def create_g5g_instance(
             "Installing the JAX runtime from wheels (no build). Follow with "
             "get_install_progress, then deploy_jax_server to ship the serving code."
         )
+        # The AMI id belongs in the confirmation: AWS ships driverless ARM64
+        # DLAMIs that boot perfectly well on a G5g and simply have no GPU, which
+        # reads as a broken runtime rather than a wrong image. Recording which
+        # image booted makes that one lookup instead of a guess.
+        logger.info("launched instance=%s ami=%s type=%s market=%s",
+                    instance_id, ami_id, instance_type, market)
         return (
             f"✅ Launching `{instance_id}` ({instance_type}, {market}, "
-            f"{_gpu_count(instance_type)}x T4G) in `{AWS_REGION}`.\n{tail}"
+            f"{_gpu_count(instance_type)}x T4G) in `{AWS_REGION}`.\n"
+            f"AMI: `{ami_id}`\n{tail}"
         )
     except Exception as exc:
         return _error(exc)
@@ -846,6 +926,8 @@ async def deploy_jax_server(instance_id: str, restart: bool = True) -> str:
     reads as success. Every redeploy silently served stale code.
     """
     try:
+        root = _payload_root()
+        build_id = _payload_digest(root)
         payload = _payload_tar_b64()
         command = (
             f"set -e; mkdir -p {APP_DIR}/app; "
@@ -866,7 +948,16 @@ async def deploy_jax_server(instance_id: str, restart: bool = True) -> str:
         output = await _ssm(instance_id, command, timeout=600)
         return (
             f"✅ Deployed {len(_PAYLOAD_FILES)} files ({len(payload) // 1024} KiB base64) "
-            f"to `{instance_id}`.\n\n```\n{output}\n```\n"
+            f"to `{instance_id}`.\n\n"
+            # WHICH sources, and their digest. _payload_root() silently picks
+            # between the working tree and the skill snapshot; on 2026-08-24 it
+            # chose the stale snapshot and nothing said so. Both facts are now in
+            # the deploy output, and verify_model_health compares the digest
+            # against what the instance reports on /health.
+            f"Payload root: `{root}`\n"
+            f"Build id: `{build_id}` — verify_model_health checks the running "
+            f"server reports this.\n\n"
+            f"```\n{output}\n```\n"
             + ("Engine init compiles the model; follow with get_jax_logs." if restart else "")
         )
     except Exception as exc:
@@ -923,18 +1014,31 @@ async def get_endpoint(instance_id: str) -> str:
 
 @mcp.tool(title="Verify model health", annotations=READ_ONLY)
 async def verify_model_health(instance_id: str) -> str:
-    """Check /health and confirm the served model reports a non-empty completion.
+    """Check /health, the served build id, and whether the reply was degenerate.
 
     Uses /v1/chat/completions: raw /v1/completions returns an empty completion on
     `-it` models, so an empty body there is not evidence of a broken deploy.
+
+    It deliberately does NOT pass on "the reply was non-empty". That is the check
+    the engineering rules call out by name — on the vLLM sibling a broken deploy
+    answered `': ok: ok: ok…'`, and on this rig KV-ring eviction returned a token
+    loop with status="success". A non-empty body is not evidence of health.
+    Instead this reads `tpu_jax_degenerate_responses_total` either side of its own
+    probe, so the verdict comes from the server's own judgement of the full text.
+
+    It also compares the build id the server reports against the digest of the
+    local payload, which is what turns a stale deploy from a multi-hour
+    investigation into one line of output.
     """
     try:
         endpoint = await get_endpoint(instance_id)
         if not endpoint.startswith("📡"):
             return endpoint
         base = endpoint.strip("📡 `")
+        metrics_url = base.replace("/v1", "/metrics")
         async with httpx.AsyncClient(timeout=60) as client:
             health = await client.get(base.replace("/v1", "/health"))
+            before, _, _ = _parse_prom((await client.get(metrics_url)).text)
             chat = await client.post(
                 f"{base}/chat/completions",
                 json={
@@ -943,13 +1047,55 @@ async def verify_model_health(instance_id: str) -> str:
                     "max_tokens": 16,
                 },
             )
+            after, _, _ = _parse_prom((await client.get(metrics_url)).text)
+
         body = chat.json()
         text = body.get("choices", [{}])[0].get("message", {}).get("content", "")
-        status = "✅" if health.status_code == 200 and text.strip() else "❌"
-        return (
-            f"{status} health={health.status_code} tokens="
-            f"{body.get('usage', {}).get('completion_tokens', 0)} reply={text!r}"
+        usage = body.get("usage") or {}
+        key = "tpu_jax_degenerate_responses_total"
+        degenerate = after.get(key, 0.0) > before.get(key, 0.0)
+
+        try:
+            health_body = health.json()
+        except Exception:
+            health_body = {}
+        served_build = health_body.get("build_id", "unknown")
+        try:
+            local_build = _payload_digest()
+        except Exception:
+            local_build = "unavailable"
+
+        ok = (
+            health.status_code == 200
+            and chat.status_code == 200
+            and not degenerate
+            and usage.get("completion_tokens", 0) > 0
         )
+        status = "✅" if ok else "❌"
+
+        lines = [
+            f"{status} health={health.status_code} "
+            f"tokens={usage.get('completion_tokens', 0)} reply={text!r}",
+            "",
+            f"- Degenerate (server's own verdict on the full text): "
+            f"**{'YES — token loop' if degenerate else 'no'}**",
+            f"- Build id served: `{served_build}`",
+        ]
+        if local_build not in ("unavailable", served_build) and served_build != "unknown":
+            lines.append(
+                f"- ⚠️ **STALE DEPLOY**: the local payload digests to `{local_build}`, "
+                f"but the instance is serving `{served_build}`. Run `make skill` "
+                f"and then deploy_jax_server — deploy ships the SKILL SNAPSHOT, "
+                f"not the working tree."
+            )
+        elif local_build == served_build:
+            lines.append(f"- Build id matches the local payload (`{local_build}`).")
+        if usage.get("pad_tokens") is not None:
+            lines.append(
+                f"- Shape: bucket={usage.get('bucket_size')} "
+                f"pad={usage.get('pad_tokens')} cold={usage.get('cold_shape')}"
+            )
+        return "\n".join(lines)
     except Exception as exc:
         return _error(exc)
 
@@ -1071,6 +1217,9 @@ async def get_metrics(instance_id: str) -> str:
         lines = [f"### Serving metrics on `{instance_id}`", ""]
         if served_model:
             lines += [f"Served checkpoint: `{served_model}`", ""]
+        if precision.get("build_id"):
+            lines += [f"Build id: `{precision['build_id']}` "
+                      f"(rig `{precision.get('rig', '?')}`)", ""]
         if precision:
             # The resolved dtypes, not the requested ones. On Turing these differ
             # from every sibling rig's, and "auto" hides which way it went.
@@ -1095,7 +1244,27 @@ async def get_metrics(instance_id: str) -> str:
 
         completions = samples.get("tpu_jax_completion_tokens_total", 0.0)
         latency = samples.get("tpu_jax_latency_seconds_sum", 0.0)
-        if completions and latency:
+        decode_s = samples.get("tpu_jax_decode_seconds_total", 0.0)
+        cold = samples.get("tpu_jax_cold_requests_total", 0.0)
+        if completions and decode_s:
+            # Decode time alone, so this is like-for-like with the gauge the
+            # benchmark reports quote rather than a lower bound. The old figure
+            # divided by TOTAL latency, which carries prefill and the HTTP round
+            # trip and so could only ever understate decode.
+            lines += [
+                "",
+                f"Cumulative decode: **{completions / decode_s:.2f} tok/s** over "
+                f"{int(completions)} completion tokens in {decode_s:.1f}s of decode. "
+                "This excludes prefill and HTTP, so it is comparable to the "
+                "`tpu_jax_decode_tokens_per_second` gauge.",
+            ]
+            if cold:
+                lines.append(
+                    f"⚠️ {int(cold)} request(s) compiled a new shape and are "
+                    "averaged in here. Cold requests measure several times slower; "
+                    "warm up before quoting this."
+                )
+        elif completions and latency:
             lines += [
                 "",
                 f"Cumulative mean: **{completions / latency:.2f} tok/s** over "

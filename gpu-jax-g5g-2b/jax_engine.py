@@ -132,11 +132,28 @@ def resolve_cache_dtype(name: str):
 
 @dataclass
 class GenerationStats:
+    """Per-request facts. Timings AND the compiled shape that produced them.
+
+    The shape fields are not decoration. `pad_len` is the variable that decided
+    the KV-ring eviction failure (docs/padding-window-eviction.md) -- it was
+    computed inside generate_stream and discarded, so the server recorded
+    status="success" for a token loop with no way to tell which request it was.
+    `cold_shape` separates "this rig is slow" from "this request compiled":
+    measured 2026-08-21, the first request after init took 18.06 s against 4.50 s
+    warm for the same prompt. `max_new_tokens_clamped` and `prefill_chunked`
+    record two silent fallbacks that otherwise leave no trace at all.
+    """
+
     prompt_tokens: int
     completion_tokens: int
     prefill_ms: float
     decode_ms: float
     finish_reason: str
+    bucket_size: int = 0
+    pad_len: int = 0
+    cold_shape: bool = False
+    prefill_chunked: bool = False
+    max_new_tokens_clamped: bool = False
 
     @property
     def decode_tok_per_s(self) -> float:
@@ -289,6 +306,10 @@ class JaxGemmaEngine:
         self.weight_bytes = 0
         self._decode_step = None
         self._jit_prefill = None
+        # (bucket, max_new_tokens) pairs already compiled in this process, so a
+        # request can report whether it paid for compilation.
+        self._seen_shapes: set[tuple[int, int]] = set()
+        self._chunk_warned: set[tuple[int, int]] = set()
 
     # ------------------------------------------------------------------ load
 
@@ -296,10 +317,30 @@ class JaxGemmaEngine:
         """Download (or read) the checkpoint and build JAX parameters on device."""
         from safetensors.flax import load_file
 
+        # Stage timings. load() runs for minutes over ~9.5 GB and used to emit
+        # nothing between "loading weights" and "loaded", so a hang -- an mmap
+        # stalling on a small host's swapfile, or a device_put failing to find a
+        # contiguous block -- was indistinguishable from slow progress. Both are
+        # real failure modes here (docs/larger-models-on-t4g.md).
+        t_stage = time.perf_counter()
+
+        def stage(name: str, **extra) -> None:
+            nonlocal t_stage
+            now = time.perf_counter()
+            detail = " ".join(f"{k}={v}" for k, v in extra.items())
+            logger.info("load stage %s took %.1fs %s", name, now - t_stage, detail)
+            t_stage = now
+
         path = local_dir or self._download()
+        stage("download", path=path)
         with open(os.path.join(path, "config.json")) as fh:
             hf_config = json.load(fh)
         self.config = config_from_hf(hf_config)
+        logger.info(
+            "config: layers=%d hidden=%d sliding_window=%s vocab=%d max_model_len=%d",
+            self.config.num_hidden_layers, self.config.hidden_size,
+            self.config.sliding_window, self.config.vocab_size, self.max_model_len,
+        )
 
         raw: dict[str, Any] = {}
         shards = sorted(f for f in os.listdir(path) if f.endswith(".safetensors"))
@@ -333,6 +374,8 @@ class JaxGemmaEngine:
         if skipped_bytes:
             logger.info("skipped %.2f GB of non-text tower weights",
                         skipped_bytes / 1e9)
+        stage("read_shards", shards=len(shards), tensors=len(raw),
+              skipped_gb=f"{skipped_bytes / 1e9:.2f}")
 
         # NOT wrapped in `jax.default_device(cpu)`, deliberately. Building the tree
         # on the host and placing it at the end is the obviously correct shape for
@@ -365,9 +408,12 @@ class JaxGemmaEngine:
 
         set_w4a16_impl(self.w4a16_impl, self.w4a16_layout)
 
+        stage("convert_params")
+
         self.device = jax.devices()[0]
         self.params = jax.device_put(self.params, self.device)
         jax.block_until_ready(self.params)
+        stage("device_put", device=str(self.device))
         self.weight_bytes = sum(
             int(x.size) * int(x.dtype.itemsize)
             for x in jax.tree_util.tree_leaves(self.params)
@@ -381,6 +427,13 @@ class JaxGemmaEngine:
         if self.window_kv is None:
             win = self.config.sliding_window
             self.window_kv = bool(win) and self.max_model_len > int(win)
+            # window_kv is the flag implicated in the eviction failure, and it is
+            # resolved from the config rather than requested, so "what did it end
+            # up as" was previously unanswerable from outside the process.
+            logger.info(
+                "window_kv=auto resolved to %s (sliding_window=%s, max_model_len=%d)",
+                self.window_kv, win, self.max_model_len,
+            )
         self._decode_step = jax.jit(
             make_cached_decode_step(self.model, quant_mode=self.quant_mode,
                                     window_kv=self.window_kv),
@@ -440,15 +493,61 @@ class JaxGemmaEngine:
                 f"Prompt of {prompt_len} tokens leaves no room within "
                 f"max_model_len={self.max_model_len}"
             )
+        requested_new_tokens = max_new_tokens
         max_new_tokens = max(1, min(max_new_tokens, budget))
+        clamped = max_new_tokens != requested_new_tokens
+        if clamped:
+            # Silent before. finish_reason then reported "length", which is
+            # indistinguishable from the client's own max_tokens being reached.
+            # It also changes the COMPILED SHAPE -- max_new_tokens is a
+            # static_argnames entry -- so a warm-up at one value followed by a
+            # clamped request silently recompiles and measures cold.
+            logger.warning(
+                "max_new_tokens clamped %d -> %d: prompt is %d tokens and "
+                "max_model_len=%d. This changes the compiled shape.",
+                requested_new_tokens, max_new_tokens, prompt_len, self.max_model_len,
+            )
 
         ids = jnp.asarray(prompt_ids, dtype=jnp.int32)[None, :]
         padded, valid_mask = pad_to_bucket(ids)
         bucket_s = int(padded.shape[1])
+        pad_len = bucket_s - prompt_len
+        # XLA compiles per (bucket, max_new_tokens) pair, so a request whose
+        # shape has not been seen pays compilation inside its own prefill_ms.
+        # Tracking it here is what lets a slow outlier be explained rather than
+        # averaged in -- CLAUDE.md's warm-up rule made observable.
+        shape_key = (bucket_s, int(max_new_tokens))
+        cold_shape = shape_key not in self._seen_shapes
+        self._seen_shapes.add(shape_key)
+        if pad_len:
+            win = getattr(self.config, "sliding_window", None)
+            if self.window_kv and win and pad_len >= int(win):
+                # The exact precondition of the eviction failure. The store fix
+                # makes this safe, but it is still worth saying out loud: it is
+                # the signature that made a "successful" response a token loop.
+                logger.warning(
+                    "prompt %d padded to bucket %d (pad=%d) meets or exceeds the "
+                    "sliding window %d with window_kv on — the pre-fix eviction "
+                    "signature. See docs/padding-window-eviction.md.",
+                    prompt_len, bucket_s, pad_len, int(win),
+                )
 
         t0 = time.perf_counter()
         chunk = self.prefill_chunk_size
-        if chunk is not None and bucket_s % chunk == 0:
+        chunked = chunk is not None and bucket_s % chunk == 0
+        if chunk is not None and not chunked and shape_key not in self._chunk_warned:
+            # Reverting to one-shot prefill was documented in a comment and
+            # logged nowhere, so an operator who set PREFILL_CHUNK_SIZE to bound
+            # prefill temporaries and then OOMed had no signal the setting did
+            # nothing for THIS request. Exactly the "a config flag being accepted
+            # is not evidence it did anything" trap the rig warns about.
+            self._chunk_warned.add(shape_key)
+            logger.warning(
+                "prefill_chunk_size=%d does not divide bucket %d — falling back "
+                "to ONE-SHOT prefill for this shape. Prefill temporaries are "
+                "unbounded on this request.", chunk, bucket_s,
+            )
+        if chunked:
             last_logits, caches, valid = jax.block_until_ready(
                 chunked_prefill_with_kv_cache(
                     self.model, padded, valid_mask, self.params, max_new_tokens,
@@ -509,6 +608,11 @@ class JaxGemmaEngine:
             prefill_ms=prefill_ms,
             decode_ms=decode_ms,
             finish_reason=finish_reason,
+            bucket_size=bucket_s,
+            pad_len=pad_len,
+            cold_shape=cold_shape,
+            prefill_chunked=chunked,
+            max_new_tokens_clamped=clamped,
         )
 
     @staticmethod
@@ -567,4 +671,10 @@ class JaxGemmaEngine:
             "ple_bits": self.ple_bits,
             "int8_lm_head": self.int8_lm_head,
             "pre_ampere": IS_PRE_AMPERE,
+            # Resolved, not requested: window_kv comes from the config when auto,
+            # and prefill chunking silently reverts per-request when the chunk
+            # size does not divide the bucket.
+            "window_kv": bool(self.window_kv),
+            "max_model_len": self.max_model_len,
+            "prefill_chunk_size": self.prefill_chunk_size or 0,
         }

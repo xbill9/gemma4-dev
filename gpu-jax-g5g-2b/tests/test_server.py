@@ -613,3 +613,219 @@ class RepoHygieneTests(BashSyntaxMixin, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ObservabilityTests(unittest.TestCase, BashSyntaxMixin):
+    """Pin the traceability machinery added 2026-08-25.
+
+    Every assertion here corresponds to a way this rig previously destroyed its
+    own evidence: dropped INFO logs, tracebacks discarded on 500s, a request id
+    that reached nothing, padding computed and thrown away, and a deploy that
+    could not be told apart from the stale one it replaced.
+    """
+
+    SERVER_SRC = None
+    ENGINE_SRC = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.SERVER_SRC = (ROOT / "jax_openai_server.py").read_text()
+        cls.ENGINE_SRC = (ROOT / "jax_engine.py").read_text()
+
+    # ----------------------------------------------------------- logging
+
+    def test_root_logging_is_configured_before_the_engine_import(self):
+        """Ordering is the whole fix, not the basicConfig call on its own.
+
+        ports.gemma4.jax_e_model logs its device-policy banner at IMPORT time and
+        is imported via jax_engine, so configuring after that import would
+        silence the one line naming the resolved compute dtype.
+        """
+        src = self.SERVER_SRC
+        config_at = src.index("logging.basicConfig(")
+        engine_import_at = src.index("from jax_engine import")
+        self.assertLess(
+            config_at, engine_import_at,
+            "logging.basicConfig must precede the jax_engine import, or the "
+            "device-policy banner is emitted before any handler exists",
+        )
+        self.assertIn("force=True", src[config_at:engine_import_at])
+
+    def test_uvicorn_does_not_configure_the_root_logger(self):
+        """The premise of the fix, asserted rather than assumed.
+
+        If uvicorn ever starts adding a root handler this test fails and the
+        basicConfig call can be reconsidered. Until then INFO records from the
+        payload reach logging.lastResort, which drops anything below WARNING.
+        """
+        import logging
+        import logging.config
+
+        try:
+            from uvicorn.config import LOGGING_CONFIG
+        except ImportError:
+            self.skipTest("uvicorn is a serving dependency, absent here")
+        root = logging.getLogger()
+        saved = list(root.handlers), root.level
+        try:
+            root.handlers = []
+            logging.config.dictConfig(LOGGING_CONFIG)
+            self.assertEqual(
+                root.handlers, [],
+                "uvicorn now configures the root logger; revisit basicConfig",
+            )
+        finally:
+            root.handlers, root.level = saved
+
+    def test_startup_reports_through_the_logger_not_print(self):
+        # print() bypasses level control and the format, and cannot be filtered
+        # by JAX_SERVER_LOG_LEVEL.
+        body = self.SERVER_SRC.split("def load_engine")[1].split("\ndef _eos_ids")[0]
+        self.assertNotIn("print(", body)
+        self.assertIn("logger.info", body)
+
+    # -------------------------------------------------------- request path
+
+    def test_failures_are_logged_with_the_traceback_and_the_request_id(self):
+        # A 500 used to leave NOTHING in the journal: HTTPException carries
+        # str(exc) to the client and discards the stack.
+        self.assertEqual(self.SERVER_SRC.count("logger.exception("), 3,
+                         "expected both handlers plus the streaming generator")
+        self.assertIn('detail=f"[{req_id}] {exc}"', self.SERVER_SRC)
+
+    def test_streaming_failures_are_counted_and_not_silent(self):
+        """The generator runs after the handler returned, outside its try."""
+        stream = self.SERVER_SRC.split("def _sse_stream")[1].split('@app.get("/health")')[0]
+        self.assertIn('METRICS["failed_requests"] += 1', stream)
+        self.assertIn('finish="error"', stream)
+
+    def test_request_id_is_echoed_in_a_header(self):
+        # Without this the id exists only inside the JSON body, so a client
+        # cannot cite a request the server is able to find.
+        self.assertIn('response.headers["X-Request-Id"] = req_id', self.SERVER_SRC)
+        self.assertEqual(self.SERVER_SRC.count('"X-Request-Id": req_id'), 2,
+                         "both streaming responses must carry it too")
+
+    def test_one_log_line_per_request_carries_the_shape(self):
+        record = self.SERVER_SRC.split("def _record")[1].split("\ndef _sse_stream")[0]
+        for field in ("id=%s", "bucket=%d", "pad=%d", "cold=%s", "finish=%s"):
+            with self.subTest(field=field):
+                self.assertIn(field, record)
+
+    # ------------------------------------------------------------- padding
+
+    def test_generation_stats_carries_the_variable_behind_the_eviction_bug(self):
+        """pad_len predicted the failure 14/14 and was being discarded."""
+        for field in ("bucket_size", "pad_len", "cold_shape",
+                      "prefill_chunked", "max_new_tokens_clamped"):
+            with self.subTest(field=field):
+                self.assertIn(f"{field}:", self.ENGINE_SRC)
+        self.assertIn("pad_len = bucket_s - prompt_len", self.ENGINE_SRC)
+
+    def test_padding_at_or_past_the_window_is_warned_about(self):
+        self.assertIn("the pre-fix eviction", self.ENGINE_SRC)
+        self.assertIn("pad_len >= int(win)", self.ENGINE_SRC)
+
+    def test_degenerate_output_is_logged_with_its_padding(self):
+        record = self.SERVER_SRC.split("def _record")[1].split("\ndef _sse_stream")[0]
+        self.assertIn("DEGENERATE OUTPUT", record)
+        self.assertIn("logger.error", record)
+
+    def test_pad_metrics_are_exported(self):
+        for series in ("tpu_jax_last_pad_tokens", "tpu_jax_max_pad_tokens",
+                       "tpu_jax_last_bucket_size", "tpu_jax_cold_requests_total",
+                       "tpu_jax_decode_seconds_total"):
+            with self.subTest(series=series):
+                self.assertIn(series, self.SERVER_SRC)
+
+    def test_metrics_carry_a_rig_label(self):
+        # Two rigs serving the same checkpoint otherwise emit byte-identical
+        # series names and label sets.
+        self.assertIn('f\'rig="{RIG_NAME}"\'', self.SERVER_SRC)
+        self.assertIn('RIG_NAME = os.environ.get("RIG_NAME"', self.SERVER_SRC)
+        # ...and the rig name must actually reach the serving process.
+        self.assertIn("RIG_NAME={MANAGED_BY}", (ROOT / "server.py").read_text())
+
+    # ---------------------------------------------------- silent fallbacks
+
+    def test_the_two_silent_fallbacks_now_warn(self):
+        self.assertIn("to ONE-SHOT prefill for this shape", self.ENGINE_SRC)
+        self.assertIn("max_new_tokens clamped", self.ENGINE_SRC)
+
+    # ------------------------------------------------------ build identity
+
+    def test_payload_digest_is_deterministic_and_content_addressed(self):
+        first, second = server._payload_digest(), server._payload_digest()
+        self.assertEqual(first, second)
+        self.assertEqual(len(first), 12)
+        self.assertRegex(first, r"^[0-9a-f]{12}$")
+
+    def test_payload_stamp_rides_in_the_tarball(self):
+        import io
+        import tarfile
+
+        raw = base64.b64decode(server._payload_tar_b64())
+        with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
+            names = tar.getnames()
+            self.assertIn("PAYLOAD_SHA", names)
+            stamped = tar.extractfile("PAYLOAD_SHA").read().decode().strip()
+        self.assertEqual(stamped, server._payload_digest())
+
+    def test_the_server_reports_the_stamp_it_was_shipped(self):
+        self.assertIn('stamp = os.path.join(here, "PAYLOAD_SHA")', self.SERVER_SRC)
+        self.assertIn('"build_id": BUILD_ID', self.SERVER_SRC)
+
+    def test_deploy_reports_the_root_it_resolved(self):
+        # _payload_root() silently picks between the working tree and the skill
+        # snapshot; on 2026-08-24 it chose the stale snapshot and said nothing.
+        src = (ROOT / "server.py").read_text()
+        deploy = src.split("async def deploy_jax_server")[1].split("@mcp.tool")[0]
+        self.assertIn("Payload root:", deploy)
+        self.assertIn("Build id:", deploy)
+
+    # ------------------------------------------------------- health verdict
+
+    def test_health_does_not_pass_on_a_merely_non_empty_reply(self):
+        """The rule the tool itself used to break.
+
+        A broken deploy answered ': ok: ok: ok…' on the vLLM sibling, and KV-ring
+        eviction returned a token loop here — both non-empty, both broken.
+        """
+        src = (ROOT / "server.py").read_text()
+        body = src.split("async def verify_model_health")[1].split("@mcp.tool")[0]
+        self.assertNotIn("and text.strip() else", body)
+        self.assertIn("tpu_jax_degenerate_responses_total", body)
+        self.assertIn("degenerate", body)
+
+    def test_health_compares_the_served_build_against_the_local_one(self):
+        src = (ROOT / "server.py").read_text()
+        body = src.split("async def verify_model_health")[1].split("@mcp.tool")[0]
+        self.assertIn("STALE DEPLOY", body)
+        self.assertIn("_payload_digest()", body)
+
+    def test_health_is_503_while_loading(self):
+        self.assertIn("response.status_code = 503", self.SERVER_SRC)
+
+    # ---------------------------------------------------------------- SSM
+
+    def test_ssm_failures_carry_the_command_id(self):
+        src = (ROOT / "server.py").read_text()
+        body = src.split("async def _ssm")[1].split("\ndef _error")[0]
+        self.assertIn("command-id {command_id}", body)
+        self.assertIn("STILL RUNNING", body)
+        self.assertIn("logger.info", body)
+
+    def test_ssm_truncation_is_detected_not_assumed(self):
+        src = (ROOT / "server.py").read_text()
+        self.assertIn("_SSM_OUTPUT_CAP = 24_000", src)
+        self.assertIn("OUTPUT TRUNCATED", src)
+
+    def test_error_renderer_logs_the_traceback(self):
+        src = (ROOT / "server.py").read_text()
+        body = src.split("def _error(exc")[1].split("@mcp.tool")[0]
+        self.assertIn("logger.exception", body)
+
+    def test_launch_reports_the_ami_it_booted(self):
+        src = (ROOT / "server.py").read_text()
+        body = src.split("async def create_g5g_instance")[1].split("@mcp.tool")[0]
+        self.assertIn("AMI: `{ami_id}`", body)

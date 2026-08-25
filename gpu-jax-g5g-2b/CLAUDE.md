@@ -462,6 +462,103 @@ no sequence-sized logits tensor at bucket 4,096 — and it lifted the dense ceil
 checkpoint now serves 1,515 and 3,515 tokens, where `larger-models-on-t4g.md` bracketed it at
 (115, 2015].
 
+## The rig could not explain its own failures
+
+**Added 2026-08-25. Verified end-to-end on CPU against the real FastAPI app; NOT
+yet confirmed on a T4G** — G5g spot capacity was exhausted across every
+`us-east-1` AZ and every instance size that day.
+
+Every incident already written up above cost more than it should have because
+the evidence was being destroyed as it was produced. The specific mechanisms:
+
+- **Every `logger.info` in the serving payload was discarded.** Measured, not
+  inferred: `jax_openai_server.py` never called `logging.basicConfig`, and
+  `uvicorn.run()` configures only its own `uvicorn*` loggers — it never adds a
+  root handler. Root kept **zero handlers before and after** uvicorn's
+  `dictConfig`, so `logging.lastResort` handled records at WARNING and above and
+  the module loggers' effective level was 30. That silently dropped the
+  `jax_e_model` **device-policy banner** — platform, compute capability, resolved
+  compute dtype — on the one rig whose entire premise is which dtype the device
+  picked, plus `quant_mode=auto resolved to ...` and the non-text-tower line. The
+  warnings that did get through printed bare, with no level or logger name,
+  because `lastResort` has no formatter.
+
+  **The placement of the fix is load-bearing, not the call itself.** The banner
+  fires at *import* of `jax_e_model`, which is imported via `jax_engine`, so
+  `basicConfig` must precede that import. `force=True` so a dependency that
+  configures first cannot win. `test_root_logging_is_configured_before_the_engine_import`
+  pins the ordering and `test_uvicorn_does_not_configure_the_root_logger` pins
+  the premise, so if uvicorn ever starts adding a root handler the test says so.
+
+- **A 500 left nothing in the journal.** Both handlers raised
+  `HTTPException(detail=str(exc))`, which discards the traceback, and logged
+  nothing. A per-request JAX OOM — the whole subject of
+  `larger-models-on-t4g.md` — was invisible to `get_jax_logs`. Worse, the SSE
+  generator body runs *after* the handler returns, so a **streaming** failure was
+  outside the handler's `try` entirely: not counted, not logged, just a short
+  answer.
+
+- **`req_id` reached nothing.** It existed only inside the response body. There
+  is now one flat `key=value` log line per request and an `X-Request-Id` header,
+  so a report of "request `chatcmpl-jax-…` was wrong" is resolvable.
+
+- **`pad_len` — the variable that decided the eviction bug — was computed and
+  thrown away.** `bucket_s` was used only for the chunk-divisibility test. It is
+  now on `GenerationStats`, in `usage`, in the log line, and on
+  `tpu_jax_last_pad_tokens` / `tpu_jax_max_pad_tokens`. That is what turns
+  `tpu_jax_degenerate_responses_total` from a smoke alarm with no address into a
+  diagnosis, and padding at or past the sliding window now warns by name.
+
+- **Nothing identified which payload a process was running.** `_payload_tar_b64`
+  was already deterministic, so `_payload_digest()` hashes the payload **file
+  contents** (not the tarball — the digest rides inside it, which would be
+  circular), ships a `PAYLOAD_SHA` stamp, and the server reports it on `/health`,
+  on `X-Build-Id`, and as a label. `deploy_jax_server` now also prints the
+  `_payload_root()` it resolved, which silently picks between the working tree
+  and the skill snapshot — the 2026-08-24 stale deploy in one line of output.
+  **`verify_model_health` compares the two and says `STALE DEPLOY`.**
+
+- **`verify_model_health` broke the rule it exists to enforce.** It gated on
+  `text.strip()` — health-checking by testing for a non-empty response, which the
+  engineering rules call out by name. It now reads
+  `tpu_jax_degenerate_responses_total` either side of its own probe, so the
+  verdict is the server's judgement of the full text rather than "not empty".
+
+- **Two silent fallbacks now warn.** `prefill_chunk_size` reverts to one-shot
+  prefill when the chunk does not divide the bucket, and `max_new_tokens` is
+  clamped against `max_model_len`. Both left no trace; the clamp additionally
+  **changes the compiled shape**, since `max_new_tokens` is a `static_argnames`
+  entry.
+
+- **SSM discarded its `CommandId` on every failure path**, including timeout —
+  where the command is still *running* on the box. It is now logged at issue time
+  and carried in both error messages. Output truncation is **detected** against
+  the documented 24,000-character cap rather than returned as if complete:
+  `get_jax_logs` at `tail=5000` will exceed it, and reading a partial journal is
+  how you conclude an error is not there.
+
+- **`_error()` swallowed the traceback across 18 tool bodies.** One
+  `logger.exception` inside it covers every call site.
+
+Two things worth keeping from the CPU verification:
+
+- **`cold_shape` is worth its own field.** The same request shape measured
+  **17.7 tok/s cold and 439.6 tok/s warm** — a 25x gap that was previously an
+  unexplained outlier averaged into the cumulative mean.
+- **The clamp really does recompile.** A request clamped from 9,999 to 236
+  came back `clamped=True cold=True` — the connection between the silent clamp
+  and a mystery slow request, observed rather than reasoned about.
+
+Metrics gained a **`rig` label** rather than a renamed prefix: two rigs serving
+the same checkpoint previously emitted byte-identical series names *and* label
+sets, but both benchmark reports compare on `tpu_jax_decode_tokens_per_second`
+**by name**, so renaming would break continuity with them. `RIG_NAME` reaches the
+serving process through the systemd `EnvironmentFile`. `tpu_jax_decode_seconds_total`
+also lands, so cumulative decode is a real rate instead of the lower bound
+`get_metrics` used to apologise for.
+
+`tests/test_server.py::ObservabilityTests` pins all of it (100 tests, green).
+
 ## Measurement
 
 **This rig has two measurements**, both its own, in `benchmarks/runs/<date>-<what>-g5g/`
