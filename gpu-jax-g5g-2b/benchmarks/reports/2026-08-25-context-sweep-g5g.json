@@ -1,0 +1,405 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-25-context-sweep-g5g",
+    "date": "2026-08-25",
+    "operator": "xbill",
+    "source": "gpu-jax-g5g-2b",
+    "notes": "First context x output-length sweep on this rig; earlier runs were a single point. Concurrency is fixed at 1 because the hardware allows nothing else: MAX_NUM_SEQS=1, Gemma4EModelJAX raises NotImplementedError for B>1, and the decode step donates its KV buffers. Every cell is warmed AT THE SHAPE IT MEASURES, because max_new_tokens is a static_argnames entry and warming at a different value leaves the measured request cold (previously a 4x error). Instance was spot and was terminated after the run."
+  },
+  "hardware": {
+    "accelerator": "nvidia-t4g",
+    "chips": 1,
+    "topology": "single-device",
+    "hbm_gb_per_chip": 15.0,
+    "machine_type": "g5g.2xlarge",
+    "host": {
+      "cloud": "aws",
+      "zone": "us-east-1a",
+      "provisioning": "spot",
+      "instance_name": "i-08806efbd4308e970"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "parameters_b": 2,
+    "weights_dtype": "bfloat16-stored/float16-compute",
+    "quantization": "none",
+    "kv_cache_dtype": "float16",
+    "max_model_len": 8192,
+    "architecture_notes": "Weights are STORED bf16 and COMPUTED float16: the loader keeps ml_dtypes bfloat16 and COMPUTE_DTYPE is float16 on SM 7.5, so XLA converts in front of every use. Measured here at 54.4% of decode."
+  },
+  "software": {
+    "engine": "pure-jax",
+    "version": "jax 0.11.1 on Python 3.14",
+    "backend": "xla-gpu",
+    "tensor_parallel_size": 1,
+    "container_image": "none (systemd unit on ami-077792d0bb6a000b8)"
+  },
+  "throughput": {
+    "workload": {
+      "tool": "benchmarks/runs/2026-08-25-context-sweep-g5g/sweep.py",
+      "dataset": "synthetic repeated-token filler",
+      "num_prompts": 12,
+      "runs_per_point": 3,
+      "noise_floor_pct": 0.8
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 41,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 12.8,
+        "per_stream_tok_per_s": 12.8,
+        "total_tok_per_s": 12.8,
+        "ttft_ms": {
+          "mean": 143.03,
+          "median": 138.2,
+          "p90": 154.8,
+          "p99": 154.8
+        },
+        "tpot_ms": {
+          "mean": 78.12,
+          "median": 78.12,
+          "p90": 78.12,
+          "p99": 78.12
+        },
+        "raw": {
+          "bucket_size": 64,
+          "pad_tokens": 23,
+          "runs": 3,
+          "decode_spread_pct": 0.0
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 137,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 13.03,
+        "per_stream_tok_per_s": 13.03,
+        "total_tok_per_s": 13.03,
+        "ttft_ms": {
+          "mean": 333.67,
+          "median": 328.9,
+          "p90": 347.3,
+          "p99": 347.3
+        },
+        "tpot_ms": {
+          "mean": 76.73,
+          "median": 76.92,
+          "p90": 76.92,
+          "p99": 76.92
+        },
+        "raw": {
+          "bucket_size": 256,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.77
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 521,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 12.93,
+        "per_stream_tok_per_s": 12.93,
+        "total_tok_per_s": 12.93,
+        "ttft_ms": {
+          "mean": 763.27,
+          "median": 761.9,
+          "p90": 770.6,
+          "p99": 770.6
+        },
+        "tpot_ms": {
+          "mean": 77.32,
+          "median": 77.52,
+          "p90": 77.52,
+          "p99": 77.52
+        },
+        "raw": {
+          "bucket_size": 640,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.77
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1033,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 12.93,
+        "per_stream_tok_per_s": 12.93,
+        "total_tok_per_s": 12.93,
+        "ttft_ms": {
+          "mean": 1541.37,
+          "median": 1539.1,
+          "p90": 1549.2,
+          "p99": 1549.2
+        },
+        "tpot_ms": {
+          "mean": 77.32,
+          "median": 77.52,
+          "p90": 77.52,
+          "p99": 77.52
+        },
+        "raw": {
+          "bucket_size": 1152,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.77
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2057,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 12.93,
+        "per_stream_tok_per_s": 12.93,
+        "total_tok_per_s": 12.93,
+        "ttft_ms": {
+          "mean": 2962.33,
+          "median": 2960.4,
+          "p90": 2981.4,
+          "p99": 2981.4
+        },
+        "tpot_ms": {
+          "mean": 77.32,
+          "median": 77.52,
+          "p90": 77.52,
+          "p99": 77.52
+        },
+        "raw": {
+          "bucket_size": 2176,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.77
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 4105,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 12.87,
+        "per_stream_tok_per_s": 12.87,
+        "total_tok_per_s": 12.87,
+        "ttft_ms": {
+          "mean": 6270.0,
+          "median": 6266.2,
+          "p90": 6300.8,
+          "p99": 6300.8
+        },
+        "tpot_ms": {
+          "mean": 77.72,
+          "median": 77.52,
+          "p90": 78.12,
+          "p99": 78.12
+        },
+        "raw": {
+          "bucket_size": 4224,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.78
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 41,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 12.8,
+        "per_stream_tok_per_s": 12.8,
+        "total_tok_per_s": 12.8,
+        "ttft_ms": {
+          "mean": 140.67,
+          "median": 134.1,
+          "p90": 153.9,
+          "p99": 153.9
+        },
+        "tpot_ms": {
+          "mean": 78.12,
+          "median": 78.12,
+          "p90": 78.12,
+          "p99": 78.12
+        },
+        "raw": {
+          "bucket_size": 64,
+          "pad_tokens": 23,
+          "runs": 3,
+          "decode_spread_pct": 0.0
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 137,
+        "output_len": 107,
+        "status": "ok",
+        "output_tok_per_s": 12.63,
+        "per_stream_tok_per_s": 12.63,
+        "total_tok_per_s": 12.63,
+        "ttft_ms": {
+          "mean": 332.73,
+          "median": 326.1,
+          "p90": 346.0,
+          "p99": 346.0
+        },
+        "tpot_ms": {
+          "mean": 79.16,
+          "median": 79.37,
+          "p90": 79.37,
+          "p99": 79.37
+        },
+        "raw": {
+          "bucket_size": 256,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.79
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 521,
+        "output_len": 86,
+        "status": "ok",
+        "output_tok_per_s": 12.67,
+        "per_stream_tok_per_s": 12.67,
+        "total_tok_per_s": 12.67,
+        "ttft_ms": {
+          "mean": 754.4,
+          "median": 752.3,
+          "p90": 761.3,
+          "p99": 761.3
+        },
+        "tpot_ms": {
+          "mean": 78.95,
+          "median": 78.74,
+          "p90": 79.37,
+          "p99": 79.37
+        },
+        "raw": {
+          "bucket_size": 640,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.79
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1033,
+        "output_len": 89,
+        "status": "ok",
+        "output_tok_per_s": 12.7,
+        "per_stream_tok_per_s": 12.7,
+        "total_tok_per_s": 12.7,
+        "ttft_ms": {
+          "mean": 1531.87,
+          "median": 1530.2,
+          "p90": 1539.3,
+          "p99": 1539.3
+        },
+        "tpot_ms": {
+          "mean": 78.74,
+          "median": 78.74,
+          "p90": 78.74,
+          "p99": 78.74
+        },
+        "raw": {
+          "bucket_size": 1152,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.0
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2057,
+        "output_len": 94,
+        "status": "ok",
+        "output_tok_per_s": 12.7,
+        "per_stream_tok_per_s": 12.7,
+        "total_tok_per_s": 12.7,
+        "ttft_ms": {
+          "mean": 2936.37,
+          "median": 2941.7,
+          "p90": 2942.9,
+          "p99": 2942.9
+        },
+        "tpot_ms": {
+          "mean": 78.74,
+          "median": 78.74,
+          "p90": 78.74,
+          "p99": 78.74
+        },
+        "raw": {
+          "bucket_size": 2176,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.0
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 4105,
+        "output_len": 94,
+        "status": "ok",
+        "output_tok_per_s": 12.6,
+        "per_stream_tok_per_s": 12.6,
+        "total_tok_per_s": 12.6,
+        "ttft_ms": {
+          "mean": 6228.7,
+          "median": 6240.3,
+          "p90": 6278.5,
+          "p99": 6278.5
+        },
+        "tpot_ms": {
+          "mean": 79.37,
+          "median": 79.37,
+          "p90": 79.37,
+          "p99": 79.37
+        },
+        "raw": {
+          "bucket_size": 4224,
+          "pad_tokens": 119,
+          "runs": 3,
+          "decode_spread_pct": 0.0
+        }
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 14.07,
+    "weights_gib": 8.62,
+    "notes": "xprof GPU_0_bfc peak 10.171 GiB in use, 2.937 GiB free, fragmentation 0.661. Serving /metrics reported weight_bytes 9.257 GB resident."
+  },
+  "issues": [
+    {
+      "summary": "0.0% of kernel time uses TensorCores \u2014 xprof reports 'Kernel uses TensorCore' False for 100% of kernel time on a chip with 65 TFLOP/s of fp16 tensor-core throughput.",
+      "status": "open"
+    },
+    {
+      "summary": "54.4% of decode is dtype conversion (wrapped_convert_*) and 32% is fp32 gemvx \u2014 86% of decode is dtype tax. Root cause: weights stored bf16, COMPUTE_DTYPE float16.",
+      "status": "open"
+    },
+    {
+      "summary": "Bucket padding is a flat 119 tokens for every bucket >= 256, and prefill is linear in the bucket, so at 137 real tokens ~39% of prefill time is spent on padding.",
+      "status": "open"
+    },
+    {
+      "summary": "GPU allocator fragmentation 0.661 at peak with 2.937 GiB free \u2014 the same condition behind the contiguous-block OOMs in docs/larger-models-on-t4g.md.",
+      "status": "open"
+    }
+  ],
+  "notes": [
+    "Decode is FLAT at 12.80 tok/s (3.4% total spread) from 41 to 4,105 prompt tokens and across 32/128 output tokens \u2014 decode does not degrade with context.",
+    "Prefill is linear in the PADDED bucket, not the real prompt: prefill_ms = 1.478 * bucket - 101, R^2 = 0.997.",
+    "All 12 cells returned ok. The dense ceiling was NOT reached at 4,105 tokens \u2014 past the (115, 2015] bracket in docs/larger-models-on-t4g.md and past the 3,515 recorded after the logits_at fix.",
+    "Bucket padding is a flat 119 tokens for every bucket >= 256, confirming on hardware that the post-fix ladder makes pad_len >= 512 unreachable.",
+    "Cold-shape warm-up cost 16-27s per cell against 2.7-13.8s measured; cold and warm are separated by the cold_shape flag rather than averaged."
+  ]
+}
