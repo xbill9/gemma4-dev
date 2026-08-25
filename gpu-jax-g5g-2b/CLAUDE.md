@@ -464,9 +464,23 @@ checkpoint now serves 1,515 and 3,515 tokens, where `larger-models-on-t4g.md` br
 
 ## The rig could not explain its own failures
 
-**Added 2026-08-25. Verified end-to-end on CPU against the real FastAPI app; NOT
-yet confirmed on a T4G** — G5g spot capacity was exhausted across every
-`us-east-1` AZ and every instance size that day.
+**Added and CONFIRMED ON A T4G 2026-08-25** on `i-0bd73466d5a07a578`
+(`g5g.2xlarge`, AMI `ami-077792d0bb6a000b8`, jax 0.11.1 / Python 3.14), after an
+end-to-end CPU pass against the real FastAPI app.
+
+**It had to be on-demand, and that is a finding about the hardware, not the
+code.** G5g spot was exhausted across all four `us-east-1` AZs and all three
+sizes tried. Polling won capacity in ~9 minutes and AWS reclaimed the instance
+**21 minutes later** (`instance-terminated-no-capacity`, launched 16:06:43Z,
+terminated 16:27:41Z) — before the wheel install finished. A verification cycle
+here needs ~30-45 minutes (install, deploy, a 9.5 GB load, warm-up, queries), so
+**spot in this family cannot currently sustain one.** Budget on-demand for
+anything that has to run to completion.
+
+That reclamation was itself diagnosed by this work: the failure surfaced as
+`SSM Failed (command-id d48800b7-…)` where it would previously have read
+`SSM Failed:` with an empty body, and the id yielded `ResponseCode: -1`, which
+pointed at the agent vanishing rather than a broken command.
 
 Every incident already written up above cost more than it should have because
 the evidence was being destroyed as it was produced. The specific mechanisms:
@@ -539,6 +553,39 @@ the evidence was being destroyed as it was produced. The specific mechanisms:
 
 - **`_error()` swallowed the traceback across 18 tool bodies.** One
   `logger.exception` inside it covers every call site.
+
+**What the T4G run established**, beyond the CPU pass:
+
+- **The device-policy banner is the first line the process emits**, and it had
+  never once appeared in a journal on this rig:
+  `INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu
+  compute_capability=7.5 compute_dtype=float16 pallas_interpret=False`.
+  Both halves matter — `float16` is the device choosing Turing's only real
+  16-bit datapath, and `pallas_interpret=False` is the difference between
+  serving and silently running a simulator.
+- **Load is now staged**: download 87.7s, read_shards 73.5s (1 shard, 600
+  tensors, 0.95 GB of non-text towers skipped), convert_params 3.4s, device_put
+  0.0s — 164.7s and 9.26 GB total. A hang is now attributable to a stage.
+- **`window_kv=auto resolved to True (sliding_window=512, max_model_len=8192)`**
+  — the flag implicated in the eviction bug, stated rather than inferred.
+- **The whole resolved configuration is one greppable line**: `READY
+  build_id=6852f5680f43 … compute_dtype=float16 kv_cache_dtype=float16
+  kv_cache_requested=auto pre_ampere=True quant_mode=fp16 window_kv=True`.
+- **Build id matched end to end** — deploy reported `6852f5680f43` and the
+  payload root it resolved, `PAYLOAD_SHA` landed in `/opt/jax-g5g/app`, and
+  `verify_model_health` confirmed the served id against the local digest.
+- **SSM truncation detection fires for real**: a deliberate 117 KB command came
+  back cut at 24,000 characters with the notice and the command-id recovery
+  line attached.
+- **The instrumentation is performance-neutral.**
+  `tpu_jax_decode_tokens_per_second` read **12.30**, against the 12.4/12.5 of the
+  two recorded runs. HBM 9.30 GB used of the 14.07 GB limit, weights 9.257 GB.
+
+**Cold/warm reproduced on the real chip**: the same prompt at the same
+`max_tokens` took **18.77s cold, then 4.35s and 4.33s warm** — matching the
+18.06s/4.50s measured 2026-08-21. `tpu_jax_cold_requests_total` counted the two
+cold shapes, and `get_metrics` correctly refused to let the 5.45 tok/s
+cumulative figure pass as a result while they were in it.
 
 Two things worth keeping from the CPU verification:
 
