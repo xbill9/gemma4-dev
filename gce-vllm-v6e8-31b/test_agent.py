@@ -903,6 +903,31 @@ class TestSweepOverrides(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("docker start vllm-gemma4", captured["cmd"])
 
+    async def test_extra_env_reaches_docker_as_env_not_as_a_serve_flag(self):
+        """Profiling is switched on by an env var, so it cannot ride in extra_flags.
+
+        VLLM_TORCH_PROFILER_DIR is what makes vLLM expose /start_profile at all, it is read
+        once at process start, and it belongs BEFORE the image name in the docker argv. Put
+        it after and it becomes an argument to `vllm serve` instead.
+        """
+        captured = {}
+
+        async def fake_run(cmd):
+            captured["cmd"] = " ".join(cmd)
+            return 0, "ok", ""
+
+        with (
+            patch("server._resolve_node_id", new=AsyncMock(return_value="node-1")),
+            patch("server.run_command", new=AsyncMock(side_effect=fake_run)),
+        ):
+            await manage_vllm_docker(action="restart", extra_env="-e VLLM_TORCH_PROFILER_DIR=/dev/shm/prof")
+
+        cmd = captured["cmd"]
+        self.assertIn("-e VLLM_TORCH_PROFILER_DIR=/dev/shm/prof", cmd)
+        self.assertLess(cmd.index("VLLM_TORCH_PROFILER_DIR"), cmd.index(server.VLLM_IMAGE))
+        # An env override is still an override, so it must rebuild rather than reuse.
+        self.assertIn("docker rm -f vllm-gemma4", cmd)
+
     async def test_overrides_are_refused_on_actions_that_cannot_apply_them(self):
         """Better to refuse than to accept a TP argument and quietly just tail the log."""
         with patch("server._resolve_node_id", new=AsyncMock(return_value="node-1")):
@@ -960,6 +985,83 @@ class TestStagedCheckpointRestore(unittest.IsolatedAsyncioTestCase):
         script = self._render("gs://bucket/model.hfcache.tar")
         self.assertIn("gcloud storage cat", script)
         self.assertIn('tar -C "$HF_HOME" -xf -', script)
+
+
+class TestProfilerSidecar(unittest.IsolatedAsyncioTestCase):
+    """The xprof trigger that replaces vLLM's removed /start_profile.
+
+    Measured on hardware 2026-08-25 against vllm/vllm-tpu:nightly: VLLM_TORCH_PROFILER_DIR is
+    not a known variable ("Unknown vLLM environment variable detected") and /start_profile
+    returns 404 with no profile route in the OpenAPI document. So the trigger lives inside the
+    engine process, loaded via sitecustomize — which runs during interpreter startup, where a
+    raise does not fail the module, it fails the container.
+    """
+
+    _PROFILING = os.path.join(os.path.dirname(os.path.abspath(__file__)), "profiling")
+
+    def _sidecar(self, **env):
+        """Import the sidecar from profiling/.
+
+        It deliberately does NOT sit at the rig root: a `sitecustomize.py` there is
+        auto-imported by every Python process started from this directory.
+        """
+        import importlib
+
+        if self._PROFILING not in sys.path:
+            sys.path.insert(0, self._PROFILING)
+        with patch.dict(os.environ, env, clear=False):
+            import profiler_sidecar
+
+            return importlib.reload(profiler_sidecar)
+
+    def test_inert_unless_a_logdir_is_requested(self):
+        """A container that mounts the sidecar but does not want profiling is unaffected."""
+        mod = self._sidecar(VLLM_XPROF_DIR="")
+        self.assertFalse(mod.install())
+
+    def test_does_not_install_in_a_process_without_tpus(self):
+        """vLLM runs the API server and the engine as SEPARATE processes.
+
+        Only the engine owns the TPU. Installing in the API server would capture nothing and
+        would bind the port the engine needs.
+        """
+        mod = self._sidecar(VLLM_XPROF_DIR="/tmp/x")
+        with patch.object(mod, "_has_tpu", return_value=False):
+            self.assertFalse(mod.install())
+
+    def test_install_never_raises_even_when_everything_fails(self):
+        """sitecustomize failures propagate out of interpreter init and kill the container."""
+        mod = self._sidecar(VLLM_XPROF_DIR="/tmp/x")
+        with patch.object(mod, "_has_tpu", side_effect=RuntimeError("boom")):
+            self.assertFalse(mod.install())
+
+    def test_has_tpu_is_false_rather_than_raising_without_jax(self):
+        mod = self._sidecar(VLLM_XPROF_DIR="/tmp/x")
+        self.assertIsInstance(mod._has_tpu(), bool)
+
+    def test_sitecustomize_swallows_a_broken_sidecar(self):
+        src = open(os.path.join(self._PROFILING, "sitecustomize.py")).read()
+        self.assertIn("try:", src)
+        self.assertIn("except Exception", src)
+
+    def test_capture_script_does_not_use_the_dead_vllm_profiler_variable(self):
+        """Regression guard: the documented vLLM recipe is a 404 on this image."""
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "capture_profile.sh")).read()
+        # Comments deliberately NAME the dead recipe to explain why it is not used, so only
+        # executable lines may be checked. Asserting over the whole file would forbid the
+        # documentation that stops someone reinstating it.
+        code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
+        self.assertNotIn("VLLM_TORCH_PROFILER_DIR", code)
+        self.assertNotIn("/start_profile", code)
+        # It must instead mount the sidecar and put it on PYTHONPATH.
+        self.assertIn("PYTHONPATH=/opt/xprof", code)
+        self.assertIn("VLLM_XPROF_DIR", code)
+
+    def test_capture_script_verifies_the_sidecar_installed_before_driving_load(self):
+        """Without the check, a container missing the trigger yields an empty trace dir."""
+        src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "capture_profile.sh")).read()
+        self.assertIn("xprof-sidecar. trace control", src)
+        self.assertLess(src.index("xprof-sidecar. trace control"), src.index("tracing $DURATION"))
 
 
 if __name__ == "__main__":

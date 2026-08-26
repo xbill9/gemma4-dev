@@ -471,6 +471,53 @@ and the layers at the 4-head limit by only **1.26x**. Two consequences:
   and an fp8 cache; the kernel config and the sharding differ from what this rig runs. Its method
   transfers — verify at the allocation line, not the flag — its numbers do not.
 
+## Profiling: xprof and TensorBoard
+
+`make profile` captures a trace, `make trace-analyze` summarises it, `make tensorboard` / `make xprof`
+render it. Traces land in `benchmarks/runs/<date>-xprof-tp<N>/` in TensorBoard's standard
+`plugins/profile/<run>/*.xplane.pb` layout, so both viewers read the directory with no conversion.
+
+**vLLM's documented profiling recipe does not work on this image, and it fails quietly.** Measured on
+hardware 2026-08-25 against `vllm/vllm-tpu:nightly`: `VLLM_TORCH_PROFILER_DIR` is **not a known variable**
+(`WARNING [envs.py:2208] Unknown vLLM environment variable detected`), `POST /start_profile` returns
+**404**, and the OpenAPI document carries no profile route. The only profiler variables the build knows are
+`VLLM_ADAPTIVE_VERIFICATION_PROFILE_CONTEXT_LEN`, `VLLM_CUSTOM_SCOPES_FOR_PROFILING`,
+`VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS`, `VLLM_NVTX_SCOPES_FOR_PROFILING` and `VLLM_TRACE_FUNCTION` —
+none of which start a trace. **Don't reinstate the env-var route.** They live in `profiling/` rather than the rig root, because a `sitecustomize.py` at the root would be auto-imported by every Python process started from this directory. A test pins that `capture_profile.sh`
+does not use it (checking executable lines only; the comments name it on purpose).
+
+So the trigger lives inside the engine process. `profiling/profiler_sidecar.py` runs a tiny HTTP control on
+`VLLM_XPROF_PORT` (9012) whose `/start` and `/stop` call `jax.profiler.start_trace` / `stop_trace`;
+`profiling/sitecustomize.py` loads it, and `capture_profile.sh` bind-mounts both into the container and puts them on
+`PYTHONPATH`, which is what makes Python auto-import `sitecustomize`.
+
+Three properties of the sidecar are load-bearing rather than defensive:
+
+- **It installs only in the process that owns the TPU.** vLLM runs the API server and the engine as
+  separate processes (`APIServer pid=1`, `EngineCore pid=711`). Installing in the API server would capture
+  nothing and would bind the port the engine needs.
+- **Nothing in it may raise.** `sitecustomize` runs during interpreter startup, so an exception there does
+  not fail the module — it fails the container.
+- **It is inert unless `VLLM_XPROF_DIR` is set**, so mounting it costs a container nothing.
+
+**`make profile` restarts the engine**, because the sidecar has to be present at process start. On this
+checkpoint that is ~7 minutes of recompilation (measured: `init engine ... took 427.88 s (compilation:
+399.57 s)`). The checkpoint is already in `/dev/shm`, so nothing is re-downloaded.
+
+**The xprof CLI has no `capture` subcommand** — capture happens in-process; the CLI is all *analysis* over
+a captured session. `analyze_trace.py` drives the useful ones: `get_hlo_op_profile`,
+`get_device_information`, and the pathology detectors `detect_unnecessary_convert_reduce`,
+`detect_layout_mismatch_copies`, `detect_unfused_reshapes`. That first detector is the TPU analogue of the
+bug that cost `gpu-jax-g5g-2b` 55% of its decode step to `wrapped_convert`.
+
+**Per-op MEANS, never a sum divided by a step count.** Zimbres 2026 §5 documents the trace export
+truncating silently at a fixed event count — ~7 of 127 decode steps at TP=8, ~14 at TP=4 — so any statistic
+formed by dividing a raw sum by the requested step count is wrong by the truncation ratio. Each per-layer
+op fires once per step per chip, so its mean per firing is its true per-step cost whatever the export did.
+
+**Unvalidated on hardware.** The sidecar was built after the 2026-08-25 slice was torn down and has never
+run on a TPU. Its guards are unit-tested; the injection path is not.
+
 ## Names derive from the rig directory
 
 `RIG_NAME` is `os.path.basename(...)` of this directory. `INSTANCE_NAME` defaults to it and is the default

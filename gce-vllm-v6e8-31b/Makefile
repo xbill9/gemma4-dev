@@ -171,6 +171,33 @@ benchmark:
 	echo "🚀 Starting benchmark against http://$$IP:8000"; \
 	python benchmarking_suite.py --url http://$$IP:8000 --model $(MODEL_PATH)
 
+# --- Profiling: xprof / TensorBoard -------------------------------------------------------
+# vLLM's own /start_profile is ABSENT from vllm-tpu:nightly (VLLM_TORCH_PROFILER_DIR is not a
+# known variable and the route 404s, measured 2026-08-25). capture_profile.sh injects an
+# in-process trigger instead; see profiler_sidecar.py.
+#
+# `profile` RESTARTS the engine, which costs ~7 min of recompilation on this checkpoint.
+TRACE_DIR ?= $(lastword $(sort $(wildcard benchmarks/runs/*xprof*)))
+
+profile:
+	@echo "📈 Capturing an xprof trace (restarts the engine — ~7 min recompile)..."
+	./capture_profile.sh
+
+trace-analyze:
+	@if [ -z "$(TRACE_DIR)" ]; then echo "❌ No benchmarks/runs/*xprof* dir. Run 'make profile' first."; exit 1; fi
+	@echo "🔬 Analysing $(TRACE_DIR)"
+	python3 analyze_trace.py $(TRACE_DIR)
+
+tensorboard:
+	@if [ -z "$(TRACE_DIR)" ]; then echo "❌ No benchmarks/runs/*xprof* dir. Run 'make profile' first."; exit 1; fi
+	@echo "🌐 TensorBoard on http://localhost:6006  (Ctrl-C to stop)"
+	tensorboard --logdir $(TRACE_DIR)
+
+xprof:
+	@if [ -z "$(TRACE_DIR)" ]; then echo "❌ No benchmarks/runs/*xprof* dir. Run 'make profile' first."; exit 1; fi
+	@echo "🌐 xprof on http://localhost:8791  (Ctrl-C to stop)"
+	xprof --logdir $(TRACE_DIR)
+
 PROMPT ?= "What is Site Reliability Engineering?"
 
 # Query the vLLM model via the TPU VM endpoint (assuming it's running)
@@ -182,7 +209,7 @@ query:
 		-H "Content-Type: application/json" \
 		-d '{"model": "$(MODEL_PATH)", "prompt": "$(PROMPT)", "max_tokens": 128, "temperature": 0.2}' | python3 -m json.tool
 
-.PHONY: install run test lint format tools mcp-config clean deploy-tpu deploy-tpu-spot deploy-tpu-ondemand deploy destroy-tpu destroy status endpoint benchmark run-container query help
+.PHONY: install run test lint format tools mcp-config clean deploy-tpu deploy-tpu-spot deploy-tpu-ondemand deploy destroy-tpu destroy status endpoint benchmark run-container query profile trace-analyze tensorboard xprof help
 
 help:
 	@echo "Make targets:"

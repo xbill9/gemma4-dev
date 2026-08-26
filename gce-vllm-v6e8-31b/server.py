@@ -1434,6 +1434,7 @@ async def manage_vllm_docker(
     kv_cache_dtype: Optional[str] = None,
     gpu_memory_utilization: Optional[float] = None,
     extra_flags: str = "",
+    extra_env: str = "",
 ) -> str:
     """Manages the vLLM Docker container on the TPU VM.
 
@@ -1461,6 +1462,7 @@ async def manage_vllm_docker(
         "kv_cache_dtype": kv_cache_dtype,
         "gpu_memory_utilization": gpu_memory_utilization,
         "extra_flags": extra_flags or None,
+        "extra_env": extra_env or None,
     }
     active = {k: v for k, v in overrides.items() if v is not None}
 
@@ -1473,10 +1475,16 @@ async def manage_vllm_docker(
         gpu_memory_utilization=gpu_memory_utilization,
         extra_flags=extra_flags,
     )
+    # extra_env carries docker `-e KEY=VALUE` pairs. It is separate from extra_flags because
+    # profiling is switched on by an ENVIRONMENT VARIABLE, not a serve flag:
+    # VLLM_TORCH_PROFILER_DIR is what makes vLLM expose /start_profile and /stop_profile at
+    # all, and it is read once at process start, so it cannot be added to a live container.
+    env_str = f" {extra_env.strip()}" if extra_env else ""
     docker_run_cmd = (
         f"sudo docker run --name vllm-gemma4 --privileged --net=host -d "
         f"-v /dev/shm:/dev/shm --shm-size 10gb "
-        f"-e HF_HOME=/dev/shm -e HF_TOKEN=$(gcloud secrets versions access latest --secret={HF_SECRET_ID}) "
+        f"-e HF_HOME=/dev/shm -e HF_TOKEN=$(gcloud secrets versions access latest --secret={HF_SECRET_ID})"
+        f"{env_str} "
         f"{VLLM_IMAGE} vllm serve {MODEL_NAME} {serve_flags}"
     )
     # `docker start` would reuse the old argv, so an override has to rebuild.
