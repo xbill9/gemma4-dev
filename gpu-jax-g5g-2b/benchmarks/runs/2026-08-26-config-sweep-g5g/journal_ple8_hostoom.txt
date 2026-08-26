@@ -1,0 +1,152 @@
+INFO:gpu-jax-g5g-2b:ssm send_command id=8b256ec3-1cd5-4bbf-a692-0165afe7cfd3 instance=i-00fc456e54538727a timeout=300s
+WARNING:gpu-jax-g5g-2b:ssm output truncated id=8b256ec3-1cd5-4bbf-a692-0165afe7cfd3
+```
+Aug 25 23:36:16 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 2min 35.715s CPU time.
+Aug 25 23:36:16 ip-172-31-4-65 systemd[1]: Started Gemma 4 E2B on T4G via JAX.
+Aug 25 23:36:21 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:21,248 INFO jax._src.xla_bridge: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+Aug 25 23:36:21 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:21,413 INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu compute_capability=7.5 compute_dtype=float16 pallas_interpret=False
+Aug 25 23:36:21 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:21,457 INFO jax_openai_server: build_id=6852f5680f43 jax devices: [CudaDevice(id=0)]
+Aug 25 23:36:28 ip-172-31-4-65 python3.14[12587]: [transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Aug 25 23:36:29 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:29,938 INFO jax_openai_server: loading tokenizer: google/gemma-4-E2B-it
+Aug 25 23:36:30 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:30,031 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:36:30 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:30,037 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/config.json "HTTP/1.1 200 OK"
+Aug 25 23:36:30 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:30,090 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:36:30 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:30,096 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/tokenizer_config.json "HTTP/1.1 200 OK"
+Aug 25 23:36:30 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:30,238 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+Aug 25 23:36:30 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:30,263 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+Aug 25 23:36:32 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:32,933 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it "HTTP/1.1 200 OK"
+Aug 25 23:36:32 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:32,991 INFO jax_openai_server: loading weights into JAX: google/gemma-4-E2B-it (quant_mode=fp16)
+Aug 25 23:36:33 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:33,020 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/revision/main "HTTP/1.1 200 OK"
+Aug 25 23:36:33 ip-172-31-4-65 python3.14[12587]: [142B blob data]
+Aug 25 23:36:33 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:33,025 INFO jax_engine: load stage download took 0.0s path=/root/.cache/huggingface/hub/models--google--gemma-4-E2B-it/snapshots/3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Aug 25 23:36:33 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:36:33,025 INFO jax_engine: config: layers=35 hidden=1536 sliding_window=512 vocab=262144 max_model_len=8192
+Aug 25 23:37:44 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:37:44,003 INFO jax_engine: skipped 0.95 GB of non-text tower weights
+Aug 25 23:37:44 ip-172-31-4-65 python3.14[12587]: 2026-08-25 23:37:44,004 INFO jax_engine: load stage read_shards took 71.0s shards=1 tensors=600 skipped_gb=0.95
+Aug 25 23:38:18 ip-172-31-4-65 systemd[1]: jax-g5g.service: A process of this unit has been killed by the OOM killer.
+Aug 25 23:38:20 ip-172-31-4-65 systemd[1]: jax-g5g.service: Main process exited, code=killed, status=9/KILL
+Aug 25 23:38:20 ip-172-31-4-65 systemd[1]: jax-g5g.service: Failed with result 'oom-kill'.
+Aug 25 23:38:20 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 9.984s CPU time.
+Aug 25 23:38:30 ip-172-31-4-65 systemd[1]: jax-g5g.service: Scheduled restart job, restart counter is at 1.
+Aug 25 23:38:30 ip-172-31-4-65 systemd[1]: Stopped Gemma 4 E2B on T4G via JAX.
+Aug 25 23:38:30 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 9.984s CPU time.
+Aug 25 23:38:30 ip-172-31-4-65 systemd[1]: Started Gemma 4 E2B on T4G via JAX.
+Aug 25 23:38:52 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:52,740 INFO jax._src.xla_bridge: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+Aug 25 23:38:53 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:53,186 INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu compute_capability=7.5 compute_dtype=float16 pallas_interpret=False
+Aug 25 23:38:53 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:53,229 INFO jax_openai_server: build_id=6852f5680f43 jax devices: [CudaDevice(id=0)]
+Aug 25 23:38:55 ip-172-31-4-65 python3.14[23042]: [transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Aug 25 23:38:56 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:56,129 INFO jax_openai_server: loading tokenizer: google/gemma-4-E2B-it
+Aug 25 23:38:56 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:56,303 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:38:56 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:56,309 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/config.json "HTTP/1.1 200 OK"
+Aug 25 23:38:56 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:56,507 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:38:56 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:56,512 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/tokenizer_config.json "HTTP/1.1 200 OK"
+Aug 25 23:38:56 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:56,541 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+Aug 25 23:38:56 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:56,563 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+Aug 25 23:38:59 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:59,210 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it "HTTP/1.1 200 OK"
+Aug 25 23:38:59 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:59,268 INFO jax_openai_server: loading weights into JAX: google/gemma-4-E2B-it (quant_mode=fp16)
+Aug 25 23:38:59 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:59,302 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/revision/main "HTTP/1.1 200 OK"
+Aug 25 23:38:59 ip-172-31-4-65 python3.14[23042]: [142B blob data]
+Aug 25 23:38:59 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:59,307 INFO jax_engine: load stage download took 0.0s path=/root/.cache/huggingface/hub/models--google--gemma-4-E2B-it/snapshots/3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Aug 25 23:38:59 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:38:59,307 INFO jax_engine: config: layers=35 hidden=1536 sliding_window=512 vocab=262144 max_model_len=8192
+Aug 25 23:40:32 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:40:32,504 INFO jax_engine: skipped 0.95 GB of non-text tower weights
+Aug 25 23:40:32 ip-172-31-4-65 python3.14[23042]: 2026-08-25 23:40:32,505 INFO jax_engine: load stage read_shards took 93.2s shards=1 tensors=600 skipped_gb=0.95
+Aug 25 23:40:51 ip-172-31-4-65 systemd[1]: jax-g5g.service: A process of this unit has been killed by the OOM killer.
+Aug 25 23:40:52 ip-172-31-4-65 systemd[1]: jax-g5g.service: Main process exited, code=killed, status=9/KILL
+Aug 25 23:40:52 ip-172-31-4-65 systemd[1]: jax-g5g.service: Failed with result 'oom-kill'.
+Aug 25 23:40:52 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 2.379s CPU time.
+Aug 25 23:41:02 ip-172-31-4-65 systemd[1]: jax-g5g.service: Scheduled restart job, restart counter is at 2.
+Aug 25 23:41:02 ip-172-31-4-65 systemd[1]: Stopped Gemma 4 E2B on T4G via JAX.
+Aug 25 23:41:02 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 2.379s CPU time.
+Aug 25 23:41:02 ip-172-31-4-65 systemd[1]: Started Gemma 4 E2B on T4G via JAX.
+Aug 25 23:41:07 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:07,339 INFO jax._src.xla_bridge: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+Aug 25 23:41:07 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:07,765 INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu compute_capability=7.5 compute_dtype=float16 pallas_interpret=False
+Aug 25 23:41:07 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:07,806 INFO jax_openai_server: build_id=6852f5680f43 jax devices: [CudaDevice(id=0)]
+Aug 25 23:41:10 ip-172-31-4-65 python3.14[26605]: [transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Aug 25 23:41:11 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:11,349 INFO jax_openai_server: loading tokenizer: google/gemma-4-E2B-it
+Aug 25 23:41:11 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:11,441 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:41:11 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:11,448 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/config.json "HTTP/1.1 200 OK"
+Aug 25 23:41:11 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:11,508 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:41:11 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:11,515 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/tokenizer_config.json "HTTP/1.1 200 OK"
+Aug 25 23:41:11 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:11,547 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+Aug 25 23:41:11 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:11,584 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+Aug 25 23:41:14 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:14,260 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it "HTTP/1.1 200 OK"
+Aug 25 23:41:14 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:14,318 INFO jax_openai_server: loading weights into JAX: google/gemma-4-E2B-it (quant_mode=fp16)
+Aug 25 23:41:14 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:14,357 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/revision/main "HTTP/1.1 200 OK"
+Aug 25 23:41:14 ip-172-31-4-65 python3.14[26605]: [142B blob data]
+Aug 25 23:41:14 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:14,362 INFO jax_engine: load stage download took 0.0s path=/root/.cache/huggingface/hub/models--google--gemma-4-E2B-it/snapshots/3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Aug 25 23:41:14 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:41:14,363 INFO jax_engine: config: layers=35 hidden=1536 sliding_window=512 vocab=262144 max_model_len=8192
+Aug 25 23:42:46 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:42:46,147 INFO jax_engine: skipped 0.95 GB of non-text tower weights
+Aug 25 23:42:46 ip-172-31-4-65 python3.14[26605]: 2026-08-25 23:42:46,149 INFO jax_engine: load stage read_shards took 91.8s shards=1 tensors=600 skipped_gb=0.95
+Aug 25 23:43:05 ip-172-31-4-65 systemd[1]: jax-g5g.service: A process of this unit has been killed by the OOM killer.
+Aug 25 23:43:06 ip-172-31-4-65 systemd[1]: jax-g5g.service: Main process exited, code=killed, status=9/KILL
+Aug 25 23:43:06 ip-172-31-4-65 systemd[1]: jax-g5g.service: Failed with result 'oom-kill'.
+Aug 25 23:43:06 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 2.565s CPU time.
+Aug 25 23:43:16 ip-172-31-4-65 systemd[1]: jax-g5g.service: Scheduled restart job, restart counter is at 3.
+Aug 25 23:43:16 ip-172-31-4-65 systemd[1]: Stopped Gemma 4 E2B on T4G via JAX.
+Aug 25 23:43:16 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 2.565s CPU time.
+Aug 25 23:43:16 ip-172-31-4-65 systemd[1]: Started Gemma 4 E2B on T4G via JAX.
+Aug 25 23:43:22 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:22,235 INFO jax._src.xla_bridge: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+Aug 25 23:43:22 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:22,680 INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu compute_capability=7.5 compute_dtype=float16 pallas_interpret=False
+Aug 25 23:43:22 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:22,724 INFO jax_openai_server: build_id=6852f5680f43 jax devices: [CudaDevice(id=0)]
+Aug 25 23:43:25 ip-172-31-4-65 python3.14[34138]: [transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Aug 25 23:43:26 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:26,060 INFO jax_openai_server: loading tokenizer: google/gemma-4-E2B-it
+Aug 25 23:43:26 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:26,149 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:43:26 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:26,153 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/config.json "HTTP/1.1 200 OK"
+Aug 25 23:43:26 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:26,282 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:43:26 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:26,287 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/tokenizer_config.json "HTTP/1.1 200 OK"
+Aug 25 23:43:26 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:26,320 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+Aug 25 23:43:26 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:26,347 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+Aug 25 23:43:28 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:28,985 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it "HTTP/1.1 200 OK"
+Aug 25 23:43:29 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:29,046 INFO jax_openai_server: loading weights into JAX: google/gemma-4-E2B-it (quant_mode=fp16)
+Aug 25 23:43:29 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:29,080 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/revision/main "HTTP/1.1 200 OK"
+Aug 25 23:43:29 ip-172-31-4-65 python3.14[34138]: [142B blob data]
+Aug 25 23:43:29 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:29,085 INFO jax_engine: load stage download took 0.0s path=/root/.cache/huggingface/hub/models--google--gemma-4-E2B-it/snapshots/3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Aug 25 23:43:29 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:43:29,086 INFO jax_engine: config: layers=35 hidden=1536 sliding_window=512 vocab=262144 max_model_len=8192
+Aug 25 23:45:02 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:45:02,010 INFO jax_engine: skipped 0.95 GB of non-text tower weights
+Aug 25 23:45:02 ip-172-31-4-65 python3.14[34138]: 2026-08-25 23:45:02,010 INFO jax_engine: load stage read_shards took 92.9s shards=1 tensors=600 skipped_gb=0.95
+Aug 25 23:45:22 ip-172-31-4-65 systemd[1]: jax-g5g.service: Main process exited, code=killed, status=9/KILL
+Aug 25 23:45:22 ip-172-31-4-65 systemd[1]: jax-g5g.service: Failed with result 'signal'.
+Aug 25 23:45:22 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 3.184s CPU time.
+Aug 25 23:45:33 ip-172-31-4-65 systemd[1]: jax-g5g.service: Scheduled restart job, restart counter is at 4.
+Aug 25 23:45:33 ip-172-31-4-65 systemd[1]: Stopped Gemma 4 E2B on T4G via JAX.
+Aug 25 23:45:33 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 3.184s CPU time.
+Aug 25 23:45:33 ip-172-31-4-65 systemd[1]: Started Gemma 4 E2B on T4G via JAX.
+Aug 25 23:45:38 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:38,460 INFO jax._src.xla_bridge: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+Aug 25 23:45:38 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:38,886 INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu compute_capability=7.5 compute_dtype=float16 pallas_interpret=False
+Aug 25 23:45:38 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:38,928 INFO jax_openai_server: build_id=6852f5680f43 jax devices: [CudaDevice(id=0)]
+Aug 25 23:45:41 ip-172-31-4-65 python3.14[37418]: [transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Aug 25 23:45:42 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:42,097 INFO jax_openai_server: loading tokenizer: google/gemma-4-E2B-it
+Aug 25 23:45:42 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:42,192 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:45:42 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:42,199 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/config.json "HTTP/1.1 200 OK"
+Aug 25 23:45:42 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:42,258 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:45:42 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:42,264 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/tokenizer_config.json "HTTP/1.1 200 OK"
+Aug 25 23:45:42 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:42,292 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main/additional_chat_templates?recursive=false&expand=false "HTTP/1.1 404 Not Found"
+Aug 25 23:45:42 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:42,323 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/tree/main?recursive=true&expand=false "HTTP/1.1 200 OK"
+Aug 25 23:45:44 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:44,997 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it "HTTP/1.1 200 OK"
+Aug 25 23:45:45 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:45,055 INFO jax_openai_server: loading weights into JAX: google/gemma-4-E2B-it (quant_mode=fp16)
+Aug 25 23:45:45 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:45,094 INFO httpx: HTTP Request: GET https://huggingface.co/api/models/google/gemma-4-E2B-it/revision/main "HTTP/1.1 200 OK"
+Aug 25 23:45:45 ip-172-31-4-65 python3.14[37418]: [142B blob data]
+Aug 25 23:45:45 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:45,099 INFO jax_engine: load stage download took 0.0s path=/root/.cache/huggingface/hub/models--google--gemma-4-E2B-it/snapshots/3e22461f65e89153144f8adb70e3b8c2cc9845a7
+Aug 25 23:45:45 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:45:45,099 INFO jax_engine: config: layers=35 hidden=1536 sliding_window=512 vocab=262144 max_model_len=8192
+Aug 25 23:47:05 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:47:05,484 INFO jax_engine: skipped 0.95 GB of non-text tower weights
+Aug 25 23:47:05 ip-172-31-4-65 python3.14[37418]: 2026-08-25 23:47:05,485 INFO jax_engine: load stage read_shards took 80.4s shards=1 tensors=600 skipped_gb=0.95
+Aug 25 23:47:23 ip-172-31-4-65 systemd[1]: jax-g5g.service: A process of this unit has been killed by the OOM killer.
+Aug 25 23:47:24 ip-172-31-4-65 systemd[1]: jax-g5g.service: Main process exited, code=killed, status=9/KILL
+Aug 25 23:47:24 ip-172-31-4-65 systemd[1]: jax-g5g.service: Failed with result 'oom-kill'.
+Aug 25 23:47:24 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 2.090s CPU time.
+Aug 25 23:47:35 ip-172-31-4-65 systemd[1]: jax-g5g.service: Scheduled restart job, restart counter is at 5.
+Aug 25 23:47:35 ip-172-31-4-65 systemd[1]: Stopped Gemma 4 E2B on T4G via JAX.
+Aug 25 23:47:35 ip-172-31-4-65 systemd[1]: jax-g5g.service: Consumed 1min 2.090s CPU time.
+Aug 25 23:47:35 ip-172-31-4-65 systemd[1]: Started Gemma 4 E2B on T4G via JAX.
+Aug 25 23:47:39 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:39,824 INFO jax._src.xla_bridge: Unable to initialize backend 'tpu': INTERNAL: Failed to open libtpu.so: libtpu.so: cannot open shared object file: No such file or directory
+Aug 25 23:47:40 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:40,256 INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu compute_capability=7.5 compute_dtype=float16 pallas_interpret=False
+Aug 25 23:47:40 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:40,298 INFO jax_openai_server: build_id=6852f5680f43 jax devices: [CudaDevice(id=0)]
+Aug 25 23:47:43 ip-172-31-4-65 python3.14[38404]: [transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Aug 25 23:47:43 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:43,685 INFO jax_openai_server: loading tokenizer: google/gemma-4-E2B-it
+Aug 25 23:47:43 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:43,799 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:47:43 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:43,806 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/config.json "HTTP/1.1 200 OK"
+Aug 25 23:47:43 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:43,989 INFO httpx: HTTP Request: HEAD https://huggingface.co/google/gemma-4-E2B-it/resolve/main/tokenizer_config.json "HTTP/1.1 307 Temporary Redirect"
+Aug 25 23:47:43 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:43,996 INFO httpx: HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/google/gemma-4-E2B-it/3e22461f65e89153144f8adb70e3b8c2cc9845a7/tokenizer_config.json "HTTP/1.1 200 OK"
+Aug 25 23:47:44 ip-172-31-4-65 python3.14[38404]: 2026-08-25 23:47:44,026 INFO http--output truncated--
+
+[!] OUTPUT TRUNCATED by SSM at 24000 characters. This is a partial result — an error may be missing from it. Re-run with a smaller tail, or fetch the full output with `aws ssm get-command-invocation --command-id 8b256ec3-1cd5-4bbf-a692-0165afe7cfd3 --instance-id i-00fc456e54538727a`.
+```
