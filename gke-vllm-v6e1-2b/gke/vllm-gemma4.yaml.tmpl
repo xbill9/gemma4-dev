@@ -1,0 +1,102 @@
+# Rendered two ways from ONE template: gke/gke-deploy.sh substitutes it with envsubst, and
+# server.py's deploy_vllm with string.Template. Both read tpu.env, so the serving config
+# cannot drift between the shell path and the MCP tools.
+#
+# Keep every placeholder in the plain VAR form, and never write a dollar sign in a comment:
+# string.Template raises on anything that is not a valid placeholder, so a dollar-brace-dots
+# example here breaks the MCP path while envsubst renders it happily.
+# Serving flags are kept identical to tpu-vllm-v6e1-2b and gce-vllm-v6e1-2b on purpose:
+# slot 1 of the rig name is the only thing that is supposed to differ between the three.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-gemma4
+  labels:
+    app: vllm-gemma4
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-gemma4
+  template:
+    metadata:
+      labels:
+        app: vllm-gemma4
+    spec:
+      # The node pool created by gke-up.sh. These two labels are what bind the pod to a
+      # v6e slice; without them it lands on the e2 system node and never sees a chip.
+      nodeSelector:
+        cloud.google.com/gke-tpu-accelerator: ${GKE_TPU_ACCELERATOR}
+        cloud.google.com/gke-tpu-topology: ${TPU_TOPOLOGY}
+      tolerations:
+        - key: google.com/tpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vllm
+          image: ${VLLM_IMAGE}
+          command: ["vllm", "serve", "${MODEL_NAME}"]
+          args:
+            - --host=0.0.0.0
+            - --port=8000
+            - --max-model-len=${MAX_MODEL_LEN}
+            - --tensor-parallel-size=${TENSOR_PARALLEL_SIZE}
+            - --disable_chunked_mm_input
+            - --max_num_batched_tokens=${MAX_NUM_BATCHED_TOKENS}
+            - '--limit-mm-per-prompt={"image":4,"audio":1}'
+            - --enable-auto-tool-choice
+            - --tool-call-parser=gemma4
+            - --reasoning-parser=gemma4
+          env:
+            - name: HF_HOME
+              value: /dev/shm
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ${HF_K8S_SECRET}
+                  key: token
+          ports:
+            - containerPort: 8000
+              name: http
+          resources:
+            limits:
+              # One v6e chip. The node exposes exactly one, so this is also what makes
+              # the pod exclusive owner of it.
+              google.com/tpu: "1"
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+          # The model download plus TPU compile is minutes, not seconds. The startup
+          # probe is what stops the kubelet restarting the pod halfway through it.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            failureThreshold: 120
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: ${VLLM_SHM_SIZE}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-gemma4
+spec:
+  # LoadBalancer matches the sibling rigs' network path — an external IP on :8000, so a
+  # benchmark run against this rig is comparable to one against the GCE twin. It is
+  # UNAUTHENTICATED. Switch to ClusterIP and use `make gke-port-forward` if that matters.
+  type: ${GKE_SERVICE_TYPE}
+  selector:
+    app: vllm-gemma4
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

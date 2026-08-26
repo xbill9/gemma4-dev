@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>The unofficial TPU migration guide: Cloud TPU API to Compute Engine</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">The unofficial TPU migration guide: Cloud TPU API to Compute Engine</h1>
+</header>
+<h1 id="the-unofficial-tpu-migration-guide-cloud-tpu-api-to-compute-engine">The unofficial TPU migration guide: Cloud TPU API to Compute Engine</h1>
+<p><a href="https://docs.cloud.google.com/tpu/docs/tpus-in-compute-engine">Cloud TPU resources in Compute Engine</a> puts it plainly:</p>
+<blockquote>
+<p>The Cloud TPU API is no longer under active development. This includes the Google Cloud CLI for the Cloud TPU API and the Cloud Client Libraries for the Cloud TPU API. The Cloud TPU API will receive bug fixes and security updates only.</p>
+<p>New hardware generations, starting with TPU7x (Ironwood), are supported only through Compute Engine or Google Kubernetes Engine (GKE).</p>
+</blockquote>
+<p>No sunset date is published, so nothing breaks on a deadline. But the second sentence is the forcing function: the API you are on today is the API your next chip will not support.</p>
+<p>So I moved a rig over — a v6e-1 (Trillium) chip serving <code>gemma-4-E2B-it</code> under vLLM, rebuilt on <code>gcloud compute instances</code>. Same chip, same checkpoint, same serving flags, only the control plane changed.</p>
+<p>The flag mapping was the quick part. Everything after it — the quota model, a dead boot, tooling that had silently gone blind — took far longer, because <strong>almost nothing on this path fails loudly.</strong> What follows is what changes, what bit me, and how to tell one failure from another.</p>
+<h2 id="what-actually-changes">What actually changes</h2>
+<p>The short version, so the rest makes sense.</p>
+<p>Old:</p>
+<pre><code>gcloud alpha compute tpus queued-resources create vllm-gemma4-qr \
+  --node-id=vllm-gemma4-qr-node \
+  --zone=us-east5-b \
+  --accelerator-type=v6e-1 \
+  --runtime-version=v2-alpha-tpuv6e \
+  --provisioning-model=flex-start \
+  --valid-until-duration=2h</code></pre>
+<p>New:</p>
+<pre><code>gcloud compute instances create gce-vllm-v6e1-2b \
+  --zone=europe-west4-a \
+  --machine-type=ct6e-standard-1t \
+  --image-family=ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e \
+  --image-project=ubuntu-os-accelerator-images \
+  --maintenance-policy=TERMINATE \
+  --boot-disk-size=200GB \
+  --scopes=cloud-platform \
+  --metadata-from-file=startup-script=/tmp/startup.sh \
+  --provisioning-model=FLEX_START \
+  --request-valid-for-duration=2h \
+  --max-run-duration=4h \
+  --instance-termination-action=DELETE</code></pre>
+<pre><code>Cloud TPU API                       Compute Engine
+----------------------------------  -------------------------------------------------
+--accelerator-type=v6e-1            --machine-type=ct6e-standard-1t
+--runtime-version=v2-alpha-tpuv6e   --image-family=ubuntu-accel-... + --image-project
+--valid-until-duration              --request-valid-for-duration
+--provisioning-model=flex-start     --provisioning-model=FLEX_START
+QR produces a node named &lt;id&gt;-node  the instance is the node
+gcloud compute tpus tpu-vm list     gcloud compute instances list
+gcloud compute tpus tpu-vm ssh      gcloud compute ssh</code></pre>
+<p>One documentation trap before you start, and it is a trap in both directions. <a href="https://docs.cloud.google.com/tpu/docs/request-using-flex-start">Request TPU Flex-start VMs</a> states:</p>
+<blockquote>
+<p>You must use the queued resources API to use TPU Flex-start VMs.</p>
+</blockquote>
+<p><strong>That is true for v5e and out of date for everything else.</strong> The page sits in the deprecated API’s doc set, describes flex-start within that API, and never mentions <code>instances create</code>. For v5e it is still correct — there is no Compute Engine path at all, as above. For v5p, v6e and TPU7x it will send you to the API you are trying to leave.</p>
+<p>The Compute Engine <a href="https://docs.cloud.google.com/compute/docs/instances/provisioning-models">provisioning models</a> page is the one to believe for those three. It lists the flex-start machine series as “A4, A3, A2, G4, and G2” plus “TPU7x, TPU v6e, and TPU v5p”; <code>instances create</code> takes <code>FLEX_START</code> as a first-class value; and <code>--request-valid-for-duration</code> is its wait knob, capped at two hours for a standalone VM. Every flex-start instance in this article was created that way.</p>
+<p>One caveat if you are planning ahead: flex-start on <strong>TPU7x is behind an allowlist</strong>, per a footnote on that page — contact your account team. v5p and v6e are ungated.</p>
+<p>Two genuine wins while we are here. <strong><code>--max-run-duration</code> is not flex-start’s alone.</strong> On the TPU API, gcloud documents the flag as “Used with flex-start”; on Compute Engine I have used it on spot creates as well, so at least those two models can carry it. Pair it with <code>--instance-termination-action=DELETE</code> and a demo box cleans up after itself. And <strong>the two-object lifecycle collapses</strong>: no queued resource owning a node you did not name, no reconciling the two names, and teardown needs no <code>--force</code> — on the old path deleting an ACTIVE resource did.</p>
+<p>Serving does not change. Same chip, same engine build, same flags: the KV cache allocation came out at <strong>1,151,744 tokens on both control planes</strong> — the same integer, not merely close — and throughput matched to 0.6% on the control cells. Larger cells varied by a few percent in both directions, but that benchmark swings further than that on cache state alone, so I would not read anything into it. <strong>This is not a performance decision.</strong> Plan it as a refactor.</p>
+<p>Now the parts that cost real time.</p>
+<h2 id="not-every-chip-has-a-compute-engine-path">Not every chip has a Compute Engine path</h2>
+<p>Check before you plan anything, and do not check by looking in the machine-type catalog, because it will tell you yes when the answer is no.</p>
+<p>v5e looks fine there:</p>
+<pre><code>$ gcloud compute machine-types list --filter=&quot;name~ct5lp&quot;
+NAME              ZONE           CPUS  MEMORY_GB  GUEST_ACCELERATOR_TYPE
+ct5lp-hightpu-1t  us-central1-a  24    48.00      [&#39;ct5lp&#39;]
+ct5lp-hightpu-4t  us-central1-a  112   192.00     [&#39;ct5lp&#39;]
+ct5lp-hightpu-8t  us-central1-a  224   384.00     [&#39;ct5lp&#39;]</code></pre>
+<p>Three shapes, 26 zones. Now create one:</p>
+<pre><code>ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+ - This user agent is not allowed to use the machine type [ct5lp-hightpu-1t].</code></pre>
+<p>Refused outright. Not a quota error, not a does-not-exist error.</p>
+<p><strong>GKE uses those exact machine type names</strong> — its TPU documentation describes <code>ct5lp-hightpu-4t</code> and its topologies directly. That gives the catalog entry a consumer who is not you, which is my best explanation for why the strings exist without a create path, though Google does not say so outright. The same reasoning covers the other things that look like a v5e path and are not: the image family is literally named <code>ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e</code>, and there is a <code>compute.googleapis.com</code> quota metric called <code>TPU-LITE-PODSLICE-V5-per-project-zone</code>. Whatever the reason, Compute-Engine-shaped artifacts exist for v5e without a Compute Engine create path, so do not treat any of them as evidence of one.</p>
+<p>The public docs agree, if you read them closely. <a href="https://docs.cloud.google.com/compute/docs/tpus/tpu-machines">TPU machines in the accelerator-optimized family</a> says “Compute Engine supports the following TPU versions: TPU7x, TPU v6e, TPU v5p” and does not mention v5e anywhere. And the <a href="https://docs.cloud.google.com/tpu/docs/v5e">TPU v5e</a> page says v5e “is supported using Google Kubernetes Engine and the Cloud TPU API”, with Compute Engine absent from that list.</p>
+<p><strong>Catalog presence is not creatability.</strong> Testing costs nothing: pick a zone where your quota is zero and try the create. A rejection is free and conclusive.</p>
+<h2 id="a-primer-on-the-four-provisioning-models">A primer on the four provisioning models</h2>
+<p>Compute Engine gives you four ways to ask for a chip, and the choice drives everything downstream — what you pay, which quota you spend, and how you fail. Worth ten minutes up front.</p>
+<pre><code>                      how you get capacity         max run                   how it ends                              quota spent                   v6e, europe-west4
+--------------------  ---------------------------  ------------------------  ---------------------------------------  ----------------------------  -----------------
+STANDARD (on-demand)  immediately, if available    unlimited                 when you say so                          standard                      $2.97/chip-hr
+SPOT                  immediately, if available    unlimited                 preempted whenever Google wants it back  preemptible -&gt; standard       $1.78/chip-hr
+FLEX_START            queues, up to a 2h wait      10 min – 7 days           at --max-run-duration                    preemptible -&gt; standard       $1.35/chip-hr
+RESERVATION_BOUND     reserved ahead, if approved  up to 90 days (calendar)  when the reservation ends                managed with the reservation  no list rate</code></pre>
+<p>Behaviour from the <a href="https://docs.cloud.google.com/compute/docs/instances/provisioning-models">provisioning models</a> page — the reservation-bound quota cell is a simplification, since that page says it varies by reservation type. Prices read live from the Cloud Billing Catalog on 2026-08-11.</p>
+<p><strong>Flex-start is the default worth reaching for, and it is the cheapest.</strong> That surprised me — it undercuts spot on v6e in both regions I priced ($1.35 against $1.78 in europe-west4, $1.40 in us-east5), and it is less than half on-demand. You trade immediacy for it: the request queues rather than failing, for up to two hours, and the instance self-terminates at a duration you set. For serving experiments and benchmarks that is the right shape.</p>
+<p><strong>Spot is not the cheap option here, despite the name.</strong> On v6e it costs <em>more</em> than flex-start, and it can be reclaimed at any time — with less warning than you might assume, since the preemption notice duration defaults to zero and the shutdown period is best-effort up to 30 seconds. I checked v5e as well, expecting the ordering to invert, and it does not: in us-west4 flex-start is $0.60 against spot’s $0.607. Spot’s one real advantage is that it does not queue — which makes it useful as a diagnostic, see below. Read the rate rather than assuming either way.</p>
+<p><strong>On-demand is for when you cannot tolerate a queue or a deadline.</strong> Twice the price, no run limit, and it is the only model that spends the family quota directly.</p>
+<p><strong>Reservation-bound is the one to know exists rather than the one to start with.</strong> You ask for capacity at a future date; if Google approves, you get a reservation and your instances bind to it. Calendar mode runs up to 90 days. It has <strong>no list rate in the billing catalog</strong> — what it costs is whatever the reservation was priced at — so if you have a cost tool, teach it to say “read the reservation” rather than falling back to the on-demand SKU. The old path had a counterpart, for what it is worth: <code>queued-resources create</code> takes a <code>--reserved</code> flag to schedule against reserved capacity.</p>
+<p><strong>The practical default:</strong> flex-start for anything time-boxed, on-demand when you need it now and unbounded, reservation-bound when you have a date and a budget, spot rarely on v6e.</p>
+<h2 id="quota-is-the-gate-and-it-is-not-the-quota-you-expect">Quota is the gate, and it is not the quota you expect</h2>
+<p>Three separate things went wrong for me here, so take them in order.</p>
+<h3 id="your-tpu-api-quota-does-not-come-with-you">1. Your TPU API quota does not come with you</h3>
+<p>The two control planes meter against completely disjoint pools. My project holds <strong>512 v6e chips in us-east5 on the TPU API</strong> and, on Compute Engine, held <strong>nothing at all</strong> in the same region for the same silicon. That is why my first create failed in the zone my rig had used happily for months.</p>
+<h3 id="which-quota-you-spend-depends-on-the-provisioning-model">2. Which quota you spend depends on the provisioning model</h3>
+<p>There are two v6e quotas on Compute Engine, and picking the wrong one to check is the easiest mistake to make:</p>
+<pre><code>Provisioning model    Quota id it spends
+--------------------  ------------------------------------------------------------------------
+FLEX_START            PREEMPTIBLE-TPU-V6E-per-project-region, falling back to the family quota
+SPOT                  PREEMPTIBLE-TPU-V6E-per-project-region
+STANDARD (on-demand)  TPUS-PER-TPU-FAMILY-per-project-region, tpu_family=CT6E</code></pre>
+<p><strong>Flex-start spends the preemptible pool.</strong> That is counterintuitive — flex-start is not preemptible in behaviour, once granted it runs uninterrupted for up to seven days — and nothing in the flag names hints at it. The <a href="https://docs.cloud.google.com/compute/docs/instances/provisioning-models">provisioning models</a> page says so, and the second sentence matters as much as the first:</p>
+<blockquote>
+<p>When you create a Flex-start VM, preemptible quota is consumed. If your project lacks preemptible quota, then standard quota is consumed.</p>
+</blockquote>
+<p>So for flex-start, <strong>a region is usable if either pool has room.</strong> Check the preemptible metric first, because that is what gets spent, but do not write a region off on one listing alone.</p>
+<p>I spent a day trying to establish this experimentally before finding it documented — and then, having found it, still got it wrong by quoting only the first sentence. Read the whole entry.</p>
+<p>Note there is <strong>no non-preemptible v6e id at all</strong> — no <code>TPU-V6E-per-project-region</code> exists — which is why on-demand falls back to the generic family quota. v4, v5e and v5p each publish their own dedicated pair, so this fallback is a v6e and TPU7x quirk rather than a rule.</p>
+<h3 id="the-obvious-command-does-not-show-either-of-them">3. The obvious command does not show either of them</h3>
+<p>This is the part that cost me the most, because it answers confidently and wrongly:</p>
+<pre><code>$ gcloud compute regions describe us-east5 --format=&quot;value(quotas.list())&quot; | tr &#39;,&#39; &#39;\n&#39; | grep TPU
+TPU_LITE_DEVICE_V5               0.0
+PREEMPTIBLE_TPU_LITE_DEVICE_V5   0.0
+TPU_LITE_PODSLICE_V5             32.0
+PREEMPTIBLE_TPU_LITE_PODSLICE_V5 1536.0</code></pre>
+<p>Four metrics, all v5e, <strong>none of which governs v6e.</strong> The regional quota view only carries the older metrics. v6e lives in the newer Cloud Quotas API and has to be asked for by name — once per metric:</p>
+<pre><code>$ gcloud alpha quotas info describe PREEMPTIBLE-TPU-V6E-per-project-region \
+    --service=compute.googleapis.com          # flex-start and spot
+
+$ gcloud alpha quotas info describe TPUS-PER-TPU-FAMILY-per-project-region \
+    --service=compute.googleapis.com          # on-demand</code></pre>
+<p><strong>Read both, because their defaults are opposite.</strong> A region absent from the family listing inherits <strong>0</strong>. A region absent from the preemptible listing inherits <strong>1536</strong>. So a region that looks dead in one listing may have plenty of headroom in the other — which is exactly the mistake I made, writing off regions as unusable when only their on-demand path was.</p>
+<p>An unset value also reads identically to a zero one, so a blank does not tell you the hardware is missing. Check <code>machine-types list</code> for that.</p>
+<h3 id="what-my-project-actually-holds">What my project actually holds</h3>
+<p>After the requests below, for the twelve regions that publish <code>ct6e-standard-1t</code>:</p>
+<pre><code>region                                                                                                                      flex-start / spot  on-demand
+--------------------------------------------------------------------------------------------------------------------------  -----------------  ---------
+europe-west4, asia-east1, asia-northeast1, asia-south1, asia-southeast1, southamerica-east1, southamerica-west1, us-south1               1536         32
+us-east1                                                                                                                                 1536         32
+us-central1, us-west1                                                                                                                    1536          0
+us-east5                                                                                                                                   32         32
+us-east4                                                                                                                                    0          0</code></pre>
+<p>Two things worth reading off that.</p>
+<p><code>us-central1</code> and <code>us-west1</code> look unusable if you only check on-demand, and are in fact fine for flex-start — they hold the full 1536 on the pool flex-start actually spends. That is the opposite-defaults trap doing real damage: I wrote both off for a day.</p>
+<p><code>us-east5</code> sits at <strong>32</strong> where every other live region has 1536. I put it there by asking for 32, not realising the preemptible metric defaults to 1536. When I noticed and went back to ask for 1536, <strong>that request was denied</strong> — so the 32 was not the self-inflicted ceiling it looked like. us-east5 simply is not giving out more today, whatever number you put in the form.</p>
+<h2 id="troubleshooting-quota-and-capacity">Troubleshooting quota and capacity</h2>
+<p>These two produce the same symptoms and have different fixes, so this is the part worth having a routine for.</p>
+<h3 id="the-symptom-your-create-sits-in-pending">The symptom: your create sits in PENDING</h3>
+<p><code>PENDING</code> means either <strong>no quota</strong> or <strong>no capacity</strong>, and from the outside they are identical. I produced both separately: a flex-start create in a region with zero quota queued indefinitely, and a flex-start create in a region with 1536 chips of quota and no hardware did exactly the same. In neither case did the create report the actual problem.</p>
+<p>It is not even consistent. In a third zone the same create came back immediately with an explicit <code>reason: stockout</code> rather than queueing. <strong>So you cannot infer the cause from the behaviour, and “did my create succeed” is not a quota test.</strong></p>
+<h3 id="the-routine">The routine</h3>
+<p><strong>Step 1 — probe capacity with a spot create.</strong> Spot does not queue; it fails fast and names the reason, which makes it a free capacity check that takes seconds:</p>
+<pre><code>$ gcloud compute instances create probe --zone=us-central1-a \
+    --machine-type=ct6e-standard-1t --provisioning-model=SPOT ...
+
+reason: stockout
+zonesAvailable: &#39;&#39;
+message: The zone &#39;.../zones/us-central1-a&#39; does not have enough resources
+  available to fulfill the request.</code></pre>
+<p>A stockout means your flex-start request is queued behind real scarcity and no amount of quota will help. If spot provisions instead, capacity exists — delete it and go look at quota. (Spot and flex-start draw on the same preemptible pool, so this probes the zone rather than your entitlement.)</p>
+<p><strong>Step 2 — try the sibling zones, not just the region.</strong> Quota is regional; capacity is zonal, and they diverge sharply. In <code>us-central1</code> I got a stockout in <code>-a</code>, a stockout in <code>-c</code>, and a working instance in <code>-b</code>, all within a few minutes and all against the same 1536-chip regional quota. <strong>If one zone is dry, the next one in the same region costs nothing to try.</strong></p>
+<p><strong>Step 3 — check both quota metrics, not one.</strong> Covered above: flex-start spends the preemptible pool first and falls back to the family quota, and the two carry opposite defaults. A region that looks dead in one listing may be fine.</p>
+<p><strong>Step 4 — only then request more quota.</strong> One command per metric, and the dimension keys differ — the family quota takes <code>region</code> <strong>and</strong> <code>tpu_family</code>, the preemptible one takes <code>region</code> alone. Read them off <code>gcloud quotas info describe &lt;quota-id&gt;</code> rather than guessing:</p>
+<pre><code>gcloud quotas preferences create \
+  --service=compute.googleapis.com --project=YOUR_PROJECT \
+  --quota-id=PREEMPTIBLE-TPU-V6E-per-project-region \
+  --dimensions=&quot;region=us-east5&quot; \
+  --preferred-value=32 \
+  --preference-id=preemptible-tpu-v6e-us-east5 \
+  --justification=&quot;...&quot;</code></pre>
+<p>Check anything you file with <code>gcloud quotas preferences list</code>. And know what you are likely to get.</p>
+<h3 id="what-quota-requests-actually-do">What quota requests actually do</h3>
+<p>I filed requests on both metrics across five regions, then retried the denials — all of them once at the same size, and the four that could be lowered again at 8 chips. Every decision came back <strong>within seconds</strong>, automated, with <code>quotaConfig.stateDetail</code> carrying the verdict:</p>
+<pre><code>
+-----------------------  --------------------------------------------------------------------------------------------------------
+approved                 us-east5 preemptible -&gt; 32, us-east5 family -&gt; 32, us-east1 family -&gt; 32
+denied                   us-central1 family, us-west1 family, us-east4 family, us-east4 preemptible, us-east5 preemptible -&gt; 1536
+denied again at 8 chips  us-central1 family, us-west1 family, us-east4 family, us-east4 preemptible
+refused at submission    us-central1 / us-east1 / us-west1 preemptible</code></pre>
+<p>Three things fall out of that.</p>
+<p><strong>The size of the ask is not the variable.</strong> The same 0 → 32 request was approved in two regions and denied in three. Retried at 8 chips, the denials were identical. Three sizes tested — 8, 32, 1536 — and the outcome tracked the <em>region</em> every time. There is no magic number.</p>
+<p><strong>Denials may track capacity.</strong> Of the regions that denied me quota, the two I went on to probe — us-central1 and us-west1 — both refused a spot create for lack of capacity. I did not probe us-east4, so this is a suggestive pattern across two regions rather than a rule, and the API says nothing about its reasoning. It is at least a reason not to read a denial as a judgement about your project.</p>
+<p><strong>You cannot ask for less than you hold.</strong> Three requests never reached review:</p>
+<pre><code>FAILED_PRECONDITION: The quota override ... decreases effective quota unsafely</code></pre>
+<p>Those regions already sat at the 1536 default and I asked for 32. Because the two metrics carry different defaults, one blanket number is wrong about half the time — read the current value per metric first.</p>
+<h3 id="quota-is-a-ceiling-not-an-allocation">Quota is a ceiling, not an allocation</h3>
+<p>The thing to internalise: <strong>holding quota does not mean the hardware is there.</strong> Single v6e chips were scarce in most places I looked — europe-west4-a served me first time, and everywhere else was a fight.</p>
+<pre><code>zone            quota held  spot create
+--------------  ----------  --------------------------------------------
+europe-west4-a        1536  provisioned
+us-central1-a         1536  reason: stockout
+us-central1-b         1536  provisioned, then stocked out a minute later
+us-central1-c         1536  reason: stockout
+us-west1-c            1536  reason: stockout</code></pre>
+<p>Three of five zones had full quota and no chips at all. <code>us-central1-b</code> is the one to remember: an instance came up there, I deleted it, and a request a minute later was refused for stockout. <strong>Availability moves faster than you can test against it</strong>, let alone plan around.</p>
+<p>So treat quota as permission to ask, not as reserved hardware. Flex-start’s queue is the mechanism that actually gets you a chip, because it waits rather than failing — which is worth more here than any amount of quota on paper.</p>
+<h2 id="the-image-is-not-the-runtime-version">The image is not the runtime version</h2>
+<p>The first boot of my migrated rig died 100 seconds in, for a reason no flag mapping would have caught:</p>
+<pre><code>+ sudo docker pull vllm/vllm-tpu:nightly
+sudo: docker: command not found
+...
+ERROR: Failed to pull vLLM Docker image after multiple retries. Exiting.</code></pre>
+<p><strong><code>ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e</code> has no <code>docker</code> on PATH at first boot.</strong> The same script had worked unchanged for months on the TPU API’s <code>v2-alpha-tpuv6e</code> runtime, which is why I assume that image ships Docker — I have not inspected it. Either way, the script came across verbatim and went straight for the pull.</p>
+<p>Install it first:</p>
+<pre><code>if ! command -v docker &gt; /dev/null 2&gt;&amp;1; then
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io
+  sudo systemctl enable --now docker
+fi</code></pre>
+<p>And fix it in three places, not one: the startup script, any Docker command your tooling runs over SSH (the recovery tool you grab after a failed boot must not fail the same way), and any copy-pasteable deploy one-liner you emit.</p>
+<p><strong>The general form:</strong> your startup script was written against a runtime version that gave you things for free. Mine assumed Docker. Whatever yours assumes, the instance will sit there reporting <code>RUNNING</code> while it fails.</p>
+<h2 id="running-does-not-mean-ready">RUNNING does not mean ready</h2>
+<p>This is the most misleading signal on the new path.</p>
+<p>A queued resource reached <code>ACTIVE</code> only once its node was up. <strong>An instance is <code>RUNNING</code> the moment the VM boots</strong> — before the startup script has pulled an image, loaded a model, or done anything at all. During the entire failed boot above, the instance list said:</p>
+<pre><code>NAME              ZONE            MACHINE_TYPE      STATUS
+gce-vllm-v6e1-2b  europe-west4-a  ct6e-standard-1t  RUNNING</code></pre>
+<p>It said that indefinitely. Nothing distinguishes a dead boot from a healthy one except reading the startup log or curling the port. Any readiness check you ported that trusted <code>ACTIVE</code> is now wrong — by several minutes on a good day, and forever on a bad one.</p>
+<h2 id="discovery-and-ssh-move-and-the-old-calls-go-quiet">Discovery and SSH move, and the old calls go quiet</h2>
+<p>A <code>ct6e-*</code> instance is an ordinary Compute Engine instance that happens to carry a TPU, so the old API cannot see it:</p>
+<pre><code>$ gcloud compute instances list --filter=&quot;name=gce-vllm-v6e1-2b&quot;
+NAME              ZONE            MACHINE_TYPE      STATUS
+gce-vllm-v6e1-2b  europe-west4-a  ct6e-standard-1t  RUNNING
+
+$ gcloud compute tpus tpu-vm list --zone=europe-west4-a
+$</code></pre>
+<p>Empty. No error, no warning — your tooling simply believes nothing is running. Two field shapes move with it: status is <code>status: RUNNING</code> rather than <code>state: READY</code>, and the external IP moves from <code>networkEndpoints[].accessConfig.externalIp</code> to <code>networkInterfaces[].accessConfigs[].natIP</code>. Copy the old status check across and it will not throw; it will just sort every healthy instance to the bottom of your ranking, which you notice the day you have two.</p>
+<p>SSH moves too, and this is the call site people miss:</p>
+<pre><code>gcloud compute tpus tpu-vm ssh &lt;node&gt;   # old
+gcloud compute ssh &lt;instance&gt;           # new</code></pre>
+<p>Everything that manages your container, tails logs, reads journalctl or runs a benchmark has to move — and those are precisely the tools you reach for <em>when something has already gone wrong</em>.</p>
+<p>I had a test asserting my rig was off the old API. It covered the discovery function. Four other tools were still calling <code>tpu-vm ssh</code> behind its back, plus several Makefile targets. <strong>Grep for the old command; do not trust one test over one function.</strong></p>
+<h2 id="three-flags-that-fail-late">Three flags that fail late</h2>
+<p><strong><code>--scopes=cloud-platform</code></strong> — required if your startup script reads a secret. Mine pulls a Hugging Face token from Secret Manager at boot. Without the scope the VM boots fine and then spins for 30 minutes before giving up, so the symptom is a slow startup followed by what looks like a token problem.</p>
+<p><strong><code>--boot-disk-size</code></strong> — the image default is 10 GB, which will not hold a vLLM TPU image. Fails after a clean boot, mid-pull, which is a long way from the flag you got wrong.</p>
+<p><strong><code>--maintenance-policy=TERMINATE</code></strong> — required, because a TPU instance cannot live-migrate.</p>
+<p>Two more worth knowing, both from the <a href="https://docs.cloud.google.com/compute/docs/instances/provisioning-models">provisioning models</a> page. Flex-start instances run for a minimum of 10 minutes and <strong>a maximum of seven days</strong>, so set <code>--max-run-duration</code> explicitly rather than discovering the boundary. And you cannot suspend one — a standalone flex-start instance can be stopped, but suspend and recreate are unavailable, and anything created through a MIG resize request cannot be stopped either. Keep state you care about on a separate disk or in GCS.</p>
+<h2 id="troubleshooting-quick-reference">Troubleshooting quick reference</h2>
+<pre><code>Symptom                                                 Likely cause                                           Check
+------------------------------------------------------  -----------------------------------------------------  -------------------------------------------------------------------------------
+PENDING for hours                                       quota or capacity — identical from outside             fire a SPOT create at the same zone; stockout means capacity, and usually it is
+This user agent is not allowed to use the machine type  that generation has no Compute Engine path             use the Cloud TPU API for that chip
+RUNNING but nothing serves                              startup script died                                    read the startup log; curl the port
+docker: command not found                               the CE image ships no Docker                           install docker.io before pulling
+Out of disk mid-pull                                    10 GB image default                                    --boot-disk-size
+Secret access hangs 30 min                              missing --scopes=cloud-platform                        recreate with the scope
+Flex-start VM disappeared                               it reached --max-run-duration, max seven days          set the duration explicitly; it is not unlimited
+tpu-vm list returns nothing                             wrong API for a ct6e-* instance                        gcloud compute instances list
+SSH says not found                                      wrong SSH surface                                      gcloud compute ssh, not tpus tpu-vm ssh
+Quota looks fine but nothing works                      reading regions describe, which shows v5 metrics only  Cloud Quotas API, by metric name
+decreases effective quota unsafely                      requesting less than you hold                          read the current value first
+gcloud alpha reported missing but works                 apt install, component manager disabled by design      ignore it; alpha ships in the base package</code></pre>
+<h2 id="the-short-version">The short version</h2>
+<p>Check whether your chip has a Compute Engine path at all, by trying a create rather than reading the catalog. Check your quota through the Cloud Quotas API rather than <code>regions describe</code>, and read it as an intersection with machine-type availability. Translate the flags. Then rewrite discovery and SSH instead of filtering them, and grep for the old commands afterwards.</p>
+<p>And assume nothing fails loudly. A stuck request, a dead boot, a blind discovery helper and a missing SSH surface all present as silence or as a cheerful <code>RUNNING</code>. The flag mapping is the part gcloud checks for you; everything in this article is the part it does not.</p>
+<p>There is nothing as constant as change. TPU7x is already Compute Engine only, so this will not be the last migration any of us does — but the next one should be cheaper, because the hard part was never the flags.</p>
+</body>
+</html>

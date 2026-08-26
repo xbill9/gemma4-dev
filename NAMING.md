@@ -16,7 +16,7 @@ tpu  -  vllm  -  v5e1  -  2b  -  q4_0
  │        │       │       └───────── Gemma 4 size:  2b / 4b / 12b / 26b / 31b
  │        │       └───────────────── accelerator + chip count:  v5e1 / v6e1 / v6e4 / inf2
  │        └───────────────────────── serving stack:  vllm / jax / pytorch
- └────────────────────────────────── where it runs:  tpu / gpu / gce / cloudrun
+ └────────────────────────────────── where it runs:  tpu / gce / gke / gpu / cloudrun
 ```
 
 Read `tpu-vllm-v5e1-2b` as: **a Cloud TPU running vLLM in Docker on v5e-1 hardware, serving the 2B Gemma 4
@@ -55,15 +55,16 @@ not which cloud it sits in.
 | --- | --- | --- |
 | `tpu` | A dedicated accelerator with its own control plane: a Cloud TPU VM or Queued Resource, or AWS Inferentia via Neuron | `gcloud compute tpus tpu-vm` / `queued-resources` |
 | `gce` | A Compute Engine instance, where the accelerator (if any) is a property of the **machine type** | `gcloud compute instances create --machine-type=ct6e-…` |
+| `gke` | A GKE node pool carrying the accelerator, with the model served from a Pod rather than a VM | `gcloud container clusters create` / `node-pools create --machine-type=ct6e-…`, then `kubectl` |
 | `gpu` | A general-purpose GPU attached to a VM, any cloud | varies (GCE, EC2) |
 | `cloudrun` | A general-purpose GPU attached to cloudrun |  Cloud Run |
 
-These three are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
+These five are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
 slot or recorded in the rig's `tpu.env`. Add a platform value only for a genuinely different execution target.
 
-**`tpu` and `gce` can name the same silicon, and that is the point.** `tpu-vllm-v6e1-2b` and
-`gce-vllm-v6e1-2b` are both one v6e-1 chip serving E2B under vLLM; they differ only in which API provisions
-it. That difference earns a slot because Google is retiring one of them — **the Cloud TPU API is no longer
+**`tpu`, `gce` and `gke` can name the same silicon, and that is the point.** `tpu-vllm-v6e1-2b`,
+`gce-vllm-v6e1-2b` and `gke-vllm-v6e1-2b` are all one v6e-1 chip serving E2B under vLLM; they differ only in
+which API provisions it. That difference earns a slot because Google is retiring one of them — **the Cloud TPU API is no longer
 under active development, and TPU7x and later are Compute Engine or GKE only** (see `@HARDWARE.md`, which
 holds the per-generation table and the migration mapping). A rig's provisioning path is therefore a fact with
 a shelf life, and the name should carry it.
@@ -99,6 +100,44 @@ the verbatim error and why its wording rules out zone and quota as explanations.
 `gce-vllm-v5e1-2b` exists as the apparatus that settled this, and is the one rig here expected never to
 provision. Keep it, and keep its name.
 `@HARDWARE.md` has the generation table.
+
+**That exclusion is about `gce`, and does not carry to `gke`** — the rejection names the *calling surface*
+(`This user agent is not allowed to use the machine type`), and GKE is the surface that requests `ct5lp-*`
+strings legitimately. See the next section.
+
+### `gke` is a third control plane, not a flavour of `gce`
+
+Added 2026-08-25 for `~/gemma4-dev/gke-vllm-v6e1-2b`. GKE is implemented *on* Compute Engine — a TPU node
+pool is a set of Compute Engine VMs carrying the same `ct6e-standard-1t` machine type the `gce` rigs create
+directly — so the tempting reading is that this is a `gce` rig that happens to run Kubernetes, with the
+cluster recorded in the README. Three things make it its own value, and they are the same three that earned
+`gce` its split from `tpu`:
+
+- **A different API provisions the hardware.** `gcloud container clusters create` and `node-pools create`,
+  not `gcloud compute instances create`. Capacity, provisioning model and failure modes are requested
+  through the cluster, and a node you never asked for by name can appear — or be replaced — on the node
+  pool's terms. `instances create` has no equivalent of that.
+- **Discovery and access are a different shape again.** A GKE node *does* list under `gcloud compute
+  instances list`, so the trap here is the opposite of the `gce` one: the discovery call succeeds and
+  returns the wrong object. What serves the model is a Pod behind a Service, reached through `kubectl`
+  and a port-forward or a LoadBalancer IP — not `gcloud compute ssh` to `:8000` on a `natIP`. Every
+  helper a `gce` rig uses for endpoint resolution is wrong here in the same quiet way the TPU API's
+  `_list_tpu_vm_nodes()` was wrong once the `gce` rigs forked off it.
+- **It provisions, and it is not a `gce` create in disguise.** First run 2026-08-25: cluster plus a
+  one-node `ct6e-standard-1t` pool in `europe-west4-a`, vLLM Ready ~10 minutes after apply, serving
+  from a LoadBalancer on `:8000`. The node-pool create also refuses `--tpu-topology` for a
+  single-host slice while GKE labels the node `gke-tpu-topology=1x1` regardless — a flag/label split
+  that has no analogue on either of the other two control planes.
+- **It is the only path with a future for v5e.** `instances create` refuses `ct5lp-hightpu-1t` outright and
+  GKE is the consumer those machine types exist for (`@HARDWARE.md`), so `gce-*-v5e1-*` is unbuildable while
+  `gke-*-v5e1-*` is the shape the six v5e rigs would have to take if the Cloud TPU API is sunset. **Untested
+  here** — the v6e node pool above proves the path, but no v5e pool has been tried, so treat the v5e
+  half as why the slot is worth having, not as a tested claim.
+
+The slot names *how the accelerator is provisioned*, so `gke` is for a rig that creates its own cluster or
+node pool. A manifest applied to a cluster someone else owns is not what it names. And the usual rule bites
+hardest here, because the underlying VM is identical: a rig that ends up shelling to `instances create` is a
+`gce` rig with a stale name, whatever Kubernetes is doing on top of it.
 
 ## Slot 2 — runtime
 
@@ -305,6 +344,8 @@ Three things that trip people up:
 | --- | --- | --- | --- | --- | --- |
 | `~/gemma4-dev/gce-vllm-v6e1-2b` | **Compute Engine instance** (`ct6e-standard-1t`) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — — the A/B twin of `tpu-vllm-v6e1-2b`, see below |
 | `~/gemma4-dev/gce-vllm-v6e8-2b` | **Compute Engine instance** (`ct6e-standard-8t`) | vLLM in Docker | v6e-8 | `gemma-4-E2B-it` | — — forked from `gce-vllm-v6e1-2b` and retargeted to eight chips 2026-08-19; the A/B twin of `tpu-vllm-v6e8-2b` |
+| `~/gemma4-dev/gce-vllm-v6e8-31b` | **Compute Engine instance** (`ct6e-standard-8t`) | vLLM in Docker | v6e-8 | `gemma-4-31B-it` | — — forked from `gce-vllm-v6e8-2b` and retargeted from E2B to 31B 2026-08-25. **Bare four-slot name is the positive claim**: the reference bf16 release, not the `-qat-w4a16-ct` or `-q4_0-unquantized` export. Not an A/B twin of anything — nothing here serves 31B through the TPU API |
+| `~/gemma4-dev/gke-vllm-v6e1-2b` | **GKE node pool** (`ct6e-standard-1t`) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — — third control plane for the chip `tpu-vllm-v6e1-2b` and `gce-vllm-v6e1-2b` already serve; **the name is a claim about work not yet done**, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-q4_0` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | `q4_0` |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-w4a16` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the `-ct` container is not part of the slot |
@@ -349,17 +390,29 @@ files and its `plugin.json`, MCP server key in `.mcp.json` / `.codex/config.toml
 file, and the hardcoded `/home/xbill/tpu-pytorch-v5e1-12b/…` paths in `ports/**/*_test.py`. Do it as its own
 commit, not folded into unrelated work.
 
-### Two rigs, one chip: the provisioning A/B
+### Three rigs, one chip: the provisioning A/B
 
-`tpu-vllm-v6e1-2b` and `gce-vllm-v6e1-2b` are deliberately identical in slots 2–4 — same runtime, same
-v6e-1 chip, same E2B checkpoint — and differ only in slot 1. They exist as a matched pair so the two
-provisioning paths can be compared directly: same model, same hardware, same serving flags, two control
+`tpu-vllm-v6e1-2b`, `gce-vllm-v6e1-2b` and `gke-vllm-v6e1-2b` are deliberately identical in slots 2–4 — same
+runtime, same v6e-1 chip, same E2B checkpoint — and differ only in slot 1. They exist as a matched set so the
+provisioning paths can be compared directly: same model, same hardware, same serving flags, three control
 planes. Keep them in step. A change to one that isn't about provisioning (serving flags, `MAX_MODEL_LEN`,
-benchmark harness) should land in both, or the comparison stops being one.
+benchmark harness) should land in all three, or the comparison stops being one.
 
-This is rule 3 of [Adding a rig](#adding-a-rig) working as intended — two rigs differing in something no
-slot captured, given a slot rather than a reused name or an abused encoding suffix. It is also the reason
-the encoding slot was **not** used: `-gce` is not a weight format, and slot 5 is one category strictly.
+**`gke-vllm-v6e1-2b` was named on 2026-08-25 before it was built, and the code caught up the same day.**
+It was forked verbatim from `gce-vllm-v6e1-2b`, so for a few hours slot 1 was a claim about shell scripts
+while `server.py` still shelled to `instances create` — the weaker of the two readings this scheme allows.
+That gap is closed: the Compute Engine path was removed from the rig, `server.py` provisions
+`gcloud container node-pools`, and the create → list → destroy round trip was verified through the MCP
+tools. The name is a claim about `server.py` again.
+
+Two things worth keeping from how it went, because both generalise to any future rig fork:
+
+- **A fork inherits its parent's control plane in more places than the obvious one.** Removing it here meant
+  `server.py`, the Makefile's `deploy-tpu*` targets, `startup_script_template.sh`, and the test that
+  *asserted* the rig was off the old path while only checking one function.
+- **The name being ahead of the code is recoverable; the name being wrong about the code is not.** Recording
+  the gap in this file while it existed is what made it a task rather than a discrepancy someone would later
+  find and "fix" by renaming the directory.
 
 ### Artifact rigs — a rig that serves nothing
 
@@ -484,8 +537,9 @@ project's README and env file, not its directory name.
 ## Adding a rig
 
 1. Name the directory from the four mandatory slots. For slot 1, pick the **control plane you will actually
-   provision through** — `tpu` for the Cloud TPU API, `gce` for a Compute Engine TPU machine type. This is a
-   claim about the code in `server.py`, and a rig that switches paths needs the rename.
+   provision through** — `tpu` for the Cloud TPU API, `gce` for a Compute Engine TPU machine type, `gke` for
+   a GKE node pool. This is a claim about the code in `server.py`, and a rig that switches paths needs the
+   rename. Three of these can name one chip, so slot 1 is the only thing telling them apart.
 2. Add slot 5 if the weights aren't the reference build — one lowercase token naming the **encoding**
    (`w4a16`, `q4_0`, `int4`), read off `MODEL_NAME`. Not `qat`, not the container, not a runtime flag.
 3. Check the name is unique. Two rigs differing only in something no slot captures (zone, batch settings,

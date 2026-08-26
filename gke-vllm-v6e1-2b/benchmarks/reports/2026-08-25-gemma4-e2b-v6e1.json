@@ -1,0 +1,402 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-25-gemma4-e2b-v6e1",
+    "date": "2026-08-25",
+    "operator": "xbill",
+    "notes": "First measurement on the GKE rig. Served from a Pod on a single-host ct6e-standard-1t node pool; the benchmark ran inside the serving pod via kubectl exec, not in a second container over SSH as on the two sibling rigs."
+  },
+  "hardware": {
+    "accelerator": "tpu-v6e",
+    "chips": 1,
+    "topology": "1x1",
+    "hbm_gb_per_chip": 32,
+    "machine_type": "ct6e-standard-1t",
+    "host": {
+      "cloud": "gcp",
+      "zone": "europe-west4-a",
+      "provisioning": "on-demand",
+      "instance_name": "gke node pool tpu-v6e-1"
+    },
+    "pricing": {
+      "currency": "USD",
+      "rate_per_chip_hour": 2.97,
+      "source": "Cloud Billing Catalog, read live 2026-08-25"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "quantization": "none",
+    "kv_cache_dtype": "auto",
+    "max_model_len": 32768,
+    "tensor_parallel_size": 1
+  },
+  "software": {
+    "engine": "vllm",
+    "version": "0.26.1rc1.dev994+gd626108b1",
+    "image": "vllm/vllm-tpu:nightly",
+    "control_plane": "gke"
+  },
+  "throughput": {
+    "workload": {
+      "tool": "vllm bench serve",
+      "dataset": "random",
+      "output_len": 128,
+      "runs_per_point": 1,
+      "noise_floor_pct": 0.5
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.56,
+        "output_tok_per_s": 199.38,
+        "total_tok_per_s": 1794.42,
+        "ttft_ms": {
+          "mean": 15.36,
+          "median": 15.68,
+          "p99": 16.93
+        },
+        "tpot_ms": {
+          "mean": 4.93,
+          "median": 4.93,
+          "p99": 4.94
+        },
+        "itl_ms": {
+          "mean": 4.93,
+          "median": 4.94,
+          "p99": 5.21
+        },
+        "per_stream_tok_per_s": 202.8
+      },
+      {
+        "concurrency": 2,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 2.97,
+        "output_tok_per_s": 379.8,
+        "total_tok_per_s": 3418.21,
+        "ttft_ms": {
+          "mean": 17.83,
+          "median": 17.06,
+          "p99": 22.78
+        },
+        "tpot_ms": {
+          "mean": 5.16,
+          "median": 5.16,
+          "p99": 5.17
+        },
+        "itl_ms": {
+          "mean": 5.16,
+          "median": 5.17,
+          "p99": 5.51
+        },
+        "per_stream_tok_per_s": 193.8
+      },
+      {
+        "concurrency": 4,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 5.41,
+        "output_tok_per_s": 692.58,
+        "total_tok_per_s": 6233.2,
+        "ttft_ms": {
+          "mean": 22.23,
+          "median": 22.54,
+          "p99": 29.44
+        },
+        "tpot_ms": {
+          "mean": 5.64,
+          "median": 5.64,
+          "p99": 5.65
+        },
+        "itl_ms": {
+          "mean": 5.64,
+          "median": 5.65,
+          "p99": 6.29
+        },
+        "per_stream_tok_per_s": 177.3
+      },
+      {
+        "concurrency": 8,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 9.22,
+        "output_tok_per_s": 1179.85,
+        "total_tok_per_s": 10618.61,
+        "ttft_ms": {
+          "mean": 27.47,
+          "median": 24.76,
+          "p99": 44.61
+        },
+        "tpot_ms": {
+          "mean": 6.58,
+          "median": 6.58,
+          "p99": 6.6
+        },
+        "itl_ms": {
+          "mean": 6.58,
+          "median": 6.6,
+          "p99": 7.11
+        },
+        "per_stream_tok_per_s": 152.0
+      },
+      {
+        "concurrency": 16,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 13.63,
+        "output_tok_per_s": 1744.29,
+        "total_tok_per_s": 15698.62,
+        "ttft_ms": {
+          "mean": 45.9,
+          "median": 34.25,
+          "p99": 117.96
+        },
+        "tpot_ms": {
+          "mean": 8.82,
+          "median": 8.71,
+          "p99": 9.43
+        },
+        "itl_ms": {
+          "mean": 8.82,
+          "median": 8.76,
+          "p99": 10.05
+        },
+        "per_stream_tok_per_s": 114.8
+      },
+      {
+        "concurrency": 32,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 13.09,
+        "output_tok_per_s": 1675.01,
+        "total_tok_per_s": 15075.05,
+        "ttft_ms": {
+          "mean": 86.56,
+          "median": 56.81,
+          "p99": 215.87
+        },
+        "tpot_ms": {
+          "mean": 18.45,
+          "median": 18.42,
+          "p99": 19.04
+        },
+        "itl_ms": {
+          "mean": 18.45,
+          "median": 18.5,
+          "p99": 21.36
+        },
+        "per_stream_tok_per_s": 54.3
+      },
+      {
+        "concurrency": 64,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 16.67,
+        "output_tok_per_s": 2134.18,
+        "total_tok_per_s": 19207.62,
+        "ttft_ms": {
+          "mean": 189.89,
+          "median": 163.85,
+          "p99": 391.86
+        },
+        "tpot_ms": {
+          "mean": 28.46,
+          "median": 28.41,
+          "p99": 30.81
+        },
+        "itl_ms": {
+          "mean": 28.46,
+          "median": 26.62,
+          "p99": 57.09
+        },
+        "per_stream_tok_per_s": 35.2
+      },
+      {
+        "concurrency": 8,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 9.26,
+        "output_tok_per_s": 1185.07,
+        "total_tok_per_s": 5925.37,
+        "ttft_ms": {
+          "mean": 24.86,
+          "median": 24.49,
+          "p99": 35.18
+        },
+        "tpot_ms": {
+          "mean": 6.59,
+          "median": 6.59,
+          "p99": 6.61
+        },
+        "itl_ms": {
+          "mean": 6.59,
+          "median": 6.6,
+          "p99": 7.15
+        },
+        "per_stream_tok_per_s": 151.7
+      },
+      {
+        "concurrency": 8,
+        "input_len": 2048,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 8.46,
+        "output_tok_per_s": 1083.34,
+        "total_tok_per_s": 18416.83,
+        "ttft_ms": {
+          "mean": 81.2,
+          "median": 86.28,
+          "p99": 133.47
+        },
+        "tpot_ms": {
+          "mean": 6.78,
+          "median": 6.76,
+          "p99": 7.14
+        },
+        "itl_ms": {
+          "mean": 6.78,
+          "median": 6.62,
+          "p99": 8.31
+        },
+        "per_stream_tok_per_s": 147.9
+      },
+      {
+        "concurrency": 8,
+        "input_len": 4096,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 7.7,
+        "output_tok_per_s": 985.59,
+        "total_tok_per_s": 32524.34,
+        "ttft_ms": {
+          "mean": 139.4,
+          "median": 133.07,
+          "p99": 216.33
+        },
+        "tpot_ms": {
+          "mean": 7.05,
+          "median": 7.13,
+          "p99": 7.68
+        },
+        "itl_ms": {
+          "mean": 7.05,
+          "median": 6.68,
+          "p99": 37.98
+        },
+        "per_stream_tok_per_s": 140.3
+      },
+      {
+        "concurrency": 8,
+        "input_len": 8192,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 6.21,
+        "output_tok_per_s": 795.36,
+        "total_tok_per_s": 51698.41,
+        "ttft_ms": {
+          "mean": 241.05,
+          "median": 234.05,
+          "p99": 399.39
+        },
+        "tpot_ms": {
+          "mean": 8.2,
+          "median": 8.18,
+          "p99": 9.34
+        },
+        "itl_ms": {
+          "mean": 8.21,
+          "median": 7.39,
+          "p99": 44.37
+        },
+        "per_stream_tok_per_s": 122.2
+      },
+      {
+        "concurrency": 8,
+        "input_len": 16384,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 3.8,
+        "output_tok_per_s": 487.02,
+        "total_tok_per_s": 62825.41,
+        "ttft_ms": {
+          "mean": 496.48,
+          "median": 479.67,
+          "p99": 878.19
+        },
+        "tpot_ms": {
+          "mean": 12.62,
+          "median": 12.45,
+          "p99": 15.24
+        },
+        "itl_ms": {
+          "mean": 15.62,
+          "median": 10.28,
+          "p99": 87.36
+        },
+        "per_stream_tok_per_s": 80.3
+      }
+    ]
+  },
+  "startup": {
+    "time_to_healthy_s": 669,
+    "notes": "From deploy_vllm returning to /v1/models answering: image pull, weight load and XLA precompile. Provisioning before that (clusters create + node-pools create through provision_gke_tpu) took a further 532 s, and a full teardown 384 s \u2014 26 m 31 s from destroy_gke_cluster to a served token."
+  },
+  "cost": {
+    "per_m_output_tokens": [
+      {
+        "operating_point": "c=1",
+        "output_tok_per_s": 199.38,
+        "usd": 4.48
+      },
+      {
+        "operating_point": "c=2",
+        "output_tok_per_s": 379.8,
+        "usd": 2.35
+      },
+      {
+        "operating_point": "c=4",
+        "output_tok_per_s": 692.58,
+        "usd": 1.29
+      },
+      {
+        "operating_point": "c=8",
+        "output_tok_per_s": 1179.85,
+        "usd": 0.76
+      },
+      {
+        "operating_point": "c=16",
+        "output_tok_per_s": 1744.29,
+        "usd": 0.51
+      },
+      {
+        "operating_point": "c=32",
+        "output_tok_per_s": 1675.01,
+        "usd": 0.53
+      },
+      {
+        "operating_point": "c=64",
+        "output_tok_per_s": 2134.18,
+        "usd": 0.42
+      }
+    ],
+    "notes": "usd is ALL-IN at the on-demand list rate: $2.97/chip-h + $0.2475/h fixed overhead (e2-standard-4 system node $0.1475 + Zonal Kubernetes Clusters fee $0.10). Spot lists at $1.782/chip-h and flex-start at $1.35/chip-h in europe-west4; neither self-terminates on a node pool, so both bill until the pool is deleted."
+  },
+  "notes": [
+    "Provisioning validated end to end through the MCP tools: destroy_gke_cluster -> provision_gke_tpu -> deploy_vllm -> serving, 26m31s total.",
+    "Benchmark runs inside the serving pod (kubectl exec) against localhost; the load is TPU-bound and the client is not.",
+    "Two-dimensional sweep: concurrency 1-64 at 1024 input, then context 512-16384 at concurrency 8. Output 128 tokens throughout.",
+    "THE c=32 DIP IS REAL, NOT NOISE. Aggregate output throughput falls from 1744 tok/s at c=16 to 1675 at c=32, then rises to 2134 at c=64. Three repeats each gave c=16 1778.7, c=32 1694.9, c=64 2351.8 tok/s with 0.1-0.2% spread, so the non-monotonic shape reproduces. Unverified hypothesis: TPU static-shape padding, i.e. the c=32 batch straddling a compiled bucket boundary. Not confirmed against the compiled shapes.",
+    "Single run per sweep point; the repeat triple above is the only measure of run-to-run spread here (0.2% at these points)."
+  ]
+}
