@@ -1,0 +1,24 @@
+quant_mode       fp16   window_kv=True
+
+static: 3.75 GFLOP/token   temp 1.615 GB   args 6.158 GB
+NOTE: 'bytes accessed' from cost_analysis ignores fusion and counts a one-row gather of a multi-GB table as a full read. It is an upper bound, not traffic. Trust the kernel table below instead.
+
+wall 79.008 ms/token -> 12.66 tok/s   (GPU lane 73.747 ms/token)
+
+ ms/token      %   calls  kernel
+   20.067  27.2%    40.0  wrapped_convert_1   <-- DTYPE CONVERSION
+   18.002  24.4%    60.0  std::enable_if<true, void>::type internal::gemvx::kernel<int, in   <-- fp32
+   10.040  13.6%    20.0  wrapped_convert_3   <-- DTYPE CONVERSION
+    9.452  12.8%     1.0  wrapped_convert_61   <-- DTYPE CONVERSION
+    6.073   8.2%     1.0  std::enable_if<!(false), void>::type internal::gemvx::kernel<int   <-- fp32
+    2.349   3.2%    15.0  input_reduce_fusion_102
+    1.225   1.7%    15.0  input_reduce_fusion_50
+    0.942   1.3%    27.0  input_reduce_fusion_144
+    0.864   1.2%    28.0  input_reduce_fusion_172
+    0.633   0.9%    57.0  input_reduce_fusion_384
+    0.407   0.6%     7.0  input_reduce_fusion_103
+    0.367   0.5%     7.0  input_reduce_fusion_110
+
+conversion  54.2%   fp32 kernels  33.8%   fp16 kernels   0.0%
+
+>>> Conversion is a large share of decode. Check whether the parameter dtypes above match COMPUTE_DTYPE: bf16 weights on a pre-Ampere GPU are converted before every matmul.

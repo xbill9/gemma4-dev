@@ -135,18 +135,33 @@ class G5gTopologyTests(unittest.TestCase):
         self.assertEqual(server._tensor_parallel_size("g5g.2xlarge"), 1)
         self.assertEqual(server._tensor_parallel_size("g5g.16xlarge"), 2)
 
-    def test_every_size_is_supported_and_only_the_smallest_needs_swap(self):
-        # Measured 2026-08-13: g5g.xlarge serves E2B at 44.24 tok/s *with* a
-        # swapfile. Without swap the kernel refuses to mmap the 10.2 GB
-        # checkpoint ("Cannot allocate memory") and systemd crash-loops. So the
-        # small size is supported, not rejected -- but its user data must carry
-        # the swapfile. UserDataTests asserts the rendered swap block itself.
-        server._validate_instance_type(SWAP_SIZE)   # must not raise
-        self.assertTrue(server._needs_swap(SWAP_SIZE))
-        for size in ("g5g.2xlarge", "g5g.4xlarge", "g5g.16xlarge"):
+    def test_every_size_is_supported_and_the_two_smallest_need_swap(self):
+        """The threshold is INCLUSIVE, and 2xlarge is the case that proves it.
+
+        Two different pressures, both measured, and 16 GiB is short for both:
+
+          * g5g.xlarge (8 GiB), 2026-08-13: without swap the kernel refuses to
+            mmap the 10.2 GB checkpoint at all and systemd crash-loops.
+          * g5g.2xlarge (16 GiB), 2026-08-26: mmaps fine, then `--ple-bits 8`
+            is OOM-KILLED five times at 14.3 GB anon-rss, because
+            quantize_ple_table upcasts the 4.70 GB PLE table while the full
+            tree is resident. `< 16` excluded exactly this size, so the rig
+            provisioned swap for the small host and skipped the one where the
+            quantization path needs it.
+        """
+        for size in (SWAP_SIZE, "g5g.2xlarge"):
+            with self.subTest(instance_type=size):
+                server._validate_instance_type(size)   # must not raise
+                self.assertTrue(server._needs_swap(size))
+        for size in ("g5g.4xlarge", "g5g.8xlarge", "g5g.16xlarge", "g5g.metal"):
             with self.subTest(instance_type=size):
                 server._validate_instance_type(size)
                 self.assertFalse(server._needs_swap(size))
+
+    def test_swap_block_is_rendered_for_the_default_size(self):
+        # The default this rig actually launches. Before 2026-08-26 this
+        # rendered no swapfile and ple_bits could not load.
+        self.assertIn("swapfile", user_data(instance_type="g5g.2xlarge"))
 
     def test_non_g5g_rejected(self):
         for bad in ("g6.xlarge", "inf2.xlarge", "g5g.unknown"):
@@ -347,12 +362,20 @@ class UserDataTests(BashSyntaxMixin, unittest.TestCase):
         text = user_data()
         self.assertLess(text.index("chmod 600 /opt/jax-g5g/env"), text.index("HF_TOKEN="))
 
-    def test_swapfile_is_rendered_only_for_the_small_host(self):
-        small = user_data(SWAP_SIZE)
-        for fragment in ("mkswap", "swapon /swapfile", "/etc/fstab"):
-            self.assertIn(fragment, small)
-        self.assertShellParses(small, SWAP_SIZE)
-        for size in ("g5g.2xlarge", "g5g.4xlarge", "g5g.16xlarge"):
+    def test_swapfile_is_rendered_for_the_two_smallest_hosts(self):
+        """2xlarge moved into this set on 2026-08-26, deliberately.
+
+        It has exactly 16 GiB and the old `< 16` gate excluded it, so ple_bits
+        was OOM-killed on the rig's own default size. See
+        InstanceTypeTests.test_every_size_is_supported_and_the_two_smallest_need_swap.
+        """
+        for size in (SWAP_SIZE, "g5g.2xlarge"):
+            with self.subTest(instance_type=size):
+                rendered = user_data(size)
+                for fragment in ("mkswap", "swapon /swapfile", "/etc/fstab"):
+                    self.assertIn(fragment, rendered)
+                self.assertShellParses(rendered, size)
+        for size in ("g5g.4xlarge", "g5g.8xlarge", "g5g.16xlarge"):
             with self.subTest(instance_type=size):
                 self.assertNotIn("mkswap", user_data(size))
 
@@ -829,3 +852,64 @@ class ObservabilityTests(unittest.TestCase, BashSyntaxMixin):
         src = (ROOT / "server.py").read_text()
         body = src.split("async def create_g5g_instance")[1].split("@mcp.tool")[0]
         self.assertIn("AMI: `{ami_id}`", body)
+
+
+class QuantizerMemoryTests(unittest.TestCase):
+    """The load-time quantizers must not allocate the destination on top of the
+    source. Both bugs below were hard startup failures on a T4G 2026-08-26, and
+    both allocations matched their tensor byte-for-byte."""
+
+    SRC = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.SRC = (ROOT / "ports" / "gemma4" / "jax_e_model.py").read_text()
+
+    def _fn(self, name):
+        body = self.SRC.split(f"def {name}")[1]
+        return body.split("\ndef ")[0]
+
+    def test_lm_head_quantizes_on_the_host_in_chunks(self):
+        """262144 x 1536 x 4 B = 1.50 GiB, the exact allocation that failed."""
+        body = self._fn("quantize_lm_head")
+        self.assertIn('jax.devices("cpu")', body)
+        self.assertIn("rows_per_chunk", body)
+        # The upcast must apply to a CHUNK, never the whole table. Checked on
+        # executable lines only -- the comment above the fix quotes the old
+        # expression on purpose, and matching prose would pass vacuously.
+        code = "\n".join(ln for ln in body.splitlines()
+                          if not ln.lstrip().startswith("#"))
+        self.assertIn("blk = blk.astype(jnp.float32)", code)
+        self.assertNotIn("emb.astype(jnp.float32)", code)
+
+    def test_lm_head_moves_the_table_host_side_before_slicing(self):
+        # Slicing a device-resident table allocates a device buffer per chunk,
+        # which defeats the point of chunking.
+        body = self._fn("quantize_lm_head")
+        move = body.index("emb_host = jax.device_put(emb, cpu)")
+        first_slice = body.index("emb_host[start:start + rows_per_chunk]")
+        self.assertLess(move, first_slice)
+
+    def test_ple_releases_the_source_before_placing_the_copy(self):
+        """262144 x 8960 x 1 B = 2.19 GiB, the exact allocation that failed.
+
+        Popping from the returned dict frees nothing -- the caller still holds
+        the device-resident original.
+        """
+        body = self._fn("quantize_ple_table")
+        self.assertIn("source.delete()", body)
+        # Opt-in: .delete() invalidates the CALLER's array. A CPU test caught
+        # this within seconds of the first version defaulting it to on.
+        self.assertIn("if release_source:", body)
+        engine = (ROOT / "jax_engine.py").read_text()
+        self.assertIn("release_source=True", engine,
+                      "load() must opt in, or the fix does nothing in production")
+        delete_at = body.index("source.delete()")
+        place_at = body.index("q_all = jax.device_put(q_all, home)")
+        self.assertLess(delete_at, place_at,
+                        "the source must be released BEFORE the copy is placed")
+
+    def test_the_failing_allocations_match_their_tensors(self):
+        # Guards the arithmetic the comments claim, so a shape change is caught.
+        self.assertAlmostEqual(262144 * 1536 * 4 / 2**30, 1.50, places=2)
+        self.assertAlmostEqual(262144 * 8960 * 1 / 2**30, 2.19, places=2)

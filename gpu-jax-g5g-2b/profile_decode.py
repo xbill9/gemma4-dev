@@ -39,6 +39,11 @@ def parse_args():
     p.add_argument("--steps", type=int, default=20)
     p.add_argument("--logdir", default="/tmp/jaxtrace")
     p.add_argument("--top", type=int, default=25)
+    # Added 2026-08-26: int8_lm_head could not be profiled at all before, which
+    # mattered because the LM-head conversion (wrapped_convert_61) was 14.3% of
+    # decode on its own -- the single kernel this flag exists to remove.
+    p.add_argument("--int8-lm-head", action="store_true",
+                   help="Quantize the LM head to int8. NOT numerics-preserving.")
     return p.parse_args()
 
 
@@ -93,6 +98,7 @@ def main():
     engine = JaxGemmaEngine(
         model_id=args.model, kv_cache_dtype="auto", quant_mode=args.quant_mode,
         max_model_len=args.max_model_len, ple_bits=args.ple_bits,
+        int8_lm_head=args.int8_lm_head,
     )
     engine.load()
 

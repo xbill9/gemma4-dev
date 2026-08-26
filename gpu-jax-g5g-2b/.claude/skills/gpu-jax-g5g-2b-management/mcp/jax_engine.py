@@ -399,9 +399,15 @@ class JaxGemmaEngine:
             # Group by the per-layer slice width: each layer's 256-element slice
             # gets its own scale. A single row-wide scale is workable at 8 bits
             # and far too coarse at 4 (16 levels across all 8960 elements).
+            # release_source=True: free the 4.38 GiB bf16 table before placing
+            # the int8/int4 copy. Without it the two are resident together and
+            # the placement fails on a fragmented device (measured 2026-08-26:
+            # RESOURCE_EXHAUSTED allocating 2.19 GiB). Safe here because
+            # self.params is reassigned on the same line.
             self.params = quantize_ple_table(
                 self.params, bits=self.ple_bits,
-                group_size=self.config.hidden_size_per_layer_input)
+                group_size=self.config.hidden_size_per_layer_input,
+                release_source=True)
         if self.dequant_at_load:
             self.params = dequantize_params_to_dense(self.params)
             self.quant_mode = "fp16"      # weights are dense now

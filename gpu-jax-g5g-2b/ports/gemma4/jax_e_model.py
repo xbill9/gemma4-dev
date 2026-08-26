@@ -1374,7 +1374,8 @@ def dequantize_params_to_dense(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def quantize_ple_table(params: Dict[str, jax.Array], bits: int = 8,
-                       group_size: int = 0) -> Dict[str, jax.Array]:
+                       group_size: int = 0,
+                       release_source: bool = False) -> Dict[str, jax.Array]:
     """Replace the per-layer-embedding table with an int8 or int4 copy.
 
     `embed_tokens_per_layer` is [vocab, layers*D_ple] — 4.70 GB in BF16 on E2B,
@@ -1402,6 +1403,12 @@ def quantize_ple_table(params: Dict[str, jax.Array], bits: int = 8,
 
     Returns a new dict; the original is not mutated. The BF16 table is dropped,
     since nothing else uses it.
+
+    release_source=True additionally DELETES the source device buffer before
+    placing the quantized copy, so peak device memory is max(source, dest)
+    rather than source + dest. That is what makes ple_bits loadable on a 14.07 GB
+    budget -- see the comment at the device_put below. It invalidates the
+    caller's array, so it is opt-in and only `load()` passes it.
     """
     if bits not in (4, 8):
         raise ValueError(f"PLE quantization supports 4 or 8 bits, got {bits}")
@@ -1452,11 +1459,34 @@ def quantize_ple_table(params: Dict[str, jax.Array], bits: int = 8,
         s_chunks.append(scale.astype(COMPUTE_DTYPE))
 
     out = dict(params)
-    out.pop("embed_tokens_per_layer")
+    source = out.pop("embed_tokens_per_layer")
     key = "embed_tokens_per_layer_q8" if bits == 8 else "embed_tokens_per_layer_q4"
     q_all = jnp.concatenate(q_chunks, axis=0)
     s_all = jnp.concatenate(s_chunks, axis=0)
+    del q_chunks, s_chunks
     if home is not None:
+        # RELEASE THE SOURCE BEFORE PLACING THE COPY. Popping it from `out` does
+        # not free anything -- the caller's dict still references the
+        # device-resident bf16 table, so the int8 copy was being placed while
+        # 4.38 GiB of original was still on the device. MEASURED 2026-08-26 on a
+        # T4G at ple_bits=8:
+        #   RESOURCE_EXHAUSTED: Out of memory while trying to allocate 2.19GiB
+        # where 2.19 GiB = 262144 x 8960 x 1 B, the int8 output exactly. Peak was
+        # ~11.5 GB against a 14.07 GB budget, which WOULD have fit if the free
+        # space were not 66% fragmented (fragmentation 0.661, measured
+        # 2026-08-25) -- a contiguous 2.19 GiB block simply was not available.
+        #
+        # OPT-IN, because .delete() frees the buffer the CALLER still holds a
+        # reference to. `load()` passes release_source=True and immediately
+        # reassigns self.params, so the source is unreachable there -- but a
+        # caller that reuses its params dict would get "Array has been deleted",
+        # which a CPU test of this function caught within seconds of the first
+        # version defaulting it to on. Silence beats a wrong default here.
+        if release_source:
+            try:
+                source.delete()
+            except Exception:
+                pass
         q_all = jax.device_put(q_all, home)
         s_all = jax.device_put(s_all, home)
     out[key] = q_all
@@ -1505,12 +1535,44 @@ def quantize_lm_head(params: Dict[str, jax.Array], keep_bf16: bool = False) -> D
     Returns a new params dict; the original is not mutated.
     """
     emb = params["embed_tokens"]
-    amax = jnp.max(jnp.abs(emb.astype(jnp.float32)), axis=-1, keepdims=True)
-    scale = jnp.maximum(amax, 1e-8) / 127.0
-    q8 = jnp.clip(jnp.round(emb.astype(jnp.float32) / scale), -127, 127).astype(jnp.int8)
+    V, H = emb.shape
+
+    # Quantize on the HOST in row chunks, exactly as quantize_ple_table does.
+    # The previous version did `emb.astype(jnp.float32)` over the WHOLE table,
+    # twice, on the device: 262144 x 1536 x 4 B = 1.50 GiB per upcast on top of
+    # an already-resident parameter tree. MEASURED 2026-08-26 on a T4G, that is
+    # a hard startup failure --
+    #   RESOURCE_EXHAUSTED: Out of memory while trying to allocate 1.50GiB
+    #   [executable_name='jit_convert_element_type']
+    # -- so int8_lm_head could not be enabled at all. The correct pattern was
+    # already in this file, 1,200 lines up, and this function never got it.
+    cpu = jax.devices("cpu")[0]
+    src_devices = getattr(emb, "devices", lambda: set())()
+    home = next(iter(src_devices), None)
+    # Move to the host ONCE, before slicing. `emb[a:b]` is evaluated on whichever
+    # device owns emb, so slicing a device-resident table allocates a device
+    # buffer per chunk -- the same trap quantize_ple_table documents.
+    emb_host = jax.device_put(emb, cpu)
+    rows_per_chunk = max(1, (1 << 26) // (H * 4))       # ~256 MB of float32
+    q_chunks, s_chunks = [], []
+    for start in range(0, V, rows_per_chunk):
+        blk = jax.device_put(emb_host[start:start + rows_per_chunk], cpu)
+        blk = blk.astype(jnp.float32)
+        amax = jnp.max(jnp.abs(blk), axis=-1, keepdims=True)
+        sc = jnp.maximum(amax, 1e-8) / 127.0
+        q_chunks.append(jnp.clip(jnp.round(blk / sc), -127, 127).astype(jnp.int8))
+        s_chunks.append(sc)
+    q8 = jnp.concatenate(q_chunks, axis=0)
+    scale = jnp.concatenate(s_chunks, axis=0)
+    del q_chunks, s_chunks, emb_host
+
     out = dict(params)
+    scale = scale.astype(COMPUTE_DTYPE).reshape(1, 1, -1)
+    if home is not None:
+        q8 = jax.device_put(q8, home)
+        scale = jax.device_put(scale, home)
     out["embed_tokens_q8"] = q8
-    out["embed_tokens_q8_scale"] = scale.astype(COMPUTE_DTYPE).reshape(1, 1, -1)
+    out["embed_tokens_q8_scale"] = scale
     if not keep_bf16:
         pass  # input embedding lookup still needs the BF16 table
     return out

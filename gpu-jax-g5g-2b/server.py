@@ -193,7 +193,15 @@ _G5G_SIZES = {
 # stage 9.5 GiB of weights". The conclusion was right and the reason was wrong,
 # and the fix is swap rather than a bigger instance -- the same remedy
 # tpu-pytorch-inf2-2b applies for its neff load.
-_SWAP_BELOW_HOST_RAM_GB = 16
+# INCLUSIVE. g5g.2xlarge has exactly 16 GiB, and `< 16` gave it no swapfile --
+# so the rig provisioned swap for g5g.xlarge and skipped the one size where the
+# quantization path actually needs it. MEASURED 2026-08-26: `--ple-bits 8` on a
+# 2xlarge was OOM-killed by the kernel five times at 14.3 GB anon-rss under
+# Restart=on-failure, because quantize_ple_table upcasts the 4.70 GB PLE table
+# to float32 while the full parameter tree is still resident. Adding 16 GiB of
+# swap by hand stopped the kills dead. The threshold, not the remedy, was the
+# bug.
+_SWAP_AT_OR_BELOW_HOST_RAM_GB = 16
 _SWAP_GB = 16
 
 
@@ -223,8 +231,14 @@ def _host_memory_gb(instance_type: str) -> int:
 
 
 def _needs_swap(instance_type: str) -> bool:
-    """True when host RAM is too small to mmap the checkpoint without swap."""
-    return 0 < _host_memory_gb(instance_type) < _SWAP_BELOW_HOST_RAM_GB
+    """True when host RAM is too small to load the checkpoint without swap.
+
+    Two distinct pressures, both real, and the larger one decides:
+      * g5g.xlarge (8 GiB) cannot even mmap the 10.2 GB checkpoint.
+      * g5g.2xlarge (16 GiB) mmaps fine and then dies in quantize_ple_table,
+        which needs >15 GiB of host RSS.
+    """
+    return 0 < _host_memory_gb(instance_type) <= _SWAP_AT_OR_BELOW_HOST_RAM_GB
 
 
 def _validate_instance_type(instance_type: str) -> None:
