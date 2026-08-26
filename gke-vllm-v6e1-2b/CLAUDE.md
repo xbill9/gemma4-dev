@@ -486,8 +486,13 @@ measured or catalog-read — if one changes here, change it in both.
 `devto-tpu-api-vs-gce-provisioning.md` is the older rig-family article, written for two control planes and
 now a plane short.
 
-The format reference for a rig write-up — and for the order a validation pass runs in — is
-[12B Gemma 4 QAT deployment with GCE, NVIDIA L4, MCP and Antigravity CLI](https://dev.to/gde/12b-gemma-4-qat-deployment-with-gce-nvidia-l4-mcp-and-antigravity-cli-49d8):
+The format reference for a rig write-up — and for the order a validation pass runs in — is the dev.to
+series, currently
+[12B Gemma 4 with NVIDIA Blackwell 6000, QAT, MTP and Antigravity CLI](https://dev.to/gde/12b-gemma-4-deployment-with-nvidia-blackwell-6000-qat-mtp-and-antigravity-cli-3gn6):
+first-person plural, ~20 short practical sections, command-then-output throughout, medal emoji in the
+comparison tables. The lifecycle it fixes is the same one the earlier
+[GCE + L4 article](https://dev.to/gde/12b-gemma-4-qat-deployment-with-gce-nvidia-l4-mcp-and-antigravity-cli-49d8)
+uses:
 
 > environment setup → MCP server over stdio → **deploy** → **validate** (`verify_model_health`,
 > `get_system_status`, endpoint) → **benchmark** with a concurrency sweep → **cost comparison** table

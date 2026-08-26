@@ -1,312 +1,370 @@
-# One TPU chip, one Kubernetes cluster: what deploying Gemma 4 to GKE actually costs
+# Gemma 4 on GKE with Cloud TPU v6e: step by step with MCP and an Agent CLI
 
-A step-by-step deployment of Gemma 4 to Google Kubernetes Engine on a single Cloud TPU v6e chip, driven
-entirely by MCP tools — and a cost breakdown that explains why the same chip is priced at $2.97 and $1.35
-per hour depending on how you ask for it.
+This article provides a step by step deployment guide for Gemma 4 to a Google Kubernetes Engine cluster
+backed by a Cloud TPU v6e (Trillium) chip. A suite of Python MCP tools is built to simplify management of
+the vLLM hosted Gemma 4 deployment from an agent CLI.
 
-[FIGURE 1 — cover: the terminal showing `get_system_status` with the cluster, node pool, TPU node and pod
-all green. Caption: One cluster, one node, one chip, one Pod — the smallest useful shape on GKE.]
+Everything below was run end to end, twice, from an empty project. Every command and output shown is real.
 
-The deployment below is deliberately minimal: one zonal cluster, one single-host TPU node pool, one node,
-one chip, one vLLM Pod serving `google/gemma-4-E2B-it`. Small enough that every line on the bill is visible
-instead of buried in a fleet.
+[FIGURE 1 — cover: the `get_system_status` output showing cluster, node pool, TPU node, Pod and endpoint all
+green. Caption: One cluster, one node, one chip, one Pod — the smallest useful shape on GKE.]
 
-Two questions get answered on the way, and neither has an obvious answer from the GPU-on-a-VM guides:
+#### What is this project trying to Do?
 
-Does the cluster create its own TPU, or does a virtual machine have to exist first? It creates its own — and
-what it creates is still a Compute Engine VM, which turns out to matter enormously for teardown.
+We want one command per lifecycle step and no remembered command lines. The agent should provision the
+hardware, deploy the model, tell us whether it is actually serving, benchmark it, and price it.
 
-Why is on-demand capacity $2.97 per chip-hour when flex-start is $1.35 for the identical silicon? Because
-they are not the same product. The difference is measured, not assumed, further down.
+The deployment is deliberately the smallest useful shape on GKE: one zonal cluster, one single-host TPU node
+pool, one `ct6e-standard-1t` node carrying a single v6e chip, and one vLLM Pod serving
+`google/gemma-4-E2B-it`. Small enough that every line on the bill is visible and every failure has exactly
+one place to be.
 
-#### What this is trying to do
+#### Where do I start?
 
-The goal is an agent-driven deployment where every step is a tool call rather than a remembered command
-line: provision a cluster and a TPU node pool, deploy vLLM as a Kubernetes Deployment with the chip attached
-to the Pod, validate it, benchmark it with a two-dimensional sweep, and price the result from the live Cloud
-Billing Catalog rather than from a rate table that goes stale silently.
+At this point you should have a GCP project with billing enabled and Compute Engine CT6E quota in the region
+you plan to use, `gcloud` installed and authenticated, a Hugging Face token with access to Gemma 4, and the
+rig checked out from GitHub. Everything below happens inside the rig directory.
 
-This is one of three rigs that serve the identical model on the identical chip and differ only in which
-control plane provisions the hardware — the Cloud TPU API, Compute Engine, and GKE. Holding the serving
-configuration constant is what makes the provisioning path the only variable.
+#### Quota: check this before anything else
 
-#### Is a cluster even the right answer for a small model?
+The two TPU control planes meter against completely different pools, and holding one buys nothing on the
+other. Our project holds 512 v6e chips in us-east5 under the Cloud TPU API quota, and zero Compute Engine
+CT6E quota in that same region. GKE spends the Compute Engine pools.
 
-Worth asking before spending an hour, because for one chip the honest answer is often no.
+Find where the machine type is published:
 
-A single TPU chip serving a 2B-class model runs perfectly well as one VM with `docker run`. Kubernetes earns
-its keep when there is more than one replica behind an endpoint, when a bad boot has to be survived without
-a human, when a model version has to roll with no downtime, or when the rest of the application already
-lives in a cluster.
+`gcloud compute machine-types list --filter="name=ct6e-standard-1t" --format="value(zone)"`
 
-Two things push against it, and both are sharper for small models than for large ones. A TPU chip is
-allocated whole — the node advertises one chip and one Pod takes it, with no MIG-style partitioning — so the
-classic small-model argument of bin-packing a dozen services onto one accelerator simply does not apply.
-And the fixed overhead of running a cluster is proportionally worse the cheaper the accelerator: about
-$0.25 an hour regardless of what else happens, which is noise against a TPU and a third of the bill against
-a cheap GPU.
+Quota is the other half, and the two ids do not behave the same way. On-demand draws on
+`TPUS-PER-TPU-FAMILY-per-project-region`, which defaults to **zero** where unset. Spot and flex-start draw
+on `PREEMPTIBLE-TPU-V6E-per-project-region`, which defaults to **1536**. Reading only the first writes off
+regions with plenty of flex-start headroom.
 
-The counterintuitive part is that small models are the easy case for Kubernetes and large ones are the hard
-case. A model that fits in one chip scales out as replicas, which is precisely what a Deployment does well.
-A model needing eight chips spans a multi-host slice, and that needs gang scheduling and a slice that fails
-as a unit.
+And quota is a ceiling, not an allocation. Every zone we probed held 1536 chips of preemptible quota, and
+four of five had no capacity at all. A spot create is the cheap probe — it fails fast with a stockout where
+flex-start silently queues.
 
-#### Setting up
+#### Setup the Basic Environment
 
-GKE needs two client-side tools a Compute Engine deployment does not, and both fail late and confusingly
-when missing:
+GKE needs two client tools a plain VM deployment does not:
 
 `sudo apt-get install -y kubectl google-cloud-cli-gke-gcloud-auth-plugin`
 
-A preflight target checks those two plus a live gcloud token and the template renderer, and prints the
-install command rather than dying halfway through a deploy.
+Then authenticate both ways — a user credential for gcloud, and application default credentials for the
+client libraries:
 
-Zone choice here is a quota decision, not a latency one. The two control planes meter against entirely
-different pools: this project holds 512 v6e chips in us-east5 under the Cloud TPU API quota and zero
-Compute Engine CT6E quota in that same region. GKE spends the Compute Engine pools, so the cluster goes
-where the Compute Engine quota and the actual hardware overlap.
+`gcloud auth login`
 
-[FIGURE 2 — image of the `tpu.env` configuration block. Caption: The env file is configuration; the
-directory name is only documentation.]
+`gcloud auth application-default login`
 
-#### The MCP server
+Store the Hugging Face token in Secret Manager once, so it never lands in a manifest or a shell history:
 
-The server is a single Python file on FastMCP, speaking stdio — the simplest transport the SDK supports,
-where the agent CLI spawns the server and talks to it over pipes.
+`echo -n "hf_your_token" | gcloud secrets create hf-token --data-file=- --project=YOUR_PROJECT`
 
-The server's name matters more than it looks: it is the key the client registers under, and that key
-prefixes every tool. With sibling rigs loaded at once, the prefix is the only thing distinguishing a call to
-the GKE rig from a call to the Compute Engine one, so it is derived from the rig directory rather than
-typed by hand.
+Then check all of it at once:
 
-Thirty tools are exposed, covering provisioning, deployment, validation, diagnostics, measurement and
-teardown. Every subprocess call goes through one helper using an argument list rather than a shell string,
-and every tool returns markdown with an emoji status prefix, because a human reads the output through an
-agent transcript.
+`make gke-preflight`
 
-#### Provisioning: what the cluster actually builds
+That target exists because every one of those four pieces fails *late* otherwise — halfway through a deploy,
+with an error that does not name the missing piece.
 
-Two calls. The first creates a zonal cluster with a small default pool that exists only to run system
-workloads — keeping kube-dns and metrics-server off the TPU node, so a chip billed by the hour is never
-kept alive by CoreDNS after the model Pod is gone. The second creates the node pool that carries the chip.
+[FIGURE 2 — the `tpu.env` configuration block. Caption: The directory name is documentation; the env file is
+configuration, and it is committed.]
 
-[GIST 1 + FIGURE 3 — the two gcloud commands. Caption: Cluster first, then the node pool that carries the
-chip. Note what is absent from the second command.]
+A real environment variable always beats the file, so a one-off run against another zone needs no edit at
+all. And never copy a value out of the directory name into a command: v6e1 is for humans, gcloud wants
+`ct6e-standard-1t`, and that string lives in the env file.
 
-What is absent from that second command is the interesting part. There is no topology flag, and adding one
-is an error. The first attempt at this deployment passed a 1x1 topology and was refused outright: TPU
-topology cannot be specified for a single-host slice. A one-chip machine type at one node *is* the slice, so
-there is nothing to describe — the flag belongs to multi-host slices, where it says how several nodes are
-wired into one.
+#### Model Management Tool with MCP Stdio Transport
 
-The trap is that GKE then labels the node with that same 1x1 topology anyway. The value is real as a Pod
-selector and rejected as a create flag, which is why they live in two separate configuration keys.
+The MCP server is a single Python file built on FastMCP. The simplest transport the SDK supports is stdio,
+which connects a locally running process — the agent CLI spawns the server and talks to it over pipes.
 
-And then the answer to the opening question:
+`mcp = FastMCP(MCP_SERVER_NAME)`
 
-[FIGURE 4 — `gcloud compute instances list` and `instance-groups managed list` output showing the
-`ct6e-standard-1t` node and its managed instance group. Caption: The node pool is a managed instance group;
-the node is an ordinary Compute Engine VM the cluster owns.]
+The server name is not cosmetic. It is the key the client registers under, and that key prefixes every tool.
+With sibling rigs loaded at once, the prefix is the only thing telling the GKE rig's tools from the Compute
+Engine rig's, so we derive it from the directory name rather than typing it.
 
-The node pool is implemented as a managed instance group, and the node inside it carries the same machine
-type a Compute Engine deployment would pass to instance creation. Same silicon, same attachment mechanism.
-What changes is who calls create, and who owns the lifecycle.
+#### Running the Python Code
+
+Install and test before wiring anything up:
+
+`make install`
+
+`make test`
+
+The tests are offline — they mock the MCP module and the Google Cloud clients before importing the server —
+so all 48 pass without touching a cloud API. Then `make lint` runs ruff and mypy, and `make run` starts the
+server by hand once, just to watch it come up.
+
+[FIGURE 3 — the agent CLI mcp_config.json registering the server. Caption: Four lines. The registration key
+is what prefixes every tool.]
+
+#### Validation with the Agent CLI
+
+Ask the agent what it can do. The `get_help` tool renders itself from the live tool list, so it cannot go
+stale. Thirty tools come back, grouped by purpose: provisioning, deployment, validation, diagnostics,
+measurement and teardown.
+
+#### Getting Started with Gemma 4 on TPU
+
+Before spending anything, ask what it will cost. The `estimate_deployment_cost` tool reads the Cloud Billing
+Catalog live at call time — there is no rate table in this project, because a hardcoded rate is wrong
+eventually and wrong silently.
+
+[FIGURE 4 — `estimate_deployment_cost` output for on-demand. Caption: $2.97 per chip-hour, read live, with
+the warning that nothing stops the bill but teardown.]
+
+#### Create the GKE Cluster
+
+One call, and it is idempotent — run it twice and the second run says the cluster is already there.
+
+[GIST 1 + FIGURE 5 — the `gcloud container clusters create` command and its output. Caption: A zonal cluster
+with a small system pool. About nine minutes.]
+
+Two decisions in that command are worth knowing. Pin the release channel, never a version: TPU v6e needs a
+recent control plane, and any version we pin goes stale — rapid gave us 1.36.3-gke.1537000. And the small
+default pool exists only for system workloads, because a chip billed by the hour must not be kept alive by
+CoreDNS after the model Pod is gone.
+
+#### Create the TPU Node Pool
+
+This is the step that gets us a chip.
+
+[GIST 2 + FIGURE 6 — the `gcloud container node-pools create` command and its output. Caption: One
+ct6e-standard-1t node. Note what is absent from the command.]
+
+Do not add a topology flag to that command. Our first attempt did, and the API refused it outright: TPU
+topology cannot be specified for a single-host TPU slice pool. A one-chip machine type at one node *is* the
+slice — there is nothing to describe, and the flag belongs to multi-host slices.
+
+What makes it a trap rather than a typo is that GKE then labels the node with that same 1x1 topology
+anyway. The value is real as a Pod selector and rejected as a create flag, so we keep them in two separate
+configuration keys.
+
+#### What Actually Got Created
+
+Here is the part nobody tells you: the cluster created its own TPU, and what it created is a Compute Engine
+VM.
+
+[FIGURE 7 — `gcloud compute instances list` and `gcloud compute instance-groups managed list` output.
+Caption: The node pool is a managed instance group; the node is an ordinary Compute Engine VM the cluster
+owns.]
+
+The node inside that group carries the same machine type we would pass to `gcloud compute instances create`
+on a VM deployment. Same silicon, same attachment mechanism. What changed is who calls create and who owns
+the lifecycle.
 
 Three consequences follow, each of which costs an afternoon if learned the hard way. Deleting that instance
-directly is not teardown — it succeeds, and the instance group rebuilds the node within minutes under a new
-name, still billing. The node is cattle: replaced on upgrade and repair, so anything written to its disk
-vanishes at the next replacement. And the node's name is not yours to choose; across two runs of this
-deployment it came back as two different names.
+directly is not teardown — it succeeds, and the instance group rebuilds the node minutes later under a new
+name, still billing; delete the pool instead. The node is cattle, replaced on upgrade and repair, so
+anything written to its disk is gone. And we do not choose the node's name: across two runs it came back
+as two entirely different ones.
 
-One more thing that surprises people: a node reporting Ready can advertise zero chips for a window, because
-the device plugin has not finished registering. A Pod scheduled in that window fails with insufficient TPU
-resources, which reads exactly like a quota problem and is not one.
+One more surprise worth knowing before it bites: a node reporting Ready can advertise zero TPU chips for a
+window, because the device plugin has not finished registering. A Pod scheduled in that window fails with
+insufficient TPU resources, which reads exactly like a quota problem and is not one. Wait thirty seconds.
 
-#### Deploying the model
+#### Deploy The Model
 
-Three things happen that have no VM equivalent: fetch cluster credentials, materialise the Hugging Face
-token as a Kubernetes Secret, and apply the manifest.
+The `deploy_vllm` tool does three things with no VM equivalent: fetches cluster credentials, copies the
+Hugging Face token from Secret Manager into a Kubernetes Secret, and applies the manifest.
 
-[GIST 2 + FIGURE 5 — the Pod spec: nodeSelector, toleration, the TPU resource limit and the vLLM args.
-Caption: All three of the selector, the limit and the toleration are load-bearing.]
+[GIST 3 + FIGURE 8 — the Pod spec: nodeSelector, toleration, TPU resource limit, vLLM args and startup
+probe. Caption: Four things in here are load-bearing.]
 
-Drop a node selector and the Pod schedules onto the small system node and fails there, which reads as a
-model-server problem rather than a placement one. Drop the resource limit and the device plugin never
-attaches the chip. No privileged container is needed — on GKE the device plugin handles device access.
+Both node selectors are load-bearing — drop one and the Pod schedules onto the small system node and fails
+there, which reads as a model-server problem rather than a placement one. The TPU resource limit is what
+makes the device plugin attach the chip. The toleration matches a taint GKE applies automatically. And the
+startup probe budget of thirty minutes exists because the load took ten: a shorter budget gets the container
+killed and restarted forever, one ten-minute load at a time.
 
-The startup probe has to cover the entire load. Image pull, weight load and XLA precompile took ten minutes;
-a probe budget shorter than that gets the container killed and restarted forever, one load at a time.
+No privileged container is needed. On GKE the device plugin handles device access.
 
-The token never goes through a command line. Creating a Kubernetes secret from a literal argument puts the
-token in the process table for every user on the machine, so the tool writes a base64 Secret manifest to a
-private temp file and applies that instead.
+#### Checking System status
 
-#### Validating: Running is three steps weaker than serving
+[FIGURE 9 — the `get_system_status` dashboard. Caption: Five separate claims, and each can be healthy while
+the next is not.]
 
-[FIGURE 6 — the `get_system_status` dashboard output. Caption: Cluster, node pool, node, Pod and endpoint
-are five separate claims, and each can be healthy while the next is not.]
+Running is three steps weaker than serving on this path. A GKE node is Ready the moment the kubelet
+registers — before the Pod is scheduled, before the image is pulled, before the weights load, before the
+compiler runs. While it loads, `get_vllm_pod_logs` shows the actual work.
 
-A Queued Resource reached ACTIVE with a node up. A Compute Engine instance was RUNNING when the VM booted.
-A GKE node is Ready the moment the kubelet registers — before the Pod is scheduled, before the image is
-pulled, before the weights load, before the compiler runs. Only a completion is evidence, and the health
-check reports one at 0.77 seconds.
+#### Cross Check The Deployed Model
 
-The endpoint is a Service, not a machine. This is the most portable mistake from the VM guides: a GKE node
-*does* appear in the Compute Engine instance list, so reading its external IP succeeds and returns the wrong
-address. Across a full teardown and rebuild the Service came back on the same IP while the node behind it
-changed name entirely.
+Never trust one layer. Go under the tools and ask Kubernetes directly with `kubectl get pods` and
+`kubectl get svc`, then bypass Kubernetes too and ask the model server:
 
-#### Cold start: about twenty minutes
+`curl -s http://EXTERNAL_IP:8000/v1/models`
 
-Provisioning the cluster and node pool took 8 minutes 52 seconds. Applying the Deployment took 6 seconds.
-The Pod then took 11 minutes 9 seconds to answer — image pull, weight load, XLA precompile. Tearing the
-whole thing down afterwards took 6 minutes 24 seconds. Measured twice from an empty project: about twenty
-minutes from nothing to a served token, twenty-six with a teardown first.
+The endpoint is a Service, not a machine, and this is the most portable mistake from the VM guides: a GKE
+node *does* appear in the Compute Engine instance list, so reading its external IP succeeds and returns the
+wrong address. Across a full teardown and rebuild our Service came back on the same IP while the node behind
+it changed name entirely.
 
-That eleven-minute load is billed chip time on every reschedule, which is an argument against letting a
-scheduler move a model Pod around casually.
+#### Review the Model
 
-#### Benchmarking, and a dip that turned out to be real
+[FIGURE 10 — `verify_model_health` and a `query_queued_gemma4` completion. Caption: Health check at 0.77
+seconds, and the model answering a question about its own hardware.]
 
-The benchmark runs inside the serving Pod against localhost — no SSH, no second container. The load is
-TPU-bound and the client is not, so sharing the Pod's CPU does not distort it.
+One caution: use the chat endpoint, not raw completions. `/v1/completions` returns an empty completion on
+instruction-tuned models, so an empty result there is expected rather than a broken deploy.
 
-[FIGURE 7 — concurrency sweep table, 1 to 64 at 1024 input / 128 output. Caption: Aggregate throughput,
-tail latency and per-stream speed across the concurrency ladder.]
+#### How long did all that take?
 
-Aggregate output throughput climbs from 199 tokens per second at concurrency 1 to 1,744 at concurrency 16 —
-and then *falls* to 1,675 at concurrency 32, before climbing again to 2,134 at 64.
+[FIGURE 11 — the timing table: provision 8m52s, deploy 6s, load 11m09s, teardown 6m24s. Caption: About
+twenty minutes from nothing to a served token, measured twice.]
 
-That looked like noise, so each of the three points was re-run three times. Run-to-run spread came in at one
-to two tenths of a percent: 1,777 / 1,780 / 1,779 at concurrency 16, and 1,694 / 1,696 / 1,694 at 32. The
-shape reproduces. Concurrency 32 really is about four percent slower than concurrency 16 on this
-configuration.
+That eleven-minute load is billed chip time every time the Pod is rescheduled, which is a good argument
+against letting a scheduler move a model Pod around casually.
 
-The plausible explanation is TPU static-shape padding — vLLM compiles a set of batch shapes and pads to the
-nearest, so a batch straddling a bucket boundary spends compute on padding. That is a hypothesis, not a
-finding; it was not verified against the compiled shape list and is recorded as unverified. The safe
-takeaway is operational rather than causal: measure your own concurrency ladder instead of assuming it rises
-monotonically, because the arithmetic answer is wrong here.
+#### Benchmark the Model
 
-[FIGURE 8 — context sweep table, 512 to 16,384 input at concurrency 8. Caption: A 32x longer prompt costs
-2.4x more per output token and 25x the time to first token.]
+The benchmark runs vLLM's own tool inside the serving Pod against localhost — no SSH, no second container.
+The load is TPU-bound and the client is not, so sharing the Pod's CPU does not distort the numbers.
 
-Prefill dominates as context grows. Throughput falls from 1,185 tokens per second at 512-token prompts to
-487 at 16,384, while p99 time to first token goes from 35 milliseconds to 878. This is the cost nobody
-models when budgeting by output tokens alone — and note that memory is not the constraint here. The chip's
-32 GB of HBM leaves roughly 19.8 GiB for KV cache after this model's weights, so a 16K context at
-concurrency 8 sits comfortably inside the budget and still nearly halves throughput. The ceiling is time.
+[FIGURE 12 — concurrency sweep, 1 to 64 at 1024 input / 128 output. Caption: Aggregate throughput, tail
+latency and per-stream speed across the ladder.]
 
-#### What it costs, and why the same chip has three prices
+Throughput is not monotonic, and the dip is real. Concurrency 32 comes in below concurrency 16. That looked
+like noise, so we ran each of those points three more times.
 
-Every price below was read live from the Cloud Billing Catalog for europe-west4.
+[FIGURE 13 — the repeat table. Caption: 0.1 to 0.2 percent run-to-run spread. The shape reproduces.]
 
-[FIGURE 9 — the three chip rates with their catalog SKU names. Caption: On-demand $2.97, spot $1.782,
-flex-start $1.35 per chip-hour — three products, not three discounts.]
+Concurrency 32 really is about four percent slower than 16 here. The plausible cause is TPU static-shape
+padding — vLLM compiles a set of batch shapes and pads to the nearest, so a batch straddling a bucket
+boundary spends compute on padding. That is a hypothesis and we have not verified it against the compiled
+shape list; it is recorded as unverified. The operational lesson stands on its own: measure your own
+concurrency ladder, because the arithmetic answer is wrong here.
 
-On-demand at $2.97 per chip-hour starts the instant you ask, runs until you stop it, and nothing preempts
-it. You are paying for unbounded, uninterruptible, immediately available capacity.
+[FIGURE 14 — context sweep, 512 to 16,384 input at concurrency 8. Caption: A 32x longer prompt costs 2.4x
+per output token and 25x the time to first token.]
 
-Spot at $1.782 is the same hardware with the guarantee removed — reclaimable at any moment, which suits work
-that checkpoints or retries, and a serving endpoint is not naturally that.
+Prefill dominates as context grows. Memory is not the limit — the chip's 32 GB of HBM leaves roughly 19.8
+GiB for KV cache after this model's weights, so 16K at concurrency 8 sits well inside the budget and still
+nearly halves throughput. The ceiling is time.
 
-Flex-start at $1.35 is a scheduled grant through Dynamic Workload Scheduler. The request queues until
-capacity exists, then runs uninterrupted for a bounded window. You give up "start now" and get "cheap and
-uninterrupted once started."
+#### Cost Breakdowns
 
-That last one was a catalog number rather than a tested path, so it was tested. A flex-start node pool
-created alongside the on-demand one came up with *zero nodes* — on GKE, flex-start is an autoscaling shape
-rather than a fixed pool, so an idle flex-start pool costs nothing at all. Scaling the Deployment to two
-replicas left the second Pod pending, and four minutes eighteen seconds later the scheduler had granted a
-chip: a node joined, the Pod landed on it, and ten minutes after that the second replica was serving.
+Every price here was read live from the Cloud Billing Catalog for europe-west4.
 
-The entire 55 percent saving costs roughly four minutes of queue. For anything bursty, that scale-from-zero
-behaviour is worth more than the rate cut — an on-demand pool bills from the moment it exists, a flex-start
-pool from the moment a Pod needs one.
+[FIGURE 15 — the three chip rates with catalog SKU names and medal ranking. Caption: Flex-start $1.35, spot
+$1.782, on-demand $2.97 per chip-hour — three products, not three discounts.]
 
-[FIGURE 10 — the overhead table: e2-standard-4 system node $0.1475/h, zonal cluster fee $0.10/h, total
-$0.2475/h. Caption: Two line items with no VM equivalent, and they do not scale down.]
+On-demand starts the instant we ask, runs unbounded, and nothing preempts it. Spot is the same hardware with
+the guarantee removed. Flex-start is a scheduled grant: the request queues until capacity exists, then runs
+uninterrupted for a bounded window.
 
-The bill is not only the chip. A system node and a cluster management fee add about twenty-five cents an
-hour whatever the provisioning model — 7.7 percent of an on-demand bill, but 15.5 percent of a flex-start
-one. The cheaper the capacity, the more the fixed cost of running Kubernetes matters, and that is the real
-cost argument against a cluster for small deployments. Google's free tier credits cover roughly one zonal
-cluster's fee; the system node is not covered.
+We tested the cheap one rather than quoting it. A flex-start node pool came up with zero nodes — on GKE
+flex-start is an autoscaling shape rather than a fixed pool, so an idle flex-start pool costs nothing at
+all. We scaled the Deployment to two replicas, the second Pod went pending, and four minutes eighteen
+seconds later the scheduler granted a chip: a node joined, the Pod landed, and ten minutes after that the
+replica was serving. The entire fifty-five percent saving costs about four minutes of queue.
 
-It is also the line nobody budgets. With the TPU node pool deleted, the cluster and its system node still
-bill about $181 a month for an empty cluster.
+[FIGURE 16 — the overhead table: system node $0.1475/h, cluster fee $0.10/h, total $0.2475/h. Caption: Two
+line items with no VM equivalent, and they do not scale down.]
 
-[FIGURE 11 — cost per million output tokens: concurrency 1/8/16/64 across on-demand, spot and flex-start.
-Caption: $4.48 to $0.21 per million output tokens on identical hardware.]
+The overhead is 7.7 percent of an on-demand bill but 15.5 percent of a flex-start one. The cheaper the
+capacity, the more the fixed cost of running Kubernetes matters — that, and not the cluster fee in
+isolation, is the real cost argument against a cluster for a small deployment. Google's free tier credits
+cover roughly one zonal cluster's fee; the system node is not covered.
 
-Putting the two together produces the number that matters. At concurrency 1 on on-demand capacity, a million
-output tokens costs $4.48. At concurrency 64 on flex-start, the same million costs $0.21.
+[FIGURE 17 — all-in hourly and monthly by provisioning model, with medals. Caption: $1,166 to $2,349 a
+month for the same chip serving the same model.]
 
-Concurrency divides the unit cost by 10.7. Procurement divides it by 2.0. Together they are a factor of 21 —
-on identical silicon, running the identical model. A deployment serving one request at a time on on-demand
-capacity is paying twenty-one times the achievable rate, and the trade it is buying is visible in the sweep:
-at concurrency 64 each caller sees 35 tokens per second instead of 203.
+[FIGURE 18 — cost per million output tokens across concurrency and provisioning model. Caption: $4.48 to
+$0.21 per million output tokens on identical hardware.]
 
-And nothing here stops billing on its own. A Compute Engine instance can carry a maximum run duration and
-delete itself. A node pool has no run bound at all — not even under flex-start, where the setting caps how
-long capacity is granted, not how long it is billed. Deleting the pool is the only thing that stops the
-meter.
+Concurrency is worth more than procurement. One stream to sixty-four divides unit cost by 10.7; on-demand to
+flex-start divides it by 2.0. Both together is a factor of 21, on identical silicon running the identical
+model. The trade is visible in the sweep: at concurrency 64 each caller sees 35 tokens per second instead of
+203.
 
-#### Five things that broke, and what they have in common
+And the line nobody budgets — with the TPU node pool deleted, the cluster and its system node still bill
+about $181 a month for an empty cluster.
 
-Every one was a correct habit imported from the Compute Engine version of this deployment.
+#### Tearing It Down
 
-A topology flag that a single-host slice refuses, while the label it sets appears on the node anyway. A
-secrets call without an explicit project, which silently resolved to a stale default project and failed with
-a permission error naming a project that appears nowhere in the deployment. A dollar sign in a template
+Nothing here stops billing on its own. A Compute Engine instance can carry a maximum run duration and delete
+itself. A node pool has no run bound at all — not even under flex-start, where the setting caps how long
+capacity is granted, not how long it is billed.
+
+Release the chip and keep the cluster:
+
+`make destroy`
+
+Or take it all:
+
+`make destroy-cluster`
+
+The same two are available as `destroy_tpu_node_pool` and `destroy_gke_cluster` from the agent.
+
+#### Five things that broke, and what they had in common
+
+Every one was a correct habit imported from the Compute Engine version of this deployment. A topology flag
+that a single-host slice refuses, while the label it sets appears on the node anyway. A secrets call without
+an explicit project, which silently resolved to a stale default project. A dollar sign in a template
 comment, tolerated by one renderer and fatal to the other, so the shell path worked and the tool path did
 not. A vocabulary drift between scripts and tools that only a test caught. And a cost tool that confidently
 repeated the VM's story about self-terminating capacity — a wrong statement about money, in the one tool
 written to avoid exactly that.
 
-The defence that worked was not more careful reading. It was a test that greps the entire server for the old
-control plane's commands rather than checking one function, because an earlier version of this project
-asserted it had migrated and verified that claim on a single call path — while four tools quietly kept using
-the old one.
+The defence that worked was not more careful reading. It was a test that greps the whole server module for
+the old control plane's commands rather than checking one function, because an earlier version of this
+project asserted it had migrated and verified that claim on a single call path — while four tools quietly
+kept using the old one.
 
-#### Conclusion
+#### Summary
 
-The deployment validates end to end: provision, deploy, validate, benchmark, price — each step a tool call,
-each result checked against the live system rather than against the previous step's assumptions.
+The strategy for using MCP for Gemma 4 TPU deployment on GKE was validated with an incremental step by step
+approach. A minimal stdio transport MCP server was started from Python source, registered with an agent CLI
+in the same local environment, and then used to provision a cluster, attach a TPU node pool, deploy vLLM,
+validate the endpoint, benchmark it and price it — each step checked against the live system rather than
+against the previous step's assumptions.
 
-A single-chip TPU deployment on GKE works and costs about twenty minutes of cold start. The cluster
-provisions its own TPU as a Compute Engine VM inside a managed instance group it owns and you do not.
-Flex-start is the default worth reaching for on bounded work — 55 percent off the chip rate for a four-minute
-queue, with a pool that costs nothing while idle. And concurrency beats procurement by five to one as a cost
-lever, provided the latency budget can absorb it.
+Having run it twice end to end: a single-chip TPU deployment on GKE takes about twenty minutes from nothing
+to a served token. The cluster provisions its own TPU as a Compute Engine VM inside a managed instance group
+it owns and we do not, so deleting that VM is not teardown and deleting the pool is. Flex-start is the
+default worth reaching for on bounded work — fifty-five percent off the chip rate for a four-minute queue,
+with a pool that costs nothing while idle. And concurrency beats procurement as a cost lever by five to one,
+provided the latency budget can absorb it.
 
-For one small model with one replica, a VM remains the simpler answer, and the cost table above says so.
-Kubernetes earns the overhead when there are replicas to schedule, versions to roll, or an application
-already living in the cluster — and when it does, the deployment above is the whole of it.
+For one small model with one replica, a plain VM remains the simpler answer and the cost tables above say
+so. Kubernetes earns its overhead when there are replicas to schedule, versions to roll, or an application
+already living in the cluster. When it does, the twenty minutes above is the whole of it.
 
 ---
 
 ## Assets to render before importing
 
-Medium's importer drops markdown tables entirely and flattens multi-line code blocks, so every one below has
-to be an image. Prose above is written to carry the argument if a reader skims the figures.
+Medium's importer drops markdown tables entirely and flattens multi-line code blocks, so each item below has
+to be an image. **Single-line commands are left as real code blocks** — those import fine. The prose is
+written to carry the argument if a reader skims every figure.
 
 | Asset | Type | Source |
 | --- | --- | --- |
-| FIGURE 1 | screenshot | `get_system_status` output — **first image in the body becomes the cover** |
+| FIGURE 1 | screenshot | `get_system_status` — **first image in the body becomes the cover** |
 | FIGURE 2 | code image | the `tpu.env` GKE block |
-| FIGURE 3 + GIST 1 | code image + gist | `clusters create` and `node-pools create` commands |
-| FIGURE 4 | code image | `compute instances list` + `instance-groups managed list` |
-| FIGURE 5 + GIST 2 | code image + gist | the Pod spec from `gke/vllm-gemma4.yaml.tmpl` |
-| FIGURE 6 | screenshot | `get_system_status` dashboard |
-| FIGURE 7 | table image | concurrency sweep, 1–64 |
-| FIGURE 8 | table image | context sweep, 512–16,384 |
-| FIGURE 9 | table image | the three chip rates + SKU names |
-| FIGURE 10 | table image | overhead breakdown |
-| FIGURE 11 | table image | $/M output tokens × provisioning model |
+| FIGURE 3 | code image | `mcp_config.json` |
+| FIGURE 4 | screenshot | `estimate_deployment_cost` output |
+| FIGURE 5 + GIST 1 | code image + gist | `clusters create` command and output |
+| FIGURE 6 + GIST 2 | code image + gist | `node-pools create` command and output |
+| FIGURE 7 | code image | `compute instances list` + `instance-groups managed list` |
+| FIGURE 8 + GIST 3 | code image + gist | the Pod spec from the manifest template |
+| FIGURE 9 | screenshot | `get_system_status` dashboard |
+| FIGURE 10 | screenshot | `verify_model_health` + a completion |
+| FIGURE 11 | table image | timing table |
+| FIGURE 12 | table image | concurrency sweep 1–64 |
+| FIGURE 13 | table image | repeat runs at c=16/32/64 |
+| FIGURE 14 | table image | context sweep 512–16,384 |
+| FIGURE 15 | table image | three chip rates + SKUs |
+| FIGURE 16 | table image | overhead breakdown |
+| FIGURE 17 | table image | all-in hourly and monthly |
+| FIGURE 18 | table image | $/M output tokens |
 
-Import rules that cost a wasted import each if forgotten: captions must be plain text with no links (a link
-inside a figcaption makes Medium drop the whole figure silently); the importer caches by URL and ignores
-query strings, so the staged page needs a content-addressed filename; and any canonical link tag must be
-stripped from the copy handed to the importer, or Medium serves the canonical URL's cached copy instead.
-All headings here are `####` because Medium renders `#` and `##` identically as its one big heading size.
+Three import rules that each cost a wasted import if forgotten: a link inside a figcaption makes Medium drop
+the whole figure silently, so captions must be plain text; the importer caches by URL and ignores query
+strings, so the staged page needs a content-addressed filename; and any canonical link tag must be stripped
+from the copy handed to the importer, or Medium serves the canonical URL's cached copy instead. All headings
+are `####` because Medium renders `#` and `##` identically as its single big heading size.
