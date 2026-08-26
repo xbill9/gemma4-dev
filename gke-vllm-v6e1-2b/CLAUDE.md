@@ -503,6 +503,35 @@ port rather than inventing `deploy_to_gke`. A validation run that stops at "the 
 pass: finish with the benchmark and the cost table, so the result is comparable to the sibling write-ups
 instead of a fresh invention.
 
+## Publishing
+
+**dev.to**: front matter with `published: false`, then `./publish-devto.sh [article.md]`. The key comes from
+`$DEV_TO_API_KEY` or `~/.devto.key` and is never passed on the command line. The draft for this rig is
+id 4489562.
+
+**Medium**: `python3 to_medium.py IN.md OUT.md` first — Medium renders **no** markdown tables at all, so the
+converter turns each one into a space-aligned fenced block, which its editor shows in monospace with the
+columns intact. That is the repo's answer and it beats rendering tables as images: nothing to generate, and
+the numbers stay selectable. `pandoc -s -o OUT.html OUT.md` renders the paste source.
+
+Then the part that is genuinely fiddly, written up in `publish-medium-clipboard.html`:
+
+- **Medium has no drafts API**, and the editor rejects synthetic paste events.
+- **`execCommand('insertHTML')` looks like it works and does not.** The text lands in `innerText` and React
+  re-renders over it — a screenshot showed an empty editor while `innerText` still reported the content.
+  **Screenshot before believing the DOM on Medium.**
+- **A real `ctrl+v` pastes, but a real `ctrl+c` does not write the OS clipboard** through browser control,
+  and `xclip`/`wl-copy` need a resident owner process that gets killed.
+- What works: serve the rig over `python3 -m http.server 8899`, open
+  `publish-medium-clipboard.html`, and **click its button** — a genuine click is the user gesture
+  `navigator.clipboard.write()` requires. Then `ctrl+v` into a new story. **Confirm the button reported
+  "COPIED n chars" before pasting**: the first attempt here pasted the machine's pre-existing clipboard
+  contents into the draft.
+
+The emoji substitution in `to_medium.py` is not cosmetic — 🥇🥈🥉 are double-width, so a medal in a cell
+throws every column after it out of alignment, which is the one thing the fenced-block treatment exists to
+preserve. They stay on the dev.to side.
+
 ## Git
 
 The git root is the **parent**, `/home/xbill/gemma4-dev` (`xbill9/gemma4-dev`). `git add .` from here stages

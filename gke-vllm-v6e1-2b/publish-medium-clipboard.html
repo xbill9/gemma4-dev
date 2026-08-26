@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Copy article to clipboard</title>
+<style>body{font:16px system-ui;padding:40px} button{font-size:22px;padding:16px 28px;cursor:pointer}
+#s{margin-top:20px;font-size:18px}</style>
+<h1>Copy the Medium article to the clipboard</h1>
+<!--
+  Why this exists. Medium has no drafts API, and getting an article in from an agent is
+  harder than it looks. Four mechanisms were tried against the live editor on 2026-08-25:
+
+    synthetic paste ClipboardEvent   rejected — the editor ignores untrusted events
+    execCommand('insertHTML')        appears in innerText, then React re-renders over it.
+                                     A screenshot showed an empty editor while innerText
+                                     still reported the text. Do not trust innerText here.
+    fetch() from the Medium page     blocked by CSP for every cross-origin URL, localhost
+                                     and raw.githubusercontent alike
+    xclip / wl-copy from the shell   the clipboard owner must stay resident; the process
+                                     gets killed and the clipboard reverts
+
+  What works: a real ctrl+v keystroke pastes fine, but a real ctrl+c does NOT write the OS
+  clipboard when it comes from browser automation. So the copy has to happen inside a page,
+  and navigator.clipboard.write() needs a user gesture — which a genuine click through
+  browser control provides.
+
+  Usage:
+    python3 -m http.server 8899        # from the rig directory
+    open http://127.0.0.1:8899/publish-medium-clipboard.html
+    click the button, wait for "COPIED n chars", then ctrl+v into a Medium new-story editor
+
+  Verify the button reported success BEFORE pasting. The first attempt here pasted whatever
+  was already on the system clipboard into the draft.
+-->
+<p>Loads the rendered article and puts it on the clipboard as <code>text/html</code>.</p>
+<button id="b">Copy article HTML</button>
+<div id="s">idle</div>
+<script>
+const s = document.getElementById('s');
+document.getElementById('b').addEventListener('click', async () => {
+  try {
+    s.textContent = 'fetching…';
+    const res = await fetch('/devto-gke-gemma4-v6e1-step-by-step-medium.html');
+    const raw = await res.text();
+    const doc = new DOMParser().parseFromString(raw, 'text/html');
+    const header = doc.querySelector('body > header'); if (header) header.remove();
+    const html = doc.body.innerHTML;
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], {type: 'text/html'}),
+      'text/plain': new Blob([doc.body.innerText], {type: 'text/plain'})
+    })]);
+    s.textContent = 'COPIED ' + html.length + ' chars of text/html';
+  } catch (e) { s.textContent = 'FAILED: ' + e.name + ' ' + e.message; }
+});
+</script>
