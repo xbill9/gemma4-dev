@@ -92,7 +92,7 @@ JAX_PORT = int(os.getenv("JAX_PORT", "8000"))
 DTYPE = os.getenv("DTYPE", "float16")
 KV_CACHE_DTYPE = os.getenv("KV_CACHE_DTYPE", "auto")
 QUANT_MODE = os.getenv("QUANT_MODE", "fp16")
-MAX_MODEL_LEN = int(os.getenv("MAX_MODEL_LEN", "8192"))
+MAX_MODEL_LEN = int(os.getenv("MAX_MODEL_LEN", "4096"))
 MAX_NUM_SEQS = int(os.getenv("MAX_NUM_SEQS", "1"))
 
 # Quantisation knobs the engine has always supported and this rig could not reach:
@@ -109,8 +109,8 @@ MAX_NUM_SEQS = int(os.getenv("MAX_NUM_SEQS", "1"))
 # is the unquantised PLE table at 4.698 GB, which is close but not equal. What is
 # certain is the remedy: ple_bits=4 shrinks that table 4x (measured saving
 # 3.505 GB) and the pair then works, so treat them as a pair on this chip.
-PLE_BITS = int(os.getenv("PLE_BITS", "0"))
-INT8_LM_HEAD = os.getenv("INT8_LM_HEAD", "").lower() in ("1", "true", "yes")
+PLE_BITS = int(os.getenv("PLE_BITS", "4"))
+INT8_LM_HEAD = os.getenv("INT8_LM_HEAD", "1").lower() in ("1", "true", "yes")
 
 # Prefill temporaries are LINEAR in the prompt tokens admitted in one pass, a flat
 # ~2.13 MB/token (jax_engine). One-shot prefill therefore OOMs at

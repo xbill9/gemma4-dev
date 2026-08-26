@@ -1,110 +1,113 @@
-# gpu-vllm-g5g-2b
+# gpu-jax-g5g-2b
 
-Serve **`google/gemma-4-E2B-it`** with **vLLM** on **AWS EC2 G5g** — an AWS Graviton2
+Serve **`google/gemma-4-E2B-it`** with **pure JAX** on **AWS EC2 G5g** — an AWS Graviton2
 (64-bit Arm) host paired with an **NVIDIA T4G Tensor Core** GPU.
 
+"Pure JAX" is literal: no PyTorch, no torch_xla, no vLLM. The engine is this repo's own
+Gemma 4 port (`ports/gemma4/`) driven by `jax_engine.py` behind an OpenAI-compatible FastAPI
+server (`jax_openai_server.py`), run under **systemd — not docker**.
+
 The rig ships a single-file FastMCP server exposing a devops agent that provisions G5g
-capacity with boto3, brings up the model server, and does SRE diagnostics against the
+capacity with boto3, ships the serving payload over SSM, and does SRE diagnostics against the
 endpoint.
 
 | | |
 | --- | --- |
 | Model | `google/gemma-4-E2B-it` (reference bf16 release — no encoding slot in the name) |
-| Runtime | vLLM, OpenAI-compatible API on `:8000` |
+| Runtime | pure JAX + XLA-GPU, OpenAI-compatible API on `:8000` |
 | Host | AWS Graviton2, `aarch64` |
-| GPU | NVIDIA T4G — Turing, **SM 7.5**, 16 GB |
+| GPU | NVIDIA T4G — Turing, **SM 7.5**, **15360 MiB measured** (not the nominal 16 GB) |
 | Default size | `g5g.2xlarge` (1 GPU, 8 vCPU, 16 GiB RAM) |
 | Region | `us-east-1` |
+| Measured | **13.10 tok/s** decode at the current default |
 
 Authoritative values live in [`tpu.env`](tpu.env). The directory name describes; the env
 file decides.
 
-## Read this before deploying
+## Why this exists next to `gpu-vllm-g5g-2b`
 
-**No prebuilt CUDA artifact covers aarch64 *and* SM 7.5 at once.** `vllm/vllm-openai:v0.27.1`
-publishes both platforms, and the arch lists differ in exactly the one place that matters:
+Identical hardware, different runtime, and **the runtime is the whole point.** The vLLM path
+reaches a served token only through a ~67-minute from-source build, a CUDA toolkit the DLAMI
+does not ship, a Rust toolchain, and an **unlanded patch to Triton's attention kernel** that
+has to be reapplied after every upgrade — because Gemma 4's heterogeneous head dims (sliding
+256, global 512) force `TRITON_ATTN`, whose 512-wide tile wants ~96 KiB of shared memory
+against Turing's 64 KiB ceiling.
 
-| Manifest | `TORCH_CUDA_ARCH_LIST` | SM 7.5? |
-| --- | --- | :---: |
-| `linux/amd64` | `7.5 8.0 8.6 8.9 9.0 10.0 12.0` | **yes** |
-| `linux/arm64` | `8.0 8.7 8.9 9.0 10.0 11.0 12.0` | **no** |
+JAX sidesteps all four: pip supplies CUDA so there is **no build**, no toolkit and no Rust,
+the plugin's cubins already cover SM 7.5, and attention is ordinary XLA rather than a
+hand-tiled Triton kernel — so there is no per-block shared-memory ceiling in the attention
+path and no patch to carry.
 
-The arm64 list targets the ARM+NVIDIA parts that actually ship — A100, Jetson Orin, GH200,
-Blackwell. T4G is not among them, and vLLM's Dockerfile adds no `+PTX`, so there is no JIT
-fallback. Deploying the published image gives `no kernel image is available for execution on
-the device`.
+`docs/turing-aarch64-gap.md` is the vLLM-side write-up and is **measured**; it is kept here
+because it is the reason this rig was built.
 
-So this rig **builds vLLM from source for SM 7.5 on the instance** (`serving='build'`, the
-default), which takes hours on a Graviton2. Full write-up, reproduction command, and the one
-layer still unverified: [`docs/turing-aarch64-gap.md`](docs/turing-aarch64-gap.md).
+## What JAX does not sidestep
 
-**Start with `verify_gpu_arch`.** It answers in minutes what the build path takes hours to
-discover.
+The same 64 KiB ceiling bites elsewhere. The fused **W4A16 Pallas kernel** is tiled for TPU
+VMEM (16 MB per core) and needs **550 KiB – 1.1 MiB per block** at this model's shapes. On
+GPU, Pallas lowers through Triton and those tiles become shared memory, so the kernel cannot
+run. `check_w4a16_fits_scoped_memory()` computes the requirement and **raises at startup with
+the arithmetic attached**, rather than dying as an `OutOfResources` at the first token.
 
-## Turing constraints
+So this rig serves the **dense reference checkpoint** at float16, deliberately not the
+`-qat-w4a16-ct` export the TPU JAX rig serves — and the rig name therefore carries no
+encoding slot.
 
-T4G is Turing, not Ada. It has **no bf16 and no fp8**. The `gpu-vllm-l4-*` sibling rigs and
-the legacy `~/gemma4-tips-aws` tree hardcode `--dtype bfloat16` and `--kv-cache-dtype fp8`;
-both are wrong here, and the first is a hard failure rather than a slow path. This rig uses
-`--dtype float16`, `--kv-cache-dtype auto`, and the `XFORMERS` attention backend.
+## Turing is not L4, and it is not v6e
 
-E2B fits comfortably regardless: `MODELS.md` puts it at 9.5 GiB of weights (8.97 measured)
-against 16 GB of GPU memory, leaving roughly 4.5 GiB for KV at 18 KiB/token.
+**Turing has no bf16 and no fp8.** Do not copy a flag from either lineage.
 
-## Instance sizes
+| | TPU v6e-1 | L4 (SM 8.9) | this rig (SM 7.5) |
+| --- | --- | --- | --- |
+| compute dtype | `bfloat16` | `bfloat16` | **`float16`** |
+| KV cache dtype | `bf16`/`fp8` | `fp8` | **`auto` → float16** |
+| fused W4A16 Pallas | yes | — | **refused at startup** |
 
-| Size | GPUs | GPU mem | vCPU | RAM | |
-| --- | --- | --- | --- | --- | --- |
-| `g5g.xlarge` | 1 | 16 GB | 4 | 8 GB | **rejected** — cannot stage 9.5 GiB of weights |
-| `g5g.2xlarge` | 1 | 16 GB | 8 | 16 GB | default |
-| `g5g.4xlarge` | 1 | 16 GB | 16 | 32 GB | |
-| `g5g.8xlarge` | 1 | 16 GB | 32 | 64 GB | |
-| `g5g.16xlarge` | 2 | 32 GB | 64 | 128 GB | `--tensor-parallel-size 2` |
-| `g5g.metal` | 2 | 32 GB | 64 | 128 GB | `--tensor-parallel-size 2` |
+The **device** decides, not `tpu.env`: `jax_e_model.py` reads the live compute capability and
+picks `float16` below SM 8.0. bfloat16 does not fail here, it **emulates** through fp32 — so
+it gets a warning; fp8 is refused outright.
 
-## Setup
-
-```bash
-./init.sh                        # verify AWS identity, install deps, register the MCP server
-```
-
-or, to register into another project:
+## Quickstart
 
 ```bash
-make init TARGET=/path/to/project ARGS='--region us-east-1'
+pip install -r requirements.txt          # control plane only
+python3 -m unittest discover -s tests -v # 105 tests, fully offline
 ```
 
-Then restart Claude Code and check `gpu-vllm-g5g-2b` under `/mcp`.
+Then, through the MCP tools (`mcp__gpu-jax-g5g-2b__…`):
 
-## Tools
+```
+create_g5g_instance → get_install_progress → verify_gpu_arch → deploy_jax_server
+                    → get_jax_logs → verify_model_health → query_model → get_metrics
+```
 
-| Tool | |
+There is **no `make deploy`** on purpose: provisioning resolves an arm64 GPU DLAMI at launch
+time, and a Makefile would have to hardcode one.
+
+**Always `make skill` before `deploy_jax_server`** — the deploy ships the *skill snapshot*,
+not the working tree, and the deploy output now prints the payload root and build id so a
+stale deploy is visible in one line.
+
+## Things that will bite you
+
+- **Warm up at the shape you measure.** `max_new_tokens` is a `static_argnames` entry, so
+  `(bucket, max_tokens)` is the compiled shape. Cold measured 18.77 s against 4.35 s warm for
+  the same request.
+- **`MAX_MODEL_LEN` is 4096 and that is the honest number.** 4,105 prompt tokens serve; 5,120
+  fails on a prefill transient. It was 8192 until 2026-08-26.
+- **The AMI must be arm64 *and* carry the NVIDIA driver.** AWS also ships ARM64 DLAMIs built
+  for Graviton CPU inference; they boot fine here and simply have no GPU. Never hardcode an
+  AMI id.
+- **`g5g.xlarge` and `g5g.2xlarge` both need a swapfile**, which `_user_data` provisions.
+- **Two GPUs on `16xlarge`/`metal` do nothing** — the engine is single-device.
+
+## Documentation
+
+| File | What |
 | --- | --- |
-| `verify_gpu_arch` | **run this first** — device capability, torch arch list, real matmul |
-| `get_deployment_config` | cloud-init + CLI launch command, changes nothing |
-| `create_g5g_instance` | launch one tagged G5g on the latest arm64 DLAMI (spot by default) |
-| `get_build_progress` | tail the from-source SM 7.5 build |
-| `list_g5g_instances` / `start_` / `stop_` / `terminate_` | lifecycle |
-| `get_endpoint` / `verify_model_health` / `query_model` | endpoint and serving checks |
-| `get_vllm_logs` | container logs over SSM |
-| `check_g5g_quotas` | G-family on-demand and spot vCPU quotas |
-| `save_hf_token` | store the HF token in Secrets Manager |
-| `get_help` | resolved config and the constraints behind it |
-
-Provisioning needs explicit subnet, security-group, and instance-profile ids — the rig
-creates no network or IAM policy of its own. Remote administration goes over SSM Run
-Command, so no inbound SSH rule and no key pair are required.
-
-## Development
-
-```bash
-make test     # offline unittest suite — no AWS, no network, no GPU
-make lint     # ruff + bash -n
-make skill    # regenerate the skill snapshots (never hand-edit them)
-```
-
-## Status
-
-**Nothing has been provisioned and this rig carries no measurements.** `benchmarks/` holds
-the synced schema and README only. The L4 artifacts that came with the directory it was
-scaffolded from were deleted rather than left to be misattributed to T4G hardware.
+| `CLAUDE.md` | authoritative working notes for this rig |
+| `docs/turing-aarch64-gap.md` | why the vLLM path is hard here (measured) |
+| `docs/larger-models-on-t4g.md` | how large a model this rig will serve |
+| `docs/bf16-weights-on-turing.md` | the dtype tax: 87% of decode |
+| `docs/padding-window-eviction.md` | a fixed silent-correctness bug in the shared port |
+| `benchmarks/` | every measurement, schema-validated |

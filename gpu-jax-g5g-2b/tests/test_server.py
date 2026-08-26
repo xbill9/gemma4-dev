@@ -591,6 +591,13 @@ class RepoHygieneTests(BashSyntaxMixin, unittest.TestCase):
         self.assertEqual(
             int(values["TENSOR_PARALLEL_SIZE"]), server._gpu_count(server.INSTANCE_TYPE)
         )
+        # Booleans are spelled as a string in the env file and a bool in the
+        # server, so they need their own comparison rather than being skipped --
+        # INT8_LM_HEAD went from off to on on 2026-08-26 and nothing was
+        # asserting the two agreed.
+        self.assertEqual(
+            values["INT8_LM_HEAD"].lower() in ("1", "true", "yes"), server.INT8_LM_HEAD
+        )
 
     def test_no_vllm_config_survives(self):
         # This rig was forked from the vLLM one. A leftover VLLM_* key would be

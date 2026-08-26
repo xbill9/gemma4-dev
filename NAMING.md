@@ -358,6 +358,7 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-jax-v6e1-26b-q4_0` | TPU | JAX | v6e-1 | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | `q4_0` — **artifact rig**, see below |
 | `~/gemma4-dev/tpu-jax-v6e1-31b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-31B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-g5g-2b` | **EC2 G5g** (Graviton2 host) | vLLM | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — hardware slot is the instance family, not the GPU SKU; carve-out below |
+| `~/gemma4-dev/gpu-jax-g5g-2b` | **EC2 G5g** (Graviton2 host) | pure JAX | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — same carve-out as the vLLM sibling; serves the dense reference build, so no encoding slot |
 | `~/gemma4-dev/gpu-vllm-l4-2b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-4b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-12b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
@@ -462,7 +463,7 @@ misattributed at once.
 
 ### `g5g` — the one case where a family name beats the GPU SKU
 
-`gpu-vllm-g5g-2b` (added 2026-08-12) is the first `gpu` rig that is a **serving** rig rather than an
+`gpu-vllm-g5g-2b` (added 2026-08-12) and `gpu-jax-g5g-2b` (added 2026-08-18, same hardware and the same carve-out) are the first `gpu` rigs that is a **serving** rig rather than an
 artifact rig, and the first whose hardware is not an L4. Its hardware slot is the **EC2 instance
 family**, which every other rule in this file argues against. This is a deliberate carve-out, decided
 after both readings were written out; **do not "correct" it back to `t4g`.**

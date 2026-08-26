@@ -49,6 +49,7 @@ they came from. See [`NAMING.md`](NAMING.md#artifact-rigs--a-rig-that-serves-not
 | [`gpu-vllm-l4-12b-w4a16`](gpu-vllm-l4-12b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-12B-it-qat-w4a16-ct` | Four grids — Cloud Run, GCE, EC2, and an MTP build |
 | [`gpu-vllm-l4-26b-w4a16`](gpu-vllm-l4-26b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-26B-A4B-it-qat-w4a16-ct` | **That Hub id does not exist** — the reports name a local mount; see the rig |
 | [`gpu-vllm-l4-31b-w4a16`](gpu-vllm-l4-31b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-31B-it-qat-w4a16-ct` | At bf16 the 31B leaves **0 GB** for KV on an L4 |
+| [`gpu-jax-g5g-2b`](gpu-jax-g5g-2b/) | pure JAX | g5g (Graviton2 + NVIDIA T4G, Turing SM 7.5) | `gemma-4-E2B-it` | Same silicon as the vLLM G5g rig, different runtime: pip supplies CUDA, so no build, no toolkit, no Triton patch. Serves the dense reference build — the fused W4A16 Pallas kernel cannot fit Turing shared memory and is refused at startup |
 
 The five `gpu-vllm-l4-*` rigs were migrated from `~/gemma4-tips` on 2026-08-07. That tree duplicated
 its artifacts heavily — **82 report files, 20 unique**, with directory names that misattribute models

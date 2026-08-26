@@ -1889,8 +1889,18 @@ class HardwareProfile:
     #: real positions), so this is defence in depth rather than the whole remedy.
     #: Cost is one extra compile per newly seen bucket, amortised by the persistent
     #: compilation cache.
+    #: MEASURED 2026-08-25: prefill is linear in the PADDED BUCKET, not in the
+    #: real prompt -- prefill_ms = 1.478 * bucket - 101, R^2 = 0.997. So every
+    #: padded token is paid for at full price. The old ladder jumped 128 -> 256
+    #: -> 384, which put a 137-token prompt in a 256 bucket: 119 tokens of
+    #: padding, ~39% of that request's prefill spent on nothing.
+    #:
+    #: 32-steps below 512 cut worst-case padding there from 127 to 31. Above 512
+    #: the 128-step is kept: padding is proportionally small and each new bucket
+    #: costs a compile. The ceiling on worst-case padding is still what keeps
+    #: pad_len < sliding_window (512) and the eviction failure unreachable.
     static_sequence_buckets: Tuple[int, ...] = (
-        (64, 128, 256) + tuple(range(384, 16384 + 1, 128))
+        tuple(range(32, 512, 32)) + tuple(range(512, 16384 + 1, 128))
     )
 
     @classmethod
