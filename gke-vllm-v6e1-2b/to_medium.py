@@ -22,7 +22,19 @@ import re
 import sys
 from typing import List, Optional
 
-SUBS = [("×", "x"), ("≥", ">="), ("≤", "<="), ("→", "->"), ("−", "-")]
+# Emoji are double-width in a monospace block, so a medal in a cell throws every column
+# after it out of alignment — the one thing the code-block treatment exists to preserve.
+# They render fine on dev.to, so this is a Medium-only substitution.
+SUBS = [
+    ("×", "x"),
+    ("≥", ">="),
+    ("≤", "<="),
+    ("→", "->"),
+    ("−", "-"),
+    ("🥇", "#1"),
+    ("🥈", "#2"),
+    ("🥉", "#3"),
+]
 
 
 def flatten_cell(text: str) -> str:

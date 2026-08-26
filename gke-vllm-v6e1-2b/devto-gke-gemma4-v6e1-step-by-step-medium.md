@@ -1,9 +1,3 @@
----
-title: "2B Gemma 4 deployment with GKE, Cloud TPU v6e, MCP and Agent CLI"
-published: false
-series: Gemma4
-tags: kubernetes, tpu, vllm, gcp
----
 
 # Gemma 4 on GKE with Cloud TPU v6e: step by step with MCP and an Agent CLI
 
@@ -53,10 +47,12 @@ gcloud compute machine-types list --filter="name=ct6e-standard-1t" --format="val
 That tells us where the machine type is published. Quota is the other half, and there are two ids that do
 not behave the same way:
 
-| Provisioning model | Quota id | Default when unset |
-| :--- | :--- | ---: |
-| On-demand | `TPUS-PER-TPU-FAMILY-per-project-region` | **0** |
-| Spot and flex-start | `PREEMPTIBLE-TPU-V6E-per-project-region` | **1536** |
+```
+Provisioning model   Quota id                                Default when unset
+-------------------  --------------------------------------  ------------------
+On-demand            TPUS-PER-TPU-FAMILY-per-project-region                   0
+Spot and flex-start  PREEMPTIBLE-TPU-V6E-per-project-region                1536
+```
 
 Reading only the first one writes off regions that have plenty of flex-start headroom. We use
 `europe-west4`, where this project has both quota and actual hardware.
@@ -511,13 +507,15 @@ models, so an empty result there is expected rather than a broken deploy.
 
 Measured twice from an empty project:
 
-| Step | Tool | Time |
-| :--- | :--- | ---: |
-| Cluster + TPU node pool | `provision_gke_tpu` | 8 m 52 s |
-| Apply Deployment + Service | `deploy_vllm` | 6 s |
-| Pod → model answering | poll `get_system_status` | 11 m 09 s |
-| **Nothing → first token** | | **~20 minutes** |
-| Full teardown | `destroy_gke_cluster` | 6 m 24 s |
+```
+Step                        Tool                           Time
+--------------------------  ----------------------  -----------
+Cluster + TPU node pool     provision_gke_tpu          8 m 52 s
+Apply Deployment + Service  deploy_vllm                     6 s
+Pod -> model answering      poll get_system_status    11 m 09 s
+Nothing -> first token                              ~20 minutes
+Full teardown               destroy_gke_cluster        6 m 24 s
+```
 
 That eleven-minute load is billed chip time **every time the Pod is rescheduled**, which is a good argument
 against letting a scheduler move a model Pod around casually.
@@ -534,24 +532,28 @@ Pod's CPU does not distort the numbers.
 
 **Concurrency sweep**, 1024 input / 128 output tokens:
 
-| Concurrency | Output tok/s | TTFT p99 | TPOT mean | Per-stream tok/s |
-| ---: | ---: | ---: | ---: | ---: |
-| 1 | 199 | 17 ms | 4.9 ms | 203 |
-| 2 | 380 | 23 ms | 5.2 ms | 194 |
-| 4 | 693 | 29 ms | 5.6 ms | 177 |
-| 8 | 1,180 | 45 ms | 6.6 ms | 152 |
-| 16 | 🥇 **1,744** | 118 ms | 8.8 ms | 115 |
-| 32 | 1,675 | 216 ms | 18.5 ms | 54 |
-| 64 | 🥇 **2,134** | 392 ms | 28.5 ms | 35 |
+```
+Concurrency  Output tok/s  TTFT p99  TPOT mean  Per-stream tok/s
+-----------  ------------  --------  ---------  ----------------
+          1  199              17 ms     4.9 ms               203
+          2  380              23 ms     5.2 ms               194
+          4  693              29 ms     5.6 ms               177
+          8  1,180            45 ms     6.6 ms               152
+         16  #1 1,744        118 ms     8.8 ms               115
+         32  1,675           216 ms    18.5 ms                54
+         64  #1 2,134        392 ms    28.5 ms                35
+```
 
 **Throughput is not monotonic, and the dip is real.** Concurrency 32 comes in *below* concurrency 16. That
 looked like noise, so we ran each point three more times:
 
-| Concurrency | Run 1 | Run 2 | Run 3 | Spread |
-| ---: | ---: | ---: | ---: | ---: |
-| 16 | 1,777.00 | 1,780.35 | 1,778.87 | 0.2% |
-| 32 | 1,694.35 | 1,696.15 | 1,694.24 | 0.1% |
-| 64 | 2,350.99 | 2,353.04 | 2,351.38 | 0.1% |
+```
+Concurrency     Run 1     Run 2     Run 3  Spread
+-----------  --------  --------  --------  ------
+         16  1,777.00  1,780.35  1,778.87    0.2%
+         32  1,694.35  1,696.15  1,694.24    0.1%
+         64  2,350.99  2,353.04  2,351.38    0.1%
+```
 
 Run-to-run spread is two tenths of a percent. The shape reproduces — concurrency 32 really is about 4%
 slower than 16 here. The plausible cause is TPU static-shape padding: vLLM compiles a set of batch shapes
@@ -562,14 +564,16 @@ the arithmetic answer is wrong here.
 
 **Context sweep**, concurrency 8:
 
-| Input tokens | Output tok/s | TTFT p99 | Per-stream tok/s |
-| ---: | ---: | ---: | ---: |
-| 512 | 1,185 | 35 ms | 152 |
-| 1,024 | 1,180 | 45 ms | 152 |
-| 2,048 | 1,083 | 133 ms | 148 |
-| 4,096 | 986 | 216 ms | 140 |
-| 8,192 | 795 | 399 ms | 122 |
-| 16,384 | 487 | 878 ms | 80 |
+```
+Input tokens  Output tok/s  TTFT p99  Per-stream tok/s
+------------  ------------  --------  ----------------
+         512         1,185     35 ms               152
+       1,024         1,180     45 ms               152
+       2,048         1,083    133 ms               148
+       4,096           986    216 ms               140
+       8,192           795    399 ms               122
+      16,384           487    878 ms                80
+```
 
 A 32× longer prompt costs **2.4× more per output token and 25× the time to first token**. Prefill dominates
 as context grows. Note that memory is not the limit — v6e's 32 GB of HBM leaves roughly 19.8 GiB for KV
@@ -585,11 +589,13 @@ Every price here was read live from the Cloud Billing Catalog for `europe-west4`
 
 **The same chip has three prices, and they are three products — not three discounts:**
 
-| | $/chip-hour | What we are buying | |
-| :--- | ---: | :--- | :--- |
-| Flex-start (DWS) | **$1.3500** | Queued grant, then uninterrupted for a bounded window | 🥇 |
-| Spot | $1.7820 | Same hardware, reclaimable at any moment | 🥈 |
-| On-demand | $2.9700 | Starts instantly, runs unbounded, nothing preempts it | 🥉 |
+```
+                  $/chip-hour  What we are buying
+----------------  -----------  -----------------------------------------------------  --
+Flex-start (DWS)      $1.3500  Queued grant, then uninterrupted for a bounded window  #1
+Spot                  $1.7820  Same hardware, reclaimable at any moment               #2
+On-demand             $2.9700  Starts instantly, runs unbounded, nothing preempts it  #3
+```
 
 We tested the cheap one rather than quoting it. A flex-start node pool came up with **zero nodes** — on GKE
 flex-start is an autoscaling shape, not a fixed pool, so an idle flex-start pool costs nothing at all. We
@@ -600,21 +606,25 @@ The whole 55% saving costs about four minutes of queue.
 
 **The bill is not only the chip.** Two line items exist here with no VM equivalent:
 
-| Line item | Catalog SKU | $/hour |
-| :--- | :--- | ---: |
-| System node `e2-standard-4` | `E2 Instance Core` ×4 + `E2 Instance Ram` ×16 GB | $0.1475 |
-| Cluster management fee | `Zonal Kubernetes Clusters` | $0.1000 |
-| **Fixed overhead, any provisioning model** | | **$0.2475** |
+```
+Line item                               Catalog SKU                                    $/hour
+--------------------------------------  --------------------------------------------  -------
+System node e2-standard-4               E2 Instance Core x4 + E2 Instance Ram x16 GB  $0.1475
+Cluster management fee                  Zonal Kubernetes Clusters                     $0.1000
+Fixed overhead, any provisioning model                                                $0.2475
+```
 
 Google's free tier credits cover roughly one zonal cluster's fee. The system node is not covered.
 
 **All-in, one chip serving:**
 
-| | Chip | Overhead | Total/hour | Total/month (730 h) | |
-| :--- | ---: | ---: | ---: | ---: | :--- |
-| Flex-start | $1.3500 | $0.2475 | **$1.5975** | **$1,166** | 🥇 |
-| Spot | $1.7820 | $0.2475 | $2.0295 | $1,482 | 🥈 |
-| On-demand | $2.9700 | $0.2475 | $3.2175 | $2,349 | 🥉 |
+```
+               Chip  Overhead  Total/hour  Total/month (730 h)
+----------  -------  --------  ----------  -------------------  --
+Flex-start  $1.3500   $0.2475     $1.5975               $1,166  #1
+Spot        $1.7820   $0.2475     $2.0295               $1,482  #2
+On-demand   $2.9700   $0.2475     $3.2175               $2,349  #3
+```
 
 The overhead is 7.7% of an on-demand bill but **15.5% of a flex-start one**. The cheaper the capacity, the
 more the fixed cost of running Kubernetes matters — that, and not the cluster fee in isolation, is the real
@@ -622,12 +632,14 @@ cost argument against a cluster for a small deployment.
 
 **Cost per million output tokens**, all-in:
 
-| Concurrency | Output tok/s | On-demand | Spot | Flex-start | |
-| ---: | ---: | ---: | ---: | ---: | :--- |
-| 1 | 199 | $4.48 | $2.83 | $2.23 | 🥉 |
-| 8 | 1,180 | $0.76 | $0.48 | $0.38 | |
-| 16 | 1,744 | $0.51 | $0.32 | $0.25 | 🥈 |
-| 64 | 2,134 | $0.42 | $0.26 | **$0.21** | 🥇 |
+```
+Concurrency  Output tok/s  On-demand   Spot  Flex-start
+-----------  ------------  ---------  -----  ----------  --
+          1           199      $4.48  $2.83       $2.23  #3
+          8         1,180      $0.76  $0.48       $0.38
+         16         1,744      $0.51  $0.32       $0.25  #2
+         64         2,134      $0.42  $0.26       $0.21  #1
+```
 
 **Concurrency is worth more than procurement.** One stream to sixty-four divides unit cost by 10.7×;
 on-demand to flex-start divides it by 2.0×. Both together: **21×**, on identical silicon running the

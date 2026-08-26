@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>2B Gemma 4 deployment with GKE, Cloud TPU v6e, MCP and Agent CLI</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">2B Gemma 4 deployment with GKE, Cloud TPU v6e, MCP and
+Agent CLI</h1>
+</header>
+<h1
+id="gemma-4-on-gke-with-cloud-tpu-v6e-step-by-step-with-mcp-and-an-agent-cli">Gemma
+4 on GKE with Cloud TPU v6e: step by step with MCP and an Agent CLI</h1>
+<p>This article provides a step by step deployment guide for Gemma 4 to
+a Google Kubernetes Engine cluster backed by a Cloud TPU v6e (Trillium)
+chip. A suite of Python MCP tools is built to simplify management of the
+vLLM hosted Gemma 4 deployment from an agent CLI.</p>
+<p>Everything below was run end to end, twice, from an empty project.
+Every command and every output shown is real.</p>
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
+<p>We want one command per lifecycle step, and no remembered command
+lines. The agent should be able to provision the hardware, deploy the
+model, tell us whether it is actually serving, benchmark it and price
+it.</p>
+<p>The deployment is deliberately the smallest useful shape on GKE:</p>
+<ul>
+<li><strong>One</strong> zonal cluster</li>
+<li><strong>One</strong> single-host TPU node pool</li>
+<li><strong>One</strong> <code>ct6e-standard-1t</code> node — a single
+v6e chip</li>
+<li><strong>One</strong> vLLM Pod serving
+<code>google/gemma-4-E2B-it</code></li>
+</ul>
+<p>Small enough that every line on the bill is visible, and every
+failure has exactly one place to be.</p>
+<h4 id="where-do-i-start">Where do I start?</h4>
+<p>At this point you should have:</p>
+<ul>
+<li>A GCP project with billing enabled, and <strong>Compute Engine CT6E
+quota in the region you plan to use</strong> — this is the one that
+trips people up, and it is covered below</li>
+<li><code>gcloud</code> installed and authenticated</li>
+<li>A Hugging Face token with access to Gemma 4</li>
+<li>The rig checked out:
+<code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+</ul>
+<p>Then <code>cd gemma4-dev/gke-vllm-v6e1-2b</code>. Everything from
+here happens in that directory.</p>
+<h4 id="quota-check-this-before-anything-else">Quota: check this before
+anything else</h4>
+<p><strong>The two TPU control planes meter against completely different
+pools, and holding one buys nothing on the other.</strong> Our project
+holds 512 v6e chips in <code>us-east5</code> under the Cloud TPU API
+quota — and zero Compute Engine CT6E quota in that same region. GKE
+spends the <strong>Compute Engine</strong> pools.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> compute machine-types list <span class="at">--filter</span><span class="op">=</span><span class="st">&quot;name=ct6e-standard-1t&quot;</span> <span class="at">--format</span><span class="op">=</span><span class="st">&quot;value(zone)&quot;</span></span></code></pre></div>
+<p>That tells us where the machine type is published. Quota is the other
+half, and there are two ids that do not behave the same way:</p>
+<pre><code>Provisioning model   Quota id                                Default when unset
+-------------------  --------------------------------------  ------------------
+On-demand            TPUS-PER-TPU-FAMILY-per-project-region                   0
+Spot and flex-start  PREEMPTIBLE-TPU-V6E-per-project-region                1536</code></pre>
+<p>Reading only the first one writes off regions that have plenty of
+flex-start headroom. We use <code>europe-west4</code>, where this
+project has both quota and actual hardware.</p>
+<p><strong>Quota is a ceiling, not an allocation.</strong> Every zone we
+probed held 1536 chips of preemptible quota and four of five had no
+capacity at all. A spot create is the cheap probe — it fails fast with
+<code>reason: stockout</code> where flex-start silently queues.</p>
+<h4 id="setup-the-basic-environment">Setup the Basic Environment</h4>
+<p>GKE needs two client tools that a plain VM deployment does not:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> apt-get install <span class="at">-y</span> kubectl google-cloud-cli-gke-gcloud-auth-plugin</span></code></pre></div>
+<p>Then authenticate both ways. The tools need a user credential for
+gcloud and application default credentials for the client libraries:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> auth login</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> auth application-default login</span></code></pre></div>
+<p>Store the Hugging Face token in Secret Manager once. The deployment
+reads it from there, so it never lands in a manifest or a shell
+history:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="at">-n</span> <span class="st">&quot;hf_your_token_here&quot;</span> <span class="kw">|</span> <span class="ex">gcloud</span> secrets create hf-token <span class="at">--data-file</span><span class="op">=</span>- <span class="at">--project</span><span class="op">=</span>YOUR_PROJECT</span></code></pre></div>
+<p>Or once the MCP server is registered, from the agent:</p>
+<pre><code>save_hf_token with token hf_your_token_here</code></pre>
+<p>Now check everything at once:</p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> gke-preflight</span></code></pre></div>
+<pre><code>✅ kubectl, gke-gcloud-auth-plugin, envsubst and gcloud credentials all present</code></pre>
+<p>That target exists because every one of those four fails
+<em>late</em> otherwise — halfway through a deploy, with an error that
+does not name the missing piece.</p>
+<h4 id="tpu.env-is-the-source-of-truth">tpu.env is the source of
+truth</h4>
+<p>The directory name is documentation. <code>tpu.env</code> is
+configuration, and it is committed:</p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="va">GOOGLE_CLOUD_PROJECT</span><span class="op">=</span>aisprint-491218</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="va">GOOGLE_CLOUD_ZONE</span><span class="op">=</span>europe-west4-a</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="va">MODEL_NAME</span><span class="op">=</span>google/gemma-4-E2B-it</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="va">MACHINE_TYPE</span><span class="op">=</span>ct6e-standard-1t</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="va">TENSOR_PARALLEL_SIZE</span><span class="op">=</span>1</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="va">MAX_MODEL_LEN</span><span class="op">=</span>32768</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="va">GKE_CLUSTER_NAME</span><span class="op">=</span>gke-vllm-v6e1-2b</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="va">GKE_NODE_POOL</span><span class="op">=</span>tpu-v6e-1</span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="va">GKE_LOCATION</span><span class="op">=</span>europe-west4-a</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a><span class="va">TPU_TOPOLOGY</span><span class="op">=</span>1x1</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="va">GKE_NUM_NODES</span><span class="op">=</span>1</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="va">GKE_NODE_PROVISIONING</span><span class="op">=</span>on-demand</span></code></pre></div>
+<p>A real environment variable always beats the file, so
+<code>make gke-status GKE_LOCATION=us-east5-b</code> works as a one-off
+without editing anything.</p>
+<p><strong>Never copy a value out of the directory name into a
+command.</strong> <code>v6e1</code> is for humans; gcloud wants
+<code>ct6e-standard-1t</code>, and it lives in
+<code>MACHINE_TYPE</code>.</p>
+<h4 id="model-management-tool-with-mcp-stdio-transport">Model Management
+Tool with MCP Stdio Transport</h4>
+<p>The MCP server is a single Python file built on FastMCP. The simplest
+transport the SDK supports is stdio, which connects a locally running
+process — the agent CLI spawns the server and talks to it over
+pipes.</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>mcp <span class="op">=</span> FastMCP(MCP_SERVER_NAME)</span></code></pre></div>
+<p>The server name is not cosmetic. It is the key the client registers
+under, and that key prefixes every tool:
+<code>mcp__gke-vllm-v6e1-2b__deploy_vllm</code>. With sibling rigs
+loaded at the same time, that prefix is the only thing that tells the
+GKE rig’s tools from the Compute Engine rig’s, so we derive it from the
+directory name rather than typing it.</p>
+<h4 id="running-the-python-code">Running the Python Code</h4>
+<p>Install and test before wiring anything up:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> install</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> test</span></code></pre></div>
+<pre><code>Ran 48 tests in 0.113s
+
+OK</code></pre>
+<p>The tests are offline — they mock the MCP module and the Google Cloud
+clients before importing the server — so this passes without touching a
+cloud API. Then lint:</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> lint</span></code></pre></div>
+<pre><code>mypy .
+Success: no issues found in 18 source files</code></pre>
+<p>And start the server by hand once, just to see it come up:</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> run</span></code></pre></div>
+<h4 id="agent-cli-mcp_config.json">Agent CLI mcp_config.json</h4>
+<p>Register the server with the agent CLI:</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;mcpServers&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;gke-vllm-v6e1-2b&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;command&quot;</span><span class="fu">:</span> <span class="st">&quot;./mcp-run.sh&quot;</span><span class="fu">,</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;args&quot;</span><span class="fu">:</span> <span class="ot">[]</span><span class="fu">,</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>      <span class="dt">&quot;env&quot;</span><span class="fu">:</span> <span class="fu">{}</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">}</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<p><code>mcp-run.sh</code> exports only variables that are not already
+set, so <code>tpu.env</code> fills the gaps without ever overriding the
+environment we are running in.</p>
+<h4 id="validation-with-the-agent-cli">Validation with the Agent
+CLI</h4>
+<p>Ask the agent what it can do. The <code>get_help</code> tool renders
+itself from the live tool list, so it cannot go stale:</p>
+<pre><code>get_help</code></pre>
+<p>Thirty tools, grouped by what they are for:</p>
+<ul>
+<li><strong>Provisioning</strong> — <code>create_gke_cluster</code>,
+<code>create_tpu_node_pool</code>, <code>provision_gke_tpu</code>,
+<code>find_tpu</code></li>
+<li><strong>Deployment</strong> — <code>deploy_vllm</code>,
+<code>manage_vllm_deployment</code>,
+<code>get_vllm_deployment_config</code></li>
+<li><strong>Validation</strong> — <code>get_system_status</code>,
+<code>verify_model_health</code>, <code>get_vllm_endpoint</code>,
+<code>query_queued_gemma4</code></li>
+<li><strong>Diagnostics</strong> — <code>get_vllm_pod_logs</code>,
+<code>get_tpu_node_diagnostics</code>,
+<code>get_cloud_logging_logs</code></li>
+<li><strong>Measurement</strong> — <code>run_vllm_benchmark</code>,
+<code>estimate_deployment_cost</code></li>
+<li><strong>Teardown</strong> — <code>destroy_tpu_node_pool</code>,
+<code>destroy_gke_cluster</code></li>
+</ul>
+<h4 id="getting-started-with-gemma-4-on-tpu">Getting Started with Gemma
+4 on TPU</h4>
+<p>Before spending anything, ask what it will cost:</p>
+<pre><code>estimate_deployment_cost with provisioning_model on-demand</code></pre>
+<pre><code>### 💸 Estimated Cost: `$2.97` for `1h` on `1` chip `v6e` (on-demand) in `europe-west4`
+- **Rate:** `$2.9700` per chip-h × `1` chips × `1h`
+- **SKU:** TpuV6e running in Netherlands
+- ⚠️ On-demand has no run bound — this bills until `destroy_tpu_node_pool`.
+- Not counted here: the `e2-standard-4` system node and the GKE cluster management fee.</code></pre>
+<p>That number is read live from the Cloud Billing Catalog at call time.
+There is no rate table in this project, because a hardcoded rate is
+wrong eventually and wrong silently.</p>
+<h4 id="create-the-gke-cluster">Create the GKE Cluster</h4>
+<p>One call, and it is idempotent — run it twice and the second run
+tells us the cluster is already there:</p>
+<pre><code>create_gke_cluster</code></pre>
+<p>Under the hood:</p>
+<div class="sourceCode" id="cb21"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> container clusters create gke-vllm-v6e1-2b <span class="dt">\</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--location</span><span class="op">=</span>europe-west4-a <span class="dt">\</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--release-channel</span><span class="op">=</span>rapid <span class="dt">\</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--num-nodes</span><span class="op">=</span>1 <span class="at">--machine-type</span><span class="op">=</span>e2-standard-4 <span class="at">--disk-size</span><span class="op">=</span>50</span></code></pre></div>
+<pre><code>✅ Cluster `gke-vllm-v6e1-2b` created in europe-west4-a (rapid channel).
+
+NAME              LOCATION        MASTER_VERSION      MACHINE_TYPE   NUM_NODES  STATUS
+gke-vllm-v6e1-2b  europe-west4-a  1.36.3-gke.1537000  e2-standard-4  1          RUNNING</code></pre>
+<p>Two decisions in that command are worth knowing:</p>
+<ul>
+<li><strong>Pin the release channel, never a version.</strong> TPU v6e
+needs a recent control plane, and any version we pin goes stale. Rapid
+gave us 1.36.3-gke.1537000.</li>
+<li><strong>The <code>e2-standard-4</code> default pool exists only for
+system workloads.</strong> Keeping kube-dns and metrics-server off the
+TPU node is the whole point — a chip billed by the hour must not be kept
+alive by CoreDNS after the model Pod is gone.</li>
+</ul>
+<p>This step takes about nine minutes.</p>
+<h4 id="create-the-tpu-node-pool">Create the TPU Node Pool</h4>
+<p>This is the step that gets us a chip:</p>
+<pre><code>create_tpu_node_pool</code></pre>
+<div class="sourceCode" id="cb24"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> container node-pools create tpu-v6e-1 <span class="dt">\</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--cluster</span><span class="op">=</span>gke-vllm-v6e1-2b <span class="at">--location</span><span class="op">=</span>europe-west4-a <span class="dt">\</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--node-locations</span><span class="op">=</span>europe-west4-a <span class="dt">\</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--machine-type</span><span class="op">=</span>ct6e-standard-1t <span class="dt">\</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--num-nodes</span><span class="op">=</span>1 <span class="at">--disk-size</span><span class="op">=</span>200</span></code></pre></div>
+<pre><code>✅ Node pool `tpu-v6e-1` created in `gke-vllm-v6e1-2b` (europe-west4-a): 1x ct6e-standard-1t, on-demand.</code></pre>
+<p><strong>Do not add <code>--tpu-topology=1x1</code> to that
+command.</strong> Our first attempt did, and the API refused it:</p>
+<pre><code>ERROR: (gcloud.container.node-pools.create) ResponseError: code=400,
+message=TPU topology can&#39;t be specified with single-host TPU slice pool;
+please remove the tpu_topology from the node pool creation request</code></pre>
+<p>A one-chip machine type at one node <strong>is</strong> the slice —
+there is no topology to describe. The flag belongs to multi-host slices.
+What makes this a trap rather than a typo is that GKE then labels the
+node <code>cloud.google.com/gke-tpu-topology=1x1</code>
+<strong>anyway</strong>, so the value is real as a Pod selector and
+rejected as a create flag. We keep them in two separate config keys for
+exactly that reason.</p>
+<p>Both steps in one call, if we prefer:</p>
+<pre><code>provision_gke_tpu</code></pre>
+<h4 id="what-actually-got-created">What Actually Got Created</h4>
+<p>Here is the thing nobody tells you: <strong>the cluster created its
+own TPU, and what it created is a Compute Engine VM.</strong></p>
+<div class="sourceCode" id="cb28"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> compute instances list</span></code></pre></div>
+<pre><code>NAME                                             MACHINE_TYPE      STATUS
+gke-gke-vllm-v6e1-2b-default-pool-8e8b988c-7d71  e2-standard-4     RUNNING
+gke-tpu-bcdb7fb0-bw0t                            ct6e-standard-1t  RUNNING</code></pre>
+<div class="sourceCode" id="cb30"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gcloud</span> compute instance-groups managed list</span></code></pre></div>
+<pre><code>NAME                                          SIZE
+gke-gke-vllm-v6e1-2b-tpu-v6e-1-cfc04f31-grp   1</code></pre>
+<p>The node pool is a <strong>managed instance group</strong>, and the
+node inside it carries the same machine type we would pass to
+<code>gcloud compute instances create</code> on a VM deployment. Same
+silicon, same attachment. What changed is who calls create and who owns
+the lifecycle.</p>
+<p>Three consequences, each of which costs an afternoon if we learn it
+the hard way:</p>
+<ul>
+<li><strong><code>gcloud compute instances delete</code> on that node is
+not teardown.</strong> It succeeds, and the instance group rebuilds the
+node minutes later under a new name, still billing. Delete the
+<strong>pool</strong>.</li>
+<li><strong>The node is cattle.</strong> It is replaced on upgrade and
+repair, so anything we write to its disk is gone.</li>
+<li><strong>We do not choose the node’s name.</strong> Across two runs
+it came back as <code>gke-tpu-cfc04f31-8h14</code> and then
+<code>gke-tpu-bcdb7fb0-bw0t</code>.</li>
+</ul>
+<p>Check what the node is advertising:</p>
+<div class="sourceCode" id="cb32"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get node gke-tpu-bcdb7fb0-bw0t <span class="at">-o</span> jsonpath=<span class="st">&#39;{.status.allocatable}&#39;</span></span></code></pre></div>
+<pre><code>{&quot;cpu&quot;:&quot;43820m&quot;,&quot;google.com/tpu&quot;:&quot;1&quot;,&quot;memory&quot;:&quot;170630440Ki&quot;,&quot;pods&quot;:&quot;110&quot;}</code></pre>
+<p><strong>A Ready node can advertise <code>google.com/tpu: 0</code> for
+a window</strong> before the device plugin registers. A Pod scheduled in
+that window fails with <code>Insufficient google.com/tpu</code>, which
+reads exactly like a quota problem and is not one. If we see that, we
+wait thirty seconds.</p>
+<h4 id="deploy-the-model">Deploy The Model</h4>
+<pre><code>deploy_vllm</code></pre>
+<pre><code>🚀 Deployed `vllm-gemma4` to cluster `gke-vllm-v6e1-2b` (europe-west4-a).
+- model: `google/gemma-4-E2B-it`, max-model-len 32768, TP 1
+- image: `vllm/vllm-tpu:nightly`, service type `LoadBalancer`
+
+deployment.apps/vllm-gemma4 created
+service/vllm-gemma4 created
+
+👉 The image pull, weight load and XLA precompile take about ten minutes.</code></pre>
+<p>That tool does three things with no VM equivalent: fetches cluster
+credentials, copies the Hugging Face token from Secret Manager into a
+Kubernetes Secret, and applies the manifest.</p>
+<p>The Pod spec is where the chip actually gets claimed:</p>
+<div class="sourceCode" id="cb36"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">nodeSelector</span><span class="kw">:</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">cloud.google.com/gke-tpu-accelerator</span><span class="kw">:</span><span class="at"> tpu-v6e-slice</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="fu">cloud.google.com/gke-tpu-topology</span><span class="kw">:</span><span class="at"> 1x1</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">tolerations</span><span class="kw">:</span></span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">key</span><span class="kw">:</span><span class="at"> google.com/tpu</span></span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">operator</span><span class="kw">:</span><span class="at"> Exists</span></span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">effect</span><span class="kw">:</span><span class="at"> NoSchedule</span></span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">containers</span><span class="kw">:</span></span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a><span class="at">        </span><span class="kw">-</span><span class="at"> </span><span class="fu">name</span><span class="kw">:</span><span class="at"> vllm</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">image</span><span class="kw">:</span><span class="at"> vllm/vllm-tpu:nightly</span></span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">command</span><span class="kw">:</span><span class="at"> </span><span class="kw">[</span><span class="st">&quot;vllm&quot;</span><span class="kw">,</span><span class="at"> </span><span class="st">&quot;serve&quot;</span><span class="kw">,</span><span class="at"> </span><span class="st">&quot;google/gemma-4-E2B-it&quot;</span><span class="kw">]</span></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">args</span><span class="kw">:</span></span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> --max-model-len=32768</span></span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> --tensor-parallel-size=1</span></span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> --max_num_batched_tokens=4096</span></span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> --enable-auto-tool-choice</span></span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> --tool-call-parser=gemma4</span></span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="kw">-</span><span class="at"> --reasoning-parser=gemma4</span></span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">resources</span><span class="kw">:</span></span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">limits</span><span class="kw">:</span></span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a><span class="at">              </span><span class="fu">google.com/tpu</span><span class="kw">:</span><span class="at"> </span><span class="st">&quot;1&quot;</span></span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a><span class="at">          </span><span class="fu">startupProbe</span><span class="kw">:</span></span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">httpGet</span><span class="kw">:</span><span class="at"> </span><span class="kw">{</span><span class="at"> </span><span class="fu">path</span><span class="kw">:</span><span class="at"> /health</span><span class="kw">,</span><span class="at"> </span><span class="fu">port</span><span class="kw">:</span><span class="at"> </span><span class="dv">8000</span><span class="at"> </span><span class="kw">}</span></span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">periodSeconds</span><span class="kw">:</span><span class="at"> </span><span class="dv">15</span></span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a><span class="at">            </span><span class="fu">failureThreshold</span><span class="kw">:</span><span class="at"> </span><span class="dv">120</span></span></code></pre></div>
+<p>Four things in there are load-bearing:</p>
+<ul>
+<li><strong>Both node selectors.</strong> Drop one and the Pod schedules
+onto the <code>e2-standard-4</code> system node and fails there, which
+reads as a vLLM problem rather than a placement one.</li>
+<li><strong>The <code>google.com/tpu: 1</code> limit.</strong> Without
+it the device plugin never attaches the chip.</li>
+<li><strong>The toleration.</strong> GKE taints TPU nodes
+<code>google.com/tpu=present:NoSchedule</code> automatically.</li>
+<li><strong>The startup probe budget.</strong> 15 s × 120 = 30 minutes.
+The load took ten; a budget shorter than that gets the container killed
+and restarted forever, one ten-minute load at a time.</li>
+</ul>
+<p>No <code>privileged: true</code> is needed. On GKE the device plugin
+handles device access.</p>
+<p>We can print the exact manifest without applying it:</p>
+<pre><code>get_vllm_deployment_config</code></pre>
+<h4 id="checking-system-status">Checking System Status</h4>
+<pre><code>get_system_status</code></pre>
+<pre><code>### 🌀 System Status (europe-west4-a)
+- **Cluster:** ✅ `gke-vllm-v6e1-2b`
+- **TPU node pool:** ✅ tpu-v6e-1
+- **vLLM Health:** 🟢 Online at http://34.91.103.13:8000 (serving `google/gemma-4-E2B-it`)
+**🖥️ TPU nodes:**
+- `gke-tpu-bcdb7fb0-bw0t` — Ready, google.com/tpu: 1, pool `tpu-v6e-1`
+**📦 vLLM pod:** `vllm-gemma4-858cfc589f-swh95` — Running, ready, on `gke-tpu-bcdb7fb0-bw0t`
+**👉 Next Step:** Use `query_queued_gemma4` to interact with the model.</code></pre>
+<p>Five separate claims there, and each can be healthy while the next is
+not. <strong>“Running” is three steps weaker than “serving” on this
+path.</strong> A GKE node is Ready the moment the kubelet registers —
+before the Pod is scheduled, before the image is pulled, before the
+weights load, before XLA compiles.</p>
+<p>While it loads, watch the actual work:</p>
+<pre><code>get_vllm_pod_logs with tail 20</code></pre>
+<h4 id="cross-check-the-deployed-model">Cross Check The Deployed
+Model</h4>
+<p>Never trust one layer. Go under the tools and ask Kubernetes
+directly:</p>
+<div class="sourceCode" id="cb41"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get pods <span class="at">-l</span> app=vllm-gemma4 <span class="at">-o</span> wide</span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a><span class="ex">kubectl</span> get svc vllm-gemma4</span></code></pre></div>
+<pre><code>NAME                           READY   STATUS    RESTARTS   AGE
+vllm-gemma4-858cfc589f-swh95   1/1     Running   0          47m</code></pre>
+<p>Then bypass Kubernetes too, and ask the model server:</p>
+<div class="sourceCode" id="cb43"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-s</span> http://34.91.103.13:8000/v1/models <span class="kw">|</span> <span class="ex">python3</span> <span class="at">-m</span> json.tool</span></code></pre></div>
+<p><strong>The endpoint is a Service, not a machine.</strong> This is
+the most portable mistake from the VM guides: a GKE node <em>does</em>
+appear in <code>gcloud compute instances list</code>, so reading its
+external IP succeeds and returns the wrong address. Across a full
+teardown and rebuild, our Service came back on the <strong>same</strong>
+IP while the node behind it changed name entirely.</p>
+<h4 id="review-the-model">Review the Model</h4>
+<pre><code>verify_model_health</code></pre>
+<pre><code>✅ Model health check PASSED.
+Response: &#39;Hello! Yes, I am working. I am...&#39;
+Latency: 0.77 seconds.</code></pre>
+<pre><code>query_queued_gemma4 with prompt &quot;In one short sentence, what is a TPU node pool?&quot;</code></pre>
+<pre><code>A TPU node pool is a group of dedicated TPU hardware resources for running machine learning workloads.</code></pre>
+<p>Or from the shell, without the agent:</p>
+<div class="sourceCode" id="cb48"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> query PROMPT=<span class="st">&quot;What is Site Reliability Engineering?&quot;</span></span></code></pre></div>
+<p><strong>Use the chat endpoint, not raw completions.</strong>
+<code>/v1/completions</code> returns an empty completion on
+<code>-it</code> models, so an empty result there is expected rather
+than a broken deploy.</p>
+<h4 id="how-long-did-all-that-take">How long did all that take?</h4>
+<p>Measured twice from an empty project:</p>
+<pre><code>Step                        Tool                           Time
+--------------------------  ----------------------  -----------
+Cluster + TPU node pool     provision_gke_tpu          8 m 52 s
+Apply Deployment + Service  deploy_vllm                     6 s
+Pod -&gt; model answering      poll get_system_status    11 m 09 s
+Nothing -&gt; first token                              ~20 minutes
+Full teardown               destroy_gke_cluster        6 m 24 s</code></pre>
+<p>That eleven-minute load is billed chip time <strong>every time the
+Pod is rescheduled</strong>, which is a good argument against letting a
+scheduler move a model Pod around casually.</p>
+<h4 id="benchmark-the-model">Benchmark the Model</h4>
+<pre><code>run_vllm_benchmark with max_concurrency 8 and save_result true</code></pre>
+<p>The benchmark runs <code>vllm bench serve</code> <strong>inside the
+serving Pod</strong> via <code>kubectl exec</code>, against localhost.
+There is no SSH here and no second container; the load is TPU-bound and
+the client is not, so sharing the Pod’s CPU does not distort the
+numbers.</p>
+<p><strong>Concurrency sweep</strong>, 1024 input / 128 output
+tokens:</p>
+<pre><code>Concurrency  Output tok/s  TTFT p99  TPOT mean  Per-stream tok/s
+-----------  ------------  --------  ---------  ----------------
+          1  199              17 ms     4.9 ms               203
+          2  380              23 ms     5.2 ms               194
+          4  693              29 ms     5.6 ms               177
+          8  1,180            45 ms     6.6 ms               152
+         16  #1 1,744        118 ms     8.8 ms               115
+         32  1,675           216 ms    18.5 ms                54
+         64  #1 2,134        392 ms    28.5 ms                35</code></pre>
+<p><strong>Throughput is not monotonic, and the dip is real.</strong>
+Concurrency 32 comes in <em>below</em> concurrency 16. That looked like
+noise, so we ran each point three more times:</p>
+<pre><code>Concurrency     Run 1     Run 2     Run 3  Spread
+-----------  --------  --------  --------  ------
+         16  1,777.00  1,780.35  1,778.87    0.2%
+         32  1,694.35  1,696.15  1,694.24    0.1%
+         64  2,350.99  2,353.04  2,351.38    0.1%</code></pre>
+<p>Run-to-run spread is two tenths of a percent. The shape reproduces —
+concurrency 32 really is about 4% slower than 16 here. The plausible
+cause is TPU static-shape padding: vLLM compiles a set of batch shapes
+and pads to the nearest, so a batch straddling a bucket boundary spends
+compute on padding. <strong>That is a hypothesis and we have not
+verified it</strong> against the compiled shape list, and it is recorded
+as unverified in the report. The operational lesson stands on its own:
+<strong>measure your own concurrency ladder</strong>, because the
+arithmetic answer is wrong here.</p>
+<p><strong>Context sweep</strong>, concurrency 8:</p>
+<pre><code>Input tokens  Output tok/s  TTFT p99  Per-stream tok/s
+------------  ------------  --------  ----------------
+         512         1,185     35 ms               152
+       1,024         1,180     45 ms               152
+       2,048         1,083    133 ms               148
+       4,096           986    216 ms               140
+       8,192           795    399 ms               122
+      16,384           487    878 ms                80</code></pre>
+<p>A 32× longer prompt costs <strong>2.4× more per output token and 25×
+the time to first token</strong>. Prefill dominates as context grows.
+Note that memory is not the limit — v6e’s 32 GB of HBM leaves roughly
+19.8 GiB for KV after this model’s weights, so 16K at concurrency 8 sits
+well inside the budget and still nearly halves throughput. The ceiling
+is time.</p>
+<p>Each point comes back as a schema-conformant
+<code>throughput.sweep[]</code> entry, so the run files itself as a
+validated report rather than a screenshot.</p>
+<h4 id="cost-breakdowns">Cost Breakdowns</h4>
+<p>Every price here was read live from the Cloud Billing Catalog for
+<code>europe-west4</code>.</p>
+<p><strong>The same chip has three prices, and they are three products —
+not three discounts:</strong></p>
+<pre><code>                  $/chip-hour  What we are buying
+----------------  -----------  -----------------------------------------------------  --
+Flex-start (DWS)      $1.3500  Queued grant, then uninterrupted for a bounded window  #1
+Spot                  $1.7820  Same hardware, reclaimable at any moment               #2
+On-demand             $2.9700  Starts instantly, runs unbounded, nothing preempts it  #3</code></pre>
+<p>We tested the cheap one rather than quoting it. A flex-start node
+pool came up with <strong>zero nodes</strong> — on GKE flex-start is an
+autoscaling shape, not a fixed pool, so an idle flex-start pool costs
+nothing at all. We scaled the Deployment to two replicas, the second Pod
+went <code>Pending</code>, and <strong>4 minutes 18 seconds later DWS
+granted a chip</strong>: a node joined, the Pod landed, and ten minutes
+later the replica was serving.</p>
+<p>The whole 55% saving costs about four minutes of queue.</p>
+<p><strong>The bill is not only the chip.</strong> Two line items exist
+here with no VM equivalent:</p>
+<pre><code>Line item                               Catalog SKU                                    $/hour
+--------------------------------------  --------------------------------------------  -------
+System node e2-standard-4               E2 Instance Core x4 + E2 Instance Ram x16 GB  $0.1475
+Cluster management fee                  Zonal Kubernetes Clusters                     $0.1000
+Fixed overhead, any provisioning model                                                $0.2475</code></pre>
+<p>Google’s free tier credits cover roughly one zonal cluster’s fee. The
+system node is not covered.</p>
+<p><strong>All-in, one chip serving:</strong></p>
+<pre><code>               Chip  Overhead  Total/hour  Total/month (730 h)
+----------  -------  --------  ----------  -------------------  --
+Flex-start  $1.3500   $0.2475     $1.5975               $1,166  #1
+Spot        $1.7820   $0.2475     $2.0295               $1,482  #2
+On-demand   $2.9700   $0.2475     $3.2175               $2,349  #3</code></pre>
+<p>The overhead is 7.7% of an on-demand bill but <strong>15.5% of a
+flex-start one</strong>. The cheaper the capacity, the more the fixed
+cost of running Kubernetes matters — that, and not the cluster fee in
+isolation, is the real cost argument against a cluster for a small
+deployment.</p>
+<p><strong>Cost per million output tokens</strong>, all-in:</p>
+<pre><code>Concurrency  Output tok/s  On-demand   Spot  Flex-start
+-----------  ------------  ---------  -----  ----------  --
+          1           199      $4.48  $2.83       $2.23  #3
+          8         1,180      $0.76  $0.48       $0.38
+         16         1,744      $0.51  $0.32       $0.25  #2
+         64         2,134      $0.42  $0.26       $0.21  #1</code></pre>
+<p><strong>Concurrency is worth more than procurement.</strong> One
+stream to sixty-four divides unit cost by 10.7×; on-demand to flex-start
+divides it by 2.0×. Both together: <strong>21×</strong>, on identical
+silicon running the identical model. The trade is visible in the sweep —
+at concurrency 64 each caller sees 35 tokens per second instead of
+203.</p>
+<p><strong>The line nobody budgets:</strong> with the TPU node pool
+deleted, the cluster and its system node still bill $0.2475/hour. That
+is <strong>$181 a month for an empty cluster.</strong></p>
+<h4 id="tearing-it-down">Tearing It Down</h4>
+<p><strong>Nothing here stops billing on its own.</strong> A Compute
+Engine instance can carry <code>--max-run-duration</code> with
+<code>--instance-termination-action=DELETE</code> and delete itself. A
+node pool has <strong>no run bound at all</strong> — not even under
+flex-start, where the setting caps how long capacity is
+<em>granted</em>, not how long it is <em>billed</em>.</p>
+<p>Release the chip and keep the cluster:</p>
+<pre><code>destroy_tpu_node_pool</code></pre>
+<pre><code>🗑️ Node pool `tpu-v6e-1` deleted from `gke-vllm-v6e1-2b` (europe-west4-a). The chip is released.</code></pre>
+<p>Or take it all:</p>
+<pre><code>destroy_gke_cluster</code></pre>
+<p>From the shell, the same two:</p>
+<div class="sourceCode" id="cb61"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb61-1"><a href="#cb61-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> destroy          <span class="co"># node pool only</span></span>
+<span id="cb61-2"><a href="#cb61-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> destroy-cluster  <span class="co"># everything</span></span></code></pre></div>
+<h4 id="five-things-that-broke-and-what-they-had-in-common">Five things
+that broke, and what they had in common</h4>
+<p>Every one was a correct habit imported from the Compute Engine
+version of this deployment.</p>
+<ol type="1">
+<li><strong><code>--tpu-topology=1x1</code></strong> — refused for a
+single-host slice, while GKE sets the matching label anyway.</li>
+<li><strong><code>gcloud secrets versions access</code> without
+<code>--project</code></strong> — silently resolved to the workstation’s
+default project, an expired lab, and failed with a permission error
+naming a project this rig never mentions.</li>
+<li><strong>A dollar sign in a template comment</strong> — the manifest
+renders through <code>envsubst</code> from the shell path and
+<code>string.Template</code> from the MCP tool. The first tolerates it,
+the second raises. So the shell path worked and the tool path did not,
+which is the worst way to find a bug.</li>
+<li><strong>Vocabulary drift</strong> — the shell scripts said
+<code>ondemand</code> and the tools said <code>on-demand</code>. A test
+caught it, not a run.</li>
+<li><strong>The cost tool repeated the VM’s story</strong> — “flex-start
+self-terminates at <code>--max-run-duration</code>, capping the bill.”
+False on a node pool: a confident wrong statement about money, in the
+one tool written to avoid exactly that.</li>
+</ol>
+<p>The defence that worked was not more careful reading. It was a test
+that greps the <strong>whole</strong> server module for the old control
+plane’s commands rather than checking one function — because an earlier
+version of this project asserted it had migrated and verified that claim
+on a single call path, while four tools quietly kept using
+<code>tpus tpu-vm ssh</code>.</p>
+<h4 id="summary">Summary</h4>
+<p>The strategy for using MCP for Gemma 4 TPU deployment on GKE was
+validated with an incremental step by step approach. A minimal stdio
+transport MCP server was started from Python source, registered with an
+agent CLI in the same local environment, and then used to provision a
+cluster, attach a TPU node pool, deploy vLLM, validate the endpoint,
+benchmark it and price it — each step checked against the live system
+rather than against the previous step’s assumptions.</p>
+<p>What we can state, having run it twice end to end:</p>
+<ul>
+<li>A single-chip TPU deployment on GKE takes <strong>about twenty
+minutes</strong> from nothing to a served token.</li>
+<li><strong>The cluster provisions its own TPU</strong>, as a Compute
+Engine VM inside a managed instance group it owns and we do not.
+Deleting that VM is not teardown; deleting the pool is.</li>
+<li><strong>Flex-start is the default worth reaching for</strong> on
+bounded work: 55% off the chip rate for a four-minute queue, with a pool
+that costs nothing while idle.</li>
+<li><strong>Concurrency beats procurement</strong> as a cost lever, five
+to one — provided the latency budget can absorb it.</li>
+</ul>
+<p>For one small model with one replica, a plain VM is still the simpler
+answer and the cost table above says so. Kubernetes earns its overhead
+when there are replicas to schedule, versions to roll, or an application
+already living in the cluster. When it does, the twenty minutes above is
+the whole of it.</p>
+</body>
+</html>
