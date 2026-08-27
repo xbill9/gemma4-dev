@@ -362,6 +362,22 @@ class UserDataTests(BashSyntaxMixin, unittest.TestCase):
         text = user_data()
         self.assertLess(text.index("chmod 600 /opt/jax-g5g/env"), text.index("HF_TOKEN="))
 
+    def test_swap_block_uses_only_portable_flags(self):
+        """`mkswap -q` is busybox; util-linux rejects it and `set -e` kills cloud-init.
+
+        This was latent for as long as only g5g.xlarge rendered the block and
+        nobody launched one. Making the threshold inclusive on 2026-08-26 pointed
+        it at the DEFAULT size and the instance came up with an empty
+        /opt/jax-g5g and no install log.
+        """
+        rendered = user_data(instance_type="g5g.2xlarge")
+        # Executable lines only -- the comment above the fix quotes the bad flag
+        # on purpose, and matching prose would fail vacuously.
+        code = "\n".join(ln for ln in rendered.splitlines()
+                          if not ln.lstrip().startswith("#"))
+        self.assertIn("mkswap /swapfile", code)
+        self.assertNotIn("mkswap -q", code)
+
     def test_swapfile_is_rendered_for_the_two_smallest_hosts(self):
         """2xlarge moved into this set on 2026-08-26, deliberately.
 

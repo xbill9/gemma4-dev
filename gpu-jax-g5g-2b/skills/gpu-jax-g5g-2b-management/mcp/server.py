@@ -388,7 +388,13 @@ def _user_data(model: str, instance_type: str) -> str:
         swap = f"""if ! swapon --show --noheadings 2>/dev/null | grep -q /swapfile; then
   fallocate -l {_SWAP_GB}G /swapfile
   chmod 600 /swapfile
-  mkswap -q /swapfile
+  # NOT `mkswap -q`: that is a busybox flag, and util-linux's mkswap (Ubuntu
+  # 22.04) rejects it with `invalid option -- 'q'`. Under `set -e` that killed
+  # cloud-init before install.sh was even written, so the box came up with an
+  # empty /opt/jax-g5g and no install log at all. Latent until 2026-08-26, when
+  # making the swap threshold inclusive rendered this block for g5g.2xlarge --
+  # the rig's DEFAULT size -- for the first time.
+  mkswap /swapfile >/dev/null
   swapon /swapfile
   grep -q /swapfile /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
