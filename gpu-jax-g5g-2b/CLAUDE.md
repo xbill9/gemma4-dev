@@ -224,11 +224,19 @@ enumerating the 26 `arm64` DLAMI parameters.
   3.12 and would still need them. deadsnakes publishes `python3.14` for jammy and noble only —
   it does not need to for resolute.
 
-**Not yet launched on.** Three things were true of the old base and must be re-checked on the
-first launch, in this order of risk: the **driver version** (was 580.126.09 reporting CUDA
-13.0, and `jax[cuda13]` needs 580+ — this is the one that could actually break); whether the
-**aws CLI** is present, since the base image is smaller; and the **PEP 668** handling. Falling
-back is one env var — the 24.04 base still works via deadsnakes.
+**VERIFIED on hardware 2026-08-27** (`i-021f15b2b45e13793`,
+`benchmarks/runs/2026-08-27-ubuntu2604-base-g5g/`). All three risks settled: driver
+**595.91.07**, well past `jax[cuda13]`'s 580+ floor; **aws-cli 2.36.30 present** and the
+HF token written; and **PEP 668 genuinely in force** —
+`/usr/lib/python3.14/EXTERNALLY-MANAGED` exists, so `--break-system-packages` was
+load-bearing, not defensive. glibc is **2.43** against 2.35, so xprof's `manylinux_2_35`
+floor now has headroom instead of sitting exactly on it. Falling back is still one env var —
+the 24.04 base works via deadsnakes.
+
+**The install went from >21 minutes to ~80 seconds**, and `python-3.14` is **1 second** of it
+because the base image already carries the interpreter. Decode measured **12.80 tok/s**,
+inside the 12.4–13.1 band of every prior run: this buys currency and install time, **not**
+speed.
 
 **Changing the SSM path required changing `DLAMI_NAME` in the same commit.** The old filter
 required `Deep Learning ARM64 AMI` *contiguously*, and the base images are named
@@ -806,8 +814,11 @@ The one mitigation for the ceiling is gated behind an untested flag.
 
 ## Tracing a deployment
 
-**Added 2026-08-27, after the `mkswap` incident. Verified offline; not yet exercised on a
-launch.**
+**Added 2026-08-27, after the `mkswap` incident. Exercised on a launch the same day —
+`benchmarks/runs/2026-08-27-ubuntu2604-base-g5g/`.** The cloud-init reporting and the stage
+markers both worked; the *failure* verdicts are still only pinned by CPU tests, because
+nothing failed. The `JAX_CACHE_S3_URI` path rendered nothing and remains **untested**: it is
+empty by default and no bucket was configured.
 
 The provisioning path had two blind spots, and the first one is why a one-character flag cost
 a launch rather than a minute.
@@ -834,8 +845,10 @@ Two optimizations landed with them:
   CPU and not network. Now 500 MiB/s / 6000 IOPS — ~4× baseline, still under `g5g.2xlarge`'s
   own EBS cap ("up to" 4.75 Gbps ≈ 593 MB/s) so the smaller sizes stay instance-bound, and
   satisfying gp3's `throughput <= IOPS × 0.25` rule, which is enforced at run-instances time
-  and so fails a *launch* rather than slowing a disk. **UNTESTED as a remedy** — the load
-  stages are already timed, so one launch settles it.
+  and so fails a *launch* rather than slowing a disk. **CONFIRMED 2026-08-27**: `read_shards`
+  went 73.5s → **24.7s**, a clean 3.0x on the same checkpoint and the same read, which happens
+  *before* quantization so the config change cannot explain it. The hypothesis was right —
+  two unrelated stages had been sitting on one number because the volume was the ceiling.
 - **The XLA compilation cache can now survive a relaunch**, via `JAX_CACHE_S3_URI`. It lives
   on the ephemeral root volume, so every relaunch recompiles every shape — and the 128-step
   bucket ladder means far more distinct shapes than the old power-of-two one, at ~14 s each
@@ -850,7 +863,14 @@ Two optimizations landed with them:
 Both now render from one set of constants. A copy-pasteable repro command that provisions a
 different volume from the tool it documents is how a manual reproduction fails to reproduce.
 
-**Still open: there is no prebuilt AMI, and the argument against one has weakened.**
+**The AMI-bake argument has now WEAKENED AGAIN, in the other direction.** An 80-second
+install is not worth baking an image for; the reason a verification cycle could not finish on
+spot was the install length, and that is gone. What did NOT change is capacity —
+`InsufficientInstanceCapacity` in us-east-1b, 1c and 1d on 2026-08-27, with only 1a
+available, and **1a was the most expensive AZ by spot price**, so price is not a usable proxy
+for capacity here. Retry across AZs; do not read cheapness as availability.
+
+**Still open, for the record: there is no prebuilt AMI.**
 `CLAUDE.md` has always argued a stock DLAMI is right here because this install is `pip
 install`, not the vLLM sibling's 67-minute build. That reasoning is sound *against that
 comparison*. But the 2026-08-25 reclamation killed an instance at 21 minutes, **before the
@@ -860,7 +880,7 @@ a cleanup, and it has not been taken.
 
 ## Measurement
 
-**This rig has five measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`
+**This rig has six measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`
 where `<hw-short>` equals the hardware slot:
 
 | Run | Decode | What it added |
@@ -870,6 +890,7 @@ where `<hw-short>` equals the hardware slot:
 | `2026-08-25-context-sweep-g5g` | 12.80 tok/s | 12 cells, context × output. First xprof. |
 | `2026-08-26-config-sweep-g5g` | 12.8 tok/s | Config sweep: all three levers fail. Locates the prefill ceiling. |
 | `2026-08-26-quant-levers-fixed-g5g` | **13.10 tok/s** | Levers fixed. 5/5 configs, 15/15 cells. Sets the current default. |
+| `2026-08-27-ubuntu2604-base-g5g` | 12.80 tok/s | Ubuntu 26.04 base. 80s install, read_shards 3x faster. |
 
 **The 12.4/12.5/12.8 figures are all the same configuration** (`ple0`, no int8 head) on
 successive stacks, and they are within noise of each other. **13.10 is a different

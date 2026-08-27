@@ -1,0 +1,281 @@
+```
+INSTALL COMPLETE
+--- cloud-init ---
+status: done
+extended_status: done
+boot_status_code: enabled-by-generator
+last_update: Thu, 01 Jan 1970 00:00:33 +0000
+detail: DataSourceEc2Local
+errors: []
+recoverable_errors: {}
+--- install log ---
+++ date +%s
++ _T0=1787848900
++ _TLAST=1787848900
++ install_runtime
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ APT_OPTS='-o DPkg::Lock::Timeout=600 -o Acquire::Retries=3'
++ APT_OPTS='-o DPkg::Lock::Timeout=600 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30'
++ apt_run update -y
++ apt-get -o DPkg::Lock::Timeout=600 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update -y
+Hit:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute InRelease
+Get:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-updates InRelease [137 kB]
+Get:3 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-backports InRelease [137 kB]
+Hit:4 https://apt.corretto.aws stable InRelease
+Get:5 https://download.docker.com/linux/ubuntu resolute InRelease [32.5 kB]
+Hit:6 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/sbsa  InRelease
+Hit:7 https://nvidia.github.io/libnvidia-container/stable/deb/arm64  InRelease
+Get:8 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main arm64 Packages [558 kB]
+Get:9 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main Translation-en [128 kB]
+Get:10 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/main arm64 Components [96.0 kB]
+Get:11 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe arm64 Packages [245 kB]
+Get:12 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe Translation-en [84.4 kB]
+Get:13 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-updates/universe arm64 Components [165 kB]
+Get:14 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/universe arm64 Packages [3140 B]
+Get:15 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/universe Translation-en [7988 B]
+Get:16 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute-backports/universe arm64 Components [1056 B]
+Get:17 http://security.ubuntu.com/ubuntu resolute-security InRelease [137 kB]
+Get:18 http://security.ubuntu.com/ubuntu resolute-security/main arm64 Packages [436 kB]
+Get:19 http://security.ubuntu.com/ubuntu resolute-security/main Translation-en [97.9 kB]
+Get:20 http://security.ubuntu.com/ubuntu resolute-security/main arm64 Components [44.8 kB]
+Get:21 http://security.ubuntu.com/ubuntu resolute-security/universe arm64 Packages [154 kB]
+Get:22 http://security.ubuntu.com/ubuntu resolute-security/universe arm64 Components [43.1 kB]
+Get:23 http://security.ubuntu.com/ubuntu resolute-security/restricted arm64 Packages [468 kB]
+Get:24 http://security.ubuntu.com/ubuntu resolute-security/restricted Translation-en [70.0 kB]
+Fetched 3045 kB in 1s (2494 kB/s)
+Reading package lists...
++ stage apt-base
++ local now
+++ date +%s
++ now=1787848908
++ echo '[stage] apt-base +8s (total 8s)'
+[stage] apt-base +8s (total 8s)
++ _TLAST=1787848908
++ command -v python3.14
+++ command -v python3.14
++ echo 'python3.14 is already present at /usr/bin/python3.14; skipping deadsnakes'
+python3.14 is already present at /usr/bin/python3.14; skipping deadsnakes
++ apt_run install -y python3.14-venv python3.14-dev
++ apt-get -o DPkg::Lock::Timeout=600 -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y python3.14-venv python3.14-dev
+Reading package lists...
+Building dependency tree...
+Reading state information...
+python3.14-venv is already the newest version (3.14.4-1ubuntu0.1).
+python3.14-venv set to manually installed.
+python3.14-dev is already the newest version (3.14.4-1ubuntu0.1).
+python3.14-dev set to manually installed.
+Solving dependencies...
+0 upgraded, 0 newly installed, 0 to remove and 11 not upgraded.
++ stage python-3.14
++ local now
+++ date +%s
++ now=1787848909
++ echo '[stage] python-3.14 +1s (total 9s)'
+[stage] python-3.14 +1s (total 9s)
++ _TLAST=1787848909
++ PIP='python3.14 -m pip install --upgrade --break-system-packages'
++ curl -sS https://bootstrap.pypa.io/get-pip.py
++ python3.14 - --break-system-packages
+Collecting pip
+  Downloading pip-26.2.1-py3-none-any.whl.metadata (4.6 kB)
+Downloading pip-26.2.1-py3-none-any.whl (1.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 40.8 MB/s  0:00:00
+Installing collected packages: pip
+  Attempting uninstall: pip
+    Found existing installation: pip 26.2.1
+    Uninstalling pip-26.2.1:
+      Successfully uninstalled pip-26.2.1
+Successfully installed pip-26.2.1
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
++ python3.14 -m pip install --upgrade --break-system-packages pip setuptools wheel
+Requirement already satisfied: pip in ./usr/local/lib/python3.14/dist-packages (26.2.1)
+Requirement already satisfied: setuptools in ./usr/local/lib/python3.14/dist-packages (84.0.0)
+Requirement already satisfied: wheel in ./usr/local/lib/python3.14/dist-packages (0.48.0)
+Requirement already satisfied: packaging>=24.0 in ./usr/local/lib/python3.14/dist-packages (from wheel) (26.3)
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
++ stage pip-bootstrap
++ local now
+++ date +%s
++ now=1787848918
++ echo '[stage] pip-bootstrap +9s (total 18s)'
+[stage] pip-bootstrap +9s (total 18s)
++ _TLAST=1787848918
++ python3.14 -m pip install --upgrade --break-system-packages 'jax[cuda13]'
+Collecting jax[cuda13]
+  Downloading jax-0.11.1-py3-none-any.whl.metadata (13 kB)
+Collecting jaxlib<=0.11.1,>=0.11.1 (from jax[cuda13])
+  Downloading jaxlib-0.11.1-cp314-cp314-manylinux_2_27_aarch64.whl.metadata (1.3 kB)
+Collecting ml_dtypes>=0.5.0 (from jax[cuda13])
+  Downloading ml_dtypes-0.6.0-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl.metadata (8.8 kB)
+Requirement already satisfied: numpy>=2.1 in ./usr/local/lib/python3.14/dist-packages (from jax[cuda13]) (2.5.2)
+Collecting opt_einsum (from jax[cuda13])
+  Downloading opt_einsum-3.4.0-py3-none-any.whl.metadata (6.3 kB)
+Requirement already satisfied: scipy>=1.15 in ./usr/local/lib/python3.14/dist-packages (from jax[cuda13]) (1.18.1)
+Collecting jax-cuda13-plugin<=0.11.1,>=0.11.1 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading jax_cuda13_plugin-0.11.1-cp314-cp314-manylinux_2_27_aarch64.whl.metadata (2.0 kB)
+Collecting jax-cuda13-pjrt==0.11.1 (from jax-cuda13-plugin<=0.11.1,>=0.11.1->jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading jax_cuda13_pjrt-0.11.1-py3-none-manylinux_2_27_aarch64.whl.metadata (580 bytes)
+Collecting nvidia-cublas>=13.0.0.19 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cublas-13.6.1.10-py3-none-manylinux_2_27_aarch64.whl.metadata (1.8 kB)
+Collecting nvidia-cuda-cupti>=13.0.48 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cuda_cupti-13.3.75-py3-none-manylinux_2_25_aarch64.whl.metadata (1.8 kB)
+Collecting nvidia-cuda-nvcc>=13.0.48 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cuda_nvcc-13.3.73-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.9 kB)
+Collecting nvidia-cuda-runtime>=13.0.48 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cuda_runtime-13.3.29-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.8 kB)
+Collecting nvidia-cudnn-cu13<10.0,>=9.12.0.46 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cudnn_cu13-9.24.0.43-py3-none-manylinux_2_27_aarch64.whl.metadata (1.9 kB)
+Collecting nvidia-cufft>=12.0.0.15 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cufft-12.3.0.29-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.8 kB)
+Collecting nvidia-cusolver>=12.0.3.29 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cusolver-12.2.6.9-py3-none-manylinux_2_27_aarch64.whl.metadata (1.9 kB)
+Collecting nvidia-cusparse>=12.6.2.49 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cusparse-12.8.2.51-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.8 kB)
+Collecting nvidia-nccl-cu13>=2.27.7 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_nccl_cu13-2.31.2-py3-none-manylinux_2_18_aarch64.whl.metadata (2.1 kB)
+Collecting nvidia-nvjitlink>=13.0.39 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_nvjitlink-13.3.33-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.8 kB)
+Collecting nvidia-cuda-nvrtc>=13.0.48 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cuda_nvrtc-13.3.33-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.8 kB)
+Collecting nvidia-nvshmem-cu13>=3.3.20 (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_nvshmem_cu13-3.7.2-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (2.2 kB)
+Collecting nvidia-nvvm (from jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_nvvm-13.3.73-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.7 kB)
+Collecting nvidia-cuda-crt (from nvidia-cuda-nvcc>=13.0.48->jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cuda_crt-13.3.73-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.7 kB)
+Collecting nvidia-cuda-cccl (from nvidia-nvshmem-cu13>=3.3.20->jax-cuda13-plugin[with-cuda]<=0.11.1,>=0.11.1; extra == "cuda13"->jax[cuda13])
+  Downloading nvidia_cuda_cccl-13.3.3.4.1-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl.metadata (1.7 kB)
+Downloading jax-0.11.1-py3-none-any.whl (3.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 70.7 MB/s  0:00:00
+Downloading jax_cuda13_plugin-0.11.1-cp314-cp314-manylinux_2_27_aarch64.whl (7.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.9/7.9 MB 84.4 MB/s  0:00:00
+Downloading jax_cuda13_pjrt-0.11.1-py3-none-manylinux_2_27_aarch64.whl (125.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 125.8/125.8 MB 102.5 MB/s  0:00:01
+Downloading jaxlib-0.11.1-cp314-cp314-manylinux_2_27_aarch64.whl (82.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 82.8/82.8 MB 88.4 MB/s  0:00:00
+Downloading nvidia_cudnn_cu13-9.24.0.43-py3-none-manylinux_2_27_aarch64.whl (651.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 651.0/651.0 MB 119.5 MB/s  0:00:03
+Downloading ml_dtypes-0.6.0-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl (360 kB)
+Downloading nvidia_cublas-13.6.1.10-py3-none-manylinux_2_27_aarch64.whl (518.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 518.6/518.6 MB 95.8 MB/s  0:00:04
+Downloading nvidia_cuda_cupti-13.3.75-py3-none-manylinux_2_25_aarch64.whl (11.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 11.8/11.8 MB 112.3 MB/s  0:00:00
+Downloading nvidia_cuda_nvcc-13.3.73-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (39.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 39.5/39.5 MB 141.9 MB/s  0:00:00
+Downloading nvidia_cuda_nvrtc-13.3.33-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (49.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 49.3/49.3 MB 133.1 MB/s  0:00:00
+Downloading nvidia_cuda_runtime-13.3.29-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (2.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.4/2.4 MB 103.7 MB/s  0:00:00
+Downloading nvidia_cufft-12.3.0.29-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (184.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 184.7/184.7 MB 153.0 MB/s  0:00:01
+Downloading nvidia_cusolver-12.2.6.9-py3-none-manylinux_2_27_aarch64.whl (267.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 267.3/267.3 MB 99.5 MB/s  0:00:02
+Downloading nvidia_cusparse-12.8.2.51-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (172.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 172.9/172.9 MB 91.2 MB/s  0:00:01
+Downloading nvidia_nccl_cu13-2.31.2-py3-none-manylinux_2_18_aarch64.whl (252.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 252.5/252.5 MB 136.5 MB/s  0:00:01
+Downloading nvidia_nvjitlink-13.3.33-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (39.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 39.2/39.2 MB 150.2 MB/s  0:00:00
+Downloading nvidia_nvshmem_cu13-3.7.2-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (135.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.2/135.2 MB 118.1 MB/s  0:00:01
+Downloading nvidia_cuda_cccl-13.3.3.4.1-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (3.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.5/3.5 MB 110.4 MB/s  0:00:00
+Downloading nvidia_cuda_crt-13.3.73-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (157 kB)
+Downloading nvidia_nvvm-13.3.73-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl (67.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.0/67.0 MB 165.6 MB/s  0:00:00
+Downloading opt_einsum-3.4.0-py3-none-any.whl (71 kB)
+Installing collected packages: jax-cuda13-pjrt, opt_einsum, nvidia-nvvm, nvidia-nvjitlink, nvidia-nccl-cu13, nvidia-cuda-runtime, nvidia-cuda-nvrtc, nvidia-cuda-cupti, nvidia-cuda-crt, nvidia-cuda-cccl, ml_dtypes, jax-cuda13-plugin, nvidia-nvshmem-cu13, nvidia-cusparse, nvidia-cufft, nvidia-cuda-nvcc, nvidia-cublas, jaxlib, nvidia-cusolver, nvidia-cudnn-cu13, jax
+
+Successfully installed jax-0.11.1 jax-cuda13-pjrt-0.11.1 jax-cuda13-plugin-0.11.1 jaxlib-0.11.1 ml_dtypes-0.6.0 nvidia-cublas-13.6.1.10 nvidia-cuda-cccl-13.3.3.4.1 nvidia-cuda-crt-13.3.73 nvidia-cuda-cupti-13.3.75 nvidia-cuda-nvcc-13.3.73 nvidia-cuda-nvrtc-13.3.33 nvidia-cuda-runtime-13.3.29 nvidia-cudnn-cu13-9.24.0.43 nvidia-cufft-12.3.0.29 nvidia-cusolver-12.2.6.9 nvidia-cusparse-12.8.2.51 nvidia-nccl-cu13-2.31.2 nvidia-nvjitlink-13.3.33 nvidia-nvshmem-cu13-3.7.2 nvidia-nvvm-13.3.73 opt_einsum-3.4.0
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
++ stage jax-wheels
++ local now
+++ date +%s
++ now=1787848963
++ echo '[stage] jax-wheels +45s (total 63s)'
+[stage] jax-wheels +45s (total 63s)
++ _TLAST=1787848963
++ python3.14 -m pip install --upgrade --break-system-packages fastapi uvicorn pydantic transformers safetensors huggingface_hub numpy jinja2
+Requirement already satisfied: fastapi in ./usr/local/lib/python3.14/dist-packages (0.141.1)
+Collecting uvicorn
+  Downloading uvicorn-0.52.4-py3-none-any.whl.metadata (6.6 kB)
+Requirement already satisfied: pydantic in ./usr/local/lib/python3.14/dist-packages (2.13.4)
+Collecting transformers
+  Downloading transformers-5.16.1-py3-none-any.whl.metadata (32 kB)
+Collecting safetensors
+  Downloading safetensors-0.8.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (4.2 kB)
+Collecting huggingface_hub
+  Downloading huggingface_hub-1.29.0-py3-none-any.whl.metadata (16 kB)
+Requirement already satisfied: numpy in ./usr/local/lib/python3.14/dist-packages (2.5.2)
+Requirement already satisfied: jinja2 in ./usr/local/lib/python3.14/dist-packages (3.1.6)
+Requirement already satisfied: starlette>=0.46.0 in ./usr/local/lib/python3.14/dist-packages (from fastapi) (1.6.0)
+Requirement already satisfied: typing-extensions>=4.8.0 in ./usr/local/lib/python3.14/dist-packages (from fastapi) (4.16.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in ./usr/local/lib/python3.14/dist-packages (from fastapi) (0.4.4)
+Requirement already satisfied: annotated-doc>=0.0.2 in ./usr/local/lib/python3.14/dist-packages (from fastapi) (0.0.5)
+Requirement already satisfied: click>=7.0 in ./usr/local/lib/python3.14/dist-packages (from uvicorn) (8.4.2)
+Requirement already satisfied: h11>=0.8 in ./usr/local/lib/python3.14/dist-packages (from uvicorn) (0.16.0)
+Requirement already satisfied: annotated-types>=0.6.0 in ./usr/local/lib/python3.14/dist-packages (from pydantic) (0.8.0)
+Requirement already satisfied: pydantic-core==2.46.4 in ./usr/local/lib/python3.14/dist-packages (from pydantic) (2.46.4)
+Requirement already satisfied: packaging>=20.0 in ./usr/local/lib/python3.14/dist-packages (from transformers) (26.3)
+Requirement already satisfied: pyyaml>=5.1 in ./usr/local/lib/python3.14/dist-packages (from transformers) (6.0.3)
+Collecting regex>=2025.10.22 (from transformers)
+  Downloading regex-2026.7.19-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (40 kB)
+Collecting tokenizers<0.24.0,>=0.23.1 (from transformers)
+  Downloading tokenizers-0.23.1-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (9.8 kB)
+Collecting typer (from transformers)
+  Downloading typer-0.27.1-py3-none-any.whl.metadata (16 kB)
+Requirement already satisfied: tqdm>=4.60 in ./usr/local/lib/python3.14/dist-packages (from transformers) (4.70.0)
+Requirement already satisfied: filelock>=3.10.0 in ./usr/local/lib/python3.14/dist-packages (from huggingface_hub) (3.32.4)
+Requirement already satisfied: fsspec>=2023.5.0 in ./usr/local/lib/python3.14/dist-packages (from huggingface_hub) (2026.7.0)
+Collecting hf-xet<2.0.0,>=1.5.2 (from huggingface_hub)
+  Downloading hf_xet-1.6.0-cp38-abi3-manylinux_2_28_aarch64.whl.metadata (4.9 kB)
+Requirement already satisfied: httpx<1,>=0.23.0 in ./usr/local/lib/python3.14/dist-packages (from huggingface_hub) (0.28.1)
+Requirement already satisfied: anyio in ./usr/local/lib/python3.14/dist-packages (from httpx<1,>=0.23.0->huggingface_hub) (4.14.2)
+Requirement already satisfied: certifi in ./usr/local/lib/python3.14/dist-packages (from httpx<1,>=0.23.0->huggingface_hub) (2026.7.22)
+Requirement already satisfied: httpcore==1.* in ./usr/local/lib/python3.14/dist-packages (from httpx<1,>=0.23.0->huggingface_hub) (1.0.9)
+Requirement already satisfied: idna in ./usr/local/lib/python3.14/dist-packages (from httpx<1,>=0.23.0->huggingface_hub) (3.19)
+Requirement already satisfied: MarkupSafe>=2.0 in ./usr/local/lib/python3.14/dist-packages (from jinja2) (3.0.3)
+Collecting shellingham>=1.3.0 (from typer->transformers)
+  Downloading shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+Requirement already satisfied: rich>=13.8.0 in ./usr/local/lib/python3.14/dist-packages (from typer->transformers) (15.0.0)
+Requirement already satisfied: markdown-it-py>=2.2.0 in ./usr/local/lib/python3.14/dist-packages (from rich>=13.8.0->typer->transformers) (4.2.0)
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in ./usr/local/lib/python3.14/dist-packages (from rich>=13.8.0->typer->transformers) (2.21.0)
+Requirement already satisfied: mdurl~=0.1 in ./usr/local/lib/python3.14/dist-packages (from markdown-it-py>=2.2.0->rich>=13.8.0->typer->transformers) (0.1.2)
+Downloading uvicorn-0.52.4-py3-none-any.whl (79 kB)
+Downloading transformers-5.16.1-py3-none-any.whl (12.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.1/12.1 MB 159.9 MB/s  0:00:00
+Downloading huggingface_hub-1.29.0-py3-none-any.whl (795 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 795.8/795.8 kB 42.3 MB/s  0:00:00
+Downloading hf_xet-1.6.0-cp38-abi3-manylinux_2_28_aarch64.whl (4.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.3/4.3 MB 141.7 MB/s  0:00:00
+Downloading tokenizers-0.23.1-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (3.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.4/3.4 MB 124.7 MB/s  0:00:00
+Downloading safetensors-0.8.0-cp310-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (502 kB)
+Downloading regex-2026.7.19-cp314-cp314-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl (797 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 797.2/797.2 kB 36.0 MB/s  0:00:00
+Downloading typer-0.27.1-py3-none-any.whl (122 kB)
+Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+Installing collected packages: uvicorn, shellingham, safetensors, regex, hf-xet, typer, huggingface_hub, tokenizers, transformers
+
+Successfully installed hf-xet-1.6.0 huggingface_hub-1.29.0 regex-2026.7.19 safetensors-0.8.0 shellingham-1.5.4 tokenizers-0.23.1 transformers-5.16.1 typer-0.27.1 uvicorn-0.52.4
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
++ stage serving-deps
++ local now
+++ date +%s
++ now=1787848976
++ echo '[stage] serving-deps +13s (total 76s)'
+[stage] serving-deps +13s (total 76s)
++ _TLAST=1787848976
++ verify_gpu
++ python3.14 -
+jax 0.11.1 devices: [CudaDevice(id=0)]
+compute_capability: 7.5
++ stage gpu-verify
++ local now
+++ date +%s
++ now=1787848980
++ echo '[stage] gpu-verify +4s (tot--output truncated--
+```
+
+✅ Runtime installed and JAX saw the GPU. Next: deploy_jax_server.

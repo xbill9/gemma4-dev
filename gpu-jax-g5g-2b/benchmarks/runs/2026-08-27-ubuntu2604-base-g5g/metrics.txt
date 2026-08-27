@@ -1,0 +1,38 @@
+### Serving metrics on `i-021f15b2b45e13793`
+
+Served checkpoint: `google/gemma-4-E2B-it`
+
+Build id: `6442508c3817` (rig `gpu-jax-g5g-2b`)
+
+| Precision | Resolved |
+| --- | --- |
+| Compute dtype | **float16** |
+| Quant mode | **fp16** |
+| KV cache dtype | **float16 (requested `auto`)** |
+| PLE bits | 4 |
+| int8 lm_head | true |
+| Pre-Ampere (no bf16/fp8) | true |
+
+| Metric | Value |
+| --- | ---: |
+| `tpu_jax_cold_requests_total` | 2 |
+| `tpu_jax_completion_tokens_total` | 193 |
+| `tpu_jax_decode_seconds_total` | 28.39 |
+| `tpu_jax_decode_tokens_per_second` | 12.80 |
+| `tpu_jax_degenerate_responses_total` | 0 |
+| `tpu_jax_hbm_limit_bytes{device="cuda:0"}` | 14073987072 |
+| `tpu_jax_hbm_used_bytes{device="cuda:0"}` | 6197370880 |
+| `tpu_jax_last_bucket_size` | 32 |
+| `tpu_jax_last_pad_tokens` | 10 |
+| `tpu_jax_latency_seconds_sum` | 49.87 |
+| `tpu_jax_max_pad_tokens` | 16 |
+| `tpu_jax_prefill_milliseconds` | 107.20 |
+| `tpu_jax_prefill_seconds_total` | 20.01 |
+| `tpu_jax_prompt_tokens_total` | 82 |
+| `tpu_jax_requests_received_total` | 4 |
+| `tpu_jax_requests_total{status="failed"}` | 0 |
+| `tpu_jax_requests_total{status="success"}` | 4 |
+| `tpu_jax_weight_bytes` | 6155450950 |
+
+Cumulative decode: **6.80 tok/s** over 193 completion tokens in 28.4s of decode. This excludes prefill and HTTP, so it is comparable to the `tpu_jax_decode_tokens_per_second` gauge.
+⚠️ 2 request(s) compiled a new shape and are averaged in here. Cold requests measure several times slower; warm up before quoting this.
