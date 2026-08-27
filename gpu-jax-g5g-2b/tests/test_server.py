@@ -584,6 +584,49 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertIn("mkswap", user_data_from_config(ok))
 
 
+class CompilationCacheDirTests(unittest.TestCase):
+    """JAX_COMPILATION_CACHE_DIR must survive the port's import.
+
+    MEASURED 2026-08-27 on i-021f15b2b45e13793: the unit set the variable, the
+    process had it, and the configured directory stayed EMPTY while 447 files
+    accumulated under the fallback. ports/gemma4/jax_e_model.py set the path
+    unconditionally at import, and jax_openai_server imports it (via jax_engine)
+    AFTER resolving the same variable -- so the port silently won, every start.
+
+    Nothing failed and nothing logged. The JAX_CACHE_S3_URI sync added the same
+    day would have backed up an empty directory forever, reporting success.
+    """
+
+    def _source(self, rel):
+        return (ROOT / rel).read_text()
+
+    def test_the_port_honours_the_env_var(self):
+        src = self._source("ports/gemma4/jax_e_model.py")
+        self.assertIn('os.environ.get("JAX_COMPILATION_CACHE_DIR")', src)
+
+    def test_the_port_does_not_hardcode_the_fallback_as_the_only_path(self):
+        # The exact shape of the bug: expanduser as the sole source, with no
+        # env lookup in front of it.
+        src = self._source("ports/gemma4/jax_e_model.py")
+        self.assertNotIn(
+            '_cache_dir = os.path.expanduser("~/.cache/jax_compilation_cache")', src
+        )
+
+    def test_both_modules_resolve_the_cache_dir_the_same_way(self):
+        # They run in one process and the later import wins, so agreeing is the
+        # only way the result does not depend on import order.
+        for rel in ("ports/gemma4/jax_e_model.py", "jax_openai_server.py"):
+            with self.subTest(module=rel):
+                src = self._source(rel)
+                self.assertIn('os.environ.get("JAX_COMPILATION_CACHE_DIR")', src)
+                self.assertIn('"~/.cache/jax_compilation_cache"', src)
+
+    def test_the_unit_actually_ships_the_variable(self):
+        # The env var is only worth honouring if the bootstrap sets it.
+        text = user_data()
+        self.assertIn(f"JAX_COMPILATION_CACHE_DIR={server.JAX_COMPILATION_CACHE_DIR}", text)
+
+
 class LatestVersionPolicyTests(BashSyntaxMixin, unittest.TestCase):
     """Newest release is the default here; a pin needs a named constraint."""
 

@@ -138,7 +138,27 @@ logger.info(
 )
 
 # Persistent JAX XLA Compilation Disk Cache (skips ~17s compilation on restart)
-_cache_dir = os.path.expanduser("~/.cache/jax_compilation_cache")
+#
+# JAX_COMPILATION_CACHE_DIR is honoured, and that is not cosmetic. This module is
+# imported by jax_engine, which jax_openai_server imports AFTER it has already
+# resolved the same variable and called jax.config.update. Setting the path
+# unconditionally here therefore OVERWROTE the server's choice, silently, on
+# every start.
+#
+# MEASURED 2026-08-27 on i-021f15b2b45e13793: the systemd unit set
+# JAX_COMPILATION_CACHE_DIR=/opt/jax-cache, the process had it in its
+# environment, and /opt/jax-cache stayed EMPTY (0 files) while 447 files and
+# 5.1 MB of cache accumulated under ~/.cache/jax_compilation_cache. So the
+# variable had never once taken effect on this rig, and anything pointed at the
+# configured directory -- the JAX_CACHE_S3_URI sync added the same day -- would
+# have backed up an empty directory forever, reporting success.
+#
+# The fallback is unchanged, so a caller that sets nothing gets exactly the old
+# path. Note that under systemd HOME is normally unset, in which case
+# expanduser() resolves via pwd and this becomes /root/.cache/... .
+_cache_dir = os.environ.get("JAX_COMPILATION_CACHE_DIR") or os.path.expanduser(
+    "~/.cache/jax_compilation_cache"
+)
 os.makedirs(_cache_dir, exist_ok=True)
 jax.config.update("jax_compilation_cache_dir", _cache_dir)
 jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
