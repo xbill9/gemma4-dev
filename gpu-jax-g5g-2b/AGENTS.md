@@ -43,7 +43,7 @@ No PyTorch, no torch_xla, no vLLM. The engine is this repo's own port (`ports/ge
 
 ## Testing
 
-`python3 -m unittest discover -s tests -v` — **unittest, never pytest**. 105 tests, fully
+`python3 -m unittest discover -s tests -v` — **unittest, never pytest**. 122 tests, fully
 offline: no AWS, no network, no GPU. They pin the Turing dtype constraints, the AMI filter,
 the host-RAM floor, the shared-memory ceiling, and that the token never reaches user data.
 

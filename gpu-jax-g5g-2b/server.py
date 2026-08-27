@@ -281,7 +281,7 @@ def _needs_swap(instance_type: str) -> bool:
 
 def _validate_instance_type(instance_type: str) -> None:
     """Only the size list is enforced. Small hosts are supported, not rejected --
-    `_user_data` provisions a swapfile for them (see `_SWAP_BELOW_HOST_RAM_GB`)."""
+    `_user_data` provisions a swapfile for them (see `_SWAP_AT_OR_BELOW_HOST_RAM_GB`)."""
     if not _is_g5g(instance_type):
         raise ValueError(f"instance_type must be one of {', '.join(sorted(_G5G_SIZES))}")
 

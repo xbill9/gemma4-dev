@@ -14,16 +14,21 @@ server (`jax_openai_server.py`), run under systemd — **not docker**.
 
 ## This rig has served
 
-**Twice, and both runs are its own.** `benchmarks/runs/2026-08-19-first-serve-g5g/` is the
-first serve; `benchmarks/runs/2026-08-21-cuda13-py314-g5g/` repeats it on the CUDA 13 /
-Python 3.14 stack. The headline is **~12 tok/s single-stream** on `g5g.2xlarge`.
+**Five runs, all its own**, on `g5g.2xlarge`. `2026-08-19-first-serve-g5g` is the first
+serve and `2026-08-21-cuda13-py314-g5g` repeats it on CUDA 13 / Python 3.14;
+`2026-08-25-context-sweep-g5g` is the first sweep and the first xprof profile;
+`2026-08-26-config-sweep-g5g` and `2026-08-26-quant-levers-fixed-g5g` break and then fix the
+quantization levers. The headline is **13.1 tok/s single-stream** at the current default,
+**12.8** at the one the first three runs measured. See **Measurement** for the table.
 
 Two things that still hold and are easy to lose:
 
-- **Most numbers you might want are still absent or belong to a sibling.** Two prompts, one
-  concurrency, one context. `tpu.env` still marks values MEASURED or PREDICTED; respect the
-  split and do not quote a PREDICTED number as a result. The KV-ceiling estimate in
-  particular remains PREDICTED — the serving runs did not test it.
+- **The grid is still thin in one axis and closed in another.** Context × output length is
+  swept (12 cells, 2026-08-25) and serving config is swept (5 configs, 2026-08-26), but
+  **concurrency is not an axis and cannot be**: `MAX_NUM_SEQS=1`, `Gemma4EModelJAX` raises
+  `NotImplementedError` for `B > 1`, and the decode step donates its KV buffers. `tpu.env`
+  still marks values MEASURED or PREDICTED; respect the split and do not quote a PREDICTED
+  number as a result.
 - **Installability is not a served token.** `jaxlib` and the CUDA plugins publishing
   `manylinux_2_27_aarch64` wheels, and the PJRT arch tables carrying `sm_75` with an SM 6.0
   floor (verified 2026-08-18), were never the same claim as "it serves".
@@ -145,10 +150,29 @@ mantissa bits, visibly truncates output. Kept for comparison; never serve with i
 `g5g.2xlarge` is the default. **Every size is supported** — `_validate_instance_type` only
 enforces the size list.
 
-`g5g.xlarge` (8 GiB) needs a swapfile, and `_user_data` provisions one automatically below
-`_SWAP_BELOW_HOST_RAM_GB = 16`. Measured on the vLLM sibling 2026-08-13, same checkpoint and
-same host, so it carries: without swap the kernel refuses to **mmap** the 10.2 GB checkpoint
-at all —
+`_user_data` provisions a swapfile at or below `_SWAP_AT_OR_BELOW_HOST_RAM_GB = 16`, which
+covers **`g5g.xlarge` and the default `g5g.2xlarge`**. Two distinct pressures, both measured,
+and the larger one sets the threshold:
+
+- **`g5g.xlarge` (8 GiB) cannot even mmap the checkpoint** (below).
+- **`g5g.2xlarge` (16 GiB) mmaps fine and then dies in `quantize_ple_table`**, which upcasts
+  the 4.70 GB PLE table to float32 while the full tree is resident. MEASURED 2026-08-26:
+  OOM-killed five times at 14.3 GB anon-RSS under `Restart=on-failure`. The gate was
+  `< 16` and 2xlarge has *exactly* 16, so the rig provisioned swap for the one size that did
+  not need it for this and skipped the one that did. **The threshold was the bug, not the
+  remedy** — the `fallocate`/`mkswap`/`swapon` block already existed.
+
+**Making it inclusive immediately exposed a second bug**, which is worth keeping as a pattern:
+the swap block had used `mkswap -q`, a **busybox** flag that util-linux (Ubuntu 22.04) rejects
+with `invalid option -- 'q'`. Under `set -e` that killed cloud-init *before install.sh was
+written*, so the instance booted with an empty `/opt/jax-g5g` and no install log at all. It
+was latent for as long as only `g5g.xlarge` rendered the block and nobody launched one.
+Two lessons: **a code path that only renders for a size nobody launches is untested code**,
+and the reason this cost a launch rather than a minute is covered under **Tracing a
+deployment** below.
+
+The mmap failure, measured on the vLLM sibling 2026-08-13 with the same checkpoint and host,
+so it carries: without swap the kernel refuses to **mmap** the 10.2 GB checkpoint at all —
 
 ```
 RuntimeError: unable to mmap 10246621918 bytes from model.safetensors:
@@ -257,8 +281,8 @@ Three things about it that are easy to get wrong:
 
 ## Commands
 
-Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v` (76 tests,
-all passing as of 2026-08-24). They are fully offline — no AWS, no network, no GPU — and pin
+Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v` (122 tests,
+all passing as of 2026-08-27). They are fully offline — no AWS, no network, no GPU — and pin
 the facts above: the Turing dtype constraints, the arm64+driver AMI filter, the host-RAM
 floor, the shared-memory ceiling, that the token never reaches user data, that `tpu.env` and
 `server.py` still agree, and that no `VLLM_*`/`TORCH_CUDA*` key survived the fork.
@@ -331,6 +355,12 @@ and it gained a `gpu-jax-g5g-2b` entry on 2026-08-18.
 ## How large a model this rig will serve
 
 **`docs/larger-models-on-t4g.md` — measured 2026-08-23. E2B is the ceiling today.**
+
+**Its DENSE prefill bracket is superseded.** That document bracketed the dense checkpoint at
+(115, 2015] tokens; the `logits_at` fix lifted it, the 2026-08-25 sweep cleared 4,105, and
+2026-08-26 located the ceiling between **4,105 and 5,120**. See the `MAX_MODEL_LEN` section.
+The model-size table below is unaffected — those blockers are load-time and per-request
+residency, not prefill context.
 
 | Model | Loads? | Serves? | Blocker |
 | --- | --- | --- | --- |
@@ -604,17 +634,193 @@ serving process through the systemd `EnvironmentFile`. `tpu_jax_decode_seconds_t
 also lands, so cumulative decode is a real rate instead of the lower bound
 `get_metrics` used to apologise for.
 
-`tests/test_server.py::ObservabilityTests` pins all of it (100 tests, green).
+`tests/test_server.py::ObservabilityTests` pins all of it.
+
+## 87% of decode is dtype tax, and nothing else is close
+
+**`benchmarks/runs/2026-08-25-context-sweep-g5g/` — MEASURED, with the first xprof profile
+taken on this rig.** This is the single most important number here and it subsumes most
+optimization ideas you might arrive at independently.
+
+| Kernel class | Time | Share |
+| --- | ---: | ---: |
+| dtype conversion (`wrapped_convert_*`) | 811.4 ms | **54.4%** |
+| fp32 `gemvx` | 486.2 ms | **32.6%** |
+| reduce fusions | 167.2 ms | 11.2% |
+| everything else | 27.2 ms | 1.8% |
+
+The cause is already written up in `docs/bf16-weights-on-turing.md` and this confirms it from
+the other side: the loader stores all 540 float parameters as **bfloat16** while
+`COMPUTE_DTYPE` is **float16**, so XLA converts in front of every use — and the matmuls that
+remain run as **fp32 GEMV**.
+
+Three corroborating facts, each of which kills a plausible-sounding alternative theory:
+
+- **Decode does not degrade with context.** 12.80 tok/s mean, **3.4% total spread** across a
+  100× context range (41 → 4,105 tokens) and a 4× output range. A cost proportional to the
+  *weights* rather than the context produces exactly that. If KV were binding, decode would
+  fall as context grew. It does not, so **the KV cache is not what sets decode speed here.**
+- **No kernel used a TensorCore** — `Kernel uses TensorCore` is `False` for **100.0%** of
+  kernel time, on a chip with 65.1 TFLOP/s of fp16 tensor-core throughput. Do **not** size an
+  expected win off that peak: at `B=1` decode is a matrix-*vector* product, bandwidth-bound by
+  nature, and tensor cores need matrix-matrix work to pay.
+- **Prefill is linear in the PADDED bucket**, not the real prompt: `prefill_ms = 1.478 ×
+  bucket − 101`, **R² = 0.997**. TTFT is a bucket property, which is why the bucket ladder is
+  a latency knob and not just a correctness one.
+
+**The untried fix is a bit-shift, and it is the highest-value work available here.**
+`docs/bf16-weights-on-turing.md` records three placements tried and rejected on hardware. The
+direction it flags as untried is straightforward: **bf16 → float32 is a 16-bit left shift**
+(`u16.astype(uint32) << 16` viewed as `float32`), pure NumPy and fully vectorised, and
+float32 → float16 is a native vectorised cast. That sidesteps `ml_dtypes`' unvectorised
+element-wise path entirely — the thing that made E2B's 4.7 GB table not finish in 10 minutes
+on Graviton2. Do it per shard at load, so no bf16 source outlives its converted copy.
+
+**Fragmentation, not peak, is the memory constraint.** xprof `GPU_0_bfc` at peak: 10.171 GiB
+in use, 2.937 GiB free, **fragmentation 0.661**. The free two-thirds is not contiguous, which
+is the same condition behind the `device_put` failures in `docs/bf16-weights-on-turing.md`.
+**Any capacity claim on this rig should quote the largest contiguous block, not free bytes** —
+two of the three quantization bugs below failed with GBs nominally free.
+
+## The quantization levers: broken three ways, then fixed and measured
+
+**`2026-08-26-config-sweep-g5g` found that none of the three levers could load;
+`2026-08-26-quant-levers-fixed-g5g` fixed all three and measured them. Both are MEASURED.**
+
+| Config | Weights | vs base | Load s | Decode tok/s (128 / 1024 / 4096) |
+| --- | ---: | ---: | ---: | --- |
+| `ple0` — the old default | 9.257 GB | — | 184.3 | 12.80 / 12.77 / 12.60 |
+| `ple8` | 6.927 GB | −2.330 | 80.5 | 12.80 / 12.70 / 12.60 |
+| `ple4` | 5.752 GB | −3.505 | 126.8 | 12.80 / 12.70 / 12.60 |
+| `ple0+int8head` | 9.660 GB | +0.403 | 94.8 | 13.10 / 13.00 / 12.80 |
+| **`ple4+int8head` — the current default** | **6.155 GB** | **−3.102** | 95.3 | **13.10 / 13.00 / 12.80** |
+
+**`tpu.env` changed on 2026-08-26 to `PLE_BITS=4` / `INT8_LM_HEAD=1`.** It is strictly better
+than the old default on both axes — 33% less memory and +2.3% throughput — but
+**`INT8_LM_HEAD` is not numerics-preserving (~0.8% logit error)**, so it is a deliberate trade
+recorded as such, not a free win.
+
+Four things worth keeping:
+
+- **PLE is memory-only, exactly as the port's comments predicted.** Decode is identical across
+  `ple0`/`ple8`/`ple4`: the table is a gather, never a matmul, so decode never streams it.
+  Every prediction in `jax_e_model.py` landed — `ple_bits=8` → −2.330 GB against −2.35
+  predicted (0.8%), `ple_bits=4` → −3.505 against −3.51 (0.1%), `int8_lm_head` +0.403 GB
+  exact.
+- **`int8_lm_head` does not do an int8 matmul.** xprof says the conversion kernel shrank 11%
+  rather than disappearing, because `jax_e_model.py` dequantizes the int8 table to fp16 **in
+  full — 0.75 GiB — on every decode step** and then runs the same matmul. It halves the bytes
+  *read* and pays a full-table convert regardless. That is the entire +2.3%. **Turing has int8
+  tensor cores (~130 TOPS) and this path never touches them** — a genuine int8 matmul is the
+  unexploited win, not a larger PLE. Same shape as the W4A16 result: what is labelled
+  quantized execution is really **dequantize-then-matmul**.
+- **PLE quantization makes loads FASTER** — 80–127 s against 184 s baseline. Less to place on
+  the device outweighs the host-side quantization cost.
+- **Two of the three bugs were one pattern**: allocate the destination before releasing the
+  source, on a device whose free memory is 66% fragmented. `quantize_lm_head` upcast
+  `[262144, 1536]` to float32 **on device** (1.50 GiB, exact) when the correct host-side
+  chunked pattern was 1,200 lines up in the same file; `quantize_ple_table` placed the int8
+  copy (2.19 GiB, exact) while the 4.38 GiB bf16 original was still resident. The third was
+  the swap gate. **`release_source` is opt-in deliberately** — the first version deleted
+  unconditionally and a CPU test caught it in seconds, because `.delete()` invalidates the
+  *caller's* array. A test asserts `load()` actually opts in, or the fix would sit in the tree
+  doing nothing.
+
+## `MAX_MODEL_LEN` is 4096 because 8192 was not reachable
+
+**MEASURED 2026-08-26.** Lowered from 8192, and the old value was not an honest number — a
+little over half of it was reachable.
+
+| prompt tokens | status | failed allocation |
+| ---: | --- | ---: |
+| 4,105 | ok | — |
+| 5,120 | **infeasible** | 2.59 GiB |
+| 6,144 | **infeasible** | 3.48 GiB |
+| 7,800 | **infeasible** | 5.11 GiB |
+
+**The prefill transient has a flat term AND a linear one, and both prior measurements were
+right.** `docs/bf16-weights-on-turing.md` measured it as FLAT in the bucket (1.504 GiB at 512
+and at 1,536, 1.742 GiB at 4,096) — that measurement was taken entirely inside the flat
+region. Above ~4K a linear term at roughly **0.9 MiB/token** takes over. Do not treat either
+as the whole story.
+
+**The documented remedy is structurally unreachable.** `PREFILL_CHUNK_SIZE` exists precisely
+to bound prefill temporaries, and `jax_e_model.py` raises `prefill_chunk_size requires
+window_kv=False`. `window_kv` auto-resolves to **True** whenever `max_model_len >
+sliding_window` (8192 > 512, and 4096 > 512), so setting `PREFILL_CHUNK_SIZE` raises at
+startup. The only route to chunked prefill is `window_kv=off`, which is **untested here**.
+The one mitigation for the ceiling is gated behind an untested flag.
+
+## Tracing a deployment
+
+**Added 2026-08-27, after the `mkswap` incident. Verified offline; not yet exercised on a
+launch.**
+
+The provisioning path had two blind spots, and the first one is why a one-character flag cost
+a launch rather than a minute.
+
+- **`get_install_progress` could not tell a dead bootstrap from a slow one.** Cloud-init
+  writes `install.sh` and *backgrounds* it, so anything that kills cloud-init before that
+  point leaves no install log — and the tool rendered that as `INSTALL IN PROGRESS` +
+  `no install log yet`, indefinitely, which is also exactly what a healthy slow install looks
+  like. It now reports `cloud-init status --long`, tails `cloud-init-output.log` when the
+  install log is absent, and returns a verdict separating **cloud-init error** /
+  **done-but-never-started** / **genuinely-still-booting**. The failing states say `NOT a slow
+  install` in as many words, because that inference is the one that was not being made.
+- **The install was the longest phase of a deploy and the only untimed one.** The model load
+  reports four stages; this reported none, so the 2026-08-25 spot reclamation at 21 minutes
+  left no record of which step was running. `install.sh` now emits `[stage] <name> +Ns` around
+  apt, the interpreter, pip bootstrap, the jax wheels, the serving deps and the GPU assertion.
+  Grep with `grep -F '[stage]' /var/log/jax-install.log`.
+
+Two optimizations landed with them:
+
+- **The root volume was left at gp3's 125 MiB/s default and the load sat on it.** MEASURED
+  2026-08-25: `read_shards` moved the checkpoint in 73.5 s (~139 MB/s) and the download took
+  87.7 s (~116 MB/s). **Two unrelated stages landing on one number is a volume ceiling**, not
+  CPU and not network. Now 500 MiB/s / 6000 IOPS — ~4× baseline, still under `g5g.2xlarge`'s
+  own EBS cap ("up to" 4.75 Gbps ≈ 593 MB/s) so the smaller sizes stay instance-bound, and
+  satisfying gp3's `throughput <= IOPS × 0.25` rule, which is enforced at run-instances time
+  and so fails a *launch* rather than slowing a disk. **UNTESTED as a remedy** — the load
+  stages are already timed, so one launch settles it.
+- **The XLA compilation cache can now survive a relaunch**, via `JAX_CACHE_S3_URI`. It lives
+  on the ephemeral root volume, so every relaunch recompiles every shape — and the 128-step
+  bucket ladder means far more distinct shapes than the old power-of-two one, at ~14 s each
+  (18.77 s cold against 4.35 s warm). **Empty by default**, so the default rendering is
+  byte-identical to what the rig shipped before; opt in with an operator-supplied URI, in the
+  same spirit as the required subnet/security-group/instance-profile ids. Upload is on a
+  **timer, not `ExecStopPost`**: spot gives ~2 minutes and does not reliably run shutdown
+  hooks. The restore carries `|| true` because it runs under `set -e` and the first launch
+  syncs a prefix that does not exist yet — the `mkswap` failure exactly.
+
+**`get_deployment_config` printed `VolumeSize=200` while `create_g5g_instance` launched 100.**
+Both now render from one set of constants. A copy-pasteable repro command that provisions a
+different volume from the tool it documents is how a manual reproduction fails to reproduce.
+
+**Still open: there is no prebuilt AMI, and the argument against one has weakened.**
+`CLAUDE.md` has always argued a stock DLAMI is right here because this install is `pip
+install`, not the vLLM sibling's 67-minute build. That reasoning is sound *against that
+comparison*. But the 2026-08-25 reclamation killed an instance at 21 minutes, **before the
+wheels finished** — so on spot this rig currently cannot reliably survive its own install.
+Baking the install into an AMI is what would make spot usable at all. That is a decision, not
+a cleanup, and it has not been taken.
 
 ## Measurement
 
-**This rig has two measurements**, both its own, in `benchmarks/runs/<date>-<what>-g5g/`
+**This rig has five measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`
 where `<hw-short>` equals the hardware slot:
 
-| Run | Decode | Note |
+| Run | Decode | What it added |
 | --- | ---: | --- |
 | `2026-08-19-first-serve-g5g` | 12.5 tok/s | First serve. CUDA 12 / Python 3.12. |
 | `2026-08-21-cuda13-py314-g5g` | 12.4 tok/s | CUDA 13 / Python 3.14, same AMI. |
+| `2026-08-25-context-sweep-g5g` | 12.80 tok/s | 12 cells, context × output. First xprof. |
+| `2026-08-26-config-sweep-g5g` | 12.8 tok/s | Config sweep: all three levers fail. Locates the prefill ceiling. |
+| `2026-08-26-quant-levers-fixed-g5g` | **13.10 tok/s** | Levers fixed. 5/5 configs, 15/15 cells. Sets the current default. |
+
+**The 12.4/12.5/12.8 figures are all the same configuration** (`ple0`, no int8 head) on
+successive stacks, and they are within noise of each other. **13.10 is a different
+configuration**, not an improvement to the old one — see the quantization-lever section.
 
 **The CUDA 13 / 3.14 bump is performance-neutral** — it buys currency, not speed. Compare the
 two on the `tpu_jax_decode_tokens_per_second` gauge, not end-to-end tok/s: the same prompt
@@ -639,19 +845,17 @@ A config flag being accepted is not evidence it did anything. Cross-check agains
 physical bound — 320 GB/s of GDDR6 and 15360 MiB is the whole envelope here — not against
 another config.
 
-## Fork debris still to clean up
+## Fork debris — cleared, and why the list stays
 
 This rig was forked from `gpu-vllm-g5g-2b` and the code was rewritten before the prose was.
-The registration files were repaired on 2026-08-18. Still stale:
+**The backlog is empty as of 2026-08-25**: registration files repaired 2026-08-18, and
+`caf89a2` retitled `README.md`, rewrote `AGENTS.md` and `GEMINI.md` (they are no longer
+byte-identical vLLM copies), and gave the monorepo `NAMING.md` and `README.md` their
+`gpu-jax-g5g-2b` entries.
 
-- **`README.md`** — titled `gpu-vllm-g5g-2b` and describes the vLLM runtime throughout.
-- **`AGENTS.md`, `GEMINI.md`** — same, byte-identical vLLM copies.
-- **Monorepo `NAMING.md` and `README.md`** — have no entry for `gpu-jax-g5g-2b` at all, and
-  `NAMING.md`'s `g5g` carve-out names only the vLLM rig. (The root `marketplace.json` does
-  have one.)
-
-Cleared 2026-08-23, listed here because the *class* of error keeps recurring — TPU-rig prose
-describing precision this chip cannot run:
+The list stays because the *class* of error keeps recurring and the recurrences are what
+matter — TPU-rig or vLLM-rig prose describing precision this chip cannot run, in a rig whose
+whole premise is which precision the device picked. Cleared 2026-08-23:
 
 - `jax_openai_server.py`'s module docstring claimed "TPU v6e-1", the `-qat-w4a16-ct`
   checkpoint and BF16 activations. It now points at `/health` and the
