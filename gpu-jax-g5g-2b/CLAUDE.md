@@ -931,6 +931,74 @@ was the wrong first hypothesis — it was working, in the wrong place.
 the later import wins, so agreeing is the only thing that makes the result independent of
 import order.
 
+## The tuning loop
+
+**`tune_loop.py` — added 2026-08-27.** One command runs a full iteration against a live
+instance: `make skill` + deploy, wait for READY, assert the served build id equals the local
+payload digest, sweep, profile, pull artifacts back, and diff against a previous run.
+
+```bash
+python3 tune_loop.py --instance i-0123 --label baseline
+# ... change the model port ...
+python3 tune_loop.py --instance i-0123 --label candidate \
+    --compare benchmarks/runs/2026-08-27-baseline-g5g
+```
+
+**Every ingredient already existed and none of them composed.** `sweep.py` lived *inside* a
+run directory and was copy-pasted per run, so each iteration re-derived its own harness;
+`profile_decode.py` sat at the rig root and was driven by hand; the xprof extraction was prose
+in `docs/profiling-recipes.md`. Three independent sources of drift between two numbers that
+are supposed to be comparable.
+
+Four things it is opinionated about, each because it has cost a measurement here:
+
+- **Deploy what you measure**, then assert the served build id equals the local digest. The
+  2026-08-24 stale deploy is one line of output now.
+- **Warm at the shape you measure.** `max_new_tokens` is a `static_argnames` entry, so
+  `(bucket, max_tokens)` *is* the compiled shape — previously a 4x error.
+- **Artifacts return through S3, not SSM.** SSM truncates at 24,000 characters silently, and
+  a kernel table exceeds it; a partial JSON is how you conclude a finding is not there.
+- **Median, not mean**, over repeats — a spot host gives the occasional slow request and the
+  cold/warm gap here is 4x.
+
+The sweep runs **before** the profiler, because `profile_decode.py` needs the GPU to itself
+and the service must stop for it.
+
+**Baseline through the loop, 2026-08-27** (`benchmarks/runs/2026-08-27-baseline-g5g/`): 12.8
+and 13.0 tok/s gauge, weights 6.155 GB, 0 degenerate, and **convert 53.9% / gemv 32.8%** — an
+independent reproduction of the 54.4% / 32.6% dtype tax from a fresh harness.
+
+### First iteration: the bf16 blocker is gone, but the fix is not this one
+
+`docs/bf16-weights-on-turing.md` records `astype(float16)` on `ml_dtypes` bfloat16 as unusably
+slow — E2B's 4.70 GB PLE table "did not finish in 10 minutes" on Graviton2, 2026-08-24 — and
+names a `view(uint16)` bit-shift as the only untried direction. **Both halves are now false,
+re-measured on the same chip** (`benchmarks/runs/2026-08-27-baseline-g5g/bf16_convert_bench.txt`,
+numpy 2.5.2 / ml_dtypes 0.6.0):
+
+| path | throughput | 4.70 GB table | bit-identical |
+| --- | ---: | ---: | --- |
+| direct `astype(float16)` | 1.15 GB/s | 4.1 s | yes |
+| **via float32** | **1.91 GB/s** | **2.5 s** | yes |
+| `view(uint16)` bit-shift | 1.27 GB/s | 3.7 s | yes |
+
+All three are bit-identical, so it is purely a speed question. **The blocker was a stale
+`ml_dtypes`, not a property of Graviton2**, and the "untried" bit-shift is not even the fastest
+of the three. Cross-checked on x86_64 the same day, same conclusion.
+
+**Converting at shard load nonetheless FAILED on hardware, and the loop caught it in one
+iteration.** Casting every tensor to `COMPUTE_DTYPE` as its shard lands, plus pointing the
+loader's default at `COMPUTE_DTYPE`, produced two regressions: `read_shards` went **24.7 s →
+79.0 s** (an order of magnitude worse than the 5 s the microbenchmark predicts for 9.26 GB, so
+the in-situ cost is not the cast itself), and `quantize_ple_table` then **OOMed allocating
+4.38 GiB on device**. Reverted; the tree serves `51bc52c9e2e9`.
+
+**Do not simply retry this.** The microbenchmark says the conversion is cheap and the
+integration says otherwise, so the next step is to find where the 54 s actually goes — 600
+tensors, a per-tensor `np.asarray` that may be copying, and host RSS moving from mmap-backed
+to anonymous are the three candidates — before touching the dtype again. The dtype tax remains
+87% of decode and remains the largest available win.
+
 ## Measurement
 
 **This rig has six measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`

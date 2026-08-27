@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+"""One iteration of the measure -> profile -> tune -> re-measure loop.
+
+Run it from the RIG DIRECTORY, against a live instance:
+
+    python3 tune_loop.py --instance i-0123 --label baseline
+    # ... change the model port ...
+    python3 tune_loop.py --instance i-0123 --label bf16-bitshift \\
+        --compare benchmarks/runs/2026-08-27-baseline-g5g
+
+WHY THIS EXISTS. Every ingredient was already here and none of them composed:
+`sweep.py` lived INSIDE a run directory and was copy-pasted per run, so each
+iteration re-derived its own harness; `profile_decode.py` sat at the rig root and
+had to be driven by hand; and the xprof extraction was prose in
+docs/profiling-recipes.md. Three sources of drift between two numbers that are
+supposed to be comparable.
+
+The loop is deliberately opinionated about three things, each of which has cost
+this rig a measurement before:
+
+  * DEPLOY WHAT YOU MEASURE. `make skill` then deploy, and assert the build id
+    the server reports equals the local payload digest. On 2026-08-24 a deploy
+    shipped the previous skill snapshot and a full measure-and-conclude cycle was
+    spent on stale code.
+  * WARM AT THE SHAPE YOU MEASURE. max_new_tokens is a static_argnames entry, so
+    (bucket, max_tokens) IS the compiled shape. Warming at a different max_tokens
+    was previously a 4x error here (3.4 vs 13.5 tok/s).
+  * ARTIFACTS COME BACK THROUGH S3, NOT SSM. SSM caps command output at 24,000
+    characters and truncates silently; an xprof kernel table exceeds that, and a
+    partial JSON is how you conclude a finding is not there.
+
+The profiler needs the GPU to itself, so the service is stopped for that phase
+and restarted after. That is why the sweep runs FIRST.
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import datetime
+import json
+import os
+import statistics
+import sys
+import time
+import urllib.error
+import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import server
+
+S3_RESULTS = "s3://vllm-models-bucket/benchmarks/gpu-jax-g5g-2b"
+REMOTE_OUT = "/opt/jax-g5g/loopout"
+FILLER = "token "
+
+
+def post(base: str, payload: dict, timeout: float = 300.0):
+    req = urllib.request.Request(
+        f"{base}/chat/completions",   # `base` here is the /v1 API base
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    t = time.time()
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        body = json.load(r)
+    return body, time.time() - t
+
+
+def cell(base: str, in_tok: int, out_tok: int, repeats: int = 3) -> dict:
+    """Warm at the measured shape, then repeat. Returns the MEDIAN, not the mean.
+
+    Median because a spot host occasionally gives one slow request and a
+    three-sample mean cannot survive it; the cold/warm gap here is 4x, so an
+    outlier that slips through would dominate.
+    """
+    prompt = (FILLER * max(1, in_tok)).strip()
+    body = {"model": server.MODEL_NAME, "max_tokens": out_tok,
+            "messages": [{"role": "user", "content": prompt}]}
+    warm, _ = post(base, body)                     # compile this exact shape
+    rates, walls = [], []
+    for _ in range(repeats):
+        got, wall = post(base, body)
+        u = got.get("usage", {})
+        comp = u.get("completion_tokens") or 0
+        walls.append(wall)
+        if wall > 0:
+            rates.append(comp / wall)
+    u = warm.get("usage", {})
+    return {
+        "input_tokens": u.get("prompt_tokens"),
+        "output_tokens": out_tok,
+        "pad_tokens": u.get("pad_tokens"),
+        "bucket": u.get("bucket_size"),
+        "end_to_end_tok_s": round(statistics.median(rates), 3) if rates else None,
+        "wall_median_s": round(statistics.median(walls), 3),
+        "samples": repeats,
+    }
+
+
+async def gauge(iid: str) -> dict:
+    """Decode gauge + weight bytes, straight off /metrics.
+
+    tpu_jax_decode_tokens_per_second is the like-for-like figure both benchmark
+    reports compare on: it times decode alone, where the end-to-end rate above
+    also carries prefill and the HTTP round trip.
+    """
+    raw = await server.get_metrics(iid)
+    out = {}
+    for line in raw.splitlines():
+        for key in ("tpu_jax_decode_tokens_per_second", "tpu_jax_weight_bytes",
+                    "tpu_jax_hbm_used_bytes", "tpu_jax_prefill_milliseconds",
+                    "tpu_jax_degenerate_responses_total", "tpu_jax_cold_requests_total"):
+            if line.strip().startswith("|") and key in line:
+                parts = [p.strip(" `|") for p in line.split("|") if p.strip(" `|")]
+                if len(parts) >= 2:
+                    try:
+                        out[key] = float(parts[-1].replace(",", ""))
+                    except ValueError:
+                        pass
+    return out
+
+
+PROFILE_SH = r"""
+set -e
+mkdir -p {out}
+cd /opt/jax-g5g/app
+set -a; . /opt/jax-g5g/env; set +a
+systemctl stop jax-g5g
+# profile_decode.py is NOT part of the deploy payload -- it is a profiling tool,
+# not a serving one -- so it is shipped by this driver alongside the run.
+PYTHONPATH=/opt/jax-g5g/app python3.14 {out}/profile_decode.py \
+    --model "$MODEL_NAME" --ple-bits "${{PLE_BITS:-4}}" {int8flag} \
+    --steps {steps} --top 25 > {out}/profile_decode.txt 2>{out}/profile_decode.err || true
+{xprof}
+systemctl start jax-g5g
+tar czf {out}.tgz -C {out} . 2>/dev/null || true
+aws s3 cp {out}.tgz {s3}/{label}.tgz --only-show-errors
+echo "UPLOADED {s3}/{label}.tgz"
+"""
+
+XPROF_SH = r"""
+python3.14 -m pip install --break-system-packages -q -r /opt/jax-g5g/requirements-profiling.txt \
+    >{out}/xprof_install.log 2>&1 || echo "xprof install FAILED" >>{out}/xprof_install.log
+PYTHONPATH=/opt/jax-g5g/app python3.14 - <<'XP' >{out}/xprof_extract.log 2>&1 || true
+import glob, json
+from xprof.convert import raw_to_tool_data as R
+xs = sorted(glob.glob("/tmp/jaxtrace/**/*.xplane.pb", recursive=True))
+print("xplane files:", xs)
+if xs:
+    print("tools:", R.xspace_to_tool_names(xs))
+    for tool in ("kernel_stats^", "memory_profile^", "roofline_model^"):
+        try:
+            data, _ = R.xspace_to_tool_data(xs, tool, {})
+            name = tool.rstrip("^")
+            open(f"{out}/xprof_{name}.json", "w").write(
+                data if isinstance(data, str) else json.dumps(data))
+            print("wrote", name)
+        except Exception as e:
+            print("FAILED", tool, type(e).__name__, e)
+XP
+"""
+
+
+async def run(args) -> None:
+    iid = args.instance
+    stamp = datetime.date.today().isoformat()
+    outdir = args.outdir or f"benchmarks/runs/{stamp}-{args.label}-g5g"
+    os.makedirs(outdir, exist_ok=True)
+    rec: dict = {"label": args.label, "instance": iid, "date": stamp}
+
+    # --- 1. deploy what we are about to measure -----------------------------
+    if not args.no_deploy:
+        os.system("make skill >/dev/null 2>&1")
+        dep = await server.deploy_jax_server(iid)
+        if not dep.startswith("✅"):
+            raise SystemExit(f"deploy failed:\n{dep}")
+        rec["build_id"] = next(
+            (ln.split("`")[1] for ln in dep.splitlines() if ln.startswith("Build id")), None)
+        print(f"[deploy] build_id={rec['build_id']}", flush=True)
+
+    # get_endpoint returns the OpenAI base, which ENDS IN /v1 -- but /health and
+    # /metrics live at the ROOT. Polling {endpoint}/health therefore 404s forever
+    # and reads as "never became ready" while the service is perfectly healthy.
+    # Keep the two apart rather than reconstructing either by hand.
+    raw = (await server.get_endpoint(iid)).strip()
+    api = next((w.strip("`") for w in raw.split() if w.strip("`").startswith("http")), raw)
+    root = api[: -len("/v1")] if api.endswith("/v1") else api
+    rec["endpoint"], rec["api_base"] = root, api
+
+    # --- 2. wait for READY --------------------------------------------------
+    t0 = time.time()
+    while time.time() - t0 < 600:
+        try:
+            urllib.request.urlopen(f"{root}/health", timeout=10).read()
+            break
+        except Exception:
+            time.sleep(5)
+    else:
+        raise SystemExit("never became ready")
+    rec["time_to_ready_s"] = round(time.time() - t0, 1)
+    print(f"[ready] {rec['time_to_ready_s']}s", flush=True)
+
+    # --- 3. build-id assertion ---------------------------------------------
+    health = json.load(urllib.request.urlopen(f"{root}/health", timeout=15))
+    rec["served_build_id"] = health.get("build_id")
+    if rec.get("build_id") and rec["served_build_id"] != rec["build_id"]:
+        raise SystemExit(
+            f"STALE DEPLOY: served {rec['served_build_id']} != local {rec['build_id']}")
+
+    # --- 4. sweep -----------------------------------------------------------
+    cells = []
+    for in_tok, out_tok in args.grid:
+        c = cell(api, in_tok, out_tok, repeats=args.repeats)
+        c["gauge_decode_tok_s"] = (await gauge(iid)).get("tpu_jax_decode_tokens_per_second")
+        cells.append(c)
+        print(f"[sweep] in={c['input_tokens']} out={out_tok} "
+              f"e2e={c['end_to_end_tok_s']} gauge={c['gauge_decode_tok_s']}", flush=True)
+        json.dump(cells, open(f"{outdir}/sweep.json", "w"), indent=2)
+    rec["cells"] = cells
+    rec["metrics"] = await gauge(iid)
+
+    # --- 5. profile (needs the GPU to itself) -------------------------------
+    if not args.no_profile:
+        await server._ssm(iid, f"mkdir -p {REMOTE_OUT}")
+        for f in ("profile_decode.py",):
+            import base64
+            blob = base64.b64encode(open(f, "rb").read()).decode()
+            await server._ssm(iid, f"echo '{blob}' | base64 -d > {REMOTE_OUT}/{f}")
+        xprof = XPROF_SH.format(out=REMOTE_OUT) if args.xprof else ""
+        sh = PROFILE_SH.format(out=REMOTE_OUT, s3=S3_RESULTS, label=args.label,
+                               steps=args.steps, xprof=xprof,
+                               int8flag="--int8-lm-head" if server.INT8_LM_HEAD else "")
+        print("[profile] running on the instance (service stopped)", flush=True)
+        print((await server._ssm(iid, sh, timeout=1800)).splitlines()[-1])
+        os.system(f"aws s3 cp {S3_RESULTS}/{args.label}.tgz {outdir}/artifacts.tgz "
+                  f"--only-show-errors && tar xzf {outdir}/artifacts.tgz -C {outdir} "
+                  f"&& rm -f {outdir}/artifacts.tgz")
+        rec["kernel_table"] = summarize_kernels(f"{outdir}/profile_decode.txt")
+
+    json.dump(rec, open(f"{outdir}/summary.json", "w"), indent=2)
+    print(f"\n[done] {outdir}/summary.json")
+    report(rec)
+    if args.compare:
+        compare(json.load(open(f"{args.compare}/summary.json")), rec)
+
+
+def summarize_kernels(path: str) -> dict:
+    """Pull the conversion / fp32-gemv shares out of profile_decode's table.
+
+    These two numbers are the whole point of the loop: 87% of decode is dtype tax
+    (54.4% conversion + 32.6% fp32 gemvx, measured 2026-08-25), so a tuning change
+    that does not move THEM will not move throughput either.
+    """
+    if not os.path.exists(path):
+        return {}
+    out, total = {}, 0.0
+    for line in open(path):
+        low = line.lower()
+        if "convert" in low and "%" in line:
+            out["convert_pct"] = out.get("convert_pct", 0.0) + _pct(line)
+        if "gemv" in low and "%" in line:
+            out["gemv_pct"] = out.get("gemv_pct", 0.0) + _pct(line)
+        total += _pct(line) if "%" in line else 0.0
+    out["accounted_pct"] = round(total, 1)
+    return {k: round(v, 2) for k, v in out.items()}
+
+
+def _pct(line: str) -> float:
+    for tok in line.replace("|", " ").split():
+        if tok.endswith("%"):
+            try:
+                return float(tok[:-1])
+            except ValueError:
+                return 0.0
+    return 0.0
+
+
+def report(rec: dict) -> None:
+    print(f"\n=== {rec['label']} (build {rec.get('served_build_id')}) ===")
+    for c in rec.get("cells", []):
+        print(f"  in={c['input_tokens']:>5} out={c['output_tokens']:>4}  "
+              f"gauge={c['gauge_decode_tok_s']}  e2e={c['end_to_end_tok_s']}")
+    m = rec.get("metrics", {})
+    print(f"  weights={m.get('tpu_jax_weight_bytes', 0)/1e9:.3f} GB  "
+          f"hbm={m.get('tpu_jax_hbm_used_bytes', 0)/1e9:.3f} GB  "
+          f"degenerate={m.get('tpu_jax_degenerate_responses_total')}")
+    if rec.get("kernel_table"):
+        print(f"  kernels: {rec['kernel_table']}")
+
+
+def compare(old: dict, new: dict) -> None:
+    print(f"\n=== {old['label']} -> {new['label']} ===")
+    om = {(c["input_tokens"], c["output_tokens"]): c for c in old.get("cells", [])}
+    for c in new.get("cells", []):
+        k = (c["input_tokens"], c["output_tokens"])
+        if k in om and om[k]["gauge_decode_tok_s"] and c["gauge_decode_tok_s"]:
+            a, b = om[k]["gauge_decode_tok_s"], c["gauge_decode_tok_s"]
+            print(f"  in={k[0]:>5} out={k[1]:>4}  {a:6.2f} -> {b:6.2f} tok/s  "
+                  f"({(b/a - 1) * 100:+.1f}%)")
+    ok, nk = old.get("kernel_table") or {}, new.get("kernel_table") or {}
+    for key in ("convert_pct", "gemv_pct"):
+        if key in ok and key in nk:
+            print(f"  {key}: {ok[key]:.1f}% -> {nk[key]:.1f}% ({nk[key] - ok[key]:+.1f})")
+    ow = (old.get("metrics") or {}).get("tpu_jax_weight_bytes")
+    nw = (new.get("metrics") or {}).get("tpu_jax_weight_bytes")
+    if ow and nw:
+        print(f"  weights: {ow/1e9:.3f} -> {nw/1e9:.3f} GB ({(nw/ow - 1) * 100:+.1f}%)")
+
+
+def grid(text: str):
+    return [tuple(int(x) for x in pair.split("x")) for pair in text.split(",")]
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--instance", required=True)
+    ap.add_argument("--label", required=True)
+    ap.add_argument("--outdir")
+    ap.add_argument("--compare", help="a previous run directory to diff against")
+    ap.add_argument("--grid", type=grid, default=grid("32x64,512x64,2048x64"),
+                    help="in_tokensXout_tokens pairs, comma separated")
+    ap.add_argument("--repeats", type=int, default=3)
+    ap.add_argument("--steps", type=int, default=20, help="decode steps to profile")
+    ap.add_argument("--xprof", action="store_true", help="also capture xprof rollups")
+    ap.add_argument("--no-deploy", action="store_true")
+    ap.add_argument("--no-profile", action="store_true")
+    asyncio.run(run(ap.parse_args()))

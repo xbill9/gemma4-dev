@@ -584,6 +584,24 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertIn("mkswap", user_data_from_config(ok))
 
 
+class LintCoverageTests(unittest.TestCase):
+    """`make lint` lints a HARDCODED list, so a new module is silently unlinted.
+
+    That is not hypothetical: profile_decode.py sat outside the list and was red
+    for a day. ports/ is excluded on purpose -- ruff's UP006/UP045 would rewrite
+    its Dict/Optional annotations, which the monorepo CLAUDE.md forbids and which
+    would drift it from the copy tpu-jax-v5e1-2b shares.
+    """
+
+    def test_every_top_level_module_is_linted(self):
+        listed = (ROOT / "Makefile").read_text()
+        modules = sorted(p.name for p in ROOT.glob("*.py"))
+        self.assertTrue(modules, "no top-level modules found")
+        for m in modules:
+            with self.subTest(module=m):
+                self.assertIn(m, listed, f"{m} is not in the `make lint` file list")
+
+
 class CompilationCacheDirTests(unittest.TestCase):
     """JAX_COMPILATION_CACHE_DIR must survive the port's import.
 
