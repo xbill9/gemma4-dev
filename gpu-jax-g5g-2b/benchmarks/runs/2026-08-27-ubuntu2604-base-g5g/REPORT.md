@@ -97,11 +97,59 @@ window, so nothing here went near the eviction bug.
   by spot price ($0.4463 vs 1b's $0.3831), so price is not a usable proxy for capacity here.
 - `NRestarts=0`, no OOM kills, no errors in the journal.
 
+## The compilation cache: a bug, then a measured 1.8x
+
+**The `JAX_CACHE_S3_URI` path was exercised, and exercising it is what found the bug.**
+
+`JAX_COMPILATION_CACHE_DIR` had never taken effect on this rig.
+`ports/gemma4/jax_e_model.py` set the cache dir unconditionally at import, and
+`jax_openai_server.py` imports it (via `jax_engine`) *after* configuring the same setting — so
+the port won every start. The unit set `/opt/jax-cache`, `/proc/PID/environ` confirmed the
+process had it, and that directory held **0 files** while **447 files / 5.1 MB** accumulated
+under the port's hardcoded `~/.cache/jax_compilation_cache` (which under systemd, with `HOME`
+unset, resolves via `pwd` to `/root/.cache/...`). After the fix, one request inverts it:
+**413 files / 3.4 MB** in `/opt/jax-cache`, **0** in the fallback.
+
+Left unfixed, the S3 sync would have restored into and uploaded from a directory nothing
+writes to — **both halves working correctly, forever, on an empty set**, reporting success on
+every timer tick.
+
+Upload verified through the systemd unit the bootstrap actually renders: `Result=success`,
+**413 objects / 2.0 MiB** in `s3://vllm-models-bucket/jax-cache/gpu-jax-g5g-2b/`, under an IAM
+policy scoped to that one prefix.
+
+### A/B: does a restored cache make a fresh process faster?
+
+Same request shape each time. Control wipes `/opt/jax-cache` and starts; treatment wipes it,
+`aws s3 sync`s the 413 files back, and starts.
+
+| Pair | Empty cache | Restored | Speedup |
+| --- | ---: | ---: | ---: |
+| 1 | 26.26s | 13.42s | 2.0x |
+| 2 | 26.50s | 15.28s | 1.7x |
+| 3 | 24.09s | 12.97s | 1.9x |
+| **mean** | **25.62s** | **13.89s** | **1.8x** |
+
+**First request is consistently ~1.8x faster** — three pairs, ratios 1.7-2.0, which is tight
+enough to trust given first-request times on this rig otherwise range 18-26s.
+
+**Time-to-ready is NOT improved.** 106.3->151.6, 71.0->66.0, 101.3->91.2 — it moves both
+directions and the spread swamps any effect. Load is dominated by the 9.5 GB read and the
+host-side quantization, neither of which the cache touches. Do not claim a startup win.
+
+**`cold_shape` stays True in both arms**, which is worth knowing before using it as a signal:
+the flag tracks whether *this process* has seen the shape, not whether XLA had to compile. A
+restored cache halves the cost of a cold shape without clearing the flag, so
+`tpu_jax_cold_requests_total` cannot tell you whether the cache helped.
+
 ## Not established
 
 - **Whether the AMI change survives a long run.** This instance served minutes, not hours.
-- **The `JAX_CACHE_S3_URI` compilation-cache path was NOT exercised** — it is empty by
-  default and no bucket was configured, so it rendered nothing. Untested.
+- **Cross-instance restore was not tested.** The A/B wiped and restored on ONE instance. The
+  actual use — a fresh instance restoring what a previous one compiled — is the same `aws s3
+  sync` but has not been run end to end through `install.sh`.
+- **The timer's 10-minute cadence was not observed firing on its own**; the upload unit was
+  started by hand.
 - **`get_install_progress`'s failure verdicts are untested on hardware** — CPU tests pin them.
 - Nothing here re-measures the dtype tax, which remains 87% of decode and unaddressed.
 

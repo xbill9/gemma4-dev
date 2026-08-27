@@ -900,10 +900,14 @@ class RepoHygieneTests(BashSyntaxMixin, unittest.TestCase):
             # they changed together on 2026-08-27 and nothing would have noticed
             # if only one of them had.
             "DLAMI_SSM_PARAMETER", "DLAMI_NAME",
+            # JAX_COMPILATION_CACHE_DIR is here because it silently did nothing
+            # until 2026-08-27; if the env file and the server ever disagree
+            # about the path again, the S3 sync backs up the wrong directory.
+            "JAX_COMPILATION_CACHE_DIR", "JAX_CACHE_S3_URI",
         ):
             with self.subTest(key=key):
                 self.assertEqual(values[key], getattr(server, key))
-        for key in ("JAX_PORT", "MAX_MODEL_LEN", "PLE_BITS"):
+        for key in ("JAX_PORT", "MAX_MODEL_LEN", "PLE_BITS", "JAX_CACHE_SYNC_MINUTES"):
             with self.subTest(key=key):
                 self.assertEqual(int(values[key]), getattr(server, key))
         self.assertEqual(

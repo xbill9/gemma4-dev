@@ -817,8 +817,8 @@ The one mitigation for the ceiling is gated behind an untested flag.
 **Added 2026-08-27, after the `mkswap` incident. Exercised on a launch the same day —
 `benchmarks/runs/2026-08-27-ubuntu2604-base-g5g/`.** The cloud-init reporting and the stage
 markers both worked; the *failure* verdicts are still only pinned by CPU tests, because
-nothing failed. The `JAX_CACHE_S3_URI` path rendered nothing and remains **untested**: it is
-empty by default and no bucket was configured.
+nothing failed. The `JAX_CACHE_S3_URI` path was exercised separately, and is written up
+below — it worked, and it found a bug that had made it pointless.
 
 The provisioning path had two blind spots, and the first one is why a one-character flag cost
 a launch rather than a minute.
@@ -850,14 +850,22 @@ Two optimizations landed with them:
   *before* quantization so the config change cannot explain it. The hypothesis was right —
   two unrelated stages had been sitting on one number because the volume was the ceiling.
 - **The XLA compilation cache can now survive a relaunch**, via `JAX_CACHE_S3_URI`. It lives
-  on the ephemeral root volume, so every relaunch recompiles every shape — and the 128-step
-  bucket ladder means far more distinct shapes than the old power-of-two one, at ~14 s each
-  (18.77 s cold against 4.35 s warm). **Empty by default**, so the default rendering is
-  byte-identical to what the rig shipped before; opt in with an operator-supplied URI, in the
-  same spirit as the required subnet/security-group/instance-profile ids. Upload is on a
-  **timer, not `ExecStopPost`**: spot gives ~2 minutes and does not reliably run shutdown
-  hooks. The restore carries `|| true` because it runs under `set -e` and the first launch
-  syncs a prefix that does not exist yet — the `mkswap` failure exactly.
+  on the ephemeral root volume, so every relaunch recompiles every shape. **Empty by default**,
+  so the default rendering is byte-identical to what the rig shipped before; opt in with an
+  operator-supplied URI, in the same spirit as the required
+  subnet/security-group/instance-profile ids. Upload is on a **timer, not `ExecStopPost`**:
+  spot gives ~2 minutes and does not reliably run shutdown hooks. The restore carries
+  `|| true` because it runs under `set -e` and the first launch syncs a prefix that does not
+  exist yet — the `mkswap` failure exactly.
+
+  **MEASURED 2026-08-27, three A/B pairs: first request 25.62 s → 13.89 s, a 1.8x speedup**
+  (ratios 1.7–2.0, against a first-request spread of 18–26 s, so the effect is well clear of
+  the noise). Two things it does **not** buy, both worth knowing before quoting it:
+  **time-to-ready is unchanged** (it moved both directions across the three pairs; load is
+  dominated by the 9.5 GB read and host-side quantization), and **`cold_shape` stays `True`**
+  — that flag tracks whether *this process* has seen the shape, not whether XLA compiled, so
+  `tpu_jax_cold_requests_total` cannot tell you whether the cache helped. Exercising this is
+  what uncovered the cache-dir bug below; **cross-instance restore is still untested.**
 
 **`get_deployment_config` printed `VolumeSize=200` while `create_g5g_instance` launched 100.**
 Both now render from one set of constants. A copy-pasteable repro command that provisions a
@@ -877,6 +885,51 @@ comparison*. But the 2026-08-25 reclamation killed an instance at 21 minutes, **
 wheels finished** — so on spot this rig currently cannot reliably survive its own install.
 Baking the install into an AMI is what would make spot usable at all. That is a decision, not
 a cleanup, and it has not been taken.
+
+## The compilation cache was configured, and configured nothing
+
+**FIXED and MEASURED 2026-08-27 on `i-021f15b2b45e13793`.** Found only because the
+`JAX_CACHE_S3_URI` sync was actually exercised — nothing about it ever failed.
+
+`ports/gemma4/jax_e_model.py` set the cache directory **unconditionally at import**:
+
+```python
+_cache_dir = os.path.expanduser("~/.cache/jax_compilation_cache")
+jax.config.update("jax_compilation_cache_dir", _cache_dir)
+```
+
+`jax_openai_server.py` resolves `JAX_COMPILATION_CACHE_DIR` and calls the same update at
+line 72 — then imports `jax_engine` at line 80, which imports this module. **The later import
+wins**, so the port silently overwrote the server's choice on every single start.
+
+The evidence is unambiguous: the systemd unit set `JAX_COMPILATION_CACHE_DIR=/opt/jax-cache`,
+`/proc/PID/environ` confirmed the process had it, and `/opt/jax-cache` held **0 files** while
+**447 files and 5.1 MB** accumulated under the port's hardcoded path. After the fix, one
+request inverts it completely: **413 files / 3.4 MB** in `/opt/jax-cache`, **0** in the
+fallback.
+
+Three things worth keeping:
+
+- **`tpu.env` advertised this variable as a working knob since the fork**, with "skips
+  recompilation on restart" as its effect. The directory it named was never written to. That
+  comment is now corrected *and* carries its own measurement rather than the TPU rig's.
+- **It would have made the S3 sync a perfect no-op.** Restore and upload both target the
+  configured directory, so the feature would have backed up an empty directory forever and
+  reported success on every timer tick. **Both halves working correctly against a path nothing
+  writes to** — the same silent-success class as the 2026-08-24 stale deploy, and the reason
+  "the flag was accepted" is never evidence here.
+- **The siblings are NOT affected, checked rather than assumed.** `tpu-jax-v5e1-2b` and
+  `tpu-jax-v6e1-2b` carry the identical three lines, but **neither sets
+  `JAX_COMPILATION_CACHE_DIR` anywhere**, so the hardcoded path is simply their effective one.
+  They have no knob to ignore.
+
+**Under systemd `HOME` is unset**, so `expanduser("~")` resolves via `pwd` to `/root`. That is
+why the files were somewhere non-obvious rather than absent, and why "the cache is not working"
+was the wrong first hypothesis — it was working, in the wrong place.
+
+`test_both_modules_resolve_the_cache_dir_the_same_way` pins it. They run in one process and
+the later import wins, so agreeing is the only thing that makes the result independent of
+import order.
 
 ## Measurement
 
