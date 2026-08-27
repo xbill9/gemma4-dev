@@ -968,6 +968,35 @@ and the service must stop for it.
 and 13.0 tok/s gauge, weights 6.155 GB, 0 degenerate, and **convert 53.9% / gemv 32.8%** — an
 independent reproduction of the 54.4% / 32.6% dtype tax from a fresh harness.
 
+**`--xprof` pulls the structured rollups back too** (`2026-08-27-baseline-xprof-g5g/`), and
+they reproduce every prior xprof finding automatically:
+
+| | 2026-08-25, by hand | 2026-08-27, through the loop |
+| --- | ---: | ---: |
+| kernel time using a TensorCore | 0.0% | **0.0%** |
+| dtype conversion | 54.4% | **54.0%** |
+| fp32 gemv | 32.6% | **32.8%** |
+| peak FLOP / HBM / ridge | 65,126 / 298.1 / 203.5 | **65,126.4 / 298.083 / 203.479** |
+
+`summarize_xprof()` reads xprof's `{cols, rows}` grid by column name rather than scraping
+formatted text, so `is_kernel_using_tensor_core` is read as a flag rather than inferred from a
+kernel name.
+
+**Two things broke getting there, both silent, both now fixed in the loop:**
+
+- **`requirements-profiling.txt` was never on the instance.** It is deliberately excluded from
+  the deploy payload, and nothing else shipped it — so `docs/profiling-recipes.md` told
+  operators to `pip install -r /opt/jax-g5g/requirements-profiling.txt`, **a path that has
+  never existed.** xprof "installed" with `Could not open requirements file` and the extraction
+  died on `ModuleNotFoundError`, both in logs nobody reads. The loop ships it; the recipe is
+  corrected.
+- **`xspace_to_tool_data` returns `bytes`, not `str`.** Passing it through `json.dumps` raises
+  `Object of type bytes is not JSON serializable`, the handler catches it, and you get a
+  **0-byte file plus a FAILED line** — a profile that looks captured and is empty.
+
+Current xprof also maps the old `kernel_stats^` names (`Received old tool format`), so the
+`^` suffix in `docs/profiling-recipes.md` still works but is no longer what the tool reports.
+
 ### First iteration: the bf16 blocker is gone, but the fix is not this one
 
 `docs/bf16-weights-on-turing.md` records `astype(float16)` on `ml_dtypes` bfloat16 as unusably

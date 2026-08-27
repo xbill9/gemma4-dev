@@ -137,23 +137,39 @@ aws s3 cp {out}.tgz {s3}/{label}.tgz --only-show-errors
 echo "UPLOADED {s3}/{label}.tgz"
 """
 
+# Substituted with str.replace on a SENTINEL, not str.format. This block embeds
+# Python that contains `{}` (an empty dict literal) and f-strings of its own, and
+# str.format reads every one of those as a placeholder -- the same brace hazard
+# the monorepo CLAUDE.md documents for startup_script_template.sh. A sentinel
+# cannot collide with embedded code.
 XPROF_SH = r"""
-python3.14 -m pip install --break-system-packages -q -r /opt/jax-g5g/requirements-profiling.txt \
-    >{out}/xprof_install.log 2>&1 || echo "xprof install FAILED" >>{out}/xprof_install.log
-PYTHONPATH=/opt/jax-g5g/app python3.14 - <<'XP' >{out}/xprof_extract.log 2>&1 || true
+python3.14 -m pip install --break-system-packages -q -r __OUT__/requirements-profiling.txt \
+    >__OUT__/xprof_install.log 2>&1 || echo "xprof install FAILED" >>__OUT__/xprof_install.log
+PYTHONPATH=/opt/jax-g5g/app python3.14 - <<'XP' >__OUT__/xprof_extract.log 2>&1 || true
 import glob, json
 from xprof.convert import raw_to_tool_data as R
 xs = sorted(glob.glob("/tmp/jaxtrace/**/*.xplane.pb", recursive=True))
 print("xplane files:", xs)
 if xs:
     print("tools:", R.xspace_to_tool_names(xs))
-    for tool in ("kernel_stats^", "memory_profile^", "roofline_model^"):
+    # No `^` suffix: current xprof maps the old `kernel_stats^` form and logs
+    # "Received old tool format". docs/profiling-recipes.md still shows the old
+    # names -- they work, but these are what the tool actually reports.
+    for tool in ("kernel_stats", "memory_profile", "roofline_model"):
         try:
             data, _ = R.xspace_to_tool_data(xs, tool, {})
-            name = tool.rstrip("^")
-            open(f"{out}/xprof_{name}.json", "w").write(
-                data if isinstance(data, str) else json.dumps(data))
-            print("wrote", name)
+            # THIS RETURNS bytes, not str. Writing it through json.dumps raises
+            # "Object of type bytes is not JSON serializable", the handler catches
+            # it, and you are left with a 0-byte file and a FAILED line in a log
+            # nobody reads -- measured 2026-08-27.
+            with open("__OUT__/xprof_" + tool + ".json", "wb") as fh:
+                if isinstance(data, bytes):
+                    fh.write(data)
+                elif isinstance(data, str):
+                    fh.write(data.encode())
+                else:
+                    fh.write(json.dumps(data).encode())
+            print("wrote", tool)
         except Exception as e:
             print("FAILED", tool, type(e).__name__, e)
 XP
@@ -221,11 +237,16 @@ async def run(args) -> None:
     # --- 5. profile (needs the GPU to itself) -------------------------------
     if not args.no_profile:
         await server._ssm(iid, f"mkdir -p {REMOTE_OUT}")
-        for f in ("profile_decode.py",):
+        # requirements-profiling.txt ships too. It is NOT in the deploy payload
+        # (a serving image should not carry a profiler) and nothing else puts it
+        # on the box -- so docs/profiling-recipes.md's
+        # `pip install -r /opt/jax-g5g/requirements-profiling.txt` referenced a
+        # path that never existed, and xprof silently failed to install.
+        for f in ("profile_decode.py", "requirements-profiling.txt"):
             import base64
             blob = base64.b64encode(open(f, "rb").read()).decode()
             await server._ssm(iid, f"echo '{blob}' | base64 -d > {REMOTE_OUT}/{f}")
-        xprof = XPROF_SH.format(out=REMOTE_OUT) if args.xprof else ""
+        xprof = XPROF_SH.replace("__OUT__", REMOTE_OUT) if args.xprof else ""
         sh = PROFILE_SH.format(out=REMOTE_OUT, s3=S3_RESULTS, label=args.label,
                                steps=args.steps, xprof=xprof,
                                int8flag="--int8-lm-head" if server.INT8_LM_HEAD else "")
@@ -235,6 +256,7 @@ async def run(args) -> None:
                   f"--only-show-errors && tar xzf {outdir}/artifacts.tgz -C {outdir} "
                   f"&& rm -f {outdir}/artifacts.tgz")
         rec["kernel_table"] = summarize_kernels(f"{outdir}/profile_decode.txt")
+        rec["xprof"] = summarize_xprof(f"{outdir}/xprof_kernel_stats.json")
 
     json.dump(rec, open(f"{outdir}/summary.json", "w"), indent=2)
     print(f"\n[done] {outdir}/summary.json")
@@ -264,6 +286,47 @@ def summarize_kernels(path: str) -> dict:
     return {k: round(v, 2) for k, v in out.items()}
 
 
+def summarize_xprof(path: str) -> dict:
+    """Kernel-time shares and TensorCore use, from xprof's structured rollup.
+
+    Preferred over the text table when available: xprof returns a
+    {cols, rows} grid, so this reads named columns instead of scraping
+    percentages out of formatted output.
+
+    `is_kernel_using_tensor_core` is the column that settles the question --
+    kernel NAMES like `gemvx::kernel<...float...>` already imply fp32, but the
+    explicit flag is what the finding rests on (docs/profiling-recipes.md).
+    """
+    if not os.path.exists(path):
+        return {}
+    grid = json.load(open(path))
+    cols = [c["id"] for c in grid.get("cols", [])]
+    if not cols or "total_duration_us" not in cols:
+        return {}
+    # strict=False on purpose: xprof has added columns between versions, and a
+    # row that is short or long should degrade to missing keys rather than
+    # raising and losing the whole profile.
+    rows = [dict(zip(cols, [c.get("v") for c in r["c"]], strict=False))
+            for r in grid.get("rows", [])]
+    total = sum(float(r.get("total_duration_us") or 0) for r in rows) or 1.0
+    buckets: dict[str, float] = {}
+    tensorcore = 0.0
+    for r in rows:
+        dur = float(r.get("total_duration_us") or 0)
+        if r.get("is_kernel_using_tensor_core"):
+            tensorcore += dur
+        name = str(r.get("kernel_name", ""))
+        key = ("convert" if "convert" in name else
+               "gemv_fp32" if "gemv" in name else
+               "fusion" if "fusion" in name else "other")
+        buckets[key] = buckets.get(key, 0.0) + dur
+    out = {f"{k}_pct": round(100 * v / total, 1) for k, v in buckets.items()}
+    out["tensorcore_pct"] = round(100 * tensorcore / total, 1)
+    out["total_kernel_ms"] = round(total / 1000, 1)
+    out["kernels"] = len(rows)
+    return out
+
+
 def _pct(line: str) -> float:
     for tok in line.replace("|", " ").split():
         if tok.endswith("%"):
@@ -285,6 +348,11 @@ def report(rec: dict) -> None:
           f"degenerate={m.get('tpu_jax_degenerate_responses_total')}")
     if rec.get("kernel_table"):
         print(f"  kernels: {rec['kernel_table']}")
+    if rec.get("xprof"):
+        x = rec["xprof"]
+        print(f"  xprof:   convert={x.get('convert_pct')}% gemv_fp32={x.get('gemv_fp32_pct')}% "
+              f"tensorcore={x.get('tensorcore_pct')}% over {x.get('total_kernel_ms')}ms "
+              f"/ {x.get('kernels')} kernels")
 
 
 def compare(old: dict, new: dict) -> None:
@@ -300,6 +368,10 @@ def compare(old: dict, new: dict) -> None:
     for key in ("convert_pct", "gemv_pct"):
         if key in ok and key in nk:
             print(f"  {key}: {ok[key]:.1f}% -> {nk[key]:.1f}% ({nk[key] - ok[key]:+.1f})")
+    ox, nx = old.get("xprof") or {}, new.get("xprof") or {}
+    for key in ("convert_pct", "gemv_fp32_pct", "tensorcore_pct"):
+        if key in ox and key in nx:
+            print(f"  xprof {key}: {ox[key]:.1f}% -> {nx[key]:.1f}% ({nx[key] - ox[key]:+.1f})")
     ow = (old.get("metrics") or {}).get("tpu_jax_weight_bytes")
     nw = (new.get("metrics") or {}).get("tpu_jax_weight_bytes")
     if ow and nw:

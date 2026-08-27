@@ -37,8 +37,18 @@ worth profiling most could not be profiled at all.
 `gcsfs` + `google-cloud-storage` behind a 39 MB wheel.
 
 ```bash
-python3.14 -m pip install -r /opt/jax-g5g/requirements-profiling.txt
+python3.14 -m pip install --break-system-packages -r <path>/requirements-profiling.txt
 ```
+
+**That file is not on the instance unless you put it there.** It is deliberately excluded from
+the deploy payload — a serving image should not carry a profiler — so nothing ships it, and
+this recipe used to name `/opt/jax-g5g/requirements-profiling.txt`, a path that has never
+existed. xprof then "installed" with `Could not open requirements file` and the extraction
+died on `ModuleNotFoundError: No module named 'xprof'`, both in logs nobody read.
+`tune_loop.py --xprof` ships it alongside `profile_decode.py`; by hand, copy it first.
+
+`--break-system-packages` is required from the Ubuntu 24.04 base onward — the system
+interpreter is marked externally-managed (PEP 668).
 
 **aarch64 note:** the wheel is `manylinux_2_35_aarch64` and the Ubuntu 22.04 DLAMI base is
 glibc 2.35 — *exactly* at the floor. It installs, but an older base would silently lose it.

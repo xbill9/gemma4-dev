@@ -1,0 +1,41 @@
+model            google/gemma-4-E2B-it
+COMPUTE_DTYPE    float16
+param dtypes     {'bfloat16': 539, 'uint8': 1, 'float16': 2, 'int8': 1}
+resident         6.155 GB
+quant_mode       fp16   window_kv=True
+
+static: 3.75 GFLOP/token   temp 1.615 GB   args 6.157 GB
+NOTE: 'bytes accessed' from cost_analysis ignores fusion and counts a one-row gather of a multi-GB table as a full read. It is an upper bound, not traffic. Trust the kernel table below instead.
+
+wall 77.810 ms/token -> 12.85 tok/s   (GPU lane 73.354 ms/token)
+
+ ms/token      %   calls  kernel
+   19.902  27.1%    40.0  wrapped_convert_1   <-- DTYPE CONVERSION
+   17.807  24.3%    60.0  std::enable_if<true, void>::type internal::gemvx::kernel<int, in   <-- fp32
+    9.956  13.6%    20.0  wrapped_convert_3   <-- DTYPE CONVERSION
+    9.305  12.7%     1.0  wrapped_convert_61   <-- DTYPE CONVERSION
+    6.048   8.2%     1.0  std::enable_if<!(false), void>::type internal::gemvx::kernel<int   <-- fp32
+    2.357   3.2%    15.0  input_reduce_fusion_102
+    1.240   1.7%    15.0  input_reduce_fusion_50
+    0.948   1.3%    27.0  input_reduce_fusion_144
+    0.869   1.2%    28.0  input_reduce_fusion_172
+    0.679   0.9%    57.0  input_reduce_fusion_384
+    0.409   0.6%     7.0  input_reduce_fusion_103
+    0.371   0.5%     7.0  input_reduce_fusion_110
+    0.361   0.5%     1.0  wrapped_convert   <-- DTYPE CONVERSION
+    0.246   0.3%    35.0  input_reduce_fusion_207
+    0.239   0.3%   105.0  input_reduce_fusion_315
+    0.222   0.3%     1.0  void gemv2N_kernel<int, int, float, float, float, float, 128, 4,   <-- fp32
+    0.185   0.3%    28.0  volta_sgemm_32x32_sliced1x4_nn   <-- fp32
+    0.183   0.2%    35.0  loop_multiply_fusion_82
+    0.165   0.2%    20.0  void cublasLt::epilogue::impl::globalKernel<8, 32, float, float,   <-- fp32
+    0.156   0.2%    28.0  void gemmSN_TN_kernel<float, 128, 16, 2, 4, 8, 9, false, cublasG   <-- fp32
+    0.117   0.2%    11.0  loop_multiply_fusion_71
+    0.096   0.1%    34.0  input_reduce_fusion_85
+    0.096   0.1%    33.0  input_multiply_reduce_fusion_32
+    0.088   0.1%    20.0  void cublasLt::splitKreduce_kernel<32, 16, int, float, float, fl   <-- fp32
+    0.082   0.1%     3.0  input_reduce_fusion_210
+
+conversion  54.0%   fp32 kernels  33.8%   fp16 kernels   0.0%
+
+>>> Conversion is a large share of decode. Check whether the parameter dtypes above match COMPUTE_DTYPE: bf16 weights on a pre-Ampere GPU are converted before every matmul.
