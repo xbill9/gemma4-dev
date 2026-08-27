@@ -584,6 +584,94 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertIn("mkswap", user_data_from_config(ok))
 
 
+class LatestVersionPolicyTests(BashSyntaxMixin, unittest.TestCase):
+    """Newest release is the default here; a pin needs a named constraint."""
+
+    def test_jax_and_python_are_unpinned_and_current(self):
+        # jax[cuda13] is the newest CUDA extra jax publishes (there is no
+        # cuda14), and the spec carries no version so pip resolves latest.
+        # 3.14 is the newest stable CPython; jaxlib publishes a cp314 aarch64
+        # wheel, which is what makes it usable here.
+        self.assertNotIn("==", server.JAX_PIP_SPEC)
+        self.assertIn("cuda13", server.JAX_PIP_SPEC)
+        self.assertEqual(server.JAX_PYTHON_VERSION, "3.14")
+
+    def test_ami_is_the_base_image_not_a_pytorch_one(self):
+        # This rig never installs into the DLAMI's PyTorch -- it ships its own
+        # CUDA libraries and jax brings its own -- so a PyTorch DLAMI is GBs of
+        # image whose whole content is deliberately unused.
+        self.assertIn("base-oss-nvidia-driver-gpu", server.DLAMI_SSM_PARAMETER)
+        self.assertNotIn("pytorch", server.DLAMI_SSM_PARAMETER)
+
+    def test_ami_line_is_one_aws_still_rebuilds(self):
+        # `/latest/` is only the newest build WITHIN a PyTorch+Ubuntu line, and
+        # AWS freezes those. The old pin resolved to an image built 2026-05-02
+        # and could never move again: it READ as "track latest" and was a pin to
+        # a dead line. 22.04 is where those lines stopped.
+        self.assertNotIn("ubuntu-22.04", server.DLAMI_SSM_PARAMETER)
+        self.assertIn("/arm64/", server.DLAMI_SSM_PARAMETER)
+        self.assertIn("nvidia-driver-gpu", server.DLAMI_SSM_PARAMETER)
+
+    def test_name_fallback_matches_the_base_images_it_now_targets(self):
+        # The old pattern required "Deep Learning ARM64 AMI" CONTIGUOUSLY and the
+        # base images are "Deep Learning ARM64 Base OSS Nvidia Driver GPU AMI
+        # (Ubuntu 26.04)". Moving the SSM path without this would leave the
+        # fallback resolving the OLD PyTorch image -- a revert that reads as a
+        # success. Driverless Graviton-CPU images must still not match.
+        import fnmatch
+        base = "Deep Learning ARM64 Base OSS Nvidia Driver GPU AMI (Ubuntu 26.04) 20260825"
+        torch = "Deep Learning ARM64 AMI OSS Nvidia Driver GPU PyTorch 2.7 (Ubuntu 22.04) 20260501"
+        driverless = "Deep Learning ARM64 AMI Graviton (Ubuntu 22.04) 20260501"
+        self.assertTrue(fnmatch.fnmatch(base, server.DLAMI_NAME))
+        self.assertTrue(fnmatch.fnmatch(torch, server.DLAMI_NAME))
+        self.assertFalse(fnmatch.fnmatch(driverless, server.DLAMI_NAME))
+
+    def test_deadsnakes_is_conditional_not_unconditional(self):
+        # Ubuntu 26.04 ships python3.14 as the SYSTEM interpreter, so the PPA is
+        # off the critical path there -- but the branch has to remain for anyone
+        # overriding DLAMI_SSM_PARAMETER back to 22.04/24.04.
+        text = user_data()
+        self.assertIn(f"command -v python{server.JAX_PYTHON_VERSION}", text)
+        self.assertIn("ppa:deadsnakes/ppa", text)
+        self.assertLess(text.index(f"command -v python{server.JAX_PYTHON_VERSION}"),
+                        text.index("ppa:deadsnakes/ppa"))
+
+    def test_pip_can_install_into_an_externally_managed_interpreter(self):
+        # PEP 668: Ubuntu marks its system interpreter externally-managed from
+        # 23.04 on, so on the 24.04/26.04 bases every system-wide pip install
+        # fails with `error: externally-managed-environment`. Without this the
+        # move to a newer base bricks the install.
+        text = user_data()
+        self.assertIn("--break-system-packages", text)
+        # get-pip.py runs before PIP is defined and needs the flag of its own.
+        self.assertIn("get-pip.py | python", text)
+        get_pip = [ln for ln in text.splitlines() if "get-pip.py" in ln]
+        self.assertTrue(all("--break-system-packages" in ln for ln in get_pip), get_pip)
+
+    def test_a_missing_aws_cli_is_reported_rather_than_silently_tokenless(self):
+        # Changing the base image made this newly plausible. A missing CLI, an
+        # empty secret and a denied GetSecretValue used to render identically as
+        # "no token", surfacing minutes later as a 401 on the download.
+        text = user_data()
+        self.assertIn("command -v aws", text)
+        self.assertIn("401", text)
+
+    def test_the_token_still_never_reaches_user_data(self):
+        # The rewrite above must not have relaxed the invariant the whole block
+        # exists for: xtrace off across the fetch, and no literal token.
+        text = user_data()
+        self.assertNotIn("hf_", text.lower().replace("hf_token=$hf", ""))
+        self.assertLess(text.index("set +x"), text.index("secretsmanager get-secret-value"))
+        self.assertLess(text.index("secretsmanager get-secret-value"),
+                        text.rindex("set -x"))
+
+    def test_rendered_bootstrap_still_parses(self):
+        text = user_data()
+        self.assertShellParses(text, "cloud-init")
+        inner = text.split("<<'INSTEOF'\n", 1)[1].split("\nINSTEOF", 1)[0]
+        self.assertShellParses(inner, "install.sh")
+
+
 class InstallTracingTests(unittest.TestCase):
     """A dead bootstrap and a running one must not share a rendering."""
 
@@ -764,6 +852,11 @@ class RepoHygieneTests(BashSyntaxMixin, unittest.TestCase):
             "MODEL_NAME", "INSTANCE_TYPE", "DTYPE", "KV_CACHE_DTYPE", "QUANT_MODE",
             "JAX_PIP_SPEC", "JAX_PYTHON_VERSION", "SERVICE_NAME",
             "XLA_PYTHON_CLIENT_MEM_FRACTION", "PREFILL_CHUNK_SIZE",
+            # The AMI keys were NOT covered here, which is the pair most able to
+            # break a launch on their own and the pair most likely to drift:
+            # they changed together on 2026-08-27 and nothing would have noticed
+            # if only one of them had.
+            "DLAMI_SSM_PARAMETER", "DLAMI_NAME",
         ):
             with self.subTest(key=key):
                 self.assertEqual(values[key], getattr(server, key))

@@ -203,10 +203,51 @@ Two requirements, and they are separate:
 describe-images filter is the fallback and deliberately requires the driver in the name.
 **Never hardcode an AMI id** — resolve it at launch.
 
+### `/latest/` in a DLAMI parameter path does not mean latest
+
+**This is the trap, and the rig was in it.** A DLAMI parameter path names a
+PyTorch-version *and* an Ubuntu-version line, and `/latest/` is only the newest build **within
+that line** — which AWS eventually stops rebuilding. The rig pinned
+`oss-nvidia-driver-gpu-pytorch-2.7-ubuntu-22.04`, which resolved to an image built
+**2026-05-02** and will never move again: 22.04 stops at PyTorch 2.7, and 2.8–2.12 are 24.04
+only. It read as "track latest" and was a pin to a dead line. VERIFIED 2026-08-27 by
+enumerating the 26 `arm64` DLAMI parameters.
+
+**Changed 2026-08-27 to `base-oss-nvidia-driver-gpu-ubuntu-26.04`.** Two independent reasons:
+
+- **Base, not PyTorch.** This rig never installs into the DLAMI's PyTorch — it ships its own
+  CUDA libraries and jax brings its own — so a PyTorch DLAMI is GBs of image whose entire
+  content is deliberately unused.
+- **26.04 ships Python 3.14 as the *system* interpreter** (3.14.3, verified in the Ubuntu
+  archive), and 3.14 is exactly `JAX_PYTHON_VERSION`. That takes the deadsnakes PPA, an
+  `add-apt-repository` and a second full `apt-get update` off the critical path. 24.04 ships
+  3.12 and would still need them. deadsnakes publishes `python3.14` for jammy and noble only —
+  it does not need to for resolute.
+
+**Not yet launched on.** Three things were true of the old base and must be re-checked on the
+first launch, in this order of risk: the **driver version** (was 580.126.09 reporting CUDA
+13.0, and `jax[cuda13]` needs 580+ — this is the one that could actually break); whether the
+**aws CLI** is present, since the base image is smaller; and the **PEP 668** handling. Falling
+back is one env var — the 24.04 base still works via deadsnakes.
+
+**Changing the SSM path required changing `DLAMI_NAME` in the same commit.** The old filter
+required `Deep Learning ARM64 AMI` *contiguously*, and the base images are named
+`Deep Learning ARM64 Base OSS Nvidia Driver GPU AMI (Ubuntu 26.04)` — so it matched none of
+them, and the fallback would have quietly resolved the **old PyTorch image**. A revert that
+reports success. The two keys are now both covered by
+`test_tpu_env_agrees_with_server_defaults`, which had been checking neither.
+
+**jax and Python were already current** and needed no change: `jax[cuda13]` carries no version
+so pip resolves latest (0.11.1, and `cuda13` is the newest CUDA extra jax publishes — there is
+no `cuda14`), and 3.14 is the newest stable CPython. **3.15 is deliberately not used**:
+`jaxlib` publishes cp315 aarch64 wheels, but that is jaxlib building against a pre-release, not
+evidence that 3.15 has shipped. `tpu.env` records that constraint.
+
 **There is no prebuilt AMI here and none is owed.** The vLLM sibling needs one because it
 carries a 67-minute build; this install is `pip install`, so a stock DLAMI is the right base.
 Do not copy that rig's `ami-0b44b90b3d02430ee` into anything here — it is a vLLM image with
-a Triton patch and no JAX.
+a Triton patch and no JAX. (The separate question of baking an AMI to survive *spot
+reclamation* is open — see **Tracing a deployment**.)
 
 ## The bootstrap is two-stage, on purpose
 
@@ -229,10 +270,22 @@ Install progress goes to `/var/log/jax-install.log`; `{APP_DIR}/INSTALL_DONE` ap
 after JAX **imports and sees the GPU**, so "INSTALL COMPLETE" is an assertion, not a guess.
 The unit is `jax-g5g.service` — read it with `journalctl`, not `docker logs`.
 
-`jax >= 0.11` needs Python 3.12 and the Ubuntu 22.04 DLAMI base ships 3.10, so the bootstrap
-installs a 3.12 interpreter from deadsnakes. It deliberately does **not** install into the
-DLAMI's own PyTorch environment: that ships its own CUDA libraries and `jax[cuda12]` brings
-its own.
+`jax >= 0.11` needs Python >= 3.12 and the rig runs **3.14**, the newest stable CPython. On
+the Ubuntu 26.04 base that is the *system* interpreter, so the bootstrap uses it directly; on
+an older base (reachable by overriding `DLAMI_SSM_PARAMETER`) it falls back to installing 3.14
+from deadsnakes. The branch is `command -v python3.14` — **do not make it unconditional in
+either direction.**
+
+It deliberately does **not** install into the DLAMI's own PyTorch environment: that ships its
+own CUDA libraries and `jax[cuda13]` brings its own. That is also why the AMI is the **base**
+image and not a PyTorch one — see **AMI resolution**.
+
+**PEP 668 applies from Ubuntu 23.04 on.** The system interpreter is marked
+externally-managed, so a system-wide `pip install` fails outright with
+`error: externally-managed-environment`. The bootstrap passes `--break-system-packages`
+(including to `get-pip.py`, which runs before the wrapper variable exists). This is a
+single-purpose serving box installing into the interpreter systemd will run, and the monorepo
+forbids virtualenvs, so the override is the honest answer rather than a workaround.
 
 ## Engineering rules
 

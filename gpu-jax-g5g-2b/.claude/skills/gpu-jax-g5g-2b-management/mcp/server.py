@@ -194,13 +194,35 @@ APP_DIR = "/opt/jax-g5g"
 # for Graviton CPU inference). Those match a loose "Deep Learning*ARM64*Ubuntu*"
 # pattern, can be the newest by CreationDate, and boot perfectly well on a G5g
 # with no GPU — a failure that looks like a broken container, not a wrong AMI.
+# The BASE image -- driver only, no PyTorch. Two independent reasons, and the
+# second one is why the previous parameter was quietly rotting.
+#
+# 1. This rig never uses the DLAMI's PyTorch. The bootstrap deliberately does not
+#    install into it (it ships its own CUDA libraries and jax brings its own), so
+#    a PyTorch DLAMI is multiple GB of image this rig exists to avoid.
+# 2. `/latest/` in a DLAMI parameter path is only the latest build WITHIN that
+#    PyTorch-version + Ubuntu-version line, and AWS freezes those lines. The old
+#    pin (pytorch-2.7-ubuntu-22.04) resolved to an AMI built 2026-05-02 and will
+#    never move again -- AWS stopped rebuilding 22.04 after PyTorch 2.7. It read
+#    as "track latest" and was in fact a pin to a dead line.
+#
+# Ubuntu 26.04 rather than 24.04 because it ships **Python 3.14 as the system
+# interpreter** (3.14.3, verified in the Ubuntu archive 2026-08-27), which is the
+# version this rig wants -- so the deadsnakes PPA leaves the critical path
+# entirely. 24.04 ships 3.12 and still needs it. Both carry a newer driver and a
+# newer glibc than 22.04, which was sitting exactly ON xprof's manylinux_2_35
+# floor.
 DLAMI_SSM_PARAMETER = os.getenv(
     "DLAMI_SSM_PARAMETER",
-    "/aws/service/deeplearning/ami/arm64/oss-nvidia-driver-gpu-pytorch-2.7-ubuntu-22.04/latest/ami-id",
+    "/aws/service/deeplearning/ami/arm64/base-oss-nvidia-driver-gpu-ubuntu-26.04/latest/ami-id",
 )
-# Fallback only, and deliberately narrower than the pattern it replaced: it
-# requires the driver in the name so the driverless images cannot match.
-DLAMI_NAME = os.getenv("DLAMI_NAME", "Deep Learning ARM64 AMI*Nvidia Driver*Ubuntu*")
+# Fallback only. It still requires the driver in the name so the driverless
+# Graviton-CPU images cannot match -- but it no longer requires "ARM64 AMI"
+# CONTIGUOUSLY, because the base images are named "Deep Learning ARM64 Base OSS
+# Nvidia Driver GPU AMI (Ubuntu 26.04)". The old pattern did not match those at
+# all, so leaving it alone while moving the SSM path would have made the fallback
+# silently resolve the OLD PyTorch image -- a revert that looks like a success.
+DLAMI_NAME = os.getenv("DLAMI_NAME", "Deep Learning ARM64*Nvidia Driver*Ubuntu*")
 
 MANAGED_BY = RIG_NAME
 
@@ -538,22 +560,44 @@ install_runtime() {{
   }}
 
   apt_run update -y
-  apt_run install -y software-properties-common
   stage apt-base
-  add-apt-repository -y ppa:deadsnakes/ppa
-  apt_run update -y
-  apt_run install -y {py} {py}-venv {py}-dev
+
+  # Use the system interpreter when it is ALREADY the version we want, and only
+  # reach for deadsnakes when it is not. On the Ubuntu 26.04 base image
+  # python{JAX_PYTHON_VERSION} IS the system python, so this drops a third-party PPA, an
+  # `add-apt-repository`, and a second full `apt-get update` off the critical
+  # path. On 22.04/24.04 -- reachable by overriding DLAMI_SSM_PARAMETER -- the
+  # deadsnakes branch still runs, so the bootstrap is not tied to one base image.
+  if command -v {py} >/dev/null 2>&1; then
+    echo "{py} is already present at $(command -v {py}); skipping deadsnakes"
+    # Still needed even when the interpreter ships with the distro: a source
+    # build of any dependency without an aarch64 wheel needs the headers.
+    apt_run install -y {py}-venv {py}-dev || apt_run install -y python3-venv python3-dev
+  else
+    apt_run install -y software-properties-common
+    add-apt-repository -y ppa:deadsnakes/ppa
+    apt_run update -y
+    apt_run install -y {py} {py}-venv {py}-dev
+  fi
   stage python-{JAX_PYTHON_VERSION}
-  curl -sS https://bootstrap.pypa.io/get-pip.py | {py}
-  {py} -m pip install --upgrade pip setuptools wheel
+
+  # PEP 668. Ubuntu marks its system interpreter externally-managed from 23.04
+  # on, so on the 24.04/26.04 bases a system-wide `pip install` fails outright
+  # with `error: externally-managed-environment`. This is a single-purpose
+  # serving box installing into the interpreter systemd will run, and the repo
+  # forbids virtualenvs, so the override is the honest answer rather than a
+  # workaround. Harmless on a deadsnakes interpreter that is not marked.
+  PIP="{py} -m pip install --upgrade --break-system-packages"
+  curl -sS https://bootstrap.pypa.io/get-pip.py | {py} - --break-system-packages
+  $PIP pip setuptools wheel
   stage pip-bootstrap
   # The jax extra pulls CUDA from pip wheels (aarch64 published for all of them),
   # so the DLAMI only supplies the driver. No CUDA toolkit, no compiler, no Rust.
   # This is the big one: several GB of CUDA wheels, and the step most likely to
   # be running when a spot reclamation lands.
-  {py} -m pip install --upgrade '{JAX_PIP_SPEC}'
+  $PIP '{JAX_PIP_SPEC}'
   stage jax-wheels
-  {py} -m pip install --upgrade {serving_reqs}
+  $PIP {serving_reqs}
   stage serving-deps
 }}
 
@@ -619,11 +663,26 @@ chmod 600 {APP_DIR}/env
 # print the token into /var/log/cloud-init-output.log — readable by anything on
 # the instance, which is the exact exposure keeping it out of user data avoids.
 set +x
-HF=$(aws secretsmanager get-secret-value --region {AWS_REGION} --secret-id {HF_SECRET_ID} --query SecretString --output text 2>/dev/null || true)
-if [ -n "$HF" ]; then
-  echo "HF_TOKEN=$HF" >>{APP_DIR}/env
+# Three failure modes used to render identically -- `2>/dev/null || true` on one
+# line meant a missing CLI, a missing secret and a denied GetSecretValue all
+# produced exactly "no token", and the visible symptom is a 401 on the
+# checkpoint download minutes later. Changing the base image made the first of
+# those newly plausible, so they are separated. xtrace stays OFF across the
+# whole block: bash traces assignments WITH their values.
+if ! command -v aws >/dev/null 2>&1; then
+  echo "WARNING: aws CLI not on PATH; cannot read secret {HF_SECRET_ID}." >&2
+  echo "WARNING: a gated checkpoint will fail with 401 at download." >&2
+else
+  HF=$(aws secretsmanager get-secret-value --region {AWS_REGION} --secret-id {HF_SECRET_ID} --query SecretString --output text 2>/dev/null || true)
+  if [ -n "$HF" ]; then
+    echo "HF_TOKEN=$HF" >>{APP_DIR}/env
+    echo "HF token written to {APP_DIR}/env"
+  else
+    echo "WARNING: secret {HF_SECRET_ID} is empty or unreadable (check the" >&2
+    echo "WARNING: instance profile's secretsmanager:GetSecretValue)." >&2
+  fi
+  unset HF
 fi
-unset HF
 set -x
 
 cat >/etc/systemd/system/{SERVICE_NAME}.service <<'UNITEOF'

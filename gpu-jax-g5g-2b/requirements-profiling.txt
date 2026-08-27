@@ -21,7 +21,9 @@
 # Serve the UI with `xprof --logdir /tmp/jaxtrace --port 6006` and tunnel it;
 # this rig opens no inbound port for it, and must not.
 #
-# aarch64 note: the wheel is manylinux_2_35_aarch64, and the Ubuntu 22.04 DLAMI
-# base is glibc 2.35 -- exactly at the floor, so it installs, but a move to an
-# older base would silently lose it. jaxlib's own wheels are manylinux_2_27.
+# aarch64 note: the wheel is manylinux_2_35_aarch64. On the old Ubuntu 22.04
+# base that was EXACTLY the floor (glibc 2.35) -- it installed, with nothing to
+# spare. The 2026-08-27 move to the Ubuntu 26.04 base clears it comfortably, so
+# this is no longer fragile; it is recorded because a move BACK to an older base
+# would silently lose xprof. jaxlib's own wheels are manylinux_2_27.
 xprof
