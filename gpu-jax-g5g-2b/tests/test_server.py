@@ -584,6 +584,172 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertIn("mkswap", user_data_from_config(ok))
 
 
+class InstallTracingTests(unittest.TestCase):
+    """A dead bootstrap and a running one must not share a rendering."""
+
+    def _progress(self, ssm_output):
+        async def fake_ssm(instance_id, command, timeout=300):
+            self._command = command
+            return ssm_output
+
+        original = server._ssm
+        server._ssm = fake_ssm
+        try:
+            return run(server.get_install_progress(instance_id="i-test"))
+        finally:
+            server._ssm = original
+
+    def test_it_asks_cloud_init_for_its_own_verdict(self):
+        # The install log only exists once cloud-init has reached install.sh, so
+        # it cannot testify about anything that killed cloud-init before that.
+        self._progress("INSTALL IN PROGRESS")
+        self.assertIn("cloud-init status", self._command)
+        self.assertIn("/var/log/cloud-init-output.log", self._command)
+
+    def test_cloud_init_error_is_not_reported_as_in_progress(self):
+        # The 2026-08-26 signature: `mkswap -q` failed under `set -e` in the swap
+        # block, which renders BEFORE install.sh is written. The old rendering
+        # was "INSTALL IN PROGRESS" + "no install log yet", forever -- identical
+        # to a healthy slow install.
+        verdict = self._progress(
+            "INSTALL IN PROGRESS\n--- cloud-init ---\nstatus: error\n"
+            "--- install log ---\nNO INSTALL LOG: cloud-init never reached install.sh"
+        )
+        self.assertIn("❌", verdict)
+        self.assertIn("cloud-init FAILED", verdict)
+        self.assertIn("NOT a slow install", verdict)
+
+    def test_done_without_an_install_log_is_also_a_failure(self):
+        # cloud-init can exit 0 having never backgrounded install.sh. Nothing is
+        # installing, and waiting will not change that.
+        verdict = self._progress(
+            "INSTALL IN PROGRESS\n--- cloud-init ---\nstatus: done\n"
+            "--- install log ---\nNO INSTALL LOG: cloud-init never reached install.sh"
+        )
+        self.assertIn("❌", verdict)
+        self.assertIn("never wrote", verdict)
+
+    def test_early_boot_without_a_log_is_still_in_progress(self):
+        # cloud-init genuinely still running is the one case where a missing
+        # install log is benign, and it must not be reported as a failure.
+        verdict = self._progress(
+            "INSTALL IN PROGRESS\n--- cloud-init ---\nstatus: running\n"
+            "--- install log ---\nNO INSTALL LOG: cloud-init never reached install.sh"
+        )
+        self.assertIn("⏳", verdict)
+        self.assertNotIn("❌", verdict)
+
+    def test_complete_outranks_everything_else(self):
+        verdict = self._progress("INSTALL COMPLETE\nstatus: done")
+        self.assertIn("✅", verdict)
+        self.assertIn("deploy_jax_server", verdict)
+
+
+class InstallStageTimingTests(BashSyntaxMixin, unittest.TestCase):
+    """The install was the longest phase of a deploy and the only untimed one."""
+
+    def test_every_install_step_emits_a_stage_marker(self):
+        text = user_data()
+        for name in ("apt-base", "pip-bootstrap", "jax-wheels", "serving-deps", "gpu-verify"):
+            with self.subTest(stage=name):
+                self.assertIn(f"stage {name}", text)
+
+    def test_jax_wheels_is_timed_separately_from_apt(self):
+        # This is the whole point of the split: a spot reclamation at 21 minutes
+        # (MEASURED 2026-08-25) left no record of which step was running, and apt
+        # and several GB of CUDA wheels are very different things to attack.
+        text = user_data()
+        self.assertLess(text.index("stage apt-base"), text.index("stage jax-wheels"))
+
+    def test_stage_helper_is_defined_before_it_is_called(self):
+        text = user_data()
+        self.assertLess(text.index("stage() {"), text.index("stage apt-base"))
+
+
+class RootVolumeTests(unittest.TestCase):
+    """gp3 defaults to 125 MiB/s and the load sat on it."""
+
+    def test_launch_and_documented_command_agree(self):
+        # These disagreed: get_deployment_config printed VolumeSize=200 while
+        # create_g5g_instance launched 100, so the copy-pasteable repro command
+        # provisioned a different volume from the tool it documents.
+        rendered = run(server.get_deployment_config())
+        self.assertIn(f"VolumeSize={server.ROOT_VOLUME_GB}", rendered)
+        self.assertNotIn("VolumeSize=200", rendered)
+
+    def test_throughput_is_set_rather_than_left_at_the_gp3_default(self):
+        # MEASURED 2026-08-25: read_shards ~139 MB/s and download ~116 MB/s, both
+        # on gp3's 125 MiB/s baseline. Two unrelated stages landing on one number
+        # is a volume ceiling.
+        self.assertGreater(server.ROOT_VOLUME_THROUGHPUT_MBPS, 125)
+        self.assertIn(f"Throughput={server.ROOT_VOLUME_THROUGHPUT_MBPS}",
+                      run(server.get_deployment_config()))
+
+    def test_gp3_throughput_to_iops_ratio_is_satisfiable(self):
+        # gp3 rejects the volume outright if throughput exceeds IOPS * 0.25 MiB/s,
+        # and it rejects it at RUN-INSTANCES time -- so a bad pair here is a
+        # launch failure, not a slow disk.
+        self.assertLessEqual(server.ROOT_VOLUME_THROUGHPUT_MBPS,
+                             server.ROOT_VOLUME_IOPS * 0.25)
+        self.assertLessEqual(server.ROOT_VOLUME_THROUGHPUT_MBPS, 1000)
+        self.assertGreaterEqual(server.ROOT_VOLUME_IOPS, 3000)
+        self.assertLessEqual(server.ROOT_VOLUME_IOPS, 16000)
+
+
+class CompilationCacheTests(BashSyntaxMixin, unittest.TestCase):
+    """Persisting /opt/jax-cache is opt-in and must stay a no-op by default."""
+
+    def _with_uri(self, uri):
+        original = server.JAX_CACHE_S3_URI
+        server.JAX_CACHE_S3_URI = uri
+        try:
+            return user_data()
+        finally:
+            server.JAX_CACHE_S3_URI = original
+
+    def test_default_is_off_and_renders_nothing(self):
+        # The default rendering must be exactly what this rig shipped before:
+        # no bucket, no IAM, no units. Opting in is the operator's call.
+        self.assertEqual(server.JAX_CACHE_S3_URI, "")
+        text = self._with_uri("")
+        self.assertNotIn("aws s3 sync", text)
+        self.assertNotIn("-cache.timer", text)
+
+    def test_enabling_it_renders_valid_bash(self):
+        text = self._with_uri("s3://bucket/jax-cache/")
+        self.assertShellParses(text, "cloud-init with cache sync")
+        inner = text.split("<<'INSTEOF'\n", 1)[1].split("\nINSTEOF", 1)[0]
+        self.assertShellParses(inner, "install.sh with cache restore")
+
+    def test_restore_cannot_kill_the_install_on_a_cold_bucket(self):
+        # install.sh runs under `set -e`, and the very first launch syncs from a
+        # prefix that does not exist yet. Without `|| true` that is the mkswap
+        # failure again: cloud-init dies and nothing installs.
+        text = self._with_uri("s3://bucket/jax-cache/")
+        restore = [ln for ln in text.splitlines() if "aws s3 sync s3://" in ln]
+        self.assertTrue(restore, "no restore line rendered")
+        self.assertTrue(all("|| true" in ln for ln in restore), restore)
+
+    def test_upload_is_on_a_timer_not_at_shutdown(self):
+        # A spot reclamation gives ~2 minutes and does not reliably run
+        # ExecStopPost, so a shutdown hook would lose exactly the compiles that
+        # the 2026-08-25 reclamation would have cost.
+        text = self._with_uri("s3://bucket/jax-cache/")
+        self.assertIn("OnUnitActiveSec=", text)
+        self.assertNotIn("ExecStopPost", text)
+
+    def test_restore_lands_before_install_done(self):
+        # INSTALL_DONE is the readiness signal deploy_jax_server waits on; a
+        # cache restored after it would race the first request.
+        #
+        # Anchored on the `touch`, not on the bare string: an apt comment 90
+        # lines earlier also says INSTALL_DONE, and matching that would make this
+        # pass no matter where the restore landed.
+        text = self._with_uri("s3://bucket/jax-cache/")
+        self.assertLess(text.index("stage cache-restore"),
+                        text.index(f"touch {server.APP_DIR}/INSTALL_DONE"))
+
+
 class RepoHygieneTests(BashSyntaxMixin, unittest.TestCase):
     def test_shell_scripts_parse(self):
         for script in ("project-setup.sh", "init.sh", "set_env.sh"):

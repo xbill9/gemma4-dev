@@ -133,6 +133,44 @@ JAX_PIP_SPEC = os.getenv("JAX_PIP_SPEC", "jax[cuda13]")
 JAX_PYTHON_VERSION = os.getenv("JAX_PYTHON_VERSION", "3.14")
 JAX_COMPILATION_CACHE_DIR = os.getenv("JAX_COMPILATION_CACHE_DIR", "/opt/jax-cache")
 
+# Optional S3 backing for that cache. EMPTY BY DEFAULT, which is exactly the
+# behaviour this rig has always had -- nothing below renders unless it is set.
+#
+# The cache lives on the ephemeral root volume, so every relaunch recompiles
+# every shape it sees. That used to be a small tax and is no longer: the bucket
+# ladder is (64, 128, 256) plus 128-steps to 16384, so there are far more
+# distinct compiled shapes than under the old power-of-two ladder. A cold shape
+# measured 18.77s against 4.35s warm on a T4G. Restoring the cache is what makes
+# "termination is cheap here" true across relaunches rather than only in theory.
+#
+# Opt-in via a URI the operator supplies, in the same spirit as the required
+# subnet/security-group/instance-profile ids: this rig does not create buckets or
+# widen IAM policy. The instance profile must already allow s3 on that prefix.
+JAX_CACHE_S3_URI = os.getenv("JAX_CACHE_S3_URI", "")
+
+# Upload cadence. A spot reclamation gives ~2 minutes of warning and does not
+# reliably run ExecStopPost, so the cache is pushed on a timer rather than at
+# shutdown -- a reclaimed instance still leaves behind whatever it had compiled.
+JAX_CACHE_SYNC_MINUTES = int(os.getenv("JAX_CACHE_SYNC_MINUTES", "10"))
+
+# Root volume. The checkpoint downloads here (10.2 GB), the loader reads it back,
+# and the pip install and the compilation cache share the same volume.
+#
+# Throughput is set EXPLICITLY because gp3's default is 125 MiB/s and the two
+# dominant load stages sit ON that number rather than near it. MEASURED
+# 2026-08-25: read_shards moved the checkpoint in 73.5s (~139 MB/s) and the
+# download took 87.7s (~116 MB/s). Two unrelated stages landing on one figure is
+# the signature of a volume ceiling, not of CPU or network. Untested as a
+# remedy -- the load stages are already timed, so one launch settles it.
+#
+# 500 MiB/s is ~4x baseline and still under g5g.2xlarge's own EBS ceiling
+# ("up to" 4.75 Gbps ~= 593 MB/s), so the smaller sizes stay instance-bound
+# rather than volume-bound. gp3 also requires throughput <= IOPS * 0.25 MiB/s,
+# which 6000 IOPS satisfies with room to raise throughput to the 1000 cap.
+ROOT_VOLUME_GB = int(os.getenv("ROOT_VOLUME_GB", "100"))
+ROOT_VOLUME_THROUGHPUT_MBPS = int(os.getenv("ROOT_VOLUME_THROUGHPUT_MBPS", "500"))
+ROOT_VOLUME_IOPS = int(os.getenv("ROOT_VOLUME_IOPS", "6000"))
+
 # What cloud-init installs on the instance, beyond JAX_PIP_SPEC. Kept here rather
 # than inline in the bootstrap so requirements-serving.txt can mirror one list;
 # tests assert the two agree, because a drifted pair is invisible until a serve.
@@ -404,6 +442,45 @@ fi
     argv = _serve_argv(model, instance_type)
     serving_reqs = " ".join(_SERVING_REQUIREMENTS)
 
+    # Both halves are empty unless JAX_CACHE_S3_URI is set, so the default
+    # rendering is byte-identical to what this rig shipped before.
+    cache_restore = ""
+    cache_units = ""
+    if JAX_CACHE_S3_URI:
+        # `|| true` on purpose: a missing prefix on the first ever run is not a
+        # failure, and this executes under `set -e` where it would otherwise kill
+        # the install -- the failure mode the mkswap flag already demonstrated.
+        cache_restore = (
+            f"aws s3 sync {JAX_CACHE_S3_URI} {JAX_COMPILATION_CACHE_DIR} "
+            f"--only-show-errors || true\nstage cache-restore\n"
+        )
+        # ExecStart needs an absolute path, so `aws` is resolved by a shell
+        # rather than hardcoded: the DLAMI ships it under /usr/bin or
+        # /usr/local/bin depending on the image.
+        cache_units = f"""cat >/etc/systemd/system/{SERVICE_NAME}-cache.service <<'CACHESVCEOF'
+[Unit]
+Description=Upload the XLA compilation cache to S3
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'aws s3 sync {JAX_COMPILATION_CACHE_DIR} {JAX_CACHE_S3_URI} --only-show-errors'
+CACHESVCEOF
+
+cat >/etc/systemd/system/{SERVICE_NAME}-cache.timer <<'CACHETIMEOF'
+[Unit]
+Description=Periodically upload the XLA compilation cache
+
+[Timer]
+OnBootSec={JAX_CACHE_SYNC_MINUTES}min
+OnUnitActiveSec={JAX_CACHE_SYNC_MINUTES}min
+
+[Install]
+WantedBy=timers.target
+CACHETIMEOF
+
+systemctl enable --now {SERVICE_NAME}-cache.timer
+"""
+
     return f"""#!/usr/bin/env bash
 set -euxo pipefail
 {swap}mkdir -p {APP_DIR}/app {JAX_COMPILATION_CACHE_DIR}
@@ -411,6 +488,18 @@ set -euxo pipefail
 cat >{APP_DIR}/install.sh <<'INSTEOF'
 #!/usr/bin/env bash
 set -euxo pipefail
+
+# The install is the LONGEST phase of a deployment and was the only one with no
+# timings at all -- the model load reports four stages, this reported none. That
+# matters most on spot: AWS reclaimed i-0bd73466d5a07a578 21 minutes in, before
+# the wheels finished, and nothing recorded which step had been reached. These
+# markers are greppable with `grep -F '[stage]' /var/log/jax-install.log`.
+_T0=$(date +%s); _TLAST=$_T0
+stage() {{
+  local now; now=$(date +%s)
+  echo "[stage] $1 +$((now - _TLAST))s (total $((now - _T0))s)"
+  _TLAST=$now
+}}
 
 # jax >= 0.11 needs Python >= 3.12; the Ubuntu 22.04 DLAMI base ships 3.10.
 # We install the newest stable line, not the floor -- see JAX_PYTHON_VERSION.
@@ -450,15 +539,22 @@ install_runtime() {{
 
   apt_run update -y
   apt_run install -y software-properties-common
+  stage apt-base
   add-apt-repository -y ppa:deadsnakes/ppa
   apt_run update -y
   apt_run install -y {py} {py}-venv {py}-dev
+  stage python-{JAX_PYTHON_VERSION}
   curl -sS https://bootstrap.pypa.io/get-pip.py | {py}
+  {py} -m pip install --upgrade pip setuptools wheel
+  stage pip-bootstrap
   # The jax extra pulls CUDA from pip wheels (aarch64 published for all of them),
   # so the DLAMI only supplies the driver. No CUDA toolkit, no compiler, no Rust.
-  {py} -m pip install --upgrade pip setuptools wheel
+  # This is the big one: several GB of CUDA wheels, and the step most likely to
+  # be running when a spot reclamation lands.
   {py} -m pip install --upgrade '{JAX_PIP_SPEC}'
+  stage jax-wheels
   {py} -m pip install --upgrade {serving_reqs}
+  stage serving-deps
 }}
 
 # Assert the GPU is actually visible to JAX before declaring the install done.
@@ -477,7 +573,8 @@ PYCHECK
 
 install_runtime
 verify_gpu
-
+stage gpu-verify
+{cache_restore}
 # Point the unit at the interpreter that actually received the packages.
 #
 # MEASURED 2026-08-19 (on 3.12, but the hazard is not version-specific): the
@@ -495,7 +592,9 @@ PY_BIN="$(command -v python{JAX_PYTHON_VERSION})"
 sed -i "s|^ExecStart=[^ ]*|ExecStart=$PY_BIN|" /etc/systemd/system/{SERVICE_NAME}.service
 systemctl daemon-reload
 
+stage unit-rewrite
 touch {APP_DIR}/INSTALL_DONE
+echo "[stage] INSTALL COMPLETE total $(($(date +%s) - _T0))s"
 INSTEOF
 chmod 700 {APP_DIR}/install.sh
 
@@ -544,7 +643,7 @@ RestartSec=10
 WantedBy=multi-user.target
 UNITEOF
 systemctl daemon-reload
-
+{cache_units}
 nohup bash {APP_DIR}/install.sh >/var/log/jax-install.log 2>&1 &
 echo "JAX runtime install started; follow /var/log/jax-install.log, then deploy_jax_server"
 """
@@ -729,7 +828,13 @@ async def get_deployment_config(
             f"--security-group-ids {security_group_id} "
             f"--iam-instance-profile Name={iam_instance_profile} "
             f"{market}"
-            f"--block-device-mappings 'DeviceName=/dev/sda1,Ebs={{VolumeSize=200,VolumeType=gp3,DeleteOnTermination=true}}' "
+            # Rendered from the same constants create_g5g_instance launches with.
+            # This line read VolumeSize=200 while the tool launched 100 and
+            # neither carried throughput -- so the copy-pasteable repro command
+            # provisioned a different volume from the tool it documents.
+            f"--block-device-mappings 'DeviceName=/dev/sda1,Ebs={{VolumeSize={ROOT_VOLUME_GB},"
+            f"VolumeType=gp3,Throughput={ROOT_VOLUME_THROUGHPUT_MBPS},Iops={ROOT_VOLUME_IOPS},"
+            f"DeleteOnTermination=true}}' "
             f"--user-data '{encoded}' --tag-specifications "
             f"'ResourceType=instance,Tags=[{{Key=Name,Value={SERVICE_NAME}}},"
             f"{{Key=ManagedBy,Value={MANAGED_BY}}}]'\n```\n\n"
@@ -776,7 +881,13 @@ async def create_g5g_instance(
             "BlockDeviceMappings": [
                 {
                     "DeviceName": "/dev/sda1",
-                    "Ebs": {"VolumeSize": 100, "VolumeType": "gp3", "DeleteOnTermination": True},
+                    "Ebs": {
+                        "VolumeSize": ROOT_VOLUME_GB,
+                        "VolumeType": "gp3",
+                        "Throughput": ROOT_VOLUME_THROUGHPUT_MBPS,
+                        "Iops": ROOT_VOLUME_IOPS,
+                        "DeleteOnTermination": True,
+                    },
                 }
             ],
             "TagSpecifications": [
@@ -986,18 +1097,67 @@ async def deploy_jax_server(instance_id: str, restart: bool = True) -> str:
 
 @mcp.tool(title="Get JAX runtime install progress", annotations=READ_ONLY)
 async def get_install_progress(instance_id: str, tail: int = 40) -> str:
-    """Tail the jax[cuda12] install started by cloud-init.
+    """Tail the jax[cuda13] install started by cloud-init, and cloud-init itself.
 
     This is a wheel install, not a build — minutes, not the hours the vLLM
     sibling needs. INSTALL COMPLETE means JAX imported *and* saw the GPU.
+
+    It reports cloud-init's OWN state too, and that is the point rather than a
+    nicety. Cloud-init writes install.sh and then backgrounds it, so anything
+    that kills cloud-init BEFORE that point leaves no install log at all — and
+    this tool used to render that as `INSTALL IN PROGRESS` + `no install log
+    yet`, forever, which is also exactly what a healthy slow install looks like.
+    A dead bootstrap and a running one must not share a rendering.
+
+    MEASURED 2026-08-26: `mkswap -q` (a busybox flag util-linux rejects) failed
+    under `set -e` in the swap block, which renders FIRST, so cloud-init died
+    before install.sh existed. The instance sat there looking like it was
+    installing. The flag is fixed; this is the fix for not being able to see it.
     """
     try:
         tail = max(1, min(tail, 5000))
+        # cloud-init-output.log is tailed only when the install log is absent.
+        # When install.sh did start it is the more specific evidence, and both
+        # at full length would risk the 24,000-character SSM cap.
         command = (
             f"test -f {APP_DIR}/INSTALL_DONE && echo 'INSTALL COMPLETE' || echo 'INSTALL IN PROGRESS'; "
-            f"tail -n {tail} /var/log/jax-install.log 2>/dev/null || echo 'no install log yet'"
+            "echo '--- cloud-init ---'; "
+            "cloud-init status --long 2>&1 || echo 'cloud-init status unavailable'; "
+            "echo '--- install log ---'; "
+            "if [ -f /var/log/jax-install.log ]; then "
+            f"tail -n {tail} /var/log/jax-install.log; "
+            "else echo 'NO INSTALL LOG: cloud-init never reached install.sh'; "
+            "echo '--- cloud-init output (tail 60) ---'; "
+            "tail -n 60 /var/log/cloud-init-output.log 2>/dev/null "
+            "|| echo 'no cloud-init output log either'; fi"
         )
-        return f"```\n{await _ssm(instance_id, command)}\n```"
+        output = await _ssm(instance_id, command)
+
+        # Ordered most-specific first. "status: error" is cloud-init's own
+        # verdict and outranks the absence of a log, which is only a symptom.
+        if "INSTALL COMPLETE" in output:
+            verdict = "\n\n✅ Runtime installed and JAX saw the GPU. Next: deploy_jax_server."
+        elif "status: error" in output:
+            verdict = (
+                "\n\n❌ cloud-init FAILED — the bootstrap died, the install is not "
+                "running and never will be. Read the cloud-init output above for the "
+                "failing command; relaunching will reproduce it. This is NOT a slow install."
+            )
+        elif "NO INSTALL LOG" in output and "status: done" in output:
+            verdict = (
+                "\n\n❌ cloud-init finished but never wrote /var/log/jax-install.log, so "
+                "the bootstrap exited before backgrounding install.sh. Nothing is "
+                "installing. Check the cloud-init output above."
+            )
+        elif "NO INSTALL LOG" in output:
+            verdict = (
+                "\n\n⏳ cloud-init is still running and has not reached install.sh yet. "
+                "Normal for the first minute or two after launch; if it persists, the "
+                "bootstrap is stuck before the install."
+            )
+        else:
+            verdict = "\n\n⏳ Installing. Wheels, not a build — minutes, not hours."
+        return f"```\n{output}\n```{verdict}"
     except Exception as exc:
         return _error(exc)
 
@@ -1329,6 +1489,13 @@ async def check_g5g_quotas() -> str:
 @mcp.tool(title="Help and configuration", annotations=READ_ONLY)
 async def get_help() -> str:
     """Show this rig's resolved configuration and the constraints that shape it."""
+    # Stated either way. The cache being ephemeral is the reason a relaunch
+    # recompiles every shape, and that is worth seeing without reading the source.
+    cache_backing = (
+        f"persisted to `{JAX_CACHE_S3_URI}` every {JAX_CACHE_SYNC_MINUTES}min"
+        if JAX_CACHE_S3_URI
+        else "ephemeral (set JAX_CACHE_S3_URI to survive a relaunch)"
+    )
     return f"""### {RIG_NAME}
 
 Serving `{MODEL_NAME}` with **pure JAX** on **EC2 G5g** — AWS Graviton2 (aarch64)
@@ -1345,6 +1512,8 @@ host, NVIDIA **T4G** GPU (Turing, SM 7.5, 15360 MiB measured).
 | Device mem fraction | `{XLA_PYTHON_CLIENT_MEM_FRACTION}` |
 | Service | `{SERVICE_NAME}` (systemd, not docker) |
 | Managed-by tag | `{MANAGED_BY}` |
+| Root volume | {ROOT_VOLUME_GB} GB gp3 @ {ROOT_VOLUME_THROUGHPUT_MBPS} MiB/s, {ROOT_VOLUME_IOPS} IOPS |
+| XLA cache | `{JAX_COMPILATION_CACHE_DIR}` — {cache_backing} |
 
 **Why this rig exists.** The vLLM path on identical hardware needs a ~67-minute
 from-source build for SM 7.5, a CUDA toolkit, Rust, and an unlanded patch to
