@@ -147,10 +147,26 @@ The serving stack that actually loads the weights.
 | --- | --- |
 | `vllm` | vLLM, OpenAI-compatible API on `:8000` (Docker image or pip install) |
 | `jax` | JAX-native — Flax, MaxText, or a hand-rolled JAX server |
+| `jaxrust` | JAX-family graph execution driven from **Rust** — the forward pass is defined in Rust and lowered to XLA/StableHLO, not written in Python |
 | `pytorch` | PyTorch, via `torch_xla` on TPU or CUDA on GPU |
 
 `vllm` names the server, not the backend it compiles to — vLLM on TPU is `vllm`, never `pytorch`, even though
 `torch_xla` sits underneath. Pick the layer you'd file a bug against.
+
+**`jaxrust` is one slot value, not a compound, and it is never spelled `jax-rust`.** Slot values cannot contain
+a hyphen, because the hyphen is the field separator: `gpu-jax-rust-g5g-2b` parses as a *five*-slot name whose
+hardware slot is `rust` and whose model slot is `g5g`. The same rule is why `v5e1` is not `v5e-1`.
+
+**Choose it by which language owns the model definition, not by what is linked in.** The `vllm` rule — file
+the bug against the layer you named — decides this too. A Python JAX rig that loads a Rust extension is still
+`jax`; a rig whose forward pass is written in Rust is `jaxrust`, even though XLA sits underneath both and it
+is frequently the *same* `libxla_extension` binary. `pytorch` draws the identical line against `torch_xla`.
+
+**`jaxrust` is not a performance claim.** Slot 2 has never been one — it records which stack loads the
+weights, and two rigs differing only in slot 2 are an A/B pair precisely because the slot does not prejudge
+the result. Rust buys memory-safety and a single static binary; the arithmetic still runs in XLA, so a
+`jaxrust` rig and a `jax` rig on the same chip should be expected to land in the same place until measured
+otherwise.
 
 ## Slot 3 — hardware
 
@@ -359,6 +375,8 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-jax-v6e1-31b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-31B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-g5g-2b` | **EC2 G5g** (Graviton2 host) | vLLM | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — hardware slot is the instance family, not the GPU SKU; carve-out below |
 | `~/gemma4-dev/gpu-jax-g5g-2b` | **EC2 G5g** (Graviton2 host) | pure JAX | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — same carve-out as the vLLM sibling; serves the dense reference build, so no encoding slot |
+| `~/gemma4-dev/gce-jaxrust-v6e1-2b` | **Compute Engine instance** (`ct6e-standard-1t`) | Rust-driven XLA (`rlx`) | v6e-1 | `gemma-4-E2B-it` | — — forked from `tpu-jax-v6e1-2b` 2026-08-28. **Slot 1 is `gce`, which resolves that rig's documented slot-1 exception rather than inheriting it** — it provisions only through Compute Engine, so the letter of the rule applies. Carries a Rust `rlx` engine under `rust/`; not an A/B twin of the `gpu` jaxrust rig (different chip *and* different backend) |
+| `~/gemma4-dev/gpu-jaxrust-g5g-2b` | **EC2 G5g** (Graviton2 host) | Rust-driven XLA | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — forked from `gpu-jax-g5g-2b` 2026-08-28, same carve-out. **The name is a claim about work not yet done**: the engine is still the Python JAX one and the Rust runtime is unresolved, see below |
 | `~/gemma4-dev/gpu-vllm-l4-2b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-4b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-12b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |

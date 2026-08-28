@@ -744,7 +744,9 @@ class TestNodeDiscovery(unittest.IsolatedAsyncioTestCase):
         script = await server._get_formatted_startup_script("google/gemma-4-31B-it", zone="europe-west4-a")
 
         install_at = script.find("apt-get install -y -qq docker.io")
-        pull_at = script.find("docker pull vllm/vllm-tpu:nightly")
+        # Image-agnostic on purpose: VLLM_IMAGE is configurable so a published result can be
+        # reproduced on its pinned tag, and this test is about ORDERING, not which image.
+        pull_at = script.find('docker pull "$VLLM_IMAGE"')
         self.assertNotEqual(install_at, -1, "startup script must install Docker")
         self.assertNotEqual(pull_at, -1, "startup script must still pull the image")
         self.assertLess(install_at, pull_at, "Docker must be installed before the pull is attempted")
@@ -950,6 +952,8 @@ class TestStagedCheckpointRestore(unittest.IsolatedAsyncioTestCase):
                 max_num_batched_tokens=4096,
                 limit_mm_per_prompt='{"image":4,"audio":1}',
                 model_gcs_uri=uri,
+                vllm_image="vllm/vllm-tpu:nightly",
+                xprof_gcs_uri="",
             )
 
     def test_template_still_renders_with_and_without_a_staged_uri(self):
@@ -1019,25 +1023,48 @@ class TestProfilerSidecar(unittest.IsolatedAsyncioTestCase):
         mod = self._sidecar(VLLM_XPROF_DIR="")
         self.assertFalse(mod.install())
 
-    def test_does_not_install_in_a_process_without_tpus(self):
-        """vLLM runs the API server and the engine as SEPARATE processes.
+    def test_detection_never_imports_jax_or_touches_the_device(self):
+        """THE REGRESSION THAT COST A BOOT.
 
-        Only the engine owns the TPU. Installing in the API server would capture nothing and
-        would bind the port the engine needs.
+        The first version called jax.devices() to decide whether this process owned the TPU.
+        On TPU that is not a query — it initialises the backend and CLAIMS THE CHIP. Running
+        from sitecustomize in vLLM's API server (pid 1), it took the TPU, and EngineCore died
+        with "The TPU is already in use by process with pid 1". Detection must be purely
+        observational.
         """
         mod = self._sidecar(VLLM_XPROF_DIR="/tmp/x")
-        with patch.object(mod, "_has_tpu", return_value=False):
-            self.assertFalse(mod.install())
+        # Strip docstrings with ast rather than by hand: the module docstring QUOTES
+        # jax.devices() in the warning about it, and a line filter cannot tell the warning
+        # from the call.
+        import ast
+
+        tree = ast.parse(open(os.path.join(self._PROFILING, "profiler_sidecar.py")).read())
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.FunctionDef, ast.ClassDef)):
+                if (
+                    node.body
+                    and isinstance(node.body[0], ast.Expr)
+                    and isinstance(node.body[0].value, ast.Constant)
+                    and isinstance(node.body[0].value.value, str)
+                ):
+                    node.body.pop(0)
+        self.assertNotIn("jax.devices()", ast.unparse(tree))
+        # And the check itself must not pull jax in as a side effect.
+        sys.modules.pop("jax", None)
+        mod._owns_tpu()
+        self.assertNotIn("jax", sys.modules)
+
+    def test_owns_tpu_reads_process_maps_and_never_raises(self):
+        mod = self._sidecar(VLLM_XPROF_DIR="/tmp/x")
+        self.assertIsInstance(mod._owns_tpu(), bool)
+        with patch("builtins.open", side_effect=OSError("no /proc")):
+            self.assertFalse(mod._owns_tpu())
 
     def test_install_never_raises_even_when_everything_fails(self):
         """sitecustomize failures propagate out of interpreter init and kill the container."""
         mod = self._sidecar(VLLM_XPROF_DIR="/tmp/x")
-        with patch.object(mod, "_has_tpu", side_effect=RuntimeError("boom")):
+        with patch.object(mod.threading, "Thread", side_effect=RuntimeError("boom")):
             self.assertFalse(mod.install())
-
-    def test_has_tpu_is_false_rather_than_raising_without_jax(self):
-        mod = self._sidecar(VLLM_XPROF_DIR="/tmp/x")
-        self.assertIsInstance(mod._has_tpu(), bool)
 
     def test_sitecustomize_swallows_a_broken_sidecar(self):
         src = open(os.path.join(self._PROFILING, "sitecustomize.py")).read()

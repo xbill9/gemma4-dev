@@ -20,15 +20,16 @@ already loaded. This module re-creates the endpoints vLLM dropped.
 HOW IT IS LOADED
 ----------------
 Python imports `sitecustomize` automatically from any `sys.path` entry at interpreter start.
-`xprof_capture.sh` bind-mounts this directory into the container and sets `PYTHONPATH`, so a
+`capture_profile.sh` (or the boot-time `XPROF_GCS_URI` path) bind-mounts this directory into the container and sets `PYTHONPATH`, so a
 `sitecustomize.py` next to this file imports it in every Python process the container starts.
 
 That "every process" is the whole difficulty, and the guards below are the substance of this
 file rather than defensive noise:
 
 - **vLLM runs the engine as a SEPARATE PROCESS from the API server** (`APIServer pid=1`,
-  `EngineCore pid=711` in the boot log). Only the engine owns the TPU. Starting a trace in the
-  API server would capture nothing and bind the port the engine wants.
+  `EngineCore pid=1615` in the boot log). Only the engine owns the TPU.
+- **Deciding which process that is must never touch the device.** Asking JAX directly claims
+  the chip; see `_owns_tpu`. This is not hypothetical — it broke a boot on 2026-08-26.
 - **Any exception here breaks the container's startup**, because sitecustomize failures
   propagate out of interpreter init. Nothing in this module may raise.
 - It stays inert unless `VLLM_XPROF_DIR` is set, so a container that mounts it but does not
@@ -50,19 +51,58 @@ _LOGDIR = os.environ.get("VLLM_XPROF_DIR", "")
 _state = {"tracing": False}
 
 
-def _has_tpu() -> bool:
-    """True only in the process that actually owns TPU devices.
+def _owns_tpu() -> bool:
+    """True only in the process that has the TPU device files OPEN.
 
-    This is the guard that keeps the control server out of the API server process. It also
-    imports jax lazily: importing jax in a process that does not need it is slow and, on the
-    TPU path, can contend for the device.
+    Two weaker checks were tried on hardware and both were wrong:
+
+    1. `jax.devices()` — not a query. It initialises the backend and CLAIMS THE CHIP. Run from
+       sitecustomize in vLLM's API server (pid 1) it took the TPU and EngineCore died with
+       "The TPU is already in use by process with pid 1". Cost a boot, 2026-08-26.
+    2. `libtpu` in /proc/self/maps — passive, but not selective. The API server imports
+       tpu_platform, so libtpu is mapped there too; pid 1 won the race for the control port
+       and EngineCore got "Address already in use". Cost a second boot the same night.
+
+    An OPEN FD on the accelerator device is the thing only the owning process has. Reading
+    /proc/self/fd initialises nothing and touches no device.
     """
     try:
-        import jax
-
-        return any(d.platform == "tpu" for d in jax.devices())
+        fds = os.path.join("/proc", "self", "fd")
+        for name in os.listdir(fds):
+            try:
+                target = os.readlink(os.path.join(fds, name))
+            except OSError:
+                continue
+            if "accel" in target or "vfio" in target:
+                return True
+        return False
     except Exception:
         return False
+
+
+def _wait_then_serve():
+    """Wait for THIS process to own the TPU, then bind the control port.
+
+    At sitecustomize time no process has initialised the backend yet, so the check above is
+    false everywhere. Polling passively lets the right process — and only the right one —
+    claim the port once vLLM has brought the engine up on its own terms.
+    """
+    import time
+
+    deadline = time.time() + float(os.environ.get("VLLM_XPROF_WAIT_S", "1800"))
+    while time.time() < deadline:
+        if _owns_tpu():
+            try:
+                from http.server import HTTPServer
+
+                server = HTTPServer(("0.0.0.0", _PORT), _handler_class())
+                print(f"[xprof-sidecar] trace control on :{_PORT} -> {_LOGDIR}", flush=True)
+                server.serve_forever()
+            except Exception as exc:
+                # Another process won the race, or the port is taken. Not fatal.
+                print(f"[xprof-sidecar] not serving: {type(exc).__name__}: {exc}", flush=True)
+            return
+        time.sleep(5)
 
 
 def _handler_class():
@@ -111,19 +151,16 @@ def _handler_class():
 
 
 def install() -> bool:
-    """Start the control server if this process owns the TPU. Never raises."""
+    """Arm the sidecar. Never raises, and never touches the TPU.
+
+    Returns whether the WAITER started, not whether the control port is up — binding happens
+    later, in whichever process turns out to own the chip.
+    """
     if not _LOGDIR:
         return False
     try:
-        if not _has_tpu():
-            return False
-        from http.server import HTTPServer
-
-        server = HTTPServer(("0.0.0.0", _PORT), _handler_class())
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        print(f"[xprof-sidecar] trace control on :{_PORT} -> {_LOGDIR}", flush=True)
+        threading.Thread(target=_wait_then_serve, daemon=True).start()
         return True
     except Exception as exc:
-        # A bound port or a jax import failure must not stop the engine from serving.
         print(f"[xprof-sidecar] not installed: {type(exc).__name__}: {exc}", flush=True)
         return False

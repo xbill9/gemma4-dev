@@ -23,3 +23,11 @@ venv/
 *.bak
 .DS_Store
 Thumbs.db
+
+# Raw xprof profiler dumps under benchmarks/runs/ are far too large for GitHub: a single
+# run's .xplane.pb hit 615 MB against a 100 MB per-file hard limit. The derived summaries
+# (xprof_kernel_stats.json, xprof_memory_profile.json) and the *.log files above are the
+# committed record of a profiling run; the raw dumps stay local.
+*.xplane.pb
+xprof.tgz
+*.trace.json.gz

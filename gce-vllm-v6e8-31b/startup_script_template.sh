@@ -66,11 +66,12 @@ else
 fi
 
 # Docker pull vLLM image
-echo "Pulling vLLM Docker image: vllm/vllm-tpu:nightly"
+VLLM_IMAGE="{vllm_image}"
+echo "Pulling vLLM Docker image: $VLLM_IMAGE"
 set +e # Allow docker pull to fail without exiting immediately
 for i in $(seq 1 5); do
-  echo "Attempt $i/5: sudo docker pull vllm/vllm-tpu:nightly"
-  sudo docker pull vllm/vllm-tpu:nightly
+  echo "Attempt $i/5: sudo docker pull $VLLM_IMAGE"
+  sudo docker pull "$VLLM_IMAGE"
   if [ $? -eq 0 ]; then
     echo "Docker image pulled successfully."
     break
@@ -191,6 +192,25 @@ else
   echo "  Stage it with stage_model_to_gcs.sh to cut this to minutes on every future boot."
 fi
 
+# --- Optional xprof sidecar -----------------------------------------------------------------
+# Arming the profiler at BOOT rather than afterwards saves a full engine restart, which on
+# this checkpoint is ~7 minutes of recompilation (measured: init engine 427.9 s, compilation
+# 399.6 s). vLLM's own VLLM_TORCH_PROFILER_DIR does not exist on these images and
+# /start_profile 404s, so the trigger has to be injected in-process — see profiling/.
+# Empty XPROF_SRC leaves the container byte-identical to an unprofiled boot.
+XPROF_SRC="{xprof_gcs_uri}"
+XPROF_MOUNT=""
+if [ -n "$XPROF_SRC" ]; then
+  echo "Fetching xprof sidecar from $XPROF_SRC..."
+  sudo mkdir -p /opt/xprof /dev/shm/xprof
+  if sudo gcloud storage cp "$XPROF_SRC/*" /opt/xprof/ 2>/dev/null; then
+    XPROF_MOUNT="-v /opt/xprof:/opt/xprof -e PYTHONPATH=/opt/xprof -e VLLM_XPROF_DIR=/dev/shm/xprof -e VLLM_XPROF_PORT=9012"
+    echo "xprof sidecar armed; trace control will listen on :9012."
+  else
+    echo "WARNING: could not fetch the sidecar. Booting WITHOUT profiling."
+  fi
+fi
+
 echo "Attempting to start vLLM container..."
 # Stop and remove any existing container with the same name to ensure a clean start
 sudo docker stop vllm-gemma4 > /dev/null 2>&1 || true
@@ -202,8 +222,8 @@ echo 'Executing command: sudo docker run --name vllm-gemma4 --privileged --net=h
   -v /dev/shm:/dev/shm --shm-size 10gb \
   -e HF_HOME="$HF_HOME" \
   -e HF_TOKEN=<masked> \
-  '"$HF_OFFLINE_FLAG"' \
-  vllm/vllm-tpu:nightly vllm serve "$VLLM_MODEL" \
+  '"$HF_OFFLINE_FLAG $XPROF_MOUNT"' \
+  "$VLLM_IMAGE" vllm serve "$VLLM_MODEL" \
   --max-model-len "$VLLM_MAX_MODEL_LEN" \
   --tensor-parallel-size "$VLLM_TP_SIZE" \
   --disable_chunked_mm_input \
@@ -217,8 +237,8 @@ sudo docker run --name vllm-gemma4 --privileged --net=host -d \
   -v /dev/shm:/dev/shm --shm-size 10gb \
   -e HF_HOME="$HF_HOME" \
   -e HF_TOKEN="$HF_TOKEN" \
-  $HF_OFFLINE_FLAG \
-  vllm/vllm-tpu:nightly vllm serve "$VLLM_MODEL" \
+  $HF_OFFLINE_FLAG $XPROF_MOUNT \
+  "$VLLM_IMAGE" vllm serve "$VLLM_MODEL" \
   --max-model-len "$VLLM_MAX_MODEL_LEN" \
   --tensor-parallel-size "$VLLM_TP_SIZE" \
   --disable_chunked_mm_input \

@@ -1,0 +1,9 @@
+# Control-plane dependencies: what the MCP server itself needs to run locally.
+#
+# Deliberately does NOT include jax. The serving stack runs on the G5g instance,
+# not here, and its dependencies are aarch64+CUDA wheels that would be wrong (and
+# enormous) on a control-plane host. Those live in requirements-serving.txt and
+# are installed by cloud-init; tests/test_server.py asserts the two agree.
+mcp
+httpx
+boto3

@@ -30,6 +30,7 @@ boundaries.
 | [`tpu-vllm-v6e1-2b`](tpu-vllm-v6e1-2b/) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | Fork of the v5e-1 rig retargeted to Trillium; provisions in `us-east5-b` |
 | [`tpu-jax-v5e1-2b`](tpu-jax-v5e1-2b/) | pure JAX | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | Hand-rolled engine + OpenAI-compatible server; no Docker, no HF token |
 | [`tpu-jax-v6e1-2b`](tpu-jax-v6e1-2b/) | pure JAX | v6e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | Fork of the v5e-1 JAX rig retargeted to Trillium and **migrated off the Cloud TPU API onto Compute Engine** — no queued-resource path at all |
+| [`gce-jaxrust-v6e1-2b`](gce-jaxrust-v6e1-2b/) | Rust-driven XLA (`rlx` → HLO → libtpu PJRT) | v6e-1 | `gemma-4-E2B-it` | Forked from `tpu-jax-v6e1-2b` 2026-08-28 to move the engine off CPython — **no Python in the serving path**. The workspace builds and clippy is clean; **nothing has run on a chip**, and `xla-probe` exists to be the first thing that does. `rlx-gemma` is GPL-3.0-only, so the model feature is opt-in — see `rust/NOTICE.md` |
 | [`tpu-pytorch-v5e1-12b`](tpu-pytorch-v5e1-12b/) | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | Static-shape decode server |
 | [`tpu-pytorch-v5e1-2b`](tpu-pytorch-v5e1-2b/) | PyTorch / `torch_xla` | v5e-1 | 2B | Near-identical fork of the 12B rig |
 | [`tpu-pytorch-v6e1-2b`](tpu-pytorch-v6e1-2b/) | PyTorch / `torch_xla` | v6e-1 | 2B | |
@@ -50,6 +51,7 @@ they came from. See [`NAMING.md`](NAMING.md#artifact-rigs--a-rig-that-serves-not
 | [`gpu-vllm-l4-26b-w4a16`](gpu-vllm-l4-26b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-26B-A4B-it-qat-w4a16-ct` | **That Hub id does not exist** — the reports name a local mount; see the rig |
 | [`gpu-vllm-l4-31b-w4a16`](gpu-vllm-l4-31b-w4a16/) | vLLM | NVIDIA L4 | `gemma-4-31B-it-qat-w4a16-ct` | At bf16 the 31B leaves **0 GB** for KV on an L4 |
 | [`gpu-jax-g5g-2b`](gpu-jax-g5g-2b/) | pure JAX | g5g (Graviton2 + NVIDIA T4G, Turing SM 7.5) | `gemma-4-E2B-it` | Same silicon as the vLLM G5g rig, different runtime: pip supplies CUDA, so no build, no toolkit, no Triton patch. Serves the dense reference build — the fused W4A16 Pallas kernel cannot fit Turing shared memory and is refused at startup |
+| [`gpu-jaxrust-g5g-2b`](gpu-jaxrust-g5g-2b/) | Rust-driven XLA | g5g (Graviton2 + NVIDIA T4G, Turing SM 7.5) | `gemma-4-E2B-it` | Forked from `gpu-jax-g5g-2b` 2026-08-28 to move the engine off CPython. **The runtime is chosen and the engine builds; nothing has run.** `rlx` + `rlx-gemma` on `Device::Cuda` — verified against the crate source, so the survey's first-draft claim that no Rust JAX reaches SM 7.5 on aarch64 is **withdrawn**; aarch64 itself is still unverified. `rlx-gemma` is GPL-3.0-only, so the model feature is opt-in — see `docs/rust-jax-runtime-survey.md` |
 
 The five `gpu-vllm-l4-*` rigs were migrated from `~/gemma4-tips` on 2026-08-07. That tree duplicated
 its artifacts heavily — **82 report files, 20 unique**, with directory names that misattribute models
@@ -118,4 +120,25 @@ the next refresh.
 
 ## License
 
-Apache-2.0.
+**Apache-2.0** — see [`LICENSE`](LICENSE). That covers every rig in this repo, with one
+carve-out.
+
+**`gpu-jaxrust-g5g-2b/rust/` is different when built with the `gemma` feature.** It links
+`rlx-gemma`, which is **GPL-3.0-only** at 0.2.11 and has no later release — `rlx` itself
+relicensed to MIT/Apache-2.0 at 0.2.14 but the model crate did not follow. GPLv3 accepts
+Apache-2.0 code; the reverse does not hold, so a **binary** built with `--features gemma` is a
+GPLv3 combined work and must ship its corresponding source under GPLv3.
+
+Three things that follow, and the first two are why nothing is owed today:
+
+- **Publishing this source is not distributing a combined work.** `rlx-gemma` is fetched by
+  cargo on the builder's machine; it is not vendored here.
+- **GPLv3 has no network clause** — that is AGPL. Serving the endpoint publicly triggers
+  nothing. The obligation attaches when you hand someone a **binary**: a release artifact, a
+  container image, an AMI.
+- **The `gemma` cargo feature is the license boundary**, not just a build switch. Built
+  `--no-default-features --features cuda`, the binary links no GPL code — it starts, reports the
+  device, and refuses generation naming the flag.
+
+Everything else in `rust/` — `gemma4-engine`'s own code and `gemma4-geometry` — is Apache-2.0
+like the rest of the repo.

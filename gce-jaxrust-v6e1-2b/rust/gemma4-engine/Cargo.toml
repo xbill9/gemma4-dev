@@ -1,0 +1,41 @@
+[package]
+name = "gemma4-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OpenAI-compatible Gemma 4 server driving XLA on a TPU v6e-1 from Rust, no Python in the serving path"
+
+[features]
+# `tpu` selects rlx's libtpu/PJRT backend. It is on by default because this rig
+# has no other reason to exist; `--no-default-features --features cpu` gives the
+# same engine on a CPU box, which is how the parity work is done off the chip.
+default = ["tpu", "gemma"]
+tpu = ["rlx/tpu", "rlx-runtime/tpu"]
+cpu = ["rlx/cpu", "rlx-runtime/cpu"]
+
+# LICENSING — read before turning this on in anything you ship.
+#
+# `rlx-gemma` is GPL-3.0-only, while `rlx` itself and this rig are permissive
+# (MIT/Apache-2.0). Linking it makes the resulting BINARY a GPLv3 combined work.
+# This rig ships source and builds on the VM, so nothing here is distributed as
+# a binary today — but the moment one is, that is the license it carries.
+#
+# Without this feature the server still builds and still starts; it answers
+# /health and reports the TPU, and refuses generation with a message naming the
+# flag. That is deliberate: the capacity path and the model path are separable,
+# and the expensive half to verify is the capacity path.
+gemma = ["dep:rlx-gemma"]
+
+[dependencies]
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive", "env"] }
+rlx = { version = "=0.2.11", default-features = false }
+rlx-runtime = { version = "=0.2.11", default-features = false }
+rlx-gemma = { version = "=0.2.11", optional = true, default-features = false }
+async-stream = "0.3.6"

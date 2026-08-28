@@ -1,0 +1,1676 @@
++ echo 'Starting Queued vLLM Bootloader...'
+Starting Queued vLLM Bootloader...
++ echo -----------------------------------
+-----------------------------------
++ echo 'Project ID: aisprint-491218'
+Project ID: aisprint-491218
++ echo 'Zone: europe-west4-a'
+Zone: europe-west4-a
++ echo 'Model Name: google/gemma-4-31B-it'
+Model Name: google/gemma-4-31B-it
++ echo 'HF_SECRET_ID: hf-token'
+HF_SECRET_ID: hf-token
++ echo -----------------------------------
+-----------------------------------
++ echo 'Checking internet connectivity...'
+Checking internet connectivity...
++ set +e
+++ seq 1 30
++ for i in $(seq 1 30)
++ echo 'Attempt 1/30: Pinging 8.8.8.8...'
+Attempt 1/30: Pinging 8.8.8.8...
++ ping -c 1 8.8.8.8
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=115 time=0.250 ms
+
+--- 8.8.8.8 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.250/0.250/0.250/0.000 ms
++ '[' 0 -eq 0 ']'
++ echo 'Internet connected.'
+Internet connected.
++ break
++ set -e
++ echo 'Checking for Docker...'
+Checking for Docker...
++ command -v docker
++ echo 'Docker not present on this image — installing docker.io...'
+Docker not present on this image — installing docker.io...
++ set +e
+++ seq 1 5
++ for i in $(seq 1 5)
++ echo 'Attempt 1/5: apt-get install docker.io'
+Attempt 1/5: apt-get install docker.io
++ sudo apt-get update -qq
++ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io
+Preconfiguring packages ...
+Selecting previously unselected package pigz.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 66818 files and directories currently installed.)
+Preparing to unpack .../0-pigz_2.6-1_amd64.deb ...
+Unpacking pigz (2.6-1) ...
+Selecting previously unselected package bridge-utils.
+Preparing to unpack .../1-bridge-utils_1.7-1ubuntu3_amd64.deb ...
+Unpacking bridge-utils (1.7-1ubuntu3) ...
+Selecting previously unselected package runc.
+Preparing to unpack .../2-runc_1.3.4-0ubuntu1~22.04.1_amd64.deb ...
+Unpacking runc (1.3.4-0ubuntu1~22.04.1) ...
+Selecting previously unselected package containerd.
+Preparing to unpack .../3-containerd_2.2.1-0ubuntu1~22.04.2_amd64.deb ...
+Unpacking containerd (2.2.1-0ubuntu1~22.04.2) ...
+Selecting previously unselected package dns-root-data.
+Preparing to unpack .../4-dns-root-data_2024071801~ubuntu0.22.04.1_all.deb ...
+Unpacking dns-root-data (2024071801~ubuntu0.22.04.1) ...
+Selecting previously unselected package dnsmasq-base.
+Preparing to unpack .../5-dnsmasq-base_2.90-0ubuntu0.22.04.4_amd64.deb ...
+Unpacking dnsmasq-base (2.90-0ubuntu0.22.04.4) ...
+Selecting previously unselected package docker.io.
+Preparing to unpack .../6-docker.io_29.1.3-0ubuntu3~22.04.2_amd64.deb ...
+Unpacking docker.io (29.1.3-0ubuntu3~22.04.2) ...
+Selecting previously unselected package ubuntu-fan.
+Preparing to unpack .../7-ubuntu-fan_0.12.16_all.deb ...
+Unpacking ubuntu-fan (0.12.16) ...
+Setting up dnsmasq-base (2.90-0ubuntu0.22.04.4) ...
+Setting up runc (1.3.4-0ubuntu1~22.04.1) ...
+Setting up dns-root-data (2024071801~ubuntu0.22.04.1) ...
+Setting up bridge-utils (1.7-1ubuntu3) ...
+Setting up pigz (2.6-1) ...
+Setting up containerd (2.2.1-0ubuntu1~22.04.2) ...
+Created symlink /etc/systemd/system/multi-user.target.wants/containerd.service → /lib/systemd/system/containerd.service.
+Setting up ubuntu-fan (0.12.16) ...
+Created symlink /etc/systemd/system/multi-user.target.wants/ubuntu-fan.service → /lib/systemd/system/ubuntu-fan.service.
+Setting up docker.io (29.1.3-0ubuntu3~22.04.2) ...
+Adding group `docker' (GID 121) ...
+Done.
+Created symlink /etc/systemd/system/multi-user.target.wants/docker.service → /lib/systemd/system/docker.service.
+Created symlink /etc/systemd/system/sockets.target.wants/docker.socket → /lib/systemd/system/docker.socket.
+Processing triggers for dbus (1.12.20-2ubuntu4.1) ...
+Processing triggers for man-db (2.10.2-1) ...
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
++ command -v docker
++ echo 'Docker installed.'
+Docker installed.
++ break
++ set -e
++ sudo systemctl enable --now docker
++ VLLM_IMAGE=vllm/vllm-tpu:v0.26.0
++ echo 'Pulling vLLM Docker image: vllm/vllm-tpu:v0.26.0'
+Pulling vLLM Docker image: vllm/vllm-tpu:v0.26.0
++ set +e
+++ seq 1 5
++ for i in $(seq 1 5)
++ echo 'Attempt 1/5: sudo docker pull vllm/vllm-tpu:v0.26.0'
+Attempt 1/5: sudo docker pull vllm/vllm-tpu:v0.26.0
++ sudo docker pull vllm/vllm-tpu:v0.26.0
+v0.26.0: Pulling from vllm/vllm-tpu
+597c6c618d36: Pulling fs layer
+255bf6f52cd0: Pulling fs layer
+b7e97db3511b: Pulling fs layer
+91b8d4ab0a8c: Pulling fs layer
+1c08b4e04c3a: Pulling fs layer
+323db1706177: Pulling fs layer
+f2384725951f: Pulling fs layer
+a9ac8f2fd54a: Pulling fs layer
+278c43479e93: Pulling fs layer
+920636a8459b: Pulling fs layer
+e1cd6eb21104: Pulling fs layer
+f57e426dc898: Pulling fs layer
+4a27d0b6c68d: Pulling fs layer
+9cc8103cccd4: Pulling fs layer
+1c5fa4f1c801: Pulling fs layer
+bc369a00f83c: Pulling fs layer
+5c69080dde07: Pulling fs layer
+bec8c67a4b33: Pulling fs layer
+f378ad390e92: Pulling fs layer
+a319ff7efac8: Pulling fs layer
+f7373e2a4bda: Pulling fs layer
+e732d614ad75: Pulling fs layer
+193249ca1043: Pulling fs layer
+ef780c5b09c5: Pulling fs layer
+3577eac9597b: Pulling fs layer
+597c6c618d36: Download complete
+1c08b4e04c3a: Download complete
+a9ac8f2fd54a: Download complete
+e1cd6eb21104: Download complete
+91b8d4ab0a8c: Download complete
+f57e426dc898: Download complete
+255bf6f52cd0: Download complete
+b7e97db3511b: Download complete
+9cc8103cccd4: Download complete
+f2384725951f: Download complete
+bec8c67a4b33: Download complete
+f7373e2a4bda: Download complete
+4a27d0b6c68d: Download complete
+ef780c5b09c5: Download complete
+193249ca1043: Download complete
+278c43479e93: Download complete
+920636a8459b: Download complete
+e732d614ad75: Download complete
+3577eac9597b: Download complete
+bc369a00f83c: Download complete
+1c5fa4f1c801: Download complete
+597c6c618d36: Pull complete
+91b8d4ab0a8c: Pull complete
+278c43479e93: Pull complete
+323db1706177: Download complete
+a319ff7efac8: Download complete
+f378ad390e92: Download complete
+b7e97db3511b: Pull complete
+920636a8459b: Pull complete
+a319ff7efac8: Pull complete
+5c69080dde07: Download complete
+e732d614ad75: Pull complete
+3577eac9597b: Pull complete
+f378ad390e92: Pull complete
+e1cd6eb21104: Pull complete
+f7373e2a4bda: Pull complete
+193249ca1043: Pull complete
+5c69080dde07: Pull complete
+f57e426dc898: Pull complete
+bec8c67a4b33: Pull complete
+bc369a00f83c: Pull complete
+f2384725951f: Pull complete
+323db1706177: Pull complete
+1c08b4e04c3a: Pull complete
+a9ac8f2fd54a: Pull complete
+9cc8103cccd4: Pull complete
+255bf6f52cd0: Pull complete
+4a27d0b6c68d: Pull complete
+ef780c5b09c5: Pull complete
+1c5fa4f1c801: Pull complete
+Digest: sha256:186f1940c353d2703bf80f80fff101b38fa8e26a9562a767b37e103f212d3d79
+Status: Downloaded newer image for vllm/vllm-tpu:v0.26.0
+docker.io/vllm/vllm-tpu:v0.26.0
++ '[' 0 -eq 0 ']'
++ echo 'Docker image pulled successfully.'
+Docker image pulled successfully.
++ break
++ set -e
++ echo 'Setting vLLM environment variables...'
+Setting vLLM environment variables...
++ VLLM_MODEL=google/gemma-4-31B-it
++ VLLM_MAX_MODEL_LEN=2048
++ VLLM_TP_SIZE=4
++ VLLM_MAX_BATCHED_TOKENS=4096
++ VLLM_LIMIT_MM_PER_PROMPT='{"image":4,"audio":1}'
++ HF_HOME=/dev/shm
++ echo 'VLLM_MODEL set to: google/gemma-4-31B-it'
+VLLM_MODEL set to: google/gemma-4-31B-it
++ echo 'VLLM_MAX_MODEL_LEN set to: 2048'
+VLLM_MAX_MODEL_LEN set to: 2048
++ echo 'VLLM_TP_SIZE set to: 4'
+VLLM_TP_SIZE set to: 4
++ echo 'VLLM_MAX_BATCHED_TOKENS set to: 4096'
+VLLM_MAX_BATCHED_TOKENS set to: 4096
++ echo 'VLLM_LIMIT_MM_PER_PROMPT set to: {"image":4,"audio":1}'
+VLLM_LIMIT_MM_PER_PROMPT set to: {"image":4,"audio":1}
++ echo 'HF_HOME set to: /dev/shm'
+HF_HOME set to: /dev/shm
++ set +x
+Fetching 'hf-token' from Secret Manager (retrying for up to 30 minutes)...
+Secret retrieved successfully on attempt 1 (value masked).
+Staged cache configured at gs://aisprint-491218-hf-cache-europe-west4/google__gemma-4-31B-it.hfcache.tar — checking that it exists...
+Restoring Hugging Face cache from gs://aisprint-491218-hf-cache-europe-west4/google__gemma-4-31B-it.hfcache.tar into /dev/shm (streaming, no temp disk)...
+Cache restored in 310s. Serving offline; no Hugging Face download needed.
+Fetching xprof sidecar from gs://aisprint-491218-hf-cache-europe-west4/xprof...
+xprof sidecar armed; trace control will listen on :9012.
+Attempting to start vLLM container...
+Executing command: sudo docker run --name vllm-gemma4 --privileged --net=host -d \
+  -v /dev/shm:/dev/shm --shm-size 10gb \
+  -e HF_HOME="$HF_HOME" \
+  -e HF_TOKEN=<masked> \
+  -e HF_HUB_OFFLINE=1 -v /opt/xprof:/opt/xprof -e PYTHONPATH=/opt/xprof -e VLLM_XPROF_DIR=/dev/shm/xprof -e VLLM_XPROF_PORT=9012 \
+  "$VLLM_IMAGE" vllm serve "$VLLM_MODEL" \
+  --max-model-len "$VLLM_MAX_MODEL_LEN" \
+  --tensor-parallel-size "$VLLM_TP_SIZE" \
+  --disable_chunked_mm_input \
+  --max_num_batched_tokens "$VLLM_MAX_BATCHED_TOKENS" \
+  --limit-mm-per-prompt "$VLLM_LIMIT_MM_PER_PROMPT" \
+  --enable-auto-tool-choice \
+  --tool-call-parser gemma4 \
+  --reasoning-parser gemma4
+7af16d7010a63a2a00d84e745d965a531ade2dfcc02fd3f71076015675c8c741
++ echo 'Docker container started. Waiting for '\''Application startup complete.'\'' in logs (up to 90 minutes)...'
+Docker container started. Waiting for 'Application startup complete.' in logs (up to 90 minutes)...
++ HEALTHY=0
+++ seq 1 540
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 1/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 1/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 2/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 2/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 3/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 3/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 4/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 4/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 5/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 5/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 6/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 6/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 7/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 7/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 8/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 8/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 9/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 9/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 10/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 10/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 11/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 11/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 12/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 12/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 13/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 13/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 14/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 14/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 15/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 15/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 16/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 16/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 17/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 17/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 18/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 18/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 19/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 19/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 20/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 20/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 21/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 21/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 22/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 22/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 23/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 23/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 24/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 24/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 25/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 25/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 26/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 26/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 27/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 27/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 28/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 28/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 29/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 29/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 30/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 30/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 31/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 31/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 32/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 32/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 33/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 33/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 34/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 34/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 35/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 35/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 36/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 36/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 37/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 37/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 38/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 38/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 39/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 39/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 40/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 40/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 41/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 41/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 42/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 42/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 43/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 43/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 44/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 44/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 45/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 45/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 46/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 46/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 47/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 47/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 48/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 48/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 49/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 49/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 50/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 50/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 51/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 51/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 52/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 52/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 53/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 53/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 54/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 54/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 55/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 55/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 56/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 56/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 57/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 57/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 58/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 58/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 59/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 59/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 60/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 60/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 61/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 61/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 62/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 62/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 63/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 63/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 64/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 64/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 65/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 65/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 66/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 66/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 67/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 67/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 68/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 68/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 69/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 69/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 70/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 70/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 71/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 71/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 72/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 72/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 73/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 73/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 74/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 74/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 75/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 75/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 76/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 76/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 77/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 77/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 78/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 78/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 79/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 79/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 80/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 80/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 81/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 81/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 82/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 82/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 83/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 83/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 84/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 84/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 85/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 85/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 86/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 86/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 87/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 87/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 88/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 88/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 89/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 89/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 90/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 90/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 91/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 91/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 92/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 92/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 93/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 93/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 94/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 94/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 95/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 95/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 96/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 96/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 97/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 97/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 98/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 98/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 99/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 99/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 100/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 100/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 101/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 101/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 102/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 102/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 103/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 103/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 104/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 104/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 105/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 105/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 106/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 106/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 107/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 107/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 108/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 108/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 109/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 109/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 110/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 110/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 111/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 111/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 112/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 112/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 113/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 113/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 114/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 114/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 115/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 115/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 116/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 116/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 117/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 117/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 118/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 118/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 119/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 119/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 120/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 120/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 121/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 121/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 122/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 122/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 123/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 123/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 124/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 124/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 125/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 125/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 126/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 126/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 127/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 127/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 128/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 128/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 129/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 129/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 130/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 130/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 131/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 131/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 132/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 132/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 133/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 133/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 134/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 134/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 135/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 135/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 136/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 136/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 137/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 137/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 138/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 138/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 139/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 139/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 140/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 140/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 141/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 141/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 142/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 142/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 143/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 143/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 144/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 144/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 145/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 145/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 146/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 146/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 147/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 147/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 148/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 148/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 149/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 149/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 150/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 150/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 151/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 151/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 152/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 152/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 153/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 153/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 154/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 154/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 155/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 155/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 156/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 156/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 157/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 157/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 158/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 158/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 159/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 159/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 160/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 160/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 161/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 161/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 162/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 162/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 163/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 163/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 164/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 164/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 165/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 165/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 166/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 166/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 167/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 167/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 168/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 168/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 169/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 169/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 170/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 170/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 171/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 171/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 172/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 172/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 173/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 173/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 174/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 174/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 175/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 175/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 176/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 176/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 177/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 177/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 178/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 178/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 179/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 179/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 180/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 180/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 181/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 181/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 182/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 182/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 183/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 183/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 184/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 184/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 185/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 185/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 186/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 186/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 187/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 187/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 188/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 188/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 189/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 189/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 190/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 190/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 191/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 191/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 192/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 192/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 193/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 193/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 194/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 194/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 195/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 195/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 196/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 196/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 197/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 197/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 198/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 198/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 199/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 199/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 200/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 200/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 201/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 201/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 202/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 202/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 203/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 203/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 204/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 204/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 205/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 205/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 206/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 206/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 207/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 207/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 208/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 208/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 209/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 209/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 210/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 210/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 211/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 211/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 212/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 212/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 213/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 213/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 214/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 214/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 215/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 215/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 216/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 216/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 217/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 217/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 218/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 218/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 219/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 219/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 220/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 220/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 221/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 221/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 222/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 222/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 223/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 223/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 224/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 224/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 225/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 225/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 226/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 226/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 227/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 227/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 228/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 228/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 229/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 229/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 230/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 230/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 231/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 231/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 232/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 232/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 233/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 233/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 234/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 234/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 235/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 235/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 236/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 236/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 237/540). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 237/540). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 540)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM '\''Application startup complete.'\'' message found in logs.'
+vLLM 'Application startup complete.' message found in logs.
++ HEALTHY=1
++ break
++ '[' 1 -eq 0 ']'
++ echo 'vLLM application startup complete. The server should now be ready.'
+vLLM application startup complete. The server should now be ready.

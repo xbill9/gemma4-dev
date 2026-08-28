@@ -35,23 +35,35 @@ import subprocess
 import sys
 
 
-def find_session(logdir: str) -> str:
-    """xprof commands take the run directory holding the .xplane.pb."""
+def find_session(logdir: str) -> tuple[str, str]:
+    """Locate the trace and split it the way the xprof CLI wants it.
+
+    Every xprof analysis takes TWO positional arguments, LOGDIR and SESSION_ID — not one
+    path. LOGDIR is the directory CONTAINING `plugins/profile/`, and SESSION_ID is the run
+    name beneath it. Passing the full run directory as a single argument fails with
+    "received no value for the required argument: session_id", which reads like a missing
+    flag rather than a wrong split.
+    """
     hits = glob.glob(os.path.join(logdir, "**", "*.xplane.pb"), recursive=True)
     if not hits:
         sys.exit(
             f"No *.xplane.pb under {logdir}.\n"
-            "Capture one with ./capture_profile.sh — note that vLLM's own /start_profile is\n"
-            "absent from vllm-tpu:nightly, so the sidecar is the only route."
+            "Capture one with ./capture_profile.sh — vLLM's own /start_profile is absent from\n"
+            "these images, so the in-process sidecar is the only route."
         )
-    return os.path.dirname(sorted(hits)[0])
+    run_dir = os.path.dirname(sorted(hits)[0])
+    session_id = os.path.basename(run_dir)
+    # .../<root>/plugins/profile/<session_id>  ->  root
+    root = os.path.dirname(os.path.dirname(os.path.dirname(run_dir)))
+    return root, session_id
 
 
-def xprof(cmd: str, session: str, extra: list[str] | None = None) -> str:
-    """Run one xprof CLI analysis. Returns '' if that analysis is unavailable."""
-    argv = ["xprof", cmd, session, *(extra or [])]
+def xprof(cmd: str, session: tuple[str, str], extra: list[str] | None = None) -> str:
+    """Run one xprof CLI analysis. Returns a note rather than raising if it is unavailable."""
+    root, session_id = session
+    argv = ["xprof", cmd, root, session_id, *(extra or [])]
     try:
-        done = subprocess.run(argv, capture_output=True, text=True, timeout=300)
+        done = subprocess.run(argv, capture_output=True, text=True, timeout=900)
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         return f"({cmd} unavailable: {type(exc).__name__})"
     return done.stdout.strip() or f"({cmd} returned nothing: {done.stderr.strip()[:200]})"
@@ -86,7 +98,7 @@ def main() -> int:
     args = ap.parse_args()
 
     session = find_session(args.logdir)
-    print(f"session: {session}\n")
+    print(f"logdir:  {session[0]}\nsession: {session[1]}\n")
 
     print("=" * 78)
     print("DEVICE / HARDWARE")

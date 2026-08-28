@@ -200,7 +200,16 @@ LOCAL_DOCKER_IMAGE = os.getenv("LOCAL_DOCKER_IMAGE", "")
 # Serving parameters. Both deployment paths (the boot-time startup script and
 # manage_vllm_docker) read these, so a container recreated by hand serves the same
 # config the queued resource booted with.
-VLLM_IMAGE = "vllm/vllm-tpu:nightly"
+# Pin this to reproduce a published result. `:nightly` is the default because this repo
+# prefers current releases, but it is NOT neutral: measured 2026-08-25, nightly forces
+# TRITON_ATTN for Gemma 4's heterogeneous head dims, then disables Triton (no driver on TPU),
+# then drops to the V1 runner — 2.34x slower than the Pallas ragged paged attention path, and
+# with no working profiler. `vllm/vllm-tpu:v0.26.0` is the tag Zimbres 2026 pinned.
+VLLM_IMAGE = os.getenv("VLLM_IMAGE", "vllm/vllm-tpu:nightly")
+
+# GCS prefix holding profiling/{profiler_sidecar,sitecustomize}.py, or "" for an unprofiled
+# boot. Set it to arm the trace control at boot and skip a 7-minute restart later.
+XPROF_GCS_URI = os.getenv("XPROF_GCS_URI", "")
 # Per-request ceiling, not an allocation. tpu.env is the source of truth (32768); this
 # default matches it so a bare `python3 server.py` serves the same config.
 MAX_MODEL_LEN = os.getenv("MAX_MODEL_LEN", "32768")
@@ -332,6 +341,8 @@ async def _get_formatted_startup_script(model_name: str, zone: str = ZONE) -> st
             max_num_batched_tokens=MAX_NUM_BATCHED_TOKENS,
             limit_mm_per_prompt=LIMIT_MM_PER_PROMPT,
             model_gcs_uri=MODEL_GCS_URI,
+            vllm_image=VLLM_IMAGE,
+            xprof_gcs_uri=XPROF_GCS_URI,
         )
     except Exception as e:
         logger.error(f"Error formatting startup script: {e}")
