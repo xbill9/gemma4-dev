@@ -1039,6 +1039,62 @@ tensors, a per-tensor `np.asarray` that may be copying, and host RSS moving from
 to anonymous are the three candidates — before touching the dtype again. The dtype tax remains
 87% of decode and remains the largest available win.
 
+## High-value optimizations, ranked against the roofline
+
+**Derived 2026-08-28 from `benchmarks/runs/2026-08-27-baseline-xprof-g5g/`.** Ranked by
+measured upside, not by plausibility. The whole point of the ordering is that **items 1 and 2
+are the same bug**, and everything below them is rounding error until that bug is gone.
+
+The physical envelope first, because every claim below is checked against it. xprof reports
+peak HBM **298.1 GiB/s = 320 GB/s**, and `tpu_jax_weight_bytes` is **6.155 GB**. A decode step
+that streams the weights once therefore cannot beat:
+
+```
+6.155 GB / 320 GB/s = 19.2 ms/step  ->  52 tok/s      (a FLOOR, not a promise)
+```
+
+Measured is **73.35 ms/step → 13.6 tok/s**, i.e. **26% of the bandwidth-bound ceiling**. The
+other 74% is not physics.
+
+| # | Item | Cost now | Upside | Confidence |
+| --- | --- | ---: | --- | --- |
+| 1 | bf16→f16 weight conversion | **39.60 ms/step (54.0%)** | → 29.6 tok/s (**2.2x**) | measured cost, untried fix |
+| 2 | matmuls run **fp32 GEMV** | 24.08 ms/step (32.8%) | with #1 → ~46 tok/s (**3.4x**) | follows from #1 |
+| 3 | 854 fusion launches/step | 8.98 ms/step (12.2%) | ≤ 12% | launch-bound, not measured as fixable |
+| 4 | bucket ladder below 512 | ~39% of a short prompt's prefill | TTFT only, not decode | measured 2026-08-25 |
+| 5 | a real int8 LM-head matmul | — | +2.3% is all `int8_lm_head` buys today | measured 2026-08-26 |
+
+**1 and 2 are one fix.** The loader stores bf16 while `COMPUTE_DTYPE` is float16, so XLA
+inserts a convert in front of every use *and* the surviving matmuls run fp32. Remove the
+conversion and both lines move. Three kernels carry it:
+
+```
+wrapped_convert_1    19.90 ms/step  27.1%   40 calls/step   (per-layer)
+wrapped_convert_3     9.96 ms/step  13.6%   20 calls/step
+wrapped_convert_61    9.31 ms/step  12.7%    1 call/step    (the LM head)
+```
+
+**The arithmetic closes.** Dropping the converts alone gives 33.75 ms → 29.6 tok/s; also
+halving the GEMV bytes by running fp16 gives **21.7 ms → 46 tok/s**, which lands **2.5 ms above
+the 19.2 ms bandwidth floor**. An estimate that stops just short of a physical bound it was not
+fitted to is worth more than one that sails past it. It would also put this rig at the vLLM
+sibling's 43–44 tok/s — the number `CLAUDE.md` says it exists to beat.
+
+**The blocker on that fix is gone but the fix is not written.** The `ml_dtypes` slowness is
+stale (re-measured 1.9 GB/s, 2.5 s for the whole PLE table), and the 2026-08-27 attempt still
+failed: `read_shards` 24.7 s → 79.0 s and an OOM in `quantize_ple_table`. **Find where the
+54 s goes before touching the dtype again** — 600 separate tensors, a per-tensor `np.asarray`
+that may copy, and host RSS moving from mmap-backed to anonymous are the three candidates.
+
+**Do not size any of this off the 65 TFLOP/s peak.** At `B=1` decode is a matrix-*vector*
+product and **0.0% of kernel time uses a TensorCore** — correctly, since tensor cores need
+matrix-matrix work. The win is removing waste and halving weight traffic, not lighting up
+units that cannot help.
+
+**Item 3 is real but small and differently shaped.** 854 fusion launches per step at ~10.5 µs
+each is launch-bound rather than compute-bound on a chip whose launch overhead is 5–10 µs.
+Worth revisiting only after 1 and 2, when it would be ~40% of a much smaller total.
+
 ## Measurement
 
 **This rig has six measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`

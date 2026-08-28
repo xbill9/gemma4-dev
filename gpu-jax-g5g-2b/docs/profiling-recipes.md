@@ -74,9 +74,34 @@ instead; it reads the optimized HLO directly.
 
 ## Traps
 
-- **`tensorboard` is not needed.** xprof is the successor to `tensorboard-plugin-profile` and
-  serves its own UI; its requirements list contains no tensorboard. A `tensorboard` install
-  on this box has `Required-by:` empty.
+- **`tensorboard` is not needed, and will not render these on its own.** xprof is the
+  successor to `tensorboard-plugin-profile` and serves its own UI; its requirements list
+  contains no tensorboard, and a `tensorboard` install on this box has `Required-by:` empty.
+  Installing plain `tensorboard` and pointing it at the logdir gets you a TensorBoard with no
+  profile plugin. Use `xprof --logdir … --port 6006`.
+
+### Viewing a profile without opening a port
+
+This rig opens **no inbound port** for a UI and must not — the security group allows 8000 for
+the endpoint and nothing else, and there is no inbound SSH rule or key at all. Two ways to
+look at a trace anyway, in preference order:
+
+1. **Locally, off the returned trace.** `tune_loop.py --xprof` brings
+   `jaxtrace/plugins/profile/<run>/*.xplane.pb` back inside the run directory, so
+   `pip install xprof && xprof --logdir benchmarks/runs/<run>/jaxtrace --port 6006` serves the
+   UI on your own machine with no instance involved. This works after the instance is gone,
+   which matters here: G5g is spot and reclamation has ranged from 21 minutes to 19 hours.
+2. **On the box, through SSM port forwarding** — no inbound rule required, because SSM tunnels
+   over the agent's outbound connection:
+
+   ```bash
+   aws ssm start-session --target <instance-id> \
+       --document-name AWS-StartPortForwardingSession \
+       --parameters '{"portNumber":["6006"],"localPortNumber":["6006"]}'
+   ```
+
+   Start `xprof --logdir /tmp/jaxtrace --port 6006` on the instance first. **Do not add an
+   inbound rule for 6006** — the tunnel is what makes that unnecessary.
 - **The `Program` row dominates roofline output.** The trace spans the whole process
   including load, so per-op roofline rows are swamped. The *device constants* in that tool
   are the useful part: peak HBM 298.1 GiB/s, peak FLOP 65,126 GFLOP/s, ridge 203.5 FLOP/byte.

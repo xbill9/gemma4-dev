@@ -132,6 +132,14 @@ PYTHONPATH=/opt/jax-g5g/app python3.14 {out}/profile_decode.py \
     --steps {steps} --top 25 > {out}/profile_decode.txt 2>{out}/profile_decode.err || true
 {xprof}
 systemctl start jax-g5g
+# The RAW trace comes back too, not just the derived rollups. jax.profiler.trace
+# writes /tmp/jaxtrace/plugins/profile/<run>/*.xplane.pb, and that file is what
+# any profile UI actually consumes -- so keeping it means the run can be opened
+# and re-analysed later, on a laptop, long after the instance is gone. Yesterday's
+# trace was NOT kept and the instance was reclaimed overnight, so it is
+# unrecoverable; that is the whole reason this line exists. A decode-only trace is
+# a few MB, which is noise next to the payload.
+cp -r /tmp/jaxtrace {out}/jaxtrace 2>/dev/null || true
 tar czf {out}.tgz -C {out} . 2>/dev/null || true
 aws s3 cp {out}.tgz {s3}/{label}.tgz --only-show-errors
 echo "UPLOADED {s3}/{label}.tgz"
