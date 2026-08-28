@@ -1,0 +1,44 @@
+# Profiling dependencies. Installed ON the instance, ON DEMAND -- deliberately
+# NOT part of requirements-serving.txt and NOT in server.py's
+# _SERVING_REQUIREMENTS, because nothing here is needed to serve a token and
+# xprof drags in gcsfs + google-cloud-storage behind a 39 MB wheel. A serving
+# image should not carry a profiler.
+#
+#   sudo python3.14 -m pip install -r requirements-profiling.txt
+#
+# xprof is the OpenXLA profiler, formerly the TensorFlow profiler. It reads the
+# *.xplane.pb that `jax.profiler.trace()` already writes, so it adds a VIEWER
+# rather than a new measurement path: profile_decode.py parses the Chrome-format
+# trace from that same directory with no dependency at all, and that is still
+# the right tool for the per-kernel question.
+#
+# What xprof adds is the memory viewer -- peak HLO buffers attributed by
+# instruction -- which is the open question in docs/larger-models-on-t4g.md.
+# profile_prefill.py answers the same question from compiled.memory_analysis()
+# and the optimized HLO without installing anything, so try that FIRST; xprof is
+# the cross-check and the UI.
+#
+# Serve the UI with `xprof --logdir /tmp/jaxtrace --port 6006` and tunnel it;
+# this rig opens no inbound port for it, and must not.
+#
+# aarch64 note: the wheel is manylinux_2_35_aarch64. On the old Ubuntu 22.04
+# base that was EXACTLY the floor (glibc 2.35) -- it installed, with nothing to
+# spare. The 2026-08-27 move to the Ubuntu 26.04 base clears it comfortably, so
+# this is no longer fragile; it is recorded because a move BACK to an older base
+# would silently lose xprof. jaxlib's own wheels are manylinux_2_27.
+xprof
+
+# TensorBoard, installed alongside xprof by request.
+#
+# BE CLEAR ABOUT WHAT THIS BUYS: TensorBoard on its own will NOT render these
+# profiles. xprof is the successor to tensorboard-plugin-profile and serves its
+# own UI, so a plain tensorboard pointed at the logdir gives you a TensorBoard
+# with no profile plugin. For the traces this rig produces, the command is
+# `xprof --logdir <dir> --port 6006`.
+#
+# It is here because it is useful for everything OTHER than those traces --
+# scalar logging from a harness, comparing runs over time -- and because having
+# both present removes "is it just not installed?" from a debugging session.
+# Not on the serving path: this file installs ON DEMAND and is deliberately
+# absent from server.py's _SERVING_REQUIREMENTS.
+tensorboard

@@ -862,6 +862,11 @@ Two optimizations landed with them:
   prefix from 413 objects / 2.0 MiB to **805 objects / 9.10 MB**, and AWS then reclaimed the
   instance — precisely the case an `ExecStopPost` hook would have missed.
 
+  **Cross-instance restore CONFIRMED 2026-08-28**: a fresh instance restored **805 files / 12 MB
+  in 6 s** (`[stage] cache-restore +6s`) from what the *terminated* 2026-08-27 box had compiled,
+  and the timer came up `enabled` unattended. Every leg of the loop — compile, upload, reclaim,
+  restore — is now measured.
+
   **MEASURED 2026-08-27, three A/B pairs: first request 25.62 s → 13.89 s, a 1.8x speedup**
   (ratios 1.7–2.0, against a first-request spread of 18–26 s, so the effect is well clear of
   the noise). Two things it does **not** buy, both worth knowing before quoting it:
@@ -1196,7 +1201,7 @@ broken model that still emits fluent text.
 
 ## Measurement
 
-**This rig has six measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`
+**This rig has eight measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`
 where `<hw-short>` equals the hardware slot:
 
 | Run | Decode | What it added |
@@ -1207,6 +1212,8 @@ where `<hw-short>` equals the hardware slot:
 | `2026-08-26-config-sweep-g5g` | 12.8 tok/s | Config sweep: all three levers fail. Locates the prefill ceiling. |
 | `2026-08-26-quant-levers-fixed-g5g` | **13.10 tok/s** | Levers fixed. 5/5 configs, 15/15 cells. Sets the current default. |
 | `2026-08-27-ubuntu2604-base-g5g` | 12.80 tok/s | Ubuntu 26.04 base. 80s install, read_shards 3x faster. |
+| `2026-08-27-baseline-g5g` + `-xprof` | 12.80 tok/s | First runs through `tune_loop.py`. |
+| `2026-08-28-full-run-cached-g5g` | 12.9 tok/s | Fresh instance restoring the cache from S3. Profile reproduces to 0.07%. |
 
 **The 12.4/12.5/12.8 figures are all the same configuration** (`ple0`, no int8 head) on
 successive stacks, and they are within noise of each other. **13.10 is a different
