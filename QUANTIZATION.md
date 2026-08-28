@@ -23,6 +23,95 @@ native fp8.** Consequences that shape every choice below, on v5e/v6e:
 
 On v7 this inverts for fp8. **Do not carry a conclusion here across generations without rechecking it.**
 
+## Choosing a format and a size: what quantization actually buys
+
+**Added 2026-08-28.** Three axes decide a rig's configuration, and **only one of them is a
+quantization decision.** They are routinely conflated, and the conflation is expensive.
+
+### 1. Compute dtype must match the chip — this dominates, and is not a quant choice
+
+Get it wrong and nothing else you do matters. MEASURED on a T4G
+(`gpu-jax-g5g-2b/benchmarks/runs/2026-08-27-baseline-xprof-g5g/`): the loader stored **bf16** while the
+device computes in **float16**, so XLA inserted a convert in front of every use.
+
+```
+dtype conversion  39.60 ms/step  54.0%      <- computes nothing
+fp32 GEMV         24.08 ms/step  32.8%      <- what the converts leave behind
+                                 -------
+                                  86.8% of decode
+```
+
+That is **larger than any quantization decision in this document would buy**, and it was invisible for
+weeks because bf16 does not *fail* on Turing — **it emulates through fp32 conversions, so the numbers
+come out right and every matmul quietly pays.** An error would have been better.
+
+| Target | Compute dtype | Trap |
+| :--- | :--- | :--- |
+| v5e / v6e / v7 | `bfloat16` | — |
+| L4 (SM 8.9) | `bfloat16` | — |
+| **T4G (SM 7.5)** | **`float16`** | bf16 emulates silently; fp8 absent |
+| inf2 | see `HARDWARE.md` | — |
+
+**Check this before evaluating any quantization scheme**, and check it from the device rather than from
+config: `ports/gemma4/jax_e_model.py` reads the live compute capability and picks, which is the pattern
+to copy.
+
+### 2. Quantization buys residency and bandwidth. It essentially never buys FLOPS
+
+Across every target in this monorepo the only genuine compute wins are **int8 on v5e/v6e (2x bf16)** and
+**fp8 on v7**. Everything else — 4-bit anywhere, fp8 on v5e/v6e, and every scheme on Turing — is
+**dequantize-then-matmul**: the weights are unpacked to the compute dtype and the same matmul runs.
+
+Measured twice on the same rig, and the pattern held both times — **the memory claim lands to the byte
+and the speed claim does not land at all**:
+
+| Lever | Memory | Throughput |
+| :--- | :--- | :--- |
+| `ple_bits=4` (E2B) | −3.505 GB against −3.51 predicted (**0.1% error**) | **0.0%** — decode identical to `ple0` |
+| `int8_lm_head` | +0.403 GB, exact to the byte | **+2.3%** |
+
+`int8_lm_head` is the instructive one: it looks like an int8 matmul and is not. The table is
+**dequantized to fp16 in full — 0.75 GiB — on every decode step**, and Turing's int8 tensor cores
+(~130 TOPS) are never touched. It halves the bytes *read* and pays a full-table convert regardless.
+
+**Corollary for sizing a new rig: pick the COARSEST quantization that fits.** Finer quantization is not
+faster; it is more unpack work in the hot path for the same matmul. Quantize to hit a residency target,
+then stop.
+
+**A fused kernel is the exception, and it does not travel.** The W4A16 Pallas kernel *is* fused on TPU
+(16 MB VMEM per core) and is **refused at startup on Turing** — it needs 550 KiB–1.1 MiB of shared memory
+per block against a 64 KiB ceiling. Same checkpoint, same code, completely different economics. Never
+assume a quantized path that pays on TPU will pay on a GPU rig.
+
+### 3. What actually binds as models grow is TRANSIENTS, not resident weights
+
+This is the axis most likely to be missed when planning a larger sibling, because the weight table in
+`MODELS.md` invites you to plan against residency alone. MEASURED on a T4G with a 14.07 GB budget:
+
+| Model | Weights | Fits? | What actually failed |
+| :--- | ---: | :--- | :--- |
+| E2B `ple4` | 3.05 GB | serves | — |
+| **E4B** | fits | **no** | OOM **5.25 GiB during load** |
+| **12B** | **8.15 GB — fits easily** | **no** | OOM **12.61 GiB per request** |
+
+Both failures are transients, on models whose weights were never the problem. Three further properties
+of the same class:
+
+- **Fragmentation, not free bytes.** Allocator fragmentation measured **0.661** at peak with 2.9 GiB
+  free — two of three quantization bugs on that rig failed with GBs nominally free. **Quote the largest
+  contiguous block in any capacity claim.**
+- **Prefill temporaries have a flat term AND a linear one.** Flat below ~4K, then ~**0.9 MiB/token**.
+  A context limit derived from KV arithmetic alone will be wrong: that rig advertised
+  `MAX_MODEL_LEN=8192` while 5,120 tokens OOMed, and was lowered to 4096.
+- **Quantizing costs memory while it runs.** `quantize_ple_table` upcasts to float32 and needs >15 GiB
+  of host RSS on E2B; the destination is allocated before the source is freed unless explicitly
+  released. **The load-time peak, not the steady state, sets the floor.**
+
+**So the order of operations for a new rig is:** match the compute dtype to the chip → size the model
+against transients rather than weights → choose the coarsest quantization that reaches that residency
+target → and only then look for a compute win, which exists on v5e/v6e int8 and v7 fp8 and essentially
+nowhere else.
+
 ## Gemma 4 is JAX-path only, and that decides everything
 
 Gemma 4 exists solely as a JAX implementation — `models/jax/gemma4.py`, `gemma4_mm.py`, `gemma4_mtp.py`,

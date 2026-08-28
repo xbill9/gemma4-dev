@@ -499,6 +499,21 @@ _BF16_WEIGHTS_GB = {"E2B": 10.2, "E4B": 16.0, "12B": 24.0, "26B": 52.0, "31B": 6
 int8/int4 columns are arithmetic halving/quartering **except** the 26B, whose 15.27 GB is the measured
 resident size after load-time Q4_0→W4A16 repacking of the `-q4_0-unquantized` export.
 
+**The int4 column UNDER-predicts by ~19%, and the reason generalises to every size.** MEASURED
+2026-08-23 on a T4G (`gpu-jax-g5g-2b/docs/larger-models-on-t4g.md`): E2B at `ple_bits=4` came to
+**3.054 GB against the 2.4 GB this table predicts**. Quartering everything is wrong in two places at
+once — **`embed_tokens` stays at the storage dtype** rather than being quantized, and **the per-group
+scales are extra**. Budget an int4 target as:
+
+```
+quartered transformer weights  +  embed_tokens at full width  +  per-group scales
+```
+
+not as `bf16 / 4`. The bf16 column is the safer of the two: it **over**-predicts, by ~6-9% (E2B
+measured 8.97 GiB on a v5e-1 and 9.257 GB on a T4G against 10.2 GB here). **For sizing a new rig,
+treat the bf16 column as a ceiling and the int4 column as a floor** — the error runs in opposite
+directions, so a plan that survives both is safe and one that needs the int4 figure to be exact is not.
+
 **The `E` prefix is load-bearing.** E4B is *not* a 4B dense model — 4.5B effective, 8.0B total. Reading
 `E4B` as "4B" understates its weights by roughly 2x, which is the difference between fitting a 16 GB
 accelerator and not.
