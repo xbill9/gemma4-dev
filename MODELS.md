@@ -501,7 +501,9 @@ resident size after load-time Q4_0→W4A16 repacking of the `-q4_0-unquantized` 
 
 **The int4 column UNDER-predicts by ~19%, and the reason generalises to every size.** MEASURED
 2026-08-23 on a T4G (`gpu-jax-g5g-2b/docs/larger-models-on-t4g.md`): E2B at `ple_bits=4` came to
-**3.054 GB against the 2.4 GB this table predicts**. Quartering everything is wrong in two places at
+**3.054 GB against the 2.4 GiB (= 2.58 GB) this table predicts**. Mind the units — the int8/int4
+columns quarter the **GiB** column, not the GB one, and comparing 3.054 GB against "2.4" as though it
+were GB turns a 19% error into an apparent 27% one. Quartering everything is wrong in two places at
 once — **`embed_tokens` stays at the storage dtype** rather than being quantized, and **the per-group
 scales are extra**. Budget an int4 target as:
 
