@@ -31,8 +31,7 @@ quantization decision.** They are routinely conflated, and the conflation is exp
 ### 1. Compute dtype must match the chip — this dominates, and is not a quant choice
 
 Get it wrong and nothing else you do matters. MEASURED on a T4G
-(`gpu-jax-g5g-2b/benchmarks/runs/2026-08-27-baseline-xprof-g5g/`): the loader stored **bf16** while the
-device computes in **float16**, so XLA inserted a convert in front of every use.
+(`gpu-jax-g5g-2b/benchmarks/runs/2026-08-27-baseline-xprof-g5g/`), 86.8% of decode goes to dtype work:
 
 ```
 dtype conversion  39.60 ms/step  54.0%      <- computes nothing
@@ -41,9 +40,20 @@ fp32 GEMV         24.08 ms/step  32.8%      <- what the converts leave behind
                                   86.8% of decode
 ```
 
-That is **larger than any quantization decision in this document would buy**, and it was invisible for
-weeks because bf16 does not *fail* on Turing — **it emulates through fp32 conversions, so the numbers
-come out right and every matmul quietly pays.** An error would have been better.
+That is **larger than any quantization decision in this document would buy**.
+
+**But be careful attributing it — on that rig it is NOT a storage-dtype mismatch.** The obvious reading
+is "weights are bf16, the device computes float16, so XLA converts". That was tested directly on
+2026-08-28 by converting the whole tree to float16 and re-profiling: the convert and GEMV kernels came
+back **identical to the microsecond**, for **+0.0% throughput**. At `B=1` decode is a matrix-*vector*
+product, cuBLAS dispatches `gemvx::kernel<..., float, float, float, ...>` reporting
+`is_op_tensor_core_eligible = False`, and **a GEMV has no half-precision path** — so the weights are
+promoted to fp32 whatever they are stored as. The converts were promotions *to* fp32.
+
+**The driver is still real and still first.** bf16 on a pre-Ampere GPU does not *fail*, it emulates
+through fp32, so the numbers come out right and every matmul quietly pays. What the T4G measurement
+adds is that **a large dtype cost can have a cause other than the storage dtype** — read the kernel
+signature before choosing a remedy, or you will spend three attempts on the wrong one.
 
 | Target | Compute dtype | Trap |
 | :--- | :--- | :--- |

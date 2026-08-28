@@ -139,7 +139,13 @@ systemctl start jax-g5g
 # trace was NOT kept and the instance was reclaimed overnight, so it is
 # unrecoverable; that is the whole reason this line exists. A decode-only trace is
 # a few MB, which is noise next to the payload.
-cp -r /tmp/jaxtrace {out}/jaxtrace 2>/dev/null || true
+mkdir -p {out}/jaxtrace
+# Only the xplane (and the chrome trace) -- that is what a profile UI reads. The
+# per-op *.hlo_proto.pb files are hundreds of tiny artefacts nothing consumes,
+# and copying the directory wholesale also drags in every EARLIER run still
+# sitting in /tmp/jaxtrace. One run committed 241 files before this narrowed.
+NEWEST=$(ls -1dt /tmp/jaxtrace/plugins/profile/*/ 2>/dev/null | head -1)
+cp "$NEWEST"/*.xplane.pb {out}/jaxtrace/profile.xplane.pb 2>/dev/null || true
 tar czf {out}.tgz -C {out} . 2>/dev/null || true
 aws s3 cp {out}.tgz {s3}/{label}.tgz --only-show-errors
 echo "UPLOADED {s3}/{label}.tgz"

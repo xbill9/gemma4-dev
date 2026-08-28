@@ -1,3 +1,32 @@
+> # SUPERSEDED 2026-08-28 — the thesis of this document is WRONG
+>
+> **The dtype tax is real (86.9% of decode). Its cause is not what this document says.**
+> Storing the weights as bf16 while the device computes float16 was tested directly, by
+> converting the whole tree to float16 in the loader and re-profiling. The convert and GEMV
+> kernels came back **identical to the microsecond**:
+>
+> ```
+>                      bf16 weights      float16 weights
+>   wrapped_convert      19.95 ms/step     19.94 ms/step   n=40
+>   (second)              9.98             9.98            n=20
+>   (LM head)             9.32             9.32            n=1
+>   gemvx                11.92             11.90           n=40
+>   throughput          12.9/13.0 tok/s   12.9/13.0 tok/s  (+0.0%)
+> ```
+>
+> **The reason is in the kernel signature.** At `B=1` decode is a matrix-*vector* product, and
+> cuBLAS dispatches `gemvx::kernel<int, int, float, float, float, float, ...>` — every template
+> parameter **fp32** — reporting `is_op_tensor_core_eligible = False`. **A GEMV has no
+> half-precision path**, so the weights are promoted to fp32 whatever they are stored as. The
+> `wrapped_convert` kernels are that promotion **to fp32**, not a bf16→float16 fixup.
+>
+> So: the storage dtype was never the lever, `0.0% TensorCore` is structural rather than a
+> misconfiguration, and the "2.2x from removing the converts" estimate was predicated on a fix
+> that does not exist at `B=1`. Everything below is kept as the record of how the wrong cause
+> was arrived at, and because its *measurements* remain sound — only the attribution was wrong.
+>
+> Full run: `benchmarks/runs/2026-08-28-f16-weights-g5g/`.
+
 # The weights are bf16 on a chip with no bf16 datapath
 
 **Measured 2026-08-24 on `i-0bca12be1046b5faf` (g5g.2xlarge, T4G, jax 0.11.1, CUDA 13,

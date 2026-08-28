@@ -60,11 +60,18 @@ fp32 GEMV          24.08 ms/step   32.8%     what the converts leave behind
                                     86.8%    of decode
 ```
 
-**86.8% of decode, to a one-line mismatch.** Larger than any quantization decision would buy.
+**86.8% of decode goes to dtype work.** Larger than any quantization decision would buy.
 
-**It hid for weeks because bf16 does not fail on Turing — it emulates through fp32.** The numbers come
-out correct and every matmul quietly pays. An outright error would have been cheaper. Assume any
-dtype mismatch is silent.
+**But do not assume the storage dtype is the cause — on this rig it was not.** Converting the whole
+tree to float16 was tested on 2026-08-28: the kernels came back identical to the microsecond, for
+**+0.0%**. At `B=1` decode is a matrix-*vector* product and cuBLAS's GEMV has **no half-precision
+path** (`is_op_tensor_core_eligible = False`), so the weights are promoted to fp32 regardless. Those
+converts were promotions *to* fp32, not a bf16→float16 fixup.
+
+**The driver is still real and still first**, because bf16 on a pre-Ampere GPU does not *fail* — it
+emulates through fp32, so the numbers come out right and every matmul quietly pays. The lesson is that
+**a large dtype cost can have a cause other than the dtype**: read the kernel signature before choosing
+a remedy, or you will spend three attempts on the wrong one.
 
 **Resolve it from the live device, not from config.** `ports/gemma4/jax_e_model.py` reads the compute
 capability and picks; that is the pattern to copy. A `DTYPE=` in an env file is an override, not the

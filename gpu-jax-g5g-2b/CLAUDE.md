@@ -1085,15 +1085,41 @@ other 74% is not physics.
 
 | # | Item | Cost now | Upside | Confidence |
 | --- | --- | ---: | --- | --- |
-| 1 | bf16→f16 weight conversion | **39.60 ms/step (54.0%)** | → 29.6 tok/s (**2.2x**) | measured cost, untried fix |
-| 2 | matmuls run **fp32 GEMV** | 24.08 ms/step (32.8%) | with #1 → ~46 tok/s (**3.4x**) | follows from #1 |
+| 1 | ~~bf16→f16 weight conversion~~ | 39.60 ms/step (54.0%) | **FALSIFIED 2026-08-28 — 0.0%** | tested on hardware |
+| 2 | fp32 GEMV has **no half path** at `B=1` | 24.08 ms/step (32.8%) | needs a GEMM, not a dtype | measured |
 | 3 | 854 fusion launches/step | 8.98 ms/step (12.2%) | ≤ 12% | launch-bound, not measured as fixable |
 | 4 | bucket ladder below 512 | ~39% of a short prompt's prefill | TTFT only, not decode | measured 2026-08-25 |
 | 5 | a real int8 LM-head matmul | — | +2.3% is all `int8_lm_head` buys today | measured 2026-08-26 |
 
-**1 and 2 are one fix.** The loader stores bf16 while `COMPUTE_DTYPE` is float16, so XLA
-inserts a convert in front of every use *and* the surviving matmuls run fp32. Remove the
-conversion and both lines move. Three kernels carry it:
+**1 and 2 were believed to be one fix. They are not, and 1 is not a fix at all.**
+
+**FALSIFIED ON HARDWARE 2026-08-28** (`benchmarks/runs/2026-08-28-f16-weights-g5g/`). The whole
+parameter tree was converted to float16 in the loader and re-profiled. Convert and GEMV kernels
+came back **identical to the microsecond** — 19.94 vs 19.95, 9.98 vs 9.98, 9.32 vs 9.32,
+gemvx 11.90 vs 11.92 — and throughput moved **+0.0%** (12.9 / 13.0 tok/s, unchanged).
+
+**The kernel signature says why.** At `B=1` decode is a matrix-*vector* product and cuBLAS
+dispatches
+
+```
+gemvx::kernel<int, int, float, float, float, float, ...>   is_op_tensor_core_eligible = False
+```
+
+— every template parameter **fp32**. **A GEMV has no half-precision path**, so weights are
+promoted to fp32 whatever they are stored as. The `wrapped_convert` kernels are that promotion
+**to fp32**; they were never a bf16→float16 fixup.
+
+Three consequences worth carrying:
+
+- **The storage dtype is not a lever here.** bf16 and float16 cost exactly the same.
+- **`0.0% TensorCore` is structural, not a misconfiguration.** cuBLAS declares a GEMV
+  ineligible; no flag changes that.
+- **The route to the 86.9% is a GEMM, not a dtype** — batching so the matmul stops being a
+  matrix-vector product. That is currently closed: `MAX_NUM_SEQS=1`, `B > 1` raises
+  `NotImplementedError`, and the decode step donates its KV buffers. **That, not the dtype, is
+  the thing standing between this rig and its ceiling.**
+
+Three kernels carry the promotion:
 
 ```
 wrapped_convert_1    19.90 ms/step  27.1%   40 calls/step   (per-layer)
@@ -1101,17 +1127,16 @@ wrapped_convert_3     9.96 ms/step  13.6%   20 calls/step
 wrapped_convert_61    9.31 ms/step  12.7%    1 call/step    (the LM head)
 ```
 
-**The arithmetic closes.** Dropping the converts alone gives 33.75 ms → 29.6 tok/s; also
-halving the GEMV bytes by running fp16 gives **21.7 ms → 46 tok/s**, which lands **2.5 ms above
-the 19.2 ms bandwidth floor**. An estimate that stops just short of a physical bound it was not
-fitted to is worth more than one that sails past it. It would also put this rig at the vLLM
-sibling's 43–44 tok/s — the number `CLAUDE.md` says it exists to beat.
+**The arithmetic still closes, but it now describes a different fix.** 33.75 ms → 29.6 tok/s
+and 21.7 ms → 46 tok/s remain the right numbers for *removing the fp32 promotion*; what changed
+is that no dtype choice removes it. Reaching them needs the matmul to become a GEMM. The
+21.7 ms figure lands 2.5 ms above the 19.2 ms bandwidth floor, which is still the reason to
+believe the ceiling is real rather than wishful — and it would put this rig at the vLLM
+sibling's 43–44 tok/s.
 
-**The blocker on that fix is gone but the fix is not written.** The `ml_dtypes` slowness is
-stale (re-measured 1.9 GB/s, 2.5 s for the whole PLE table), and the 2026-08-27 attempt still
-failed: `read_shards` 24.7 s → 79.0 s and an OOM in `quantize_ple_table`. **Find where the
-54 s goes before touching the dtype again** — 600 separate tensors, a per-tensor `np.asarray`
-that may copy, and host RSS moving from mmap-backed to anonymous are the three candidates.
+**Do not spend more effort on the weight dtype.** Three attempts, all measured: a host-side
+cast (a device→host round-trip, `read_shards` 24.7 → 79.0 s), a loader-only on-device cast
+(OOM at `2x tree`), and a released-source cast that loads cleanly and buys **+0.0%**.
 
 **Do not size any of this off the 65 TFLOP/s peak.** At `B=1` decode is a matrix-*vector*
 product and **0.0% of kernel time uses a TensorCore** — correctly, since tensor cores need
