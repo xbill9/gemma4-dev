@@ -142,14 +142,34 @@ the flag tracks whether *this process* has seen the shape, not whether XLA had t
 restored cache halves the cost of a cold shape without clearing the flag, so
 `tpu_jax_cold_requests_total` cannot tell you whether the cache helped.
 
+## Settled overnight, 2026-08-28
+
+The instance was left running and AWS reclaimed it. That answered two of the open items.
+
+**The AMI change survives a long run.** `i-021f15b2b45e13793` launched 2026-08-27 16:40Z and
+was terminated 2026-08-28 11:51Z — **19.2 hours** — by
+`instance-terminated-no-capacity`, i.e. AWS taking the capacity back, not any fault of the
+image, the runtime or the payload. Roughly $8.60 of spot at $0.4463/h.
+
+**The upload timer fires unattended.** `jax-g5g-cache.timer` was never touched again after the
+one manual `systemctl start`, and the S3 prefix grew from **413 objects / 2.0 MiB** to
+**805 objects / 9.10 MB** across the night as more shapes were compiled. The cadence works and
+the cache accumulates without supervision.
+
+**This materially nuances the spot story.** `CLAUDE.md` recorded a 2026-08-25 reclamation at
+**21 minutes** and concluded spot in this family "cannot currently sustain" a verification
+cycle. This run got **19.2 hours** on the same instance type, in the same region, in the AZ
+that was the *only* one with capacity at launch. So reclamation here is **highly variable
+rather than reliably fast** — 21 minutes once, 19 hours the next — and the right posture is to
+checkpoint continuously (which the harnesses already do) rather than to assume either outcome.
+Do not quote the 21-minute figure as typical; do not quote this one either.
+
 ## Not established
 
-- **Whether the AMI change survives a long run.** This instance served minutes, not hours.
 - **Cross-instance restore was not tested.** The A/B wiped and restored on ONE instance. The
   actual use — a fresh instance restoring what a previous one compiled — is the same `aws s3
-  sync` but has not been run end to end through `install.sh`.
-- **The timer's 10-minute cadence was not observed firing on its own**; the upload unit was
-  started by hand.
+  sync` but has not been run end to end through `install.sh`. The 805-object cache now sitting
+  in S3 is exactly the input for that test.
 - **`get_install_progress`'s failure verdicts are untested on hardware** — CPU tests pin them.
 - Nothing here re-measures the dtype tax, which remains 87% of decode and unaddressed.
 

@@ -858,6 +858,10 @@ Two optimizations landed with them:
   `|| true` because it runs under `set -e` and the first launch syncs a prefix that does not
   exist yet — the `mkswap` failure exactly.
 
+  **The timer is CONFIRMED firing unattended, 2026-08-28.** Left alone overnight it took the
+  prefix from 413 objects / 2.0 MiB to **805 objects / 9.10 MB**, and AWS then reclaimed the
+  instance — precisely the case an `ExecStopPost` hook would have missed.
+
   **MEASURED 2026-08-27, three A/B pairs: first request 25.62 s → 13.89 s, a 1.8x speedup**
   (ratios 1.7–2.0, against a first-request spread of 18–26 s, so the effect is well clear of
   the noise). Two things it does **not** buy, both worth knowing before quoting it:
@@ -877,6 +881,13 @@ spot was the install length, and that is gone. What did NOT change is capacity �
 `InsufficientInstanceCapacity` in us-east-1b, 1c and 1d on 2026-08-27, with only 1a
 available, and **1a was the most expensive AZ by spot price**, so price is not a usable proxy
 for capacity here. Retry across AZs; do not read cheapness as availability.
+
+**Reclamation is highly variable, not reliably fast.** The 2026-08-25 instance was taken at
+**21 minutes**; the 2026-08-27 one ran **19.2 hours** before `instance-terminated-no-capacity`
+(launched 16:40Z, terminated 2026-08-28 11:51Z), on the same instance type in the same region.
+**Neither figure is typical** — quote the range, and checkpoint continuously rather than
+sizing work to an assumed lifetime. `sweep.py`, `config_sweep.py` and `tune_loop.py` already
+write results per request or per cell for exactly this reason.
 
 **Still open, for the record: there is no prebuilt AMI.**
 `CLAUDE.md` has always argued a stock DLAMI is right here because this install is `pip
