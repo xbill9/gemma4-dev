@@ -1095,6 +1095,105 @@ units that cannot help.
 each is launch-bound rather than compute-bound on a chip whose launch overhead is 5–10 µs.
 Worth revisiting only after 1 and 2, when it would be ~40% of a much smaller total.
 
+## The model's quirks, and where they land on Turing
+
+E2B is irregular in four ways that all touch memory or attention, and **the port handles all four
+correctly** — verified by reading `ports/gemma4/` against `MODELS.md` on 2026-08-28. This section
+records *how*, because the correctness is not obvious from the code and the arithmetic it produces is
+the reason this rig's constraint is prefill rather than KV.
+
+### Two attention geometries, not one
+
+**28 sliding layers at `head_dim=256`; 7 full-attention layers at `global_head_dim=512`.** Both keep
+8 query heads and **1 KV head**. `global_head_dim` is real and applies to Q, K, V *and* the norms —
+not a Q-only field.
+
+The port never assumes one head_dim. `Gemma4EAttentionJAX` picks per layer:
+
+```python
+self.head_dim   = config.head_dim if self.is_sliding else config.global_head_dim
+self.num_kv_heads = config.num_key_value_heads if self.is_sliding else config.num_global_key_value_heads
+```
+
+and carries **two RoPE tables** (`inv_freq_sliding` at `rope_theta`, `inv_freq_global` at
+`global_rope_theta`), because the two geometries have different widths *and* different theta.
+
+### Three head mismatches
+
+| Mismatch | Value | How the port avoids it |
+| :--- | :--- | :--- |
+| Q:KV is **8:1** — full MQA, not GQA | `num_attention_heads=8`, `num_key_value_heads=1` | K/V reshaped to `num_kv_heads`, broadcast at the score |
+| Heads **do not tile** hidden_size | `8 x 256 = 2048` vs `hidden_size=1536` | head_dim read from config, never derived |
+| `global_head_dim` **applies to K/V** | 512 vs 256 | per-layer selection above |
+
+**Mismatch 2 is the one that bites**, because deriving `head_dim = hidden_size / num_heads` yields
+**192** and is wrong everywhere.
+
+**The dataclass defaults are NOT E2B's, and one of them is that exact mistake.**
+`Gemma4EConfig` defaults to `hidden_size=2048` — which is `num_attention_heads x head_dim`, the Q
+projection's *output* width — against E2B's real **1536**; and to `num_key_value_heads=4` against E2B's
+real **1**. Every shape-critical field is `pick()`ed from the checkpoint's `config.json`, so a complete
+config is correct. But **a field missing from a config yields a wrong-shaped model rather than an
+error.** Do not read these defaults as documentation of E2B.
+
+### KV sharing: 20 of 35 layers, resolving to exactly two caches
+
+`first_kv_shared_layer_idx = 35 - 20 = 15`. Layers 0-14 own caches; 15-34 read an earlier layer's.
+`kv_share_map()` implements "the last preceding layer of the **same attention type**", and with the
+period-5 pattern that collapses to **two sources: layer 13 for all 16 shared sliding layers, layer 14
+for the 4 shared full ones.** Not a rolling window, not paired layers. `create_kv_cache` allocates over
+`range(first_kv_shared_layer_idx)` only, so **15 caches exist, not 35.**
+
+### The sliding ring caps 12 of those 15 at the window
+
+With `window_kv` on — it auto-resolves True whenever `max_model_len > sliding_window`, so **always
+here** — sliding layers allocate `min(max_seq_len, sliding_window)` = **512 slots**, indexed
+`position % buf_len`. Full-attention layers allocate the full context.
+
+**The four quirks compound, and the result is that KV is free on this rig:**
+
+| | sliding (12 layers, ring) | full (3 layers) | total | of 14.07 GB |
+| :--- | ---: | ---: | ---: | ---: |
+| ctx 4096, `window_kv=True` | 6.0 MiB | 24.0 MiB | **30.0 MiB** | **0.22%** |
+| ctx 4096, `window_kv=False` | 48.0 MiB | 24.0 MiB | 72.0 MiB | 0.54% |
+| ctx 8192, `window_kv=True` | 6.0 MiB | 48.0 MiB | 54.0 MiB | 0.40% |
+
+At float16, B=1, one KV head. The per-token figure if every cached layer grew is
+`12x256x2x2 + 3x512x2x2` = **18,432 B = 18 KiB/token**, reproducing `MODELS.md` exactly.
+
+**So the entire KV cache at 4K is 30 MiB, and the prefill transient this rig actually OOMs on is
+~5.2 GiB — 174x larger.** That is the arithmetic behind "KV is NOT the binding constraint, prefill
+is", and it is why raising `MAX_MODEL_LEN` does not trade against KV in any meaningful way. **Never
+size this rig's context from KV arithmetic.**
+
+### Where Turing's 64 KiB actually bites — and where it does not
+
+**The 512-wide full-attention head is exactly what breaks the vLLM path on this chip.** Gemma 4's
+heterogeneous head dims force `TRITON_ATTN`, whose 512-wide tile wants ~96 KiB of shared memory per
+block against Turing's 64 KiB ceiling — `docs/turing-aarch64-gap.md` is the measured write-up, and it
+is the reason this rig exists.
+
+**JAX does not care, and the reason is specific:** attention here is ordinary XLA ops, not a hand-tiled
+kernel, so there is no per-block shared-memory budget in the attention path at all. A 512 head_dim is
+just a wider matmul.
+
+**The ceiling still bites — one step over, in quantization rather than attention.** The fused W4A16
+Pallas kernel is tiled for TPU VMEM and needs **550 KiB - 1.1 MiB** per block at these shapes.
+`check_w4a16_fits_scoped_memory()` computes the requirement and **raises at startup with the arithmetic
+attached** rather than dying as a Triton `OutOfResources` at the first token — which is precisely the
+failure mode that made the vLLM path hard to diagnose.
+
+**The distinction is worth keeping: attention escaped the ceiling because XLA does not tile by hand;
+the quantized matmul did not, because Pallas does.**
+
+### One quirk E2B does not have
+
+`attention_k_eq_v` — full-attention layers shipping no `v_proj`, one projection feeding both K and V —
+is **`false` on E2B and E4B, and `true` on 12B, 26B and 31B.** The port reads it and aliases V to K.
+Treat it as the family default **above** E4B: a larger sibling that reports missing tensors on load
+should be checked against this first, and a loader that tolerates `None` there produces a silently
+broken model that still emits fluent text.
+
 ## Measurement
 
 **This rig has six measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`
