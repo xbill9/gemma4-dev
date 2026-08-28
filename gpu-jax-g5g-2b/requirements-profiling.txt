@@ -27,3 +27,18 @@
 # this is no longer fragile; it is recorded because a move BACK to an older base
 # would silently lose xprof. jaxlib's own wheels are manylinux_2_27.
 xprof
+
+# TensorBoard, installed alongside xprof by request.
+#
+# BE CLEAR ABOUT WHAT THIS BUYS: TensorBoard on its own will NOT render these
+# profiles. xprof is the successor to tensorboard-plugin-profile and serves its
+# own UI, so a plain tensorboard pointed at the logdir gives you a TensorBoard
+# with no profile plugin. For the traces this rig produces, the command is
+# `xprof --logdir <dir> --port 6006`.
+#
+# It is here because it is useful for everything OTHER than those traces --
+# scalar logging from a harness, comparing runs over time -- and because having
+# both present removes "is it just not installed?" from a debugging session.
+# Not on the serving path: this file installs ON DEMAND and is deliberately
+# absent from server.py's _SERVING_REQUIREMENTS.
+tensorboard
