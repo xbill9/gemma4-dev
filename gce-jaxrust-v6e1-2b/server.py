@@ -1607,23 +1607,40 @@ async def probe_zone_capacity(
         "--no-service-account",
         "--no-scopes",
     ]
+    async def _delete_probe() -> tuple[int, str]:
+        """Best-effort teardown. Called on EVERY path that could have left an instance,
+        not just the success path.
+
+        This used to hang off `rc == 0` alone, and on 2026-08-28 that leaked a real
+        instance: the create exceeded the 180s timeout below, `run_command` returned
+        non-zero, and the function returned "neither stockout nor quota" while a
+        ct6e-standard-1t sat in STAGING and billed. A create that times out has not
+        necessarily failed — it has only stopped being watched.
+        """
+        return (
+            await run_command(
+                [
+                    "gcloud",
+                    "compute",
+                    "instances",
+                    "delete",
+                    instance_name,
+                    f"--project={PROJECT_ID}",
+                    f"--zone={zone}",
+                    "--quiet",
+                ],
+                timeout=300,
+            )
+        )[::2]
+
     logger.info(f"Probing {zone} for {machine_type} capacity via a SPOT create...")
-    rc, stdout, stderr = await run_command(create_cmd, timeout=180)
+    # 300s, not 180s: a ct6e spot create in a zone that HAS capacity was measured taking
+    # longer than 180s to return, which turned a successful probe into an inconclusive
+    # one and leaked the instance behind it.
+    rc, stdout, stderr = await run_command(create_cmd, timeout=300)
     if rc == 0:
         # Capacity existed. Delete immediately — this is a probe, not a deployment.
-        del_rc, _, del_err = await run_command(
-            [
-                "gcloud",
-                "compute",
-                "instances",
-                "delete",
-                instance_name,
-                f"--project={PROJECT_ID}",
-                f"--zone={zone}",
-                "--quiet",
-            ],
-            timeout=300,
-        )
+        del_rc, del_err = await _delete_probe()
         cleanup = (
             "Probe instance deleted."
             if del_rc == 0
@@ -1652,7 +1669,23 @@ async def probe_zone_capacity(
             f"the same wall unless `{GCE_QUOTA_ID}` has room to fall back on. Read both with "
             f"`get_zones_with_available_quota`.\n\n{stderr}"
         )
-    return f"⚠️ Probe of `{zone}` failed for a reason that is neither stockout nor quota:\n{stderr}"
+    # Neither a recognised failure nor a success — most often a create that outran its
+    # timeout. An instance may well exist and be billing, so tear it down before
+    # reporting, and say what was found rather than implying nothing was created.
+    del_rc, del_err = await _delete_probe()
+    if del_rc == 0:
+        aftermath = (
+            f"\n\n**An instance did exist and has been deleted.** A create that outruns its timeout "
+            f"has not failed — it has only stopped being watched, and reaching this branch after a "
+            f"successful delete is itself weak evidence that `{zone}` HAS capacity. Re-probe to "
+            f"confirm, or go straight to a flex-start create."
+        )
+    else:
+        aftermath = (
+            f"\n\nNo instance was left behind (delete said: {del_err.strip() or 'nothing to delete'}). "
+            f"The `--max-run-duration=10m` backstop on the probe would have caught it regardless."
+        )
+    return f"⚠️ Probe of `{zone}` failed for a reason that is neither stockout nor quota:\n{stderr}{aftermath}"
 
 
 async def _update_status_file(zone: str, success_str: str, detail_str: str) -> None:

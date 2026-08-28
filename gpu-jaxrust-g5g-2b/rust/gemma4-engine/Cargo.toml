@@ -1,0 +1,51 @@
+[package]
+name = "gemma4-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "OpenAI-compatible Gemma 4 E2B server driving CUDA on an NVIDIA T4G from Rust, no Python in the serving path."
+
+[features]
+# `cpu` is the default so the crate builds and tests anywhere — including the
+# x86_64 dev box with no driver, which is where the parity work happens.
+# The rig itself builds `--no-default-features --features cuda,gemma`.
+default = ["cpu", "gemma"]
+cpu = ["rlx-runtime/cpu"]
+cuda = ["rlx-runtime/cuda", "rlx-gemma?/cuda"]
+
+# LICENSING — read before shipping a binary.
+#
+# `rlx-gemma` is GPL-3.0-only at 0.2.11 and there is no later release: `rlx`
+# itself relicensed to MIT/Apache-2.0 at 0.2.14, but `rlx-gemma` did NOT follow,
+# so the permissive relicense does not reach the model crate. Linking it makes
+# the resulting BINARY a GPLv3 combined work. This rig ships source and builds on
+# the instance, so nothing is distributed as a binary today — the moment one is,
+# that is the license it carries.
+#
+# Without this feature the server still builds and starts, answers /health,
+# reports the device, and refuses generation naming the flag. That split is
+# deliberate: the capacity path and the model path are separable, and the
+# capacity path is the expensive half to verify on spot G5g.
+gemma = ["dep:rlx-gemma"]
+
+[dependencies]
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+tokio-stream = "0.1"
+clap = { version = "4", features = ["derive", "env"] }
+gemma4-geometry = { path = "../gemma4-geometry" }
+# Ranges, not pins, so both follow new releases. Note where they actually land:
+# `rlx-runtime` publishes 0.2.14 but resolves to **0.2.11** here, because
+# `rlx-gemma` 0.2.11 hard-pins `rlx-runtime = "=0.2.11"` and cargo cannot carry two
+# semver-compatible copies. 0.2.11 is also the newest `rlx-gemma` there is — `rlx`
+# and `rlx-runtime` went to 0.2.14 and the model crate did not follow, which is the
+# same split that left it GPL-3.0-only (see the licensing note above).
+# So this is rlx-gemma's floor showing through, NOT an old pin of ours: when
+# rlx-gemma publishes again, both move on their own.
+rlx-runtime = { version = "0.2", default-features = false }
+rlx-gemma = { version = "0.2", optional = true, default-features = false }
