@@ -1038,11 +1038,33 @@ loader's default at `COMPUTE_DTYPE`, produced two regressions: `read_shards` wen
 the in-situ cost is not the cast itself), and `quantize_ple_table` then **OOMed allocating
 4.38 GiB on device**. Reverted; the tree serves `51bc52c9e2e9`.
 
-**Do not simply retry this.** The microbenchmark says the conversion is cheap and the
-integration says otherwise, so the next step is to find where the 54 s actually goes — 600
-tensors, a per-tensor `np.asarray` that may be copying, and host RSS moving from mmap-backed
-to anonymous are the three candidates — before touching the dtype again. The dtype tax remains
-87% of decode and remains the largest available win.
+**DIAGNOSED 2026-08-28. The 54 s was a device→host round-trip, and none of the three
+candidates above was right.**
+
+`jax_engine.load()` uses `from safetensors.flax import load_file`, which returns
+`jaxlib._jax.ArrayImpl` **already resident on `CudaDevice(id=0)`** (`memory_kind=device`,
+verified on hardware). **The weights never touch the host on this path**, so every line of
+`docs/bf16-weights-on-turing.md` reasoning about *where on the host* to cast was answering the
+wrong question. The 2026-08-27 code called `np.asarray()` on device arrays; measured D2H here
+is **1.25 GB/s**, so the 9.26 GB tree costs ~7.4 s of pure transfer before any conversion.
+Removing the host cast returns `read_shards` to **25.6 s** against the 24.7 s baseline —
+**the whole regression was the round-trip.**
+
+**The one-line loader change alone is correct and still not sufficient.** Pointing `get_arr`'s
+default at `COMPUTE_DTYPE` with no host cast makes it an ordinary on-device `astype`, and
+`read_shards` is then normal — but it OOMs on **384 MiB**, because `raw_weights` holds every
+bf16 source for the whole conversion while the f16 tree is built beside it. bf16 and float16
+are both 2 bytes, so **the finished tree is the same size**; the problem is only that both
+exist at once, 9.26 + 9.26 GB against 14.07.
+
+**The remedy is to release each source as its copy is made** — peak becomes
+`finished tree + one tensor` instead of `2x tree`. That is the `release_source=True` pattern
+`quantize_ple_table` already uses. Two cautions: `.delete()` invalidates the **caller's**
+array, so release must be opt-in with a test asserting the caller opts in; and peak is
+`9.26 GB + largest tensor`, where the largest is `embed_tokens_per_layer` at **4.375 GiB**
+(~13.6 GB against 14.07), so **convert that one early**, while little else is resident.
+
+The dtype tax remains 86.9% of decode and the largest available win.
 
 ## High-value optimizations, ranked against the roofline
 

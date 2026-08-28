@@ -60,6 +60,65 @@ shape and it fails here — `device_put` of the finished 9.26 GB tree cannot fin
 4.38 GiB block for the PLE table inside a 14.07 GB budget, and ordering the puts
 largest-first does not rescue it.
 
+## 2026-08-28: the host-side reasoning above is wrong for this loader
+
+**Everything in this document that reasons about "casting on the host" assumes the weights are
+on the host. They are not.** MEASURED on `i-0e629977053de0e57`:
+
+```
+safetensors.flax.load_file -> jaxlib._jax.ArrayImpl
+  dtype    bfloat16
+  devices  {CudaDevice(id=0)}
+  sharding SingleDeviceSharding(device=CudaDevice(id=0), memory_kind=device)
+```
+
+`jax_engine.load()` uses `from safetensors.flax import load_file`, so **every weight is already
+resident on the GPU the moment the shard is read.** There is no host-side stage to put a cast
+in. (`safetensors.numpy.load_file` cannot even open this checkpoint — it raises
+`TypeError: data type 'bfloat16' not understood`.)
+
+**That explains the 2026-08-27 failure exactly, and both halves of it.** The attempt added a
+host-side chunked cast in the shard loop, which called `np.asarray()` on device arrays:
+
+- **The 54 s was device→host transfer.** Measured D2H on this box is **1.25 GB/s**, so dragging
+  the 9.26 GB tree back costs **~7.4 s** of pure transfer before any conversion, plus the cast,
+  plus re-upload, plus allocator churn. Removing the host cast returns `read_shards` to
+  **25.6 s** against the 24.7 s baseline — **the regression was entirely the round-trip.**
+- **The OOM was both copies resident.** The bf16 tree stayed on device while f16 copies
+  accumulated beside it.
+
+### The loader-only change is correct and still not sufficient
+
+Pointing `get_arr`'s default at `COMPUTE_DTYPE` and adding **no** host cast makes the conversion
+an ordinary on-device `astype`. `read_shards` is then normal (25.6 s) — but it still OOMs,
+now on a mere **384 MiB**, because `raw_weights` holds every bf16 source for the whole
+conversion while the f16 tree is built beside it. **bf16 and float16 are both 2 bytes, so the
+finished tree is the same size** — the problem is purely that both exist at once:
+9.26 GB + 9.26 GB against a 14.07 GB budget.
+
+### The remedy, and the pattern already exists in this repo
+
+**Release each source as its converted copy is made**, so peak is `finished tree + one tensor`
+rather than `2x tree`. That is exactly the `release_source=True` pattern
+`quantize_ple_table` already uses, added 2026-08-26 for the same class of failure.
+
+Two cautions, both learned the expensive way:
+
+- **`.delete()` invalidates the CALLER's array.** The first version of `release_source` deleted
+  unconditionally and a CPU test caught it in seconds — any caller reusing its params dict got
+  `Array has been deleted`. Make release opt-in and assert the caller opts in.
+- **Order matters at this budget.** Peak is `9.26 GB + largest single tensor`, and the largest
+  is `embed_tokens_per_layer` at **4.375 GiB** — about 13.6 GB against 14.07. Converting that
+  tensor early, while little else is resident, is the difference between fitting and not.
+
+**Do not attempt this without watching `read_shards` and the allocation log together.** The
+failure mode is a startup OOM, not a slow serve.
+
+**Superseded above:** the "three placements tried and rejected" reasoning, and the
+`view(uint16)` bit-shift as the untried direction. The bit-shift is real and bit-identical
+(re-measured 2026-08-27) but irrelevant here — it is a *host* technique for weights that never
+reach the host.
+
 **Promising direction, untried:** bf16 → f16 is a pure bit operation (truncate the mantissa,
 same exponent bias), so a `view(uint16)` shift-and-round on the host would avoid ml_dtypes
 entirely and run at memory bandwidth. Overflow only matters for values outside f16 range,
