@@ -1,0 +1,36 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The path is relative to the project directory, as in .mcp.json;
+# never pin an absolute cwd, which is how the inf2 rig ended up pointing at a directory that
+# does not exist.
+#
+# WRITTEN FRESH AT THE FORK, not copied. The G5g -> G6 fork of the JAX rig left this exact
+# file untouched and it was wrong in three ways at once: it named the wrong server, pointed at
+# a skill path that did not exist, and -- the dangerous one -- gated tool names that no longer
+# existed (`*_g5g_*` against actual `*_g6_*` tools), so every destructive tool was UNGATED
+# while appearing to be gated. A gate on a tool name that does not exist fails open silently.
+# Ground truth for tool names: `grep -n "^@mcp.tool" server.py`.
+[mcp_servers.gpu-vllm-g6-2b]
+command = "python3"
+args = [".claude/skills/gpu-vllm-g6-2b-management/mcp/server.py"]
+
+[mcp_servers.gpu-vllm-g6-2b.env]
+AWS_REGION = "us-east-1"
+MODEL_NAME = "google/gemma-4-E2B-it"
+INSTANCE_TYPE = "g6.xlarge"
+MCP_SERVER_NAME = "gpu-vllm-g6-2b"
+
+# Launching costs money and a spot instance can be reclaimed under you. Gate the
+# state-changing tools.
+#
+# Termination is CHEAPER here than on the T4G sibling, and the reason is the fork: that rig
+# loses a locally built SM 7.5 image with the root volume, ~67 minutes of build. This rig
+# builds nothing, so a relaunch costs an image pull and the model download. Gated anyway --
+# it is still destructive, and a one-time spot instance cannot be stopped, only terminated.
+[mcp_servers.gpu-vllm-g6-2b.tools.create_g6_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-vllm-g6-2b.tools.terminate_g6_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-vllm-g6-2b.tools.stop_g6_instance]
+approval_mode = "approve"

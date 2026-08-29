@@ -1,0 +1,15 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The path is relative to the project directory, as in .mcp.json;
+# it previously pinned an absolute cwd of /home/xbill/tpu-pytorch-inf2, which does not exist.
+[mcp_servers.tpu-jax-inf2-2b]
+command = "python3"
+args = [".claude/skills/tpu-jax-inf2-2b-management/mcp/server.py"]
+
+[mcp_servers.tpu-jax-inf2-2b.env]
+AWS_REGION = "us-east-1"
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+INSTANCE_TYPE = "inf2.xlarge"
+MCP_SERVER_NAME = "tpu-jax-inf2-2b"
+
+[mcp_servers.tpu-jax-inf2-2b.tools.create_inf2_instance]
+approval_mode = "approve"

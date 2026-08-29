@@ -1,0 +1,21 @@
+# Serving dependencies, installed ON the G5g instance by cloud-init.
+#
+# Not installed locally: these resolve against the instance's CUDA torch.
+# server.py's _SERVING_REQUIREMENTS is the source of truth for what the bootstrap
+# actually installs; this file mirrors it and a test asserts they match.
+#
+# TORCH IS NOT LISTED, AND THAT IS THE POINT. The ARM64 PyTorch DLAMI ships
+# torch already built with sm_75 in its arch list (measured: torch 2.12.0+cu132).
+# Upstream PyPI aarch64 wheels omit Turing, so `pip install torch` here would
+# either fall back to CPU silently or demand a from-source build.
+transformers accelerate
+fastapi
+uvicorn
+pydantic
+# Chat-template rendering for transformers. A missing jinja2 leaves /health
+# green and fails every generation with a 500 (measured 2026-08-19 on the JAX
+# sibling; the failure is in transformers, so it transfers).
+jinja2
+safetensors
+huggingface_hub
+numpy
