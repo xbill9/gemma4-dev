@@ -13,7 +13,19 @@ SKILL = ROOT / ".claude" / "skills" / SKILL_NAME
 
 
 def main() -> int:
-    for name in ("server.py", "project-setup.sh", "requirements.txt"):
+    # The serving payload travels with the skill, not just the MCP control plane,
+    # so an installed copy under ~/.claude/skills can still ship the engine to an
+    # instance. server.py resolves the payload next to itself first and only then
+    # looks up at the rig root.
+    names = (
+        "server.py",
+        "project-setup.sh",
+        "requirements.txt",
+        "requirements-serving.txt",
+        "torch_generate.py",
+        "torch_openai_server.py",
+    )
+    for name in names:
         source = ROOT / name
         destination = SKILL / "mcp" / name
         destination.parent.mkdir(parents=True, exist_ok=True)

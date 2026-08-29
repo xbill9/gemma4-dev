@@ -68,6 +68,53 @@ Supported topology defaults are derived from EC2 hardware: `inf2.xlarge` and
 `inf2.8xlarge` expose 1 device/2 NeuronCores, `inf2.24xlarge` exposes
 6/12, and `inf2.48xlarge` exposes 12/24.
 
+### Serving: prebuilt container, or the native engine
+
+Two paths, and they are not interchangeable.
+
+**Container — what the MCP tools deploy.** `serving="optb"` launches
+`docker.io/xbill9/gemma4-optb:slim`, a `torch_neuronx`-traced graph with the
+compiled neffs and the weights baked in, serving on port 8080. Every measurement
+in `benchmarks/` came off this path.
+
+**Native engine — `torch_generate.py` + `torch_openai_server.py`.** The same
+design without the bake: it traces from a checkpoint at start-up (or reloads
+saved graphs from `--neff-dir`) and serves OpenAI routes on port 8000 under
+uvicorn. It defaults to the dense reference `google/gemma-4-E2B-it` rather than
+the QAT checkpoint in the container.
+
+```bash
+# on the instance, with the Neuron DLAMI's torch/torch-neuronx already present
+python3 -m pip install -r requirements-serving.txt
+
+# smoke-test the engine in-process, outside HTTP
+python3 torch_generate.py --prompt "What is AWS Inferentia?" --stats
+
+# device against CPU, token-for-token, plus per-slot isolation
+python3 torch_generate.py --parity --batch 4
+
+# serve
+python3 torch_openai_server.py --port 8000 --neff-dir /opt/gemma4/neff
+```
+
+> **No MCP tool deploys the native engine yet.** `create_inf2_instance` still
+> renders cloud-init for the container, so the engine is started by hand for now.
+> It has **not been run on a device** — it is the container's proven graph design,
+> reorganised and parameterised, and nothing more than that until a run says
+> otherwise.
+
+Three properties are worth knowing before touching it:
+
+- **The embedding lookup runs on the host, on purpose.** A gather over the
+  4.70 GB per-layer table returns zeros on a NeuronCore rather than raising,
+  which decodes to an EOS — a clean `200 OK` with an empty completion and no
+  error anywhere. `docs/neuron-jax-quirks.md` has the evidence.
+- **`--batch`, `--max-total` and `--prompt-bucket` are traced into the graph.**
+  Changing one is a recompile, not a flag, which is why `--batch` defaults to 1
+  and `--neff-dir` is worth setting.
+- **Empty output is the signature failure here, not an edge case.** Check the
+  text, never the token count.
+
 ### Tools
 
 - `get_deployment_config`, `create_inf2_instance`, `list_inf2_instances`
@@ -119,7 +166,8 @@ make lint
 make skill-package
 ```
 
-The root `server.py`, `project-setup.sh`, and `requirements.txt` are
+The root `server.py`, `project-setup.sh`, `requirements.txt`,
+`requirements-serving.txt`, `torch_generate.py` and `torch_openai_server.py` are
 authoritative for the **inf2** agent; `make skill` refreshes the bundled
 copies under `.claude/skills/tpu-pytorch-inf2-2b-management/` and `skills/`. The
 `tpu-management` skill copy is maintained in its own repo — update it there

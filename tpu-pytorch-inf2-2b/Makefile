@@ -77,7 +77,7 @@ test: $(SUBDIRS)
 lint: TARGET := lint
 lint: $(SUBDIRS)
 	@command -v ruff >/dev/null || { echo "ruff not found; install with: pip install ruff"; exit 1; }
-	ruff check server.py refresh_skill.py tests
+	ruff check server.py refresh_skill.py torch_generate.py torch_openai_server.py tests
 	@for s in project-setup.sh init.sh set_env.sh set_adc.sh; do bash -n $$s || exit 1; done
 	@echo "lint OK"
 

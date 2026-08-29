@@ -11,6 +11,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import server  # noqa: E402
+import torch_generate  # noqa: E402
+import torch_openai_server  # noqa: E402
+
+# The files refresh_skill.py snapshots into both skill copies: the MCP control
+# plane *and* the serving payload. Spelled out here rather than imported from
+# refresh_skill so that adding a file shows up as a test edit rather than passing
+# vacuously against whatever the module happens to hold.
+SKILL_SOURCES = (
+    "server.py", "project-setup.sh", "requirements.txt",
+    "requirements-serving.txt", "torch_generate.py", "torch_openai_server.py",
+)
 
 
 def run(coro):
@@ -125,6 +136,64 @@ class Inf2HelpersTests(unittest.TestCase):
         self.assertTrue(result.startswith("❌"))
 
 
+class NeuronEngineTests(unittest.TestCase):
+    """Offline checks on the engine's static-shape contract.
+
+    Nothing here loads a checkpoint or imports torch: torch_generate defers both,
+    so the parts that decide graph geometry are testable on a laptop. The parts
+    that need a device are not covered here and cannot be -- `torch_generate.py
+    --parity` is what checks those, on the instance.
+    """
+
+    def test_prompt_bucket_must_leave_room_to_decode(self):
+        with self.assertRaises(ValueError):
+            torch_generate.NeuronGemmaEngine(max_total=32, prompt_bucket=32)
+
+    def test_device_is_restricted(self):
+        with self.assertRaises(ValueError):
+            torch_generate.NeuronGemmaEngine(device="cuda")
+
+    def test_neff_filename_encodes_every_traced_dimension(self):
+        """A graph traced at one geometry cannot run at another.
+
+        The filename carries batch, max_total and prompt_bucket so a mismatched
+        cache MISSES rather than loading and failing on shape at the first
+        request.
+        """
+        a = torch_generate.NeuronGemmaEngine(batch=1, max_total=128, prompt_bucket=32,
+                                             neff_dir="/n")._neff_paths()
+        for other in (
+            torch_generate.NeuronGemmaEngine(batch=8, max_total=128, prompt_bucket=32,
+                                             neff_dir="/n"),
+            torch_generate.NeuronGemmaEngine(batch=1, max_total=256, prompt_bucket=32,
+                                             neff_dir="/n"),
+            torch_generate.NeuronGemmaEngine(batch=1, max_total=128, prompt_bucket=64,
+                                             neff_dir="/n"),
+        ):
+            self.assertNotEqual(a, other._neff_paths())
+
+    def test_stream_cannot_reach_the_park_row(self):
+        """Idle slots write KV at `park`; a live stream must stay below it.
+
+        Otherwise a parked slot's write lands on a decoding stream's cache row
+        and corrupts it, which shows up as wrong text rather than an error.
+        """
+        park = 127
+        stream = torch_openai_server.Stream(
+            prompt_ids=list(range(20)), max_new=10_000, temperature=0.0, top_k=0,
+            top_p=1.0, stop_ids=set(), timeout_s=None, ceiling=park,
+        )
+        highest_position = stream.n0 + stream.max_new - 1
+        self.assertLess(highest_position, park)
+
+    def test_stream_always_gets_at_least_one_token(self):
+        stream = torch_openai_server.Stream(
+            prompt_ids=list(range(126)), max_new=64, temperature=0.0, top_k=0,
+            top_p=1.0, stop_ids=set(), timeout_s=None, ceiling=127,
+        )
+        self.assertGreaterEqual(stream.max_new, 1)
+
+
 class RepoHygieneTests(unittest.TestCase):
     def test_shell_scripts_parse(self):
         for script in ("project-setup.sh", "init.sh", "set_env.sh", "set_adc.sh"):
@@ -135,7 +204,7 @@ class RepoHygieneTests(unittest.TestCase):
 
     def test_skill_snapshots_match_sources(self):
         for prefix in (".claude/skills/tpu-pytorch-inf2-2b-management", "skills/tpu-pytorch-inf2-2b-management"):
-            for source in ("server.py", "project-setup.sh", "requirements.txt"):
+            for source in SKILL_SOURCES:
                 self.assertTrue(
                     filecmp.cmp(
                         ROOT / source, ROOT / prefix / "mcp" / source, shallow=False

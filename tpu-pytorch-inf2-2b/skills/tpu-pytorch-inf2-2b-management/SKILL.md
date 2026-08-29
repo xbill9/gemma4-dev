@@ -35,6 +35,25 @@ adds a 16 GB swapfile because the one-time neff load peaks ~14.5 GB of host
 RAM on the 16 GB `inf2.xlarge`. Expect a long first start (image pull +
 neff load) before health passes.
 
+## The native engine (`torch_openai_server.py`) — not deployed by any tool
+
+The skill ships `torch_generate.py` and `torch_openai_server.py` beside the MCP
+server: the same traced-graph design as the Option-B container, but tracing from
+a checkpoint at start-up instead of from baked-in neffs, defaulting to the dense
+reference `google/gemma-4-E2B-it`, and serving on port 8000 under uvicorn.
+
+**No tool starts it.** `create_inf2_instance` renders cloud-init for the
+container only. Run it by hand on the instance if asked; do not describe it as
+what a deployment is running, and do not attribute the container's benchmark
+numbers to it — it has not been run on a device.
+
+If you do run it: `pip install -r requirements-serving.txt` (never `pip install
+torch` — that replaces the DLAMI's Neuron-matched build with an upstream one that
+has no NeuronCore support and fails silently), set `--neff-dir` so a cold trace is
+paid once, and treat an **empty completion as the signature Neuron fault**, not a
+cold start: an oversized device gather returns zeros, which decode to the pad id,
+which is an EOS, so the endpoint answers `200 OK` with nothing in it.
+
 ## Guardrails
 
 - Accept only supported `inf2.*` types; never silently fall back to GPU.

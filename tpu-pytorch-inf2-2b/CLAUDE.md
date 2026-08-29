@@ -8,8 +8,18 @@ of the `tpu-management` skill / `tpu-devops` MCP agent for Google Cloud TPUs
 ## Authoritative files
 
 - `server.py`: inf2 MCP server and AWS lifecycle implementation
+- `torch_generate.py`: the native `torch_neuronx` Gemma-4 engine, plus a one-shot
+  CLI. Do not confuse it with `torchtpu_generate.py` beside it, which targets a
+  **Google TPU** and is governed by the TorchTPU rules below; none of those apply
+  to Neuron.
+- `torch_openai_server.py`: OpenAI-compatible FastAPI/SSE server over that engine.
+  Imports the engine rather than copying it — see below.
 - `project-setup.sh`: skill installer and MCP registration
-- `requirements.txt`: runtime dependencies
+- `requirements.txt`: control-plane dependencies
+- `requirements-serving.txt`: what gets installed **on the instance**. Disjoint
+  from `requirements.txt`, and it deliberately lists neither `torch` nor
+  `torch-neuronx` (both ship in the DLAMI, matched to the runtime) nor
+  `optimum-neuron` (no Gemma-4 model class).
 - `.claude/skills/tpu-pytorch-inf2-2b-management/SKILL.md`: inf2 workflow and guardrails
 - `.claude/skills/tpu-management/`: bundled snapshot of the TPU skill — edit
   it in its own repo and re-sync; only consume it here (SKILL.md lifecycle,
@@ -17,6 +27,50 @@ of the `tpu-management` skill / `tpu-devops` MCP agent for Google Cloud TPUs
 
 Run `make skill` after editing sources. This refreshes the inf2 MCP snapshots
 and the plugin-layout copy. Run `make skill-package` when publishing a release.
+
+## Two serving paths, and only one of them is wired
+
+- **Container (what `server.py` deploys today).** `serving="optb"` launches the
+  prebuilt `docker.io/xbill9/gemma4-optb:slim` image — a `torch_neuronx`-traced
+  graph with the neffs and weights baked in, serving on port 8080. This is the
+  path with measurements behind it.
+- **Native engine (`torch_generate.py` + `torch_openai_server.py`).** The same
+  design, un-baked: it traces from a checkpoint at start-up (or reloads neffs
+  from `--neff-dir`) and serves OpenAI routes on 8000 under uvicorn. It defaults
+  to the **dense reference** `google/gemma-4-E2B-it`, not the QAT checkpoint the
+  container carries.
+
+**There is no MCP tool that deploys the native engine yet.** `create_inf2_instance`
+still renders cloud-init for the container. Until that lands, the engine is run by
+hand on the instance, and any claim that this rig "serves through the native
+engine" is false. The G5g sibling's `deploy_torch_server` is the shape the missing
+tool should take.
+
+## Engine rules (Neuron)
+
+These are load-bearing and every one of them has a silent failure behind it —
+`docs/neuron-jax-quirks.md` has the measurements.
+
+- **The embedding gather stays on the host.** `embed_tokens` and
+  `get_per_layer_inputs` run on the CPU and their outputs are fed into the traced
+  graph as `inputs_embeds` / `per_layer_inputs`. The per-layer table is 4.70 GB,
+  and a gather that large on a NeuronCore returns **zeros instead of raising** —
+  which decodes to the pad id, which is an EOS, so the endpoint answers `200 OK`
+  with an empty completion and nothing reports a fault. Moving that gather onto
+  the device is the single most expensive change anyone could make here.
+- **Shapes are traced, not requested.** `batch`, `max_total` and `prompt_bucket`
+  are baked into the graph; a caller cannot vary them and a new value is a
+  multi-minute recompile. Sampling parameters stay on the host for the same
+  reason — as trace-time constants they would be a compile per distinct
+  `temperature`.
+- **The engine exists once.** `torch_openai_server.py` imports
+  `NeuronGemmaEngine`; it does not carry a second copy. A drifted copy of the KV
+  blend or the per-stream masks produces plausible text, not an error.
+- **Check content, never token count.** An isolation run once recorded 20 tokens
+  as a 2700x win; that same configuration returned an empty string end-to-end.
+  `torch_generate.py --parity` is the check that means something: device against
+  CPU token-for-token, *and* duplicate prompts in different slots emitting
+  identical sequences, which is what catches a per-stream mask bug that B=1 hides.
 
 ## Engineering rules (inf2)
 

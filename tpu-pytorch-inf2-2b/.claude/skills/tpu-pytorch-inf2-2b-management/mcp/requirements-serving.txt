@@ -1,0 +1,31 @@
+# Serving dependencies, installed ON the Inf2 instance.
+#
+# Not installed locally: the control plane never loads a checkpoint, and these
+# resolve against the instance's Neuron runtime. requirements.txt is the
+# control-plane list and stays disjoint from this one.
+#
+# TORCH IS NOT LISTED, AND NEITHER IS torch-neuronx. Both ship in the Neuron
+# DLAMI, built against the runtime and the compiler already on the box, and they
+# come from https://pip.repos.neuron.amazonaws.com rather than PyPI. A plain
+# `pip install torch` here replaces the Neuron-matched build with an upstream one
+# that has no NeuronCore support at all -- the import still succeeds and every
+# trace then silently falls back to CPU.
+transformers
+accelerate
+fastapi
+uvicorn
+pydantic
+# Chat-template rendering for transformers. A missing jinja2 leaves /health green
+# and fails every generation with a 500 (measured 2026-08-19 on the G5g sibling;
+# the failure is inside transformers, so it transfers). transformers does not
+# pull it in and memoizes the availability check at import, so installing it late
+# needs a service restart.
+jinja2
+safetensors
+huggingface_hub
+numpy
+#
+# DELIBERATELY ABSENT: optimum-neuron. It is the natural-looking dependency and
+# it is the wrong one -- it has no Gemma-4 model class, so the vLLM Neuron DLC
+# path comes up healthy and serves gibberish (CLAUDE.md, "Engineering rules").
+# torch_generate.py traces the transformers model directly instead.
