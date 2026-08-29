@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Gemma 4 in Pure JAX: What Ports from TPU to GPU, and What Doesn't</title></head><body><h1>Gemma 4 in Pure JAX: What Ports from TPU to GPU, and What Doesn't</h1><figure><img src="img/cover-medium-gde.jpg" alt="A systolic-array die and a GPU die on one board. A single amber instruction stream splits and feeds both; one secondary trace to the GPU is broken and dark."></figure>
+<p>This article is about running a hand-written <strong>Gemma 4</strong> port in <strong>pure JAX</strong> on three different accelerators, and about the two places the abstraction leaks.</p>
+<p>The code is here:</p>
+<p><a href="https://github.com/xbill9/gemma4-dev">github.com/xbill9/gemma4-dev</a></p>
+<h4>What is this project trying to Do?</h4>
+<p>This project aims to serve one Gemma 4 checkpoint from one JAX port across every accelerator I can rent, and to find out — by measurement, not by reading docs — which parts of "it's just JAX" are true.</p>
+<p>The port lives in <code>ports/gemma4/</code> and is driven by a generation loop behind an OpenAI-compatible server. No PyTorch, no vLLM, no <code>torch_xla</code>. The same code runs on Cloud TPU v5e and v6e, and on an NVIDIA T4G attached to an AWS Graviton2 host.</p>
+<p>"Pure JAX" is the whole experiment. If the port is really portable, the only thing that should change between those rigs is a config file.</p>
+<p>It mostly is. Two things are not, and they are the interesting part.</p>
+<h4>Gemma 4 E2B is not a stock transformer</h4>
+<p>Any port has to carry four irregularities, and none of them are optional:</p>
+<ol>
+<li><strong>Two attention geometries.</strong> Sliding layers use <code>head_dim=256</code>, global layers use <strong>512</strong>. Most inference stacks assume one head dimension per model.</li>
+<li><strong>8:1 MQA</strong>, so the KV budget is nothing like the parameter count would suggest.</li>
+<li><strong>A KV-share map</strong> that collapses <strong>35 layers onto 15 caches</strong>.</li>
+<li><strong>A 512-slot sliding ring</strong>, plus per-layer embeddings (PLE) held in a <strong>4.70 GB</strong> table that gets quantized to 4 bits on load.</li>
+</ol>
+<p>That first one is worth dwelling on, because it is what breaks other stacks. On the vLLM path, the heterogeneous head dims force the Triton attention backend:</p>
+<figure><img src="img/gde-code-01-4cdea716.png" alt="Gemma4 model has heterogeneous head dimensions"><figcaption>gde-code-01-4cdea716</figcaption></figure>
+<p>And on a Turing GPU that backend then asks for shared memory the hardware does not have:</p>
+<figure><img src="img/gde-code-02-a55c14fc.png" alt="triton.runtime.errors.OutOfResources: out of resource: shared memory,"><figcaption>gde-code-02-a55c14fc</figcaption></figure>
+<p><strong>JAX never enters that conversation.</strong> Attention is ordinary XLA rather than a hand-tiled kernel, so there is no per-block shared-memory ceiling in the attention path at all. This is the clearest win of the whole exercise: the irregular geometry that is a special case everywhere else is just array shapes here.</p>
+<h4>The dtype policy has to read the device, not the config</h4>
+<p>This is the single most expensive lesson in the repo.</p>
+<p><strong>A wrong compute dtype does not raise. It emulates.</strong> <code>bfloat16</code> on a pre-Ampere GPU does not fail — XLA routes it through fp32 and you simply lose most of your decode to conversion. Nothing in the logs is red.</p>
+<p>So the port does not take the dtype from a config file. It reads the live compute capability off the device and decides:</p>
+<pre><code>COMPUTE_DTYPE = float16 if IS_PRE_AMPERE else bfloat16
+</code></pre>
+<p>On TPU that resolves to <code>bfloat16</code>, which the MXUs run natively. On an SM 8.9 Ada card, <code>bfloat16</code>. On the SM 7.5 Turing card in this rig, <strong><code>float16</code></strong> — Turing's only real 16-bit datapath, since it has neither bf16 nor fp8.</p>
+<p>The first line the process emits states what it decided, so a misconfiguration is one grep away rather than a mystery in the throughput:</p>
+<figure><img src="img/gde-code-03-95f29414.png" alt="INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu"><figcaption>gde-code-03-95f29414</figcaption></figure>
+<p><code>pallas_interpret=False</code> matters just as much — it is the difference between serving and silently running a simulator.</p>
+<h4>Where the abstraction actually leaks: Pallas</h4>
+<p>Here is the part that does not port, and it is not a bug — it is a real hardware difference wearing a portable API.</p>
+<p>The fused <strong>W4A16 kernel is written in Pallas</strong>, and it is tiled for <strong>TPU VMEM</strong>, which gives you 16 MB per core. At this model's shapes the tiles want <strong>550 KiB – 1.1 MiB per block</strong>.</p>
+<p>On a GPU, Pallas lowers through Triton, and those tiles become <strong>shared memory</strong>. Turing gives you 64 KiB per block. Ada raises the ceiling, but nowhere near a megabyte.</p>
+<p>So the same Pallas kernel that is the fast path on TPU <strong>cannot run on either GPU</strong>. The rig computes the requirement at startup and refuses with the arithmetic attached, rather than dying as a cryptic <code>OutOfResources</code> at the first token:</p>
+<pre><code>check_w4a16_fits_scoped_memory()
+</code></pre>
+<p>The practical consequence: the GPU rigs serve the <strong>dense reference checkpoint</strong> at 16-bit, while the TPU rigs serve the <code>-qat-w4a16-ct</code> export. Same port, same model family, different weights — because a kernel written against VMEM does not describe a GPU.</p>
+<p><strong>If you take one thing from this article, take that one.</strong> Pallas is portable as an API and not portable as a memory model.</p>
+<h4>The bug that returns <code>200 OK</code></h4>
+<p>A padding-eviction bug in the KV ring cache cost a week, and it is the kind only Gemma 4's geometry produces.</p>
+<p>The invariant is: <strong>a cache index is an absolute real position, and padding never occupies an index a real position uses.</strong> A port that right-pads into the 512-slot ring violates it, and the failure mode is not a crash or a NaN. It is a <strong>token loop</strong> — a clean HTTP <code>200</code>, <code>status: "success"</code>, and output like <code>The The The The</code>.</p>
+<p>Nothing in the logs is red. Nothing in the metrics is red. The only thing that catches it is a degeneracy check on the output itself, which the server now runs on every response.</p>
+<p>The scariest bugs in this whole project all returned success.</p>
+<h4>What did port, with no changes at all</h4>
+<p>Enough that the exercise was worth it:</p>
+<ul>
+<li><strong>The model code.</strong> All four irregularities, both attention geometries, the KV-share map, the ring — identical source on TPU and GPU.</li>
+<li><strong>The compilation cache.</strong> XLA's persistent cache works the same way; on the GPU rig it restores <strong>805 files / 12 MB in 6 seconds</strong> onto a fresh instance from a box that had already been terminated.</li>
+<li><strong>Bucketing and static shapes.</strong> <code>max_new_tokens</code> is a <code>static_argnames</code> entry, so <code>(bucket, max_tokens)</code> is the compiled shape on every backend. Warm up at the shape you measure — the same request took <strong>18.77 s cold against 4.35 s warm</strong>.</li>
+<li><strong><code>pip</code> supplies CUDA.</strong> <code>jax[cuda13]</code> means the GPU rig installs in <strong>117 seconds</strong> with no build step, no CUDA toolkit and no Rust — against a ~67-minute from-source build on the vLLM path.</li>
+</ul>
+<h4>The number I could not explain</h4>
+<p>Profiling decode with xprof on the Turing card gave this:</p>
+<figure><img src="img/gde-code-04-68a4c7a1.png" alt="conversion   54.0%   &lt;-- dtype conversion"><figcaption>gde-code-04-68a4c7a1</figcaption></figure>
+<p><strong>Zero.</strong> 1,466 ms of kernels across 108 distinct kernels on a Tensor Core GPU, without one Tensor Core firing. More than half of decode went to converting numbers between formats before any math happened.</p>
+<p>The obvious hypothesis was bf16 weights being converted on a chip with no bf16 datapath. So I converted the checkpoint to float16 host-side and re-ran. Parameter dtypes read <code>{'float16': 541, 'uint8': 1, 'int8': 1}</code> — and <strong>conversion stayed at 54.0%</strong>.</p>
+<p>The obvious explanation is wrong and I do not yet know the real one. I would rather publish the open question than a tidy story.</p>
+<p>What I can stand behind is that the measurement is real: the same profile on a <strong>different instance, a different AMI and a restored cache</strong> landed at 1466.0 ms against 1467.1 ms. <strong>1.1 ms apart on 1467.</strong></p>
+<p>The next rig is the control for exactly this — the same port on an <strong>Ada</strong> card, where <code>_compute_dtype()</code> returns <code>bfloat16</code> with no code change and the conversion pressure is removed at the hardware level. If 54% survives onto a bf16-native chip, the cause was never dtype at all.</p>
+<h4>Honest numbers</h4>
+<figure><img src="img/gde-table-01-17cd76f3.png" alt="Measured on the T4G"><figcaption>Measured on the T4G</figcaption></figure>
+<p><strong>Quote the gauge, not end-to-end.</strong> End-to-end throughput does fall with a longer prompt (12.43 → 8.22), but that is prefill being linear in the padded bucket, not decode degrading. They are two different claims and conflating them makes a benchmark a lie.</p>
+<h4>Summary</h4>
+<p>One JAX port, three accelerators. The model code, the compilation cache and the static-shape discipline all transferred untouched, and Gemma 4's awkward geometry — the thing that forces a special-case kernel on other stacks — turned out to be the easiest part, because in JAX it is just shapes.</p>
+<p>What did not transfer was the one piece written against a specific memory model. Pallas gives you a portable API on top of VMEM and shared memory, and those are not the same size. That boundary is worth knowing before you plan a port around a fused kernel.</p></body></html>
