@@ -16,3 +16,10 @@ the rendered output:
 - **No links inside `<figcaption>`.** Medium drops the entire figure, silently.
 
 Regenerate with `build_medium.py` rather than editing these by hand.
+
+## A fourth trap, measured 2026-08-28
+
+**No trailing newline inside `<pre><code>`.** A block ending `...\n</code></pre>`
+makes Medium's importer emit a *second, empty* code block after every real one —
+19 blocks arrived as 38, alternating real and empty. Strip the newline before
+`</code>`; single-line blocks lose nothing by it.

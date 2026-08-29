@@ -38,60 +38,46 @@
 <p>The instance profile needs <code>AmazonSSMManagedInstanceCore</code> plus read access to your Secrets Manager secret and your S3 cache bucket. There is <strong>no inbound SSH rule and no private key</strong> — all remote administration goes over SSM Run Command.</p>
 <h4>Install the Rig</h4>
 <p>Clone the monorepo and install the control plane:</p>
-<pre><code>git clone https://github.com/xbill9/gemma4-dev
-</code></pre>
-<pre><code>cd gemma4-dev/gpu-jax-g5g-2b
-</code></pre>
-<pre><code>pip install -r requirements.txt
-</code></pre>
+<pre><code>git clone https://github.com/xbill9/gemma4-dev</code></pre>
+<pre><code>cd gemma4-dev/gpu-jax-g5g-2b</code></pre>
+<pre><code>pip install -r requirements.txt</code></pre>
 <p>That installs <code>boto3</code> and FastMCP only. Nothing here needs a GPU — the GPU is on the other end.</p>
 <h4>Run the Tests</h4>
-<pre><code>python3 -m unittest discover -s tests -v
-</code></pre>
+<pre><code>python3 -m unittest discover -s tests -v</code></pre>
 <p>105 tests, fully offline. Every cloud, subprocess, and network boundary is mocked. If these do not pass, do not launch an instance.</p>
 <h4>Register the MCP Server</h4>
 <p>The whole rig is driven by an MCP server exposing a devops agent:</p>
-<pre><code>./project-setup.sh
-</code></pre>
+<pre><code>./project-setup.sh</code></pre>
 <p>This installs the bundled skill and registers <code>.mcp.json</code>:</p>
 <figure><img src="img/aws-code-01-d390afe3.png" alt="{"><figcaption>aws-code-01-d390afe3</figcaption></figure>
 <p>Copy-paste form of the same file:</p>
-<pre><code>{&quot;mcpServers&quot;:{&quot;gpu-jax-g5g-2b&quot;:{&quot;command&quot;:&quot;python3&quot;,&quot;args&quot;:[&quot;.claude/skills/gpu-jax-g5g-2b-management/mcp/server.py&quot;],&quot;env&quot;:{&quot;AWS_REGION&quot;:&quot;us-east-1&quot;,&quot;MODEL_NAME&quot;:&quot;google/gemma-4-E2B-it&quot;,&quot;INSTANCE_TYPE&quot;:&quot;g5g.2xlarge&quot;,&quot;MCP_SERVER_NAME&quot;:&quot;gpu-jax-g5g-2b&quot;}}}}
-</code></pre>
+<pre><code>{&quot;mcpServers&quot;:{&quot;gpu-jax-g5g-2b&quot;:{&quot;command&quot;:&quot;python3&quot;,&quot;args&quot;:[&quot;.claude/skills/gpu-jax-g5g-2b-management/mcp/server.py&quot;],&quot;env&quot;:{&quot;AWS_REGION&quot;:&quot;us-east-1&quot;,&quot;MODEL_NAME&quot;:&quot;google/gemma-4-E2B-it&quot;,&quot;INSTANCE_TYPE&quot;:&quot;g5g.2xlarge&quot;,&quot;MCP_SERVER_NAME&quot;:&quot;gpu-jax-g5g-2b&quot;}}}}</code></pre>
 <p>Every tool is now available as <code>mcp__gpu-jax-g5g-2b__&lt;tool&gt;</code>.</p>
 <h4>Save the Hugging Face Token</h4>
-<pre><code>save_hf_token(token=&quot;hf_...&quot;)
-</code></pre>
+<pre><code>save_hf_token(token=&quot;hf_...&quot;)</code></pre>
 <p>This writes to AWS Secrets Manager under <code>vllm/hf-token</code>. The instance fetches it at boot into a root-only <code>EnvironmentFile</code>.</p>
 <p>Note- the token never goes in user data. Instance metadata is readable by anything running on the box.</p>
 <h4>Check the Quotas</h4>
-<pre><code>check_g5g_quotas()
-</code></pre>
+<pre><code>check_g5g_quotas()</code></pre>
 <p>Reports your On-Demand and Spot G instance vCPU limits for the region. <code>g5g.2xlarge</code> is 8 vCPU. Check this before launching, not after the launch fails.</p>
 <h4>Launch the Instance</h4>
-<pre><code>create_g5g_instance(subnet_id=&quot;subnet-...&quot;, security_group_id=&quot;sg-...&quot;, iam_instance_profile=&quot;...&quot;, spot=True)
-</code></pre>
+<pre><code>create_g5g_instance(subnet_id=&quot;subnet-...&quot;, security_group_id=&quot;sg-...&quot;, iam_instance_profile=&quot;...&quot;, spot=True)</code></pre>
 <p>The AMI is resolved at launch time from SSM Parameter Store:</p>
-<pre><code>/aws/service/deeplearning/ami/arm64/base-oss-nvidia-driver-gpu-ubuntu-26.04/latest/ami-id
-</code></pre>
+<pre><code>/aws/service/deeplearning/ami/arm64/base-oss-nvidia-driver-gpu-ubuntu-26.04/latest/ami-id</code></pre>
 <p><strong>Never hardcode an AMI id here.</strong> AWS also ships ARM64 DLAMIs built for Graviton <em>CPU</em> inference. They boot perfectly and simply have no GPU. The <code>/latest/</code> parameter also moves — this rig has seen <code>ami-0bff4343bfd56a20e</code> become <code>ami-025a6e5b3b786cf61</code> overnight as Ubuntu 26.04 became 26.04.1.</p>
 <h4>Watch the Install</h4>
-<pre><code>get_install_progress(instance_id=&quot;i-...&quot;)
-</code></pre>
+<pre><code>get_install_progress(instance_id=&quot;i-...&quot;)</code></pre>
 <p>Cloud-init installs <code>jax[cuda13]</code> on Python 3.14. The stages are timed:</p>
 <p>![<a href="img/aws-code-02-867f3f71.png">stage) jax-wheels      43s   (total  84s)</a>
 <em>aws-code-02-867f3f71</em></p>
 <p><strong>117 seconds, and there is no compile step anywhere in it.</strong> That is the entire reason this rig exists — more on that below.</p>
 <p>The <code>cache-restore</code> stage pulled <strong>805 files / 12 MB in 6 seconds</strong> from S3, on a <em>fresh</em> instance, compiled by a box that had already been terminated. XLA's cold-compile penalty becomes a rounding error on Spot.</p>
 <h4>Verify the GPU</h4>
-<pre><code>verify_gpu_arch(instance_id=&quot;i-...&quot;)
-</code></pre>
+<pre><code>verify_gpu_arch(instance_id=&quot;i-...&quot;)</code></pre>
 <p>This measures whether JAX's CUDA kernels actually cover this GPU, rather than trusting that they do. You want to see SM 7.5 claimed and a real device, not a silent CPU fallback.</p>
 <h4>Deploy the Server</h4>
-<pre><code>make skill
-</code></pre>
-<pre><code>deploy_jax_server(instance_id=&quot;i-...&quot;)
-</code></pre>
+<pre><code>make skill</code></pre>
+<pre><code>deploy_jax_server(instance_id=&quot;i-...&quot;)</code></pre>
 <p><strong>Always <code>make skill</code> first.</strong> The deploy ships the <em>skill snapshot</em>, not your working tree. The deploy output prints the payload root and the build id so a stale deploy is visible in one line.</p>
 <h4>Verify The Installation</h4>
 <p>The first line the process emits is the device-policy banner:</p>
@@ -102,18 +88,14 @@
 <p>Load is staged, so a hang is attributable:</p>
 <figure><img src="img/aws-code-05-e6c91a2e.png" alt="download        87.7s"><figcaption>aws-code-05-e6c91a2e</figcaption></figure>
 <p>Then confirm the served build matches what you shipped:</p>
-<pre><code>verify_model_health(instance_id=&quot;i-...&quot;)
-</code></pre>
+<pre><code>verify_model_health(instance_id=&quot;i-...&quot;)</code></pre>
 <h4>Query the Model</h4>
-<pre><code>query_model(instance_id=&quot;i-...&quot;, prompt=&quot;Explain Graviton in one sentence.&quot;)
-</code></pre>
+<pre><code>query_model(instance_id=&quot;i-...&quot;, prompt=&quot;Explain Graviton in one sentence.&quot;)</code></pre>
 <p>The endpoint is OpenAI-compatible on <code>:8000</code>, so anything that speaks that API works:</p>
-<pre><code>get_endpoint(instance_id=&quot;i-...&quot;)
-</code></pre>
+<pre><code>get_endpoint(instance_id=&quot;i-...&quot;)</code></pre>
 <p>Note- <strong>warm up at the shape you measure.</strong> <code>max_new_tokens</code> is a <code>static_argnames</code> entry, so <code>(bucket, max_tokens)</code> is the compiled shape. The same request measured <strong>18.77 s cold against 4.35 s warm</strong>.</p>
 <h4>Check the Metrics</h4>
-<pre><code>get_metrics(instance_id=&quot;i-...&quot;)
-</code></pre>
+<pre><code>get_metrics(instance_id=&quot;i-...&quot;)</code></pre>
 <figure><img src="img/aws-code-06-edcc4da2.png" alt="tpu_jax_decode_tokens_per_second   13.0"><figcaption>aws-code-06-edcc4da2</figcaption></figure>
 <p><strong>Quote the gauge, not end-to-end.</strong> Decode is flat at 12.9 / 13.0 / 12.9 tok/s across 41 → 2,057 input tokens. End-to-end throughput <em>does</em> fall (12.43 → 8.22) — but that is prefill being linear in the padded bucket, not decode degrading. Two different claims.</p>
 <h4>Why Not vLLM?</h4>
@@ -141,8 +123,7 @@
 <figure><img src="img/aws-table-01-83c52414.png" alt="AWS services used"><figcaption>AWS services used</figcaption></figure>
 <p>Everything goes through <code>boto3</code>. The rig never shells out to the AWS CLI.</p>
 <h4>Clean Up</h4>
-<pre><code>terminate_g5g_instance(instance_id=&quot;i-...&quot;)
-</code></pre>
+<pre><code>terminate_g5g_instance(instance_id=&quot;i-...&quot;)</code></pre>
 <p>Termination is cheap on this rig — there is no built image to lose with the root volume, only a pip install and a model cache, and the compilation cache is already in S3.</p>
 <h4>What I Learned This Summer</h4>
 <p><strong>Check reachability on paper before spending a provisioning cycle.</strong> A nine-step analysis order — does the compute dtype match the chip, is there a fused kernel for that format on that chip — runs in an afternoon. A launch costs a day. It has killed two bad plans before either touched hardware.</p>

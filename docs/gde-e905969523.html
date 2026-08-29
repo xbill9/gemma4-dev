@@ -24,8 +24,7 @@
 <p>This is the single most expensive lesson in the repo.</p>
 <p><strong>A wrong compute dtype does not raise. It emulates.</strong> <code>bfloat16</code> on a pre-Ampere GPU does not fail — XLA routes it through fp32 and you simply lose most of your decode to conversion. Nothing in the logs is red.</p>
 <p>So the port does not take the dtype from a config file. It reads the live compute capability off the device and decides:</p>
-<pre><code>COMPUTE_DTYPE = float16 if IS_PRE_AMPERE else bfloat16
-</code></pre>
+<pre><code>COMPUTE_DTYPE = float16 if IS_PRE_AMPERE else bfloat16</code></pre>
 <p>On TPU that resolves to <code>bfloat16</code>, which the MXUs run natively. On an SM 8.9 Ada card, <code>bfloat16</code>. On the SM 7.5 Turing card in this rig, <strong><code>float16</code></strong> — Turing's only real 16-bit datapath, since it has neither bf16 nor fp8.</p>
 <p>The first line the process emits states what it decided, so a misconfiguration is one grep away rather than a mystery in the throughput:</p>
 <figure><img src="img/gde-code-03-95f29414.png" alt="INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu"><figcaption>gde-code-03-95f29414</figcaption></figure>
@@ -35,8 +34,7 @@
 <p>The fused <strong>W4A16 kernel is written in Pallas</strong>, and it is tiled for <strong>TPU VMEM</strong>, which gives you 16 MB per core. At this model's shapes the tiles want <strong>550 KiB – 1.1 MiB per block</strong>.</p>
 <p>On a GPU, Pallas lowers through Triton, and those tiles become <strong>shared memory</strong>. Turing gives you 64 KiB per block. Ada raises the ceiling, but nowhere near a megabyte.</p>
 <p>So the same Pallas kernel that is the fast path on TPU <strong>cannot run on either GPU</strong>. The rig computes the requirement at startup and refuses with the arithmetic attached, rather than dying as a cryptic <code>OutOfResources</code> at the first token:</p>
-<pre><code>check_w4a16_fits_scoped_memory()
-</code></pre>
+<pre><code>check_w4a16_fits_scoped_memory()</code></pre>
 <p>The practical consequence: the GPU rigs serve the <strong>dense reference checkpoint</strong> at 16-bit, while the TPU rigs serve the <code>-qat-w4a16-ct</code> export. Same port, same model family, different weights — because a kernel written against VMEM does not describe a GPU.</p>
 <p><strong>If you take one thing from this article, take that one.</strong> Pallas is portable as an API and not portable as a memory model.</p>
 <h4>The bug that returns <code>200 OK</code></h4>
