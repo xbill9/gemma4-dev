@@ -1,6 +1,6 @@
 {
   "name": "gemma4-dev",
-  "description": "Claude Code plugins for Google Cloud TPU DevOps: one management skill and one MCP server per Gemma 4 serving rig (JAX, PyTorch/torch_xla). Both are named after the rig directory — skill <rig>-management, tools prefixed mcp__<rig>__.",
+  "description": "Claude Code plugins for Google Cloud TPU DevOps: one management skill and one MCP server per Gemma 4 serving rig (JAX, PyTorch/torch_xla). Both are named after the rig directory \u2014 skill <rig>-management, tools prefixed mcp__<rig>__.",
   "owner": {
     "name": "xbill9",
     "url": "https://github.com/xbill9"
@@ -9,22 +9,32 @@
     {
       "name": "gce-jaxrust-v6e1-2b",
       "source": "./gce-jaxrust-v6e1-2b",
-      "description": "Manage Google Cloud TPU capacity and Gemma 4 serving from Rust on Compute Engine TPU VMs: flex-start provisioning, capacity probing, quotas, cost estimates, and SRE diagnostics via the gce-jaxrust-v6e1-2b MCP server. The engine is Rust — rlx's JAX-shaped IR lowered to HLO and executed through libtpu's PJRT plugin, no Python in the serving path. Forked from tpu-jax-v6e1-2b 2026-08-28; nothing provisioned or measured on this path yet."
+      "description": "Manage Google Cloud TPU capacity and Gemma 4 serving from Rust on Compute Engine TPU VMs: flex-start provisioning, capacity probing, quotas, cost estimates, and SRE diagnostics via the gce-jaxrust-v6e1-2b MCP server. The engine is Rust \u2014 rlx's JAX-shaped IR lowered to HLO and executed through libtpu's PJRT plugin, no Python in the serving path. Forked from tpu-jax-v6e1-2b 2026-08-28; nothing provisioned or measured on this path yet."
     },
     {
       "name": "gpu-jax-g5g-2b",
       "source": "./gpu-jax-g5g-2b",
-      "description": "EC2 G5g DevOps for the pure-JAX Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, JAX-on-Turing verification, and SRE diagnostics via the gpu-jax-g5g-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4G (Turing, SM 7.5) behind an AWS Graviton2 host — no build, no CUDA toolkit, no Triton patch, because jax[cuda12] publishes aarch64 wheels that already carry sm_75."
+      "description": "EC2 G5g DevOps for the pure-JAX Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, JAX-on-Turing verification, and SRE diagnostics via the gpu-jax-g5g-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4G (Turing, SM 7.5) behind an AWS Graviton2 host \u2014 no build, no CUDA toolkit, no Triton patch, because jax[cuda12] publishes aarch64 wheels that already carry sm_75."
+    },
+    {
+      "name": "gpu-jax-g6-2b",
+      "source": "./gpu-jax-g6-2b",
+      "description": "EC2 G6 DevOps for the pure-JAX Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution, JAX-on-Ada verification, and SRE diagnostics via the gpu-jax-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9, 23034 MiB). Forked from gpu-jax-g5g-2b 2026-08-28 to move the same engine off Turing onto a native bfloat16 datapath: measured the same day at 48.3-48.5 tok/s against the T4G's 12.80 at an identical config, with the 54% dtype-conversion tax at 0.0% and decode at the bandwidth roofline."
     },
     {
       "name": "gpu-jaxrust-g5g-2b",
       "source": "./gpu-jaxrust-g5g-2b",
-      "description": "EC2 G5g DevOps for the Rust-driven-XLA Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, Turing verification, and SRE diagnostics via the gpu-jaxrust-g5g-2b MCP server. Forked from gpu-jax-g5g-2b 2026-08-28 to move the engine off CPython onto Rust. The control plane is complete and measured nothing yet — the Rust engine is not written, and the rig currently runs the inherited Python JAX engine as its fallback and parity oracle."
+      "description": "EC2 G5g DevOps for the Rust-driven-XLA Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, Turing verification, and SRE diagnostics via the gpu-jaxrust-g5g-2b MCP server. Forked from gpu-jax-g5g-2b 2026-08-28 to move the engine off CPython onto Rust. The control plane is complete and measured nothing yet \u2014 the Rust engine is not written, and the rig currently runs the inherited Python JAX engine as its fallback and parity oracle."
     },
     {
       "name": "gpu-vllm-g5g-2b",
       "source": "./gpu-vllm-g5g-2b",
-      "description": "EC2 G5g DevOps for the vLLM Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 AMI resolution, SM 7.5 build orchestration, and SRE diagnostics via the gpu-vllm-g5g-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4G (Turing) behind an AWS Graviton2 host — the one rig here whose GPU has no prebuilt aarch64 CUDA kernels."
+      "description": "EC2 G5g DevOps for the vLLM Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 AMI resolution, SM 7.5 build orchestration, and SRE diagnostics via the gpu-vllm-g5g-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4G (Turing) behind an AWS Graviton2 host \u2014 the one rig here whose GPU has no prebuilt aarch64 CUDA kernels."
+    },
+    {
+      "name": "gpu-vllm-g6-2b",
+      "source": "./gpu-vllm-g6-2b",
+      "description": "EC2 G6 DevOps for the vLLM Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution, SM 8.9 verification, and SRE diagnostics via the gpu-vllm-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9). Forked from gpu-vllm-g5g-2b 2026-08-28, and the fork REMOVES that rig's reason for existing: G6 is x86_64 and SM 8.9, both carried by the published amd64 image, so there is no from-source build, no CUDA toolkit, no Rust and no Triton patch. Exists as the runtime control for gpu-jax-g6-2b on identical silicon. Has served nothing."
     },
     {
       "name": "tpu-jax-v5e1-2b",

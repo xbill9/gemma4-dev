@@ -181,7 +181,14 @@ Accelerator generation plus chip count, punctuation stripped.
 | `v6e8` | TPU v6e, 8 chips — one host on both control planes (`v6e-8` / `ct6e-standard-8t`) |
 | `inf2` | AWS Inferentia2 |
 
-For `gpu` platforms the slot takes the GPU SKU — `l4`, `t4`, `a100` — same rule: lowercase, no punctuation.
+For `gpu` platforms the slot depends on **who sells the machine**, and the split is
+load-bearing rather than cosmetic:
+
+- **On EC2 — the instance family.** `g5g`, `g4dn`, `g6`, `g6f`. This was a `g5g`-only carve-out
+  until 2026-08-28; it is now the rule for every EC2 GPU rig. See below.
+- **Everywhere else — the GPU SKU.** `l4`, `a100`: lowercase, no punctuation. This is what the
+  five `gpu-vllm-l4-*` artifact rigs use and they are unaffected.
+
 For `gce` use `cpu`.
 
 The value is always **`inf2`**, never bare `inf` — the generation is part of the part name, both existing
@@ -377,6 +384,11 @@ Three things that trip people up:
 | `~/gemma4-dev/gpu-jax-g5g-2b` | **EC2 G5g** (Graviton2 host) | pure JAX | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — same carve-out as the vLLM sibling; serves the dense reference build, so no encoding slot |
 | `~/gemma4-dev/gce-jaxrust-v6e1-2b` | **Compute Engine instance** (`ct6e-standard-1t`) | Rust-driven XLA (`rlx`) | v6e-1 | `gemma-4-E2B-it` | — — forked from `tpu-jax-v6e1-2b` 2026-08-28. **Slot 1 is `gce`, which resolves that rig's documented slot-1 exception rather than inheriting it** — it provisions only through Compute Engine, so the letter of the rule applies. Carries a Rust `rlx` engine under `rust/`; not an A/B twin of the `gpu` jaxrust rig (different chip *and* different backend) |
 | `~/gemma4-dev/gpu-jaxrust-g5g-2b` | **EC2 G5g** (Graviton2 host) | Rust-driven XLA | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — forked from `gpu-jax-g5g-2b` 2026-08-28, same carve-out. **The name is a claim about work not yet done**: the engine is still the Python JAX one and the Rust runtime is unresolved, see below |
+| `~/gemma4-dev/gpu-jax-g4dn-2b` | **EC2 G4dn** (x86_64 host) | pure JAX | g4dn (Intel/AMD + NVIDIA T4, Turing) | `gemma-4-E2B-it` | — — added 2026-08-28, forked from `gpu-jax-g5g-2b`. Hardware slot is the instance family per the EC2 rule below. Created as `gpu-jax-t4-2b` and renamed the same day |
+| `~/gemma4-dev/gpu-jax-g6-2b` | **EC2 G6** (x86_64 host) | pure JAX | g6 (NVIDIA L4, Ada) | `gemma-4-E2B-it` | — — added 2026-08-28, forked from `gpu-jax-g5g-2b`. Family rather than SKU also keeps `g6` distinct from `g6f`, which is half an L4. Created as `gpu-jax-l4-2b` and renamed the same day |
+| `~/gemma4-dev/gpu-vllm-g6-2b` | **EC2 G6** (x86_64 host) | vLLM | g6 (NVIDIA L4, Ada) | `gemma-4-E2B-it` | — — added 2026-08-28, forked from `gpu-vllm-g5g-2b`. **Slot 2 is the only slot that differs from `gpu-jax-g6-2b`**, which is what an A/B pair looks like — and it is the cleanest one in this tree, because both sides run stock (the T4G pair was not: its vLLM side used hand-reduced Triton tiles). Note this rig is the SAME SILICON as the five `gpu-vllm-l4-*` artifact rigs and the SAME RUNTIME, and still takes `g6` rather than `l4` under the EC2 rule below; do not read their numbers as its own |
+| `~/gemma4-dev/gpu-pytorch-g5g-2b` | **EC2 G5g** (Graviton2 host) | PyTorch / `transformers` | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — added 2026-08-28, forked from `gpu-jax-g5g-2b`. Same `g5g` carve-out as its siblings; **slot 2 is the only slot that differs from the JAX rig**, which is exactly what NAMING.md says an A/B pair looks like |
+| `~/gemma4-dev/tpu-jax-inf2-2b` | Inferentia (slot `tpu`) | pure JAX (`jax-neuronx`) | inf2 | `gemma-4-E2B-it` | — — added 2026-08-28. Slot 3 is unaffected by the EC2 rule: `inf2` is both the part name and the instance family, so both readings agree |
 | `~/gemma4-dev/gpu-vllm-l4-2b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-4b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-12b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
@@ -479,12 +491,18 @@ served. Only reports whose own `Model:` and `Endpoint:` lines agreed were migrat
 Filling slot 4 or slot 5 by reading a `~/gemma4-tips` directory name would have produced five rigs
 misattributed at once.
 
-### `g5g` — the one case where a family name beats the GPU SKU
+### EC2 GPU rigs take the instance family, not the GPU SKU
 
-`gpu-vllm-g5g-2b` (added 2026-08-12) and `gpu-jax-g5g-2b` (added 2026-08-18, same hardware and the same carve-out) are the first `gpu` rigs that is a **serving** rig rather than an
-artifact rig, and the first whose hardware is not an L4. Its hardware slot is the **EC2 instance
-family**, which every other rule in this file argues against. This is a deliberate carve-out, decided
-after both readings were written out; **do not "correct" it back to `t4g`.**
+**Widened from a `g5g`-only carve-out to the general EC2 rule on 2026-08-28**, when
+`gpu-jax-g4dn-2b` and `gpu-jax-g6-2b` were added. They were first created as `gpu-jax-t4-2b` and
+`gpu-jax-l4-2b` under the SKU reading below, and renamed the same day. **Do not "correct" any of
+them back to a SKU.**
+
+The original carve-out covered `gpu-vllm-g5g-2b` (2026-08-12) and `gpu-jax-g5g-2b` (2026-08-18) —
+the first `gpu` rigs that were *serving* rigs rather than artifact rigs, and the first whose
+hardware was not an L4. The two arguments below were written to justify `g5g` specifically. The
+first turned out to be narrow and the second turned out to be general, which is why the rule
+widened rather than the exception multiplying.
 
 The default reading would be `t4g`: the GPU is an NVIDIA **T4G**, slot 3 says "GPU SKU, lowercase, no
 punctuation," and `g5g` is an instance family — the same category as `ec2` and `cloudrun`, which this
@@ -493,8 +511,9 @@ file excludes precisely because they say nothing about the silicon. Two facts be
 - **`t4g` is already taken, by CPUs.** AWS ships `t4g.nano`…`t4g.2xlarge`: Graviton2 **burstable CPU**
   instances with no GPU at all. They sit in the same instance-family namespace as `g5g` — AWS's own
   Graviton inventory lists `T4g` and `G5g` side by side. So `t4g` is the one GPU SKU whose spelling
-  collides head-on with a well-known GPU-less instance type. `l4` and `a100` have no such problem, and
-  this is why the L4 rigs are not a precedent either way.
+  collides head-on with a well-known GPU-less instance type. **This argument is narrow** — `l4` and
+  `a100` have no such problem — and on its own it would justify only `g5g`. The second argument is
+  the one that generalizes.
 - **`g5g` loses no information, because the family is 1:1 with the silicon.** The usual objection to a
   family name is that it is lossy — `ec2` could be any chip. G5g is the **only** Graviton+GPU family
   AWS has ever shipped, and there is no Graviton3 or Graviton4 GPU instance, so `g5g` names exactly
@@ -512,11 +531,19 @@ Two limits on how far this generalizes:
 - **This does not reopen the cloud slot.** Cloud provider is still not a slot, and `ec2`, `cloudrun`
   and `gce` are still not values for slot 3. What earns `g5g` its place is the 1:1 mapping to silicon,
   which no cloud name has.
-- **It does not license a family name whenever one exists.** If AWS ever ships a second Graviton+GPU
-  family, `g5g` stops being 1:1 and the rig needs revisiting. Record that here if it happens.
+- **On EC2 it now DOES license the family name, and that is the point.** The family is the unit you
+  actually provision, quota and pay for — you request a `g6.xlarge`, never "an L4" — and it pins the
+  host architecture, which the SKU does not. `g5g` and `g4dn` are the same Turing-class silicon on
+  `aarch64` and `x86_64` respectively; naming both `t4`-something would hide the only difference
+  between them, which is the entire reason the pair exists as an A/B. The family also separates
+  `g6` from `g6f`, a whole L4 from half of one, which `l4` cannot.
+- **A family that stops being 1:1 with its silicon needs revisiting.** If AWS ever ships a second
+  Graviton+GPU family, `g5g` loses the property that earned it. Record that here if it happens.
 
 The chip keeps its own name everywhere it is the chip under discussion — `@HARDWARE.md`'s section is
-headed T4G, and so is the rig's `tpu.env`. Only the slot is `g5g`.
+headed T4G, and so is the rig's `tpu.env`. Only the slot is the family. The same holds for the newer
+pair: `gpu-jax-g6-2b` talks about the L4 and about Ada throughout its README, and its test class is
+`AdaConstraintTests`, because those are claims about the chip rather than about the rig.
 
 **Predates the scheme — not counter-examples:**
 
