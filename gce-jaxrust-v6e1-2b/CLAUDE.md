@@ -36,26 +36,43 @@ nothing and measured nothing on the Rust path.** Everything below about the Rust
 The distinction matters more here than in a settled rig, so it is at the top rather than
 buried in a benchmarks README.
 
-**Verified on this workstation (2026-08-28):**
+**MEASURED on a real v6e-1 (`ct6e-standard-1t`, `europe-west4-a`, spot, 2026-08-28):**
 
-- The whole `rust/` workspace compiles — `xla-probe` against the real `pjrt` 0.2.0 API,
-  `gemma4-engine` against `rlx` 0.2.11 and `rlx-gemma` 0.2.11 — with `cargo clippy
-  -D warnings` clean.
-- `rlx-tpu` 0.2.11 resolves into the dependency graph through `rlx-runtime/tpu`, so
-  `Device::Tpu` is a reachable backend and not just an enum variant.
-- The `jaxrust` startup script renders through `str.format()` and passes `bash -n`; the
-  149-test suite passes.
+- **Rust executes on the TPU.** `tpu-selftest` built a 256×256 f32 matmul in rlx's IR,
+  compiled it for `Device::Tpu`, ran it through libtpu's PJRT plugin and got 256.0 in all
+  65,536 elements. The full lifecycle ran through this rig's own tools —
+  `create_tpu_vm_instance(workload="jaxrust")` → `wait_for_jaxrust_ready` →
+  `deploy_jaxrust_engine` → `verify_rust_tpu`.
+- **It is not a silent CPU fallback**, checked three ways rather than trusting the device
+  name: `/tmp/tpu_logs` grew on the TPU run and not on the CPU run; libtpu logged
+  `XLA::TPU running hlo passes for 6 instructions, modules: selftest`; and a second
+  process was refused with `The TPU is already in use by process with pid …`.
+- **The `gemma4-engine` binary builds on the VM** with `--features tpu,gemma`, linking
+  `rlx-gemma`.
 
-**Not verified, and not to be written up as if it were:**
+**Still not verified:**
 
-- That libtpu's PJRT plugin loads, creates a client, or executes anything on a v6e-1 from
-  Rust. `xla-probe` exists precisely to answer that and has never run on a chip.
-- That `rlx-gemma` produces correct Gemma 4 E2B output on TPU. Its own backend feature
-  list (`metal`, `mlx`, `cuda`, `rocm`, `gpu`, `vulkan`, `coreml`) does **not** include
-  `tpu`, and the rlx README's TPU evidence is "MiniLM-L6 E2E via PJRT" — an encoder two
-  orders of magnitude smaller than this, not a decoder LLM. Treat TPU + Gemma 4 as an
-  untested intersection of two tested things.
+- **That Gemma 4 E2B produces correct output on TPU.** No checkpoint has been loaded. What
+  is proven is that rlx's TPU backend compiles and executes *a* graph correctly — not that
+  it does so for E2B's PLE, alternating local/global attention and KV sharing. Do not
+  promote the selftest into a claim about the model.
 - Any throughput, latency or HBM figure. There are none.
+
+**Three defects found by running it, all now fixed or recorded:**
+
+1. **`xla-probe` cannot create a PJRT client at all** — see "The Rust engine" below. It is
+   no longer what the rig gates on.
+2. **rlx-tpu SIGSEGVs on teardown.** rlx-tpu 0.2.11 against libtpu 0.75 computes correctly,
+   prints every success line, and then dies with 139 while dropping the compiled graph.
+   stderr is empty and there is no Rust panic. Leaving via `std::process::exit`, which
+   skips destructors, exits 0 on the identical binary. **A marker-scanning supervisor would
+   have called that healthy** — which is why `verify_rust_tpu` asserts on the exit code and
+   never on the marker. `SELFTEST_RUN_DROP=1` reproduces the crash against a newer stack.
+3. **`libopenblas-dev` was missing from the startup script**, and it fails later than
+   `protoc` does: rlx-cpu links `-lopenblas`, `rlx-runtime/tpu` pulls `cpu` in
+   transitively, and the entire ~150-crate workspace compiles before the final link of the
+   engine fails. `xla-probe` linked fine because it has no rlx in it, which is the only
+   reason the cause was legible.
 
 ## Control plane: Compute Engine, and only Compute Engine
 

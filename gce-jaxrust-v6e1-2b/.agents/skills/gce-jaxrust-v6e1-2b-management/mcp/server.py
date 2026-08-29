@@ -1185,13 +1185,21 @@ async def deploy_jaxrust_engine(
     build_timeout_minutes: Annotated[int, Field(ge=5, le=90)] = 45,
 ) -> str:
     """Uploads the `rust/` workspace, builds it on the VM in release mode, and runs
-    `xla-probe` — which compiles a StableHLO matmul on the chip and checks the
-    numbers that come back.
+    `tpu-selftest` — which builds a matmul graph in rlx, compiles it for the device,
+    executes it and checks every element of the result.
 
-    The probe is the point. A build that succeeds proves the toolchain works; it
+    The self-test is the point. A build that succeeds proves the toolchain works; it
     says nothing about whether libtpu can talk to a chip, and this rig's standing
-    rule is that a thing being accepted is not evidence it did anything. The probe
-    is the cheapest artefact that fails when the accelerator does not work.
+    rule is that a thing being accepted is not evidence it did anything.
+
+    It runs `tpu-selftest` rather than `xla-probe` because the two do NOT share a
+    binding layer, which cost a deployment to discover on 2026-08-28: `xla-probe`
+    goes through the `pjrt` crate, whose 0.2.0 bindings build
+    `PJRT_Client_Create_Args` at 72 bytes, and libtpu 0.75 rejects anything but the
+    88-byte layout that PJRT API 0.59 introduced. The probe cannot create a client at
+    all — while `rlx-tpu`, which the engine actually uses, carries the 88-byte struct
+    and works. A gate on the wrong stack is worse than no gate: it fails when the
+    engine would succeed.
 
     `target/` is excluded from the upload — it is the largest directory in the
     workspace and the VM is the only host whose build output matters."""
@@ -1234,12 +1242,19 @@ async def deploy_jaxrust_engine(
 
     remote = (
         ". /etc/profile.d/jaxrust.sh && set -e && "
+        # Force CARGO_HOME to somewhere the SSH user can write, whatever the profile
+        # says. The toolchain lives under a root-owned /opt/rust, and cargo takes a
+        # $CARGO_HOME/.package-cache lock before it does anything else — against a
+        # root-owned CARGO_HOME that fails with a permission error that reads like a
+        # broken toolchain. The startup script no longer exports it, but a VM booted
+        # from an older copy of that script still does, so pin it here too.
+        'export CARGO_HOME="$HOME/.cargo" && '
         f"rm -rf {JAXRUST_REMOTE_DIR} && mkdir -p {JAXRUST_REMOTE_DIR} && "
         f"tar xzf /tmp/jaxrust.tar.gz -C {JAXRUST_REMOTE_DIR} --strip-components=1 && "
         f"cd {JAXRUST_REMOTE_DIR} && "
-        "cargo build --release -p xla-probe && "
         f"cargo build --release -p gemma4-engine --no-default-features --features {shlex.quote(features)} && "
-        "./target/release/xla-probe"
+        f"cargo build --release -p gemma4-engine --no-default-features --features {shlex.quote(features)} --bin tpu-selftest && "
+        "./target/release/tpu-selftest tpu"
     )
     argv, target = _build_ssh_cmd(remote, instance_name, zone)
     rc, stdout, stderr = await run_command(argv, timeout=build_timeout_minutes * 60)
@@ -1248,11 +1263,25 @@ async def deploy_jaxrust_engine(
         hint = ""
         if "Could not find `protoc`" in output:
             hint = "\n\n`protoc` is missing — the startup script installs it, so this VM was not booted with the jaxrust workload."
+        elif "-lopenblas" in output:
+            hint = (
+                "\n\n`libopenblas-dev` is missing. rlx-cpu links -lopenblas and rlx-runtime's `tpu` "
+                "feature pulls `cpu` in transitively, so the whole workspace compiles and only the "
+                "final link fails. The startup script installs it; this VM predates that fix."
+            )
+        elif "Unexpected PJRT_Client_Create_Args size" in output:
+            hint = (
+                "\n\nPJRT ABI mismatch between the Rust bindings and libtpu. Pin an older "
+                "`LIBTPU_SPEC`, or check that the binary being run is the rlx-based `tpu-selftest` "
+                "rather than the `pjrt`-based `xla-probe`."
+            )
+        elif "already in use by process" in output:
+            hint = "\n\nAnother process holds the chip. Only one may: `manage_jaxrust_server` action='stop'."
         elif "GetPjrtApi" in output or "no TPU PJRT plugin found" in output:
             hint = "\n\nlibtpu did not resolve. Check LIBTPU_PATH in /etc/profile.d/jaxrust.sh."
         return f"❌ Build or probe failed on `{target}`:\n```\n{output}\n```{hint}"
     return (
-        f"✅ Engine built and the probe passed on `{target}` (features `{features}`):\n"
+        f"✅ Engine built and the self-test passed on `{target}` (features `{features}`):\n"
         f"```\n{output}\n```\n"
         "Start serving with `manage_jaxrust_server` action='start'."
     )
@@ -1263,23 +1292,34 @@ async def verify_rust_tpu(
     instance_name: str = INSTANCE_NAME,
     zone: Optional[str] = None,
 ) -> str:
-    """Re-runs `xla-probe` over SSH: loads the PJRT plugin, lists the devices with
-    their HBM stats, compiles a StableHLO matmul and checks the result.
+    """Re-runs `tpu-selftest` over SSH: builds a matmul graph in rlx, compiles it for
+    the device, executes it, and checks every element of the result.
 
     The Rust analogue of `verify_jax_tpu`, and deliberately stricter than it.
     `dlopen` on libtpu.so succeeds on a host with no chip, exactly as `import jax`
     succeeds with no TPU backend — so this asserts on a computed value rather than
-    on a device list."""
+    on a device list.
+
+    **It asserts on the exit code, never on the marker.** Measured on a v6e-1 on
+    2026-08-28: rlx-tpu 0.2.11 against libtpu 0.75 prints every success line and then
+    SIGSEGVs in PJRT teardown. A marker-scanning check would have called that healthy.
+    `tpu-selftest` now leaves via `process::exit` to dodge the crash, and
+    `SELFTEST_RUN_DROP=1` reproduces it against a newer rlx or libtpu."""
     zone = _zone(zone)
-    remote = f". /etc/profile.d/jaxrust.sh && {JAXRUST_REMOTE_DIR}/target/release/xla-probe"
+    remote = f". /etc/profile.d/jaxrust.sh && {JAXRUST_REMOTE_DIR}/target/release/tpu-selftest tpu"
     argv, target = _build_ssh_cmd(remote, instance_name, zone)
     rc, stdout, stderr = await run_command(argv, timeout=300)
     output = "\n".join(part for part in (stdout, stderr) if part).strip()
     if rc != 0:
         if "No such file" in output:
-            return f"❌ No probe binary on `{target}` — run `deploy_jaxrust_engine` first.\n{output}"
+            return f"❌ No self-test binary on `{target}` — run `deploy_jaxrust_engine` first.\n{output}"
+        if "already in use by process" in output:
+            return (
+                f"❌ Another process holds the chip on `{target}` — only one may. Stop it with "
+                f"`manage_jaxrust_server` action='stop'.\n{output}"
+            )
         return f"❌ Rust cannot execute on the TPU on `{target}`:\n{output}"
-    return f"🟢 Rust compiled and ran StableHLO on the TPU on `{target}`:\n{output}"
+    return f"🟢 rlx compiled and executed on the TPU on `{target}`:\n{output}"
 
 
 @mcp.tool(title="Manage the Rust engine process", annotations=DESTRUCTIVE)
@@ -1607,23 +1647,40 @@ async def probe_zone_capacity(
         "--no-service-account",
         "--no-scopes",
     ]
+    async def _delete_probe() -> tuple[int, str]:
+        """Best-effort teardown. Called on EVERY path that could have left an instance,
+        not just the success path.
+
+        This used to hang off `rc == 0` alone, and on 2026-08-28 that leaked a real
+        instance: the create exceeded the 180s timeout below, `run_command` returned
+        non-zero, and the function returned "neither stockout nor quota" while a
+        ct6e-standard-1t sat in STAGING and billed. A create that times out has not
+        necessarily failed — it has only stopped being watched.
+        """
+        return (
+            await run_command(
+                [
+                    "gcloud",
+                    "compute",
+                    "instances",
+                    "delete",
+                    instance_name,
+                    f"--project={PROJECT_ID}",
+                    f"--zone={zone}",
+                    "--quiet",
+                ],
+                timeout=300,
+            )
+        )[::2]
+
     logger.info(f"Probing {zone} for {machine_type} capacity via a SPOT create...")
-    rc, stdout, stderr = await run_command(create_cmd, timeout=180)
+    # 300s, not 180s: a ct6e spot create in a zone that HAS capacity was measured taking
+    # longer than 180s to return, which turned a successful probe into an inconclusive
+    # one and leaked the instance behind it.
+    rc, stdout, stderr = await run_command(create_cmd, timeout=300)
     if rc == 0:
         # Capacity existed. Delete immediately — this is a probe, not a deployment.
-        del_rc, _, del_err = await run_command(
-            [
-                "gcloud",
-                "compute",
-                "instances",
-                "delete",
-                instance_name,
-                f"--project={PROJECT_ID}",
-                f"--zone={zone}",
-                "--quiet",
-            ],
-            timeout=300,
-        )
+        del_rc, del_err = await _delete_probe()
         cleanup = (
             "Probe instance deleted."
             if del_rc == 0
@@ -1652,7 +1709,23 @@ async def probe_zone_capacity(
             f"the same wall unless `{GCE_QUOTA_ID}` has room to fall back on. Read both with "
             f"`get_zones_with_available_quota`.\n\n{stderr}"
         )
-    return f"⚠️ Probe of `{zone}` failed for a reason that is neither stockout nor quota:\n{stderr}"
+    # Neither a recognised failure nor a success — most often a create that outran its
+    # timeout. An instance may well exist and be billing, so tear it down before
+    # reporting, and say what was found rather than implying nothing was created.
+    del_rc, del_err = await _delete_probe()
+    if del_rc == 0:
+        aftermath = (
+            f"\n\n**An instance did exist and has been deleted.** A create that outruns its timeout "
+            f"has not failed — it has only stopped being watched, and reaching this branch after a "
+            f"successful delete is itself weak evidence that `{zone}` HAS capacity. Re-probe to "
+            f"confirm, or go straight to a flex-start create."
+        )
+    else:
+        aftermath = (
+            f"\n\nNo instance was left behind (delete said: {del_err.strip() or 'nothing to delete'}). "
+            f"The `--max-run-duration=10m` backstop on the probe would have caught it regardless."
+        )
+    return f"⚠️ Probe of `{zone}` failed for a reason that is neither stockout nor quota:\n{stderr}{aftermath}"
 
 
 async def _update_status_file(zone: str, success_str: str, detail_str: str) -> None:

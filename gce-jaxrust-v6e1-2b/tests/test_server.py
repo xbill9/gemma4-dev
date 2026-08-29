@@ -398,12 +398,23 @@ class JaxrustStartupTemplateTests(unittest.TestCase):
 
     def test_installs_the_build_dependencies_pjrt_sys_needs(self):
         rendered = self.render()
-        for pkg in ("protobuf-compiler", "clang", "binutils"):
-            self.assertIn(pkg, rendered, f"{pkg} missing — pjrt-sys will fail late without it")
+        for pkg in ("protobuf-compiler", "clang", "binutils", "libopenblas-dev"):
+            self.assertIn(pkg, rendered, f"{pkg} missing — the build will fail late without it")
 
     def test_asserts_libtpu_is_actually_a_pjrt_plugin(self):
         rendered = self.render()
         self.assertIn("GetPjrtApi", rendered)
+
+    def test_profile_does_not_force_a_root_owned_cargo_home(self):
+        """The toolchain is installed as root under /opt/rust, but cargo *writes* to
+        CARGO_HOME — the $CARGO_HOME/.package-cache lock before anything else. Exporting
+        a root-owned CARGO_HOME to every login shell makes the build user fail on that
+        lock with a permission error that reads like a corrupt toolchain."""
+        rendered = self.render()
+        profile = rendered.split("cat > /etc/profile.d/jaxrust.sh", 1)[1].split("PROFILE", 2)[1]
+        self.assertNotIn("CARGO_HOME", profile)
+        self.assertIn("RUSTUP_HOME", profile, "the shared read-only toolchain still has to be findable")
+        self.assertIn("LIBTPU_PATH", profile)
 
     def test_installs_libtpu_without_jax(self):
         """--no-deps, and no jax spec: Python is the delivery mechanism for one .so,

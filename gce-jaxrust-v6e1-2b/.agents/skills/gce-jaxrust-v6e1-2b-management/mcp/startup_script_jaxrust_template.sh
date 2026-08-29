@@ -49,8 +49,15 @@ done
 # after everything else has succeeded. clang is there for bindgen, which pjrt-sys
 # also runs; binutils gives us nm, used below to prove libtpu really is a PJRT
 # plugin rather than merely a file that exists.
+# libopenblas-dev is NOT optional either, and it fails even later than protoc does:
+# rlx-cpu links -lopenblas, rlx-runtime's `tpu` feature pulls `cpu` in transitively,
+# and the whole ~150-crate workspace compiles successfully before the final link of
+# the engine binary dies with "unable to find library -lopenblas". Measured on this
+# rig 2026-08-28: the probe linked fine (it has no rlx in it) and only the engine
+# failed, which is what made the cause legible at all.
 apt-get install -y \
   build-essential clang cmake pkg-config protobuf-compiler binutils \
+  libopenblas-dev \
   curl git ca-certificates python3 python3-pip
 
 # rustup rather than the distro rustc: Ubuntu 22.04 ships 1.75, and the rlx
@@ -92,8 +99,16 @@ fi
 # Python path on the same VM does not turn into an argument about which plugin
 # each side loaded.
 mkdir -p /etc/profile.d
+# NOTE what is deliberately NOT exported here: CARGO_HOME.
+#
+# The toolchain is installed as root under /opt/rust so every user shares one copy,
+# but cargo *writes* to CARGO_HOME while building — the registry cache and, before
+# anything else, the $CARGO_HOME/.package-cache lock. Pointing the build user at a
+# root-owned CARGO_HOME fails on that lock with a permission error that reads like a
+# corrupt toolchain. Letting it default to ~/.cargo costs one re-download of the
+# registry index per user and nothing else; RUSTUP_HOME stays shared and read-only,
+# which is all the rustup shims need to resolve the toolchain.
 cat > /etc/profile.d/jaxrust.sh <<PROFILE
-export CARGO_HOME=/opt/rust/cargo
 export RUSTUP_HOME=/opt/rust/rustup
 export PATH="/opt/rust/cargo/bin:\$PATH"
 export LIBTPU_PATH="$LIBTPU_SO"
@@ -101,11 +116,8 @@ export TPU_LIBRARY_PATH="$LIBTPU_SO"
 PROFILE
 chmod 0644 /etc/profile.d/jaxrust.sh
 
-# The toolchain is installed as root but built against by the SSH user, so the
-# cargo/rustup trees have to be readable and the registry cache writable.
+# Readable and executable by everyone, writable by nobody but root.
 chmod -R a+rX /opt/rust
-mkdir -p /opt/rust/cargo/registry
-chmod -R 1777 /opt/rust/cargo/registry
 
 # libtpu creates /tmp/tpu_logs as root here; without this every later non-root
 # run spams "Could not open the log file ... Permission denied".

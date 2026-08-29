@@ -345,7 +345,7 @@ PJRT plugin.
 ```
 create_tpu_vm_instance(workload="jaxrust")   # RUNNING is not ready
 wait_for_jaxrust_ready                       # toolchain + libtpu installed. Nothing built.
-deploy_jaxrust_engine                        # uploads rust/, builds release, RUNS THE PROBE
+deploy_jaxrust_engine                        # uploads rust/, builds release, RUNS THE SELF-TEST
 manage_jaxrust_server(action="start", model_path="/path/to/checkpoint")
 ```
 
@@ -358,21 +358,34 @@ present, and a `libtpu.so` exporting `GetPjrtApi` is on disk with `LIBTPU_PATH` 
 at it. It does **not** mean anything has compiled, and it does not mean the chip has
 executed an instruction. `deploy_jaxrust_engine` settles both, in that order.
 
-**The probe asserts on a computed value.** `dlopen` on `libtpu.so` succeeds on a host
-with no chip attached, exactly as `import jax` succeeds with no TPU backend — which is
-why the JAX path asserts on `jax.devices()` rather than on the import. `xla-probe` goes a
-step further: it compiles a StableHLO matmul, runs it, and checks that every element of
-the result is what arithmetic says. A plugin that loads, a client that creates and a
-device that lists are three separate facts, and none of them says the MXU computed
-anything. It also prints each device's `largest_free_block_bytes` next to the HBM limit,
-which is the number that decides whether a weight tensor can actually be placed.
+**The self-test asserts on a computed value, and the rig asserts on its exit code.**
+`dlopen` on `libtpu.so` succeeds on a host with no chip attached, exactly as `import jax`
+succeeds with no TPU backend — which is why the JAX path asserts on `jax.devices()` rather
+than on the import. `tpu-selftest` goes further: it compiles a matmul in rlx, runs it, and
+checks every element of the result. A plugin that loads, a client that creates and a device
+that lists are three separate facts, and none says the MXU computed anything.
+
+**Never gate on the marker.** Measured on a v6e-1 2026-08-28: rlx-tpu 0.2.11 against libtpu
+0.75 prints every success line, *then* SIGSEGVs (139) in PJRT teardown, with empty stderr
+and no panic. `tpu-selftest` leaves via `process::exit` to skip destructors and so exits 0;
+`SELFTEST_RUN_DROP=1` reproduces the crash against a newer stack.
+
+**It is `tpu-selftest`, not `xla-probe`, and that distinction cost a deployment.** The two
+do not share a binding layer: the probe reaches PJRT through the `pjrt` crate (0.2.0 builds
+`PJRT_Client_Create_Args` at 72 bytes) while the engine reaches it through `rlx-tpu` (88
+bytes, the layout PJRT API 0.59 introduced). libtpu 0.75 refuses the 72-byte version, so
+the probe cannot open a client at all — on hardware where the engine works. A gate that
+does not share the stack it gates is not a smaller question, it is a different one.
 
 **Field notes on the Rust path:**
 
-- **`protoc` and `clang` are mandatory and fail late.** `pjrt-sys` runs `prost-build` and
-  `bindgen` in its build script; without `protoc` the build dies with ``Could not find
-  `protoc` `` minutes in, nowhere near the cause. The startup script installs both. A
-  build failure with that message means the VM was not booted with the `jaxrust` workload.
+- **`protoc`, `clang` and `libopenblas-dev` are mandatory and all fail late.** `pjrt-sys`
+  runs `prost-build` and `bindgen` in its build script; without `protoc` the build dies
+  with ``Could not find `protoc` `` minutes in. Worse, rlx-cpu links `-lopenblas` and
+  `rlx-runtime/tpu` pulls `cpu` in transitively, so without `libopenblas-dev` the entire
+  ~150-crate workspace compiles and only the **final link** of the engine fails. Both are
+  in the startup script; a build failing on either means the VM predates that fix or was
+  not booted with the `jaxrust` workload.
 - **The rlx model crates trail the framework.** `rlx` publishes 0.2.14, but `rlx-gemma`
   0.2.11 pins `rlx-runtime =0.2.11` exactly, so the workspace is held at 0.2.11
   throughout. Bumping `rlx` alone fails version selection.
@@ -385,9 +398,14 @@ which is the number that decides whether a weight tensor can actually be placed.
 - **Started is not serving.** The engine compiles the graph before it binds port 8000, so
   a port that is not answering yet is a load in progress. Watch for
   `JAXRUST-SERVER: listening` in action='logs'.
-- **Nothing on this path has run on a chip yet.** As of 2026-08-28 the workspace compiles
-  and the templates render; that is all. Do not write up a result from it that you have
-  not seen.
+- **Rust runs on the chip; Gemma 4 does not yet.** Measured 2026-08-28 on a v6e-1:
+  `tpu-selftest` compiled and executed a 256×256 f32 matmul through libtpu and got the
+  right answer in all 65,536 elements, verified as not-a-CPU-fallback three ways
+  (`/tmp/tpu_logs` grew only on the TPU run; libtpu logged `XLA::TPU running hlo passes …
+  modules: selftest`; a second process was refused with `The TPU is already in use`). **No
+  checkpoint has been loaded**, so nothing here is evidence about E2B's PLE, alternating
+  attention or KV sharing, and there are no throughput numbers. Do not write up a result
+  you have not seen.
 
 ## JAX on TPU (bare dev VMs) — the parity oracle
 

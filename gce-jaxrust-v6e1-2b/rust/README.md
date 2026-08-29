@@ -1,11 +1,33 @@
 # `rust/` — the engine
 
-Two crates. The small one is the one to run first.
+Two crates, three binaries. `tpu-selftest` is the one to run first.
 
-| Crate | Binary | What it is |
+| Binary | Crate | What it is |
 | --- | --- | --- |
-| `xla-probe` | `xla-probe` | Loads libtpu's PJRT plugin, lists devices with HBM stats, compiles a StableHLO matmul, executes it and checks the numbers. |
+| `tpu-selftest` | `gemma4-engine` | **The gate.** Builds a matmul in rlx's IR, compiles it for the device, runs it, checks every element. |
 | `gemma4-engine` | `gemma4-engine` | OpenAI-compatible server: rlx's JAX-shaped IR → HLO → PJRT → chip. |
+| `xla-probe` | `xla-probe` | Low-level PJRT diagnostic. **Cannot create a client against current libtpu** — see below. |
+
+**`xla-probe` is not the gate, and the reason is worth the paragraph.** It was written to
+answer "a strictly smaller question" than the engine — but it does not, because it does not
+share the engine's binding layer. It reaches PJRT through the `pjrt` crate; the engine
+reaches it through `rlx-tpu`'s own hand-written FFI. Those are different ABIs of different
+vintages, and on 2026-08-28 on a live v6e-1 they disagreed:
+
+```
+api version : Version { major_version: 0, minor_version: 75 }
+Unexpected PJRT_Client_Create_Args size: expected 88, got 72.
+```
+
+`pjrt-sys` 0.2.0 builds that struct with 9 fields (72 bytes); libtpu 0.75 requires the
+11-field, 88-byte layout that PJRT API 0.59 added for `kKeyValueTryGetCallback`. `rlx-tpu`
+already carries the 88-byte version — with a source comment naming that exact API level —
+so the engine works where the probe cannot even open a client.
+
+**The lesson generalizes past this bug:** a gate that does not share the binding layer of
+the thing it gates is not a smaller question, it is a different one, and it fails
+independently in both directions. `tpu-selftest` lives inside `gemma4-engine` precisely so
+it cannot drift from what it is vouching for.
 
 ## The layering, and which layer to file a bug against
 
@@ -16,9 +38,11 @@ gemma4-engine  ── rlx-gemma ──┐
 xla-probe ─────────────────────────────────── pjrt (PJRT C API) ─────────────────┘
 ```
 
-`xla-probe` deliberately bypasses rlx entirely and talks to the PJRT C API
-directly. That is what makes it useful: when the engine fails, the probe tells
-you whether the problem is above or below rlx, and it does so in about a second.
+`xla-probe` deliberately bypasses rlx entirely and talks to the PJRT C API directly. That
+independence was meant to isolate faults — and it is exactly why it cannot serve as the
+gate: a stack nothing else uses fails on its own schedule. `tpu-selftest` takes the
+engine's path minus the model, which is the property that actually makes a check
+predictive.
 
 ## Why `pjrt` and not the `xla` crate
 
@@ -38,13 +62,15 @@ different silicon" should look like.
 
 ## Building
 
-Needs `protoc` and `clang` on the build host — `pjrt-sys` runs `prost-build` and
-`bindgen` in its build script, and without `protoc` the build dies with
-``Could not find `protoc` `` several minutes in. The `jaxrust` startup script
+Needs `protoc`, `clang` and `libopenblas-dev` on the build host. `pjrt-sys` runs
+`prost-build` and `bindgen` in its build script, so without `protoc` the build dies with
+``Could not find `protoc` `` several minutes in; and rlx-cpu links `-lopenblas` (pulled in
+transitively by `rlx-runtime/tpu`), so without it the entire workspace compiles and only
+the final link of the engine fails. The `jaxrust` startup script
 installs both; on a workstation:
 
 ```bash
-sudo apt-get install -y protobuf-compiler clang build-essential
+sudo apt-get install -y protobuf-compiler clang build-essential libopenblas-dev
 cargo build --release                     # both crates, tpu + gemma features
 cargo build --release -p gemma4-engine --no-default-features --features cpu,gemma
 ```
@@ -60,8 +86,8 @@ a build failure and a capacity failure can be kept apart.
 ## Running
 
 ```bash
-# 1. Does this host compile and execute StableHLO on a chip at all?
-LIBTPU_PATH=/usr/local/lib/python3.10/dist-packages/libtpu/libtpu.so ./target/release/xla-probe
+# 1. Can rlx compile and execute on this chip at all? (the gate)
+./target/release/tpu-selftest tpu     # `cpu` runs the identical graph off the chip
 
 # 2. Serve.
 ./target/release/gemma4-engine \
@@ -76,6 +102,14 @@ the name `rlx-tpu` reads, and a rig that disagrees with its own engine about
 which plugin it loaded is a bug that only surfaces on the chip.
 
 ## Things that are true of this engine and will surprise you
+
+**rlx SIGSEGVs on teardown, after computing the right answer.** Measured on a v6e-1
+2026-08-28: rlx-tpu 0.2.11 + libtpu 0.75 prints every success line and then dies with 139
+while dropping the compiled graph — empty stderr, no panic. `std::process::exit`, which
+skips destructors, exits 0 on the identical binary and inputs, so the fault is in PJRT
+client teardown rather than in compile or execute. `tpu-selftest` exits that way by
+default; `SELFTEST_RUN_DROP=1` reproduces the crash. **Never gate on the success marker
+alone** — it is printed before the crash, so only the exit status tells the two apart.
 
 **The runner is `!Send`.** PJRT's `Client` is `Rc`-based, so the compiled graph
 and everything holding it are single-threaded. `engine.rs` puts the model on one
