@@ -17,9 +17,20 @@ the rendered output:
 
 Regenerate with `build_medium.py` rather than editing these by hand.
 
-## A fourth trap, measured 2026-08-28
+## Two more things, measured 2026-08-28
 
-**No trailing newline inside `<pre><code>`.** A block ending `...\n</code></pre>`
-makes Medium's importer emit a *second, empty* code block after every real one —
-19 blocks arrived as 38, alternating real and empty. Strip the newline before
-`</code>`; single-line blocks lose nothing by it.
+**The importer emits an empty code block after every code block, and it does not
+matter.** 19 blocks arrive as 38 in the EDITOR, alternating real and empty. Three
+fixes were tried and all three were wrong: stripping the trailing newline inside
+`<code>`, flattening `<pre><code>` to a bare `<pre>`, and separating adjacent
+blocks. It is inherent importer behaviour.
+
+**The empties do not render publicly.** Verified by publishing a throwaway story
+with two code blocks and reading the public page: exactly two `<pre>`, zero
+empty. So they are an editor-only artifact and need no work at all — do not
+spend an afternoon deleting them by hand.
+
+**Medium allows two published-or-scheduled stories per 24 hours.** The throwaway
+probe above consumed one of the two slots and delayed the second real article by
+a day. If a probe is needed, budget for it or run it on a day with nothing to
+ship.
