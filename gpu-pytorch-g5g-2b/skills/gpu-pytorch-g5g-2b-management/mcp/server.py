@@ -371,6 +371,10 @@ def _serve_argv(model: str, instance_type: str) -> str:
 _PAYLOAD_FILES = (
     "torch_openai_server.py",
     "torch_generate.py",
+    # Shipped so a profile costs no second provisioning round. The JAX sibling
+    # kept its profiling entry points OUT of the payload and its recipe then
+    # pointed at a path that had never existed on any instance.
+    "profile_decode.py",
 )
 
 

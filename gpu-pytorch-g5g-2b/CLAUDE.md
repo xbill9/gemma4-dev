@@ -158,6 +158,84 @@ Two corroborations worth keeping:
 towers the JAX loader skips. Resident, not streamed during text decode, so they cost memory and
 not throughput.
 
+## Batching is worth 7.84x and is free — MEASURED, and it is the next piece of work
+
+**`benchmarks/runs/2026-08-29-profile-and-fixes-g5g/` — the rig's first profile.**
+
+| B | ms/step | tok/s | peak GB |
+| ---: | ---: | ---: | ---: |
+| 1 | 93.21 | 10.73 | 10.271 |
+| 2 | 94.43 | 21.18 | 10.308 |
+| 4 | 94.92 | 42.14 | 10.382 |
+| 8 | 95.05 | **84.16** | 10.529 |
+
+**Per-step time grew 2.0% while the batch grew 8x**, for 0.258 GB. That is the direct
+confirmation of what the first report could only argue from a roofline: the decode step is
+dominated by costs independent of batch, so extra sequences are nearly free.
+
+**84.16 tok/s at B=8 beats the vLLM sibling's 43-44 and the JAX sibling's 13.10 outright** — but
+it is measured on the ENGINE, not through the server. `MAX_NUM_SEQS=1` and one lock mean the
+served path cannot reach it. **Continuous batching is the highest-value work in this rig, and it
+is now quantified rather than assumed.**
+
+### Where the 93 ms/step goes
+
+`torch.profiler`, 24 steps. Decode runs on `gemv` kernels (`gemv2T_kernel_val` 15.4%,
+`internal::gemvx` variants 14.7%); `turing_fp16_s1688gemm_*` tensor-core kernels appear only
+~106 times in 24 steps and are prefill. Three things settled:
+
+- **SDPA is already active and attention is 1.0% of decode.** No free win there, and
+  FlashAttention-2 needs Ampere. Stop considering it.
+- **~5,650 kernel launches per step**, dominated by 1-3 µs elementwise kernels (`copy_` 955/step,
+  `mul` 733/step, `pow` 504/step) on a chip whose launch overhead is 5-10 µs. **Launch-bound.**
+  `torch.compile(mode="reduce-overhead")` + `StaticCache` is the direct fix and ranks second.
+- **61.3 ms of the 93.2 ms step is not weight streaming** (the floor is 10.209 GB / 320 GB/s =
+  31.9 ms), and none of it scales with B.
+
+Note this rig's GEMV is templated on `__half`, so PyTorch is **not** uniformly promoting to fp32
+the way the JAX sibling's profile showed. Do not carry that claim across.
+
+## Two fixes the first run's code needed
+
+### `logits_to_keep=1` — the sibling's bug, reintroduced
+
+`forward` defaults `logits_to_keep=0`, meaning **keep all**. Prefill ran the LM head over every
+prompt position and built a `[1, S, 262144]` tensor to use one row: **1.311 GB at S=2,501 and
+2.147 GB at `--seq 4096`**, plus ~2 TFLOP of discarded matmul. This is `logits_at` in the JAX
+sibling, reintroduced by writing the obvious `out.logits[:, -1, :]` — which slices *after* the
+cost is paid.
+
+**−12.6% per-token prefill** (0.6417 → 0.5611 ms/token), against ~17% predicted from the LM
+head's FLOP share. **Compare on the range both runs share.** Run 2's slope over its own full
+92–3,746 range is 0.6449 ms/token because attention is O(S²); differencing that against run 1's
+shorter range hides the improvement completely.
+
+### `device_map`, not `.to(device)` — the load was swap-bound
+
+`from_pretrained(...).to(cuda)` builds the whole tree in HOST memory then copies it.
+
+| | host peak | swap peak |
+| --- | ---: | ---: |
+| `.to(device)` | 14.0 GB | 2.8 GB |
+| `device_map={"": 0}` | **10.52 GB** | **0** |
+
+On a 16 GiB `g5g.2xlarge` the old path drove the box into the swapfile and spent minutes at
+**98% iowait**. **Quote the memory, not the wall time** — the post-fix 11.3 s load also had a
+warm page cache, so it is not a clean A/B; host peak and swap peak are.
+
+The swapfile stays: it is the right safety net. This stops it being the load path.
+
+## Coverage: the first sweep overstated it
+
+Run 1 reported "8/8 cells" having swept only to **2,501 tokens against a `--seq` of 4096** — it
+never approached the configured bound. Run 2 reaches **3,746 tokens at 10.91 tok/s**. `sweep.py`
+now takes `--contexts`, so the range is named rather than inherited. Decode is flat to 6.2% over
+a 41x context range.
+
+**Not worth pursuing, now measured rather than assumed:** the attention backend (SDPA active,
+1.0% of decode) and the weight storage dtype (falsified at +0.0% on the sibling; decode here
+already dispatches `__half` GEMV).
+
 ## Profiling is installed on the box
 
 `xprof` and `tensorboard` install with the serving deps and are **VERIFIED importable on
@@ -173,8 +251,11 @@ instance — xprof "installed" with `Could not open requirements file` and the e
 
 **Their install is non-fatal on purpose.** A missing aarch64 wheel must not cost the serve, so
 the branch warns loudly (`[stage] profiling-deps FAILED`) rather than dying under `set -e` —
-which is precisely how `import jax` in `verify_gpu` used to kill the whole install. **No profile
-has been taken on this rig yet**; installing the tools is not the same claim as having used them.
+which is precisely how `import jax` in `verify_gpu` used to kill the whole install.
+
+`profile_decode.py` ships in the deploy payload and drives both of them. A 24-step decode with
+`record_shapes=True` writes a **296 MB** tensorboard trace and `key_averages()` over it takes
+minutes — narrow the window with `torch.profiler.schedule` if that matters.
 
 ## `apt-daily-upgrade` restarts the serving unit mid-load
 

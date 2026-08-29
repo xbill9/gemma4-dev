@@ -175,9 +175,19 @@ class KVCacheDecodeEngine:
 
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(model_id)
         t0 = time.monotonic()
+        # device_map, NOT .to(device). `from_pretrained(...).to(cuda)` builds the
+        # whole tree in HOST memory first and then copies it, which peaks at
+        # ~14.65 GB of RSS on a 16 GiB g5g.2xlarge. MEASURED 2026-08-29: that
+        # peak drove the box into the swapfile and the load spent minutes at 98%
+        # iowait, thrashing (si/so ~30k blocks/s). device_map streams shard by
+        # shard straight to the GPU, so host RSS never holds the full model.
+        #
+        # The swapfile is still the right safety net -- this makes it stop being
+        # the load path.
         self.model = (
-            transformers.AutoModelForCausalLM.from_pretrained(model_id, dtype=self.dtype)
-            .to(self.device)
+            transformers.AutoModelForCausalLM.from_pretrained(
+                model_id, dtype=self.dtype, device_map={"": 0},
+            )
             .eval()
         )
         self.load_seconds = time.monotonic() - t0
@@ -282,7 +292,19 @@ class KVCacheDecodeEngine:
 
         with torch.inference_mode():
             t0 = time.monotonic()
-            out = self.model(input_ids=ids, use_cache=True)
+            # logits_to_keep=1 -- NOT optional, and it defaults to "keep all".
+            #
+            # Without it the LM head runs over every prompt position and builds
+            # a [1, S, 262144] logits tensor of which exactly one row is used:
+            # 1.311 GB at S=2,501 and 2.147 GB at the configured --seq 4096, plus
+            # ~2 TFLOP of discarded matmul. MEASURED 2026-08-29: prefill was
+            # linear at 0.63 ms/token with this missing.
+            #
+            # This is the same bug the JAX sibling fixed as `logits_at`, where it
+            # lifted the dense context ceiling outright -- reintroduced here by
+            # writing the obvious `out.logits[:, -1, :]`, which slices AFTER the
+            # cost has already been paid.
+            out = self.model(input_ids=ids, use_cache=True, logits_to_keep=1)
             torch.cuda.synchronize()
             prefill_s = time.monotonic() - t0
 

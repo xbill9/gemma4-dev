@@ -21,6 +21,8 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-08-25-gemma4-e2b-v6e1` | google/gemma-4-E2B-it | tpu-v6e×1 | on-demand / gcp | vllm 0.26.1rc1.dev994+gd62… | 2-D (6ctx × 7conc) | 2,134 | 0.42 | 1.1 | ok | gke-vllm-v6e1-2b |
 | `2026-08-29-first-serve-g4dn` | google/gemma-4-E2B-it | nvidia-t4×1 | — | jax 0.11.1 | 2-D (3ctx × 2conc)<br>1 infeasible | 13 | — | 1.1 | ok | gpu-jax-g4dn-2b |
 | `2026-08-29-first-serve-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (4ctx × 1conc) | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
+| `2026-08-29-gemma4-e2b-g6` | google/gemma-4-E2B-it | NVIDIA L4×1 | — | pytorch-transformers torch… | 2-D (4ctx × 1conc) | — | — | 1.1 | ok | gpu-pytorch-g6-2b |
+| `2026-08-29-profile-and-fixes-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (6ctx × 1conc)<br>2 infeasible | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
 
 ## Sweep run directories
 
@@ -49,7 +51,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-jax-g5g-2b | `2026-08-28-full-run-cached-g5g` | 119 | 0 | 0 | yes | **no** |
 | gpu-jax-g6-2b | `2026-08-28-first-serve-g6` | 13 | 0 | 0 | yes | **no** |
 | gpu-pytorch-g5g-2b | `2026-08-29-first-serve-g5g` | 4 | 0 | 0 | yes | **no** |
-| gpu-pytorch-g6-2b | `2026-08-28-first-serve-g6` | 13 | 0 | 0 | yes | **no** |
+| gpu-pytorch-g5g-2b | `2026-08-29-profile-and-fixes-g5g` | 7 | 0 | 0 | yes | **no** |
+| gpu-pytorch-g6-2b | `2026-08-29-first-serve-g6` | 5 | 0 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-08-12-first-serve-g5g` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-08-14-rust-frontend-g5g` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-09-vllm-grid-cloudrun-l4` | 1 | 0 | 0 | yes | **no** |
@@ -123,8 +126,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-jax-g6-2b | 0 | 1 |
 | gpu-jaxrust-g5g-2b | 0 | 0 |
 | gpu-pytorch-g4dn-2b | 0 | 0 |
-| gpu-pytorch-g5g-2b | 1 | 1 |
-| gpu-pytorch-g6-2b | 0 | 1 |
+| gpu-pytorch-g5g-2b | 2 | 2 |
+| gpu-pytorch-g6-2b | 1 | 1 |
 | gpu-vllm-g4dn-2b | 0 | 0 |
 | gpu-vllm-g5g-2b | 0 | 2 |
 | gpu-vllm-g6-2b | 0 | 0 |

@@ -103,6 +103,11 @@ def main() -> int:
     ap.add_argument("--model", default=os.getenv("MODEL_NAME", "google/gemma-4-E2B-it"))
     ap.add_argument("--out", required=True, help="run directory to write into")
     ap.add_argument("--repeats", type=int, default=REPEATS)
+    # Configurable because the first run swept only to 2,501 tokens against a
+    # --seq of 4096 and still reported "8/8 cells" -- coverage overstated by not
+    # going near the configured bound. Name the contexts you mean.
+    ap.add_argument("--contexts", default=",".join(str(c) for c in CONTEXTS))
+    ap.add_argument("--outputs", default=",".join(str(o) for o in OUTPUTS))
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -113,9 +118,9 @@ def main() -> int:
     cells, degen_before = [], gauge(get_text(root + "/metrics"),
                                    "tpu_jax_degenerate_responses_total")
 
-    for ctx in CONTEXTS:
+    for ctx in [int(c) for c in args.contexts.split(",")]:
         prompt = prompt_for(ctx)
-        for out_len in OUTPUTS:
+        for out_len in [int(o) for o in args.outputs.split(",")]:
             label = f"ctx~{ctx} out={out_len}"
             try:
                 # Warm AT THIS SHAPE, then measure. The warm-up result is

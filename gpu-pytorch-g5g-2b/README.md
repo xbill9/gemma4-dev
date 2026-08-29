@@ -5,9 +5,16 @@ Graviton2 (64-bit Arm) host paired with an **NVIDIA T4G** (Turing, SM 7.5).
 
 > **Status: this rig has served, once.** Forked from
 > [`gpu-jax-g5g-2b`](../gpu-jax-g5g-2b/) on 2026-08-28; first serve **2026-08-29** on a
-> `g5g.2xlarge` spot instance — **10.88 tok/s decode, 8/8 cells, 0 degenerate**
-> ([`benchmarks/runs/2026-08-29-first-serve-g5g/`](benchmarks/runs/2026-08-29-first-serve-g5g/)).
+> `g5g.2xlarge` spot instance — **10.88 tok/s decode, 0 degenerate**
+> ([`benchmarks/runs/2026-08-29-first-serve-g5g/`](benchmarks/runs/2026-08-29-first-serve-g5g/)),
+> then profiled and fixed the same day
+> ([`.../2026-08-29-profile-and-fixes-g5g/`](benchmarks/runs/2026-08-29-profile-and-fixes-g5g/)).
 > 92 tests pass offline.
+>
+> **The profile's headline: batching is worth 7.84x and is very nearly free** — per-step time
+> grew 2.0% while the batch grew 8x, reaching **84.16 tok/s at B=8** for 0.258 GB. That beats
+> both siblings outright, but only on the engine: `MAX_NUM_SEQS=1` means the served path cannot
+> reach it yet. Continuous batching is the top-ranked work.
 >
 > That first launch found **six fatal bugs in the deploy path**, none of which the offline tests
 > could see, because none of them asserted on the rendered bootstrap — `verify_gpu` imported
