@@ -493,6 +493,20 @@ class PayloadTests(unittest.TestCase):
             with self.subTest(path=rel):
                 self.assertTrue((root / rel).is_file())
 
+
+    def test_payload_gzip_header_carries_no_timestamp(self):
+        """The flake the deterministic test could only catch by luck.
+
+        Bytes 4:8 of a gzip stream are MTIME. `tarfile.open(mode="w:gz")` fills
+        them from the clock, so two calls either side of a second boundary
+        produced different payloads while every tar entry was correctly zeroed.
+        Assert the header directly rather than hoping two calls race.
+        """
+        import base64 as _b64
+        blob = _b64.b64decode(server._payload_tar_b64())
+        self.assertEqual(blob[:2], b"\x1f\x8b")       # gzip magic
+        self.assertEqual(blob[4:8], b"\x00\x00\x00\x00", "gzip MTIME must be zeroed")
+
     def test_payload_is_deterministic(self):
         # Idempotent redeploys depend on this: same sources, same bytes.
         self.assertEqual(server._payload_tar_b64(), server._payload_tar_b64())

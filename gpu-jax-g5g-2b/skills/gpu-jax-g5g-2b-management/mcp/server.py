@@ -406,12 +406,13 @@ def _payload_tar_b64() -> str:
     payload it is executing. It is derived from the same file contents, so it
     does not disturb determinism.
     """
+    import gzip as _gzip
     import io as _io
     import tarfile
 
     root = _payload_root()
-    buf = _io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=9) as tar:
+    raw = _io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w") as tar:
         for rel in sorted(_PAYLOAD_FILES):
             info = tar.gettarinfo(os.path.join(root, rel), arcname=rel)
             info.mtime, info.uid, info.gid = 0, 0, 0
@@ -423,6 +424,15 @@ def _payload_tar_b64() -> str:
         info.size, info.mtime, info.uid, info.gid, info.mode = len(stamp), 0, 0, 0, 0o644
         info.uname = info.gname = ""
         tar.addfile(info, _io.BytesIO(stamp))
+
+    # gzip's CONTAINER header carries its own MTIME, independent of the tar
+    # entries above. Zeroing only the entries -- which is what `mode="w:gz"`
+    # left us with -- made this function non-deterministic across a second
+    # boundary: two calls in the same second matched, two that straddled one did
+    # not. It passed almost every run, which is exactly why it survived.
+    buf = _io.BytesIO()
+    with _gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=9, mtime=0) as gz:
+        gz.write(raw.getvalue())
     return base64.b64encode(buf.getvalue()).decode()
 
 
