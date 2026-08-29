@@ -1,0 +1,134 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Pure JAX on G5g: Serving Gemma 4 on Graviton and a T4G</title></head><body><h1>Pure JAX on G5g: Serving Gemma 4 on Graviton and a T4G</h1><figure><img src="img/cover-medium-aws.jpg" alt="An Arm server die and a GPU die on one circuit board, joined by a glowing amber path carrying tokens; the GPU's tensor-core grid is dark."></figure>
+<p>This article provides a step by step deployment guide for serving Google's Gemma 4 on an AWS EC2 G5g instance using pure JAX.</p>
+<p>The code is here:</p>
+<p><a href="https://github.com/xbill9/gemma4-dev">github.com/xbill9/gemma4-dev</a></p>
+<h4>What is this project trying to Do?</h4>
+<p>This project aims to serve a modern open model on the cheapest whole CUDA GPU AWS will rent you, and to measure honestly what that costs.</p>
+<h4>Aren't You Using The Wrong GPU?</h4>
+<p>Probably! The T4G is a Turing chip from 2018. It has no bfloat16 and no fp8.</p>
+<p>But it is cheap, it is available when nothing else is, and it is attached to a Graviton2 host — which makes G5g the rare hardware axis that almost nothing in the ML ecosystem targets: <strong>aarch64 and CUDA together</strong>.</p>
+<p>So let's give pure JAX a shot on G5g!</p>
+<h4>AWS EC2 G5g</h4>
+<p>G5g instances pair an AWS Graviton2 (64-bit Arm) processor with NVIDIA T4G Tensor Core GPUs. At <code>g5g.xlarge</code> they are the <strong>cheapest EC2 instance carrying a whole NVIDIA GPU</strong>, and the only Arm-based GPU family AWS offers.</p>
+<p>Two GPU instances are cheaper per hour and neither can serve this model (us-east-1, Linux, on-demand, checked against the Pricing API on 2026-08-28):</p>
+<ul>
+<li><code>g6f.large</code> at <strong>$0.2020</strong> is genuinely NVIDIA and genuinely CUDA — but it is <strong>one eighth of a GPU with 3 GB</strong>, and the weights alone are 6.155 GB. The first <code>g6f</code> that fits is <code>g6f.4xlarge</code> at $0.9500, which is 1.7x this rig's <code>g5g.2xlarge</code>.</li>
+<li><code>g4ad.xlarge</code> at <strong>$0.3785</strong> carries an AMD Radeon Pro V520 — no CUDA at any price.</li>
+</ul>
+<p>Among whole NVIDIA GPUs, G5g is the floor: <code>g5g.xlarge</code> at $0.4200, and the next one up is <code>g4dn.xlarge</code> at $0.5260.</p>
+<p>More information is available here:</p>
+<p>https://aws.amazon.com/ec2/instance-types/g5g/</p>
+<p>The default in this rig is <code>g5g.2xlarge</code> — 1 GPU, 8 vCPU, 16 GiB RAM.</p>
+<p>Note- the T4G reports <strong>15,360 MiB</strong> of device memory, not the nominal 16 GB. Budget against the measured number.</p>
+<h4>Gemma 4</h4>
+<p>Gemma is Google's family of open models built from the same research as Gemini. This rig serves <code>google/gemma-4-E2B-it</code>, the instruction-tuned reference release.</p>
+<h4>JAX</h4>
+<p>JAX is Google's array computing library — NumPy semantics, composable transformations, and compilation to XLA. On NVIDIA hardware, <code>pip</code> supplies the CUDA libraries, so there is nothing to build.</p>
+<p>More information is available here:</p>
+<p>https://github.com/jax-ml/jax</p>
+<p>"Pure JAX" here is literal. The engine is this repo's own Gemma 4 port driven by a JAX generation loop behind an OpenAI-compatible FastAPI server, running under systemd.</p>
+<h4>Prerequisites</h4>
+<p>You need four things before starting:</p>
+<ul>
+<li>An AWS account with G instance vCPU quota in <code>us-east-1</code></li>
+<li>A <strong>subnet id</strong>, a <strong>security group id</strong>, and an <strong>IAM instance profile</strong> — the rig requires all three explicitly and will not create them for you</li>
+<li>A Hugging Face token with access to the Gemma weights</li>
+<li>Python 3.13 and <code>pip</code></li>
+</ul>
+<p>The instance profile needs <code>AmazonSSMManagedInstanceCore</code> plus read access to your Secrets Manager secret and your S3 cache bucket. There is <strong>no inbound SSH rule and no private key</strong> — all remote administration goes over SSM Run Command.</p>
+<h4>Install the Rig</h4>
+<p>Clone the monorepo and install the control plane:</p>
+<pre>git clone https://github.com/xbill9/gemma4-dev</pre>
+<pre>cd gemma4-dev/gpu-jax-g5g-2b</pre>
+<pre>pip install -r requirements.txt</pre>
+<p>That installs <code>boto3</code> and FastMCP only. Nothing here needs a GPU — the GPU is on the other end.</p>
+<h4>Run the Tests</h4>
+<pre>python3 -m unittest discover -s tests -v</pre>
+<p>105 tests, fully offline. Every cloud, subprocess, and network boundary is mocked. If these do not pass, do not launch an instance.</p>
+<h4>Register the MCP Server</h4>
+<p>The whole rig is driven by an MCP server exposing a devops agent:</p>
+<pre>./project-setup.sh</pre>
+<p>This installs the bundled skill and registers <code>.mcp.json</code>:</p>
+<figure><img src="img/aws-code-01-d390afe3.png" alt="{"><figcaption>aws-code-01-d390afe3</figcaption></figure>
+<p>Copy-paste form of the same file:</p>
+<pre>{&quot;mcpServers&quot;:{&quot;gpu-jax-g5g-2b&quot;:{&quot;command&quot;:&quot;python3&quot;,&quot;args&quot;:[&quot;.claude/skills/gpu-jax-g5g-2b-management/mcp/server.py&quot;],&quot;env&quot;:{&quot;AWS_REGION&quot;:&quot;us-east-1&quot;,&quot;MODEL_NAME&quot;:&quot;google/gemma-4-E2B-it&quot;,&quot;INSTANCE_TYPE&quot;:&quot;g5g.2xlarge&quot;,&quot;MCP_SERVER_NAME&quot;:&quot;gpu-jax-g5g-2b&quot;}}}}</pre>
+<p>Every tool is now available as <code>mcp__gpu-jax-g5g-2b__&lt;tool&gt;</code>.</p>
+<h4>Save the Hugging Face Token</h4>
+<pre>save_hf_token(token=&quot;hf_...&quot;)</pre>
+<p>This writes to AWS Secrets Manager under <code>vllm/hf-token</code>. The instance fetches it at boot into a root-only <code>EnvironmentFile</code>.</p>
+<p>Note- the token never goes in user data. Instance metadata is readable by anything running on the box.</p>
+<h4>Check the Quotas</h4>
+<pre>check_g5g_quotas()</pre>
+<p>Reports your On-Demand and Spot G instance vCPU limits for the region. <code>g5g.2xlarge</code> is 8 vCPU. Check this before launching, not after the launch fails.</p>
+<h4>Launch the Instance</h4>
+<pre>create_g5g_instance(subnet_id=&quot;subnet-...&quot;, security_group_id=&quot;sg-...&quot;, iam_instance_profile=&quot;...&quot;, spot=True)</pre>
+<p>The AMI is resolved at launch time from SSM Parameter Store:</p>
+<pre>/aws/service/deeplearning/ami/arm64/base-oss-nvidia-driver-gpu-ubuntu-26.04/latest/ami-id</pre>
+<p><strong>Never hardcode an AMI id here.</strong> AWS also ships ARM64 DLAMIs built for Graviton <em>CPU</em> inference. They boot perfectly and simply have no GPU. The <code>/latest/</code> parameter also moves — this rig has seen <code>ami-0bff4343bfd56a20e</code> become <code>ami-025a6e5b3b786cf61</code> overnight as Ubuntu 26.04 became 26.04.1.</p>
+<h4>Watch the Install</h4>
+<pre>get_install_progress(instance_id=&quot;i-...&quot;)</pre>
+<p>Cloud-init installs <code>jax[cuda13]</code> on Python 3.14. The stages are timed:</p>
+<p>![<a href="img/aws-code-02-867f3f71.png">stage) jax-wheels      43s   (total  84s)</a>
+<em>aws-code-02-867f3f71</em></p>
+<p><strong>117 seconds, and there is no compile step anywhere in it.</strong> That is the entire reason this rig exists — more on that below.</p>
+<p>The <code>cache-restore</code> stage pulled <strong>805 files / 12 MB in 6 seconds</strong> from S3, on a <em>fresh</em> instance, compiled by a box that had already been terminated. XLA's cold-compile penalty becomes a rounding error on Spot.</p>
+<h4>Verify the GPU</h4>
+<pre>verify_gpu_arch(instance_id=&quot;i-...&quot;)</pre>
+<p>This measures whether JAX's CUDA kernels actually cover this GPU, rather than trusting that they do. You want to see SM 7.5 claimed and a real device, not a silent CPU fallback.</p>
+<h4>Deploy the Server</h4>
+<pre>make skill</pre>
+<pre>deploy_jax_server(instance_id=&quot;i-...&quot;)</pre>
+<p><strong>Always <code>make skill</code> first.</strong> The deploy ships the <em>skill snapshot</em>, not your working tree. The deploy output prints the payload root and the build id so a stale deploy is visible in one line.</p>
+<h4>Verify The Installation</h4>
+<p>The first line the process emits is the device-policy banner:</p>
+<figure><img src="img/aws-code-03-95f29414.png" alt="INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu"><figcaption>aws-code-03-95f29414</figcaption></figure>
+<p>Both halves matter. <code>float16</code> is <strong>the device choosing</strong> Turing's only real 16-bit datapath — it is read from the live compute capability, not from a config file. And <code>pallas_interpret=False</code> is the difference between serving and silently running a simulator.</p>
+<p>Then the whole resolved configuration lands on one greppable line:</p>
+<figure><img src="img/aws-code-04-bbdd18b0.png" alt="READY build_id=6852f5680f43 ... compute_dtype=float16 kv_cache_dtype=float16"><figcaption>aws-code-04-bbdd18b0</figcaption></figure>
+<p>Load is staged, so a hang is attributable:</p>
+<figure><img src="img/aws-code-05-e6c91a2e.png" alt="download        87.7s"><figcaption>aws-code-05-e6c91a2e</figcaption></figure>
+<p>Then confirm the served build matches what you shipped:</p>
+<pre>verify_model_health(instance_id=&quot;i-...&quot;)</pre>
+<h4>Query the Model</h4>
+<pre>query_model(instance_id=&quot;i-...&quot;, prompt=&quot;Explain Graviton in one sentence.&quot;)</pre>
+<p>The endpoint is OpenAI-compatible on <code>:8000</code>, so anything that speaks that API works:</p>
+<pre>get_endpoint(instance_id=&quot;i-...&quot;)</pre>
+<p>Note- <strong>warm up at the shape you measure.</strong> <code>max_new_tokens</code> is a <code>static_argnames</code> entry, so <code>(bucket, max_tokens)</code> is the compiled shape. The same request measured <strong>18.77 s cold against 4.35 s warm</strong>.</p>
+<h4>Check the Metrics</h4>
+<pre>get_metrics(instance_id=&quot;i-...&quot;)</pre>
+<figure><img src="img/aws-code-06-edcc4da2.png" alt="tpu_jax_decode_tokens_per_second   13.0"><figcaption>aws-code-06-edcc4da2</figcaption></figure>
+<p><strong>Quote the gauge, not end-to-end.</strong> Decode is flat at 12.9 / 13.0 / 12.9 tok/s across 41 → 2,057 input tokens. End-to-end throughput <em>does</em> fall (12.43 → 8.22) — but that is prefill being linear in the padded bucket, not decode degrading. Two different claims.</p>
+<h4>Why Not vLLM?</h4>
+<p>Because I tried, on identical silicon, and it works — at 43 tok/s — but only after this:</p>
+<ol>
+<li>A ~67-minute from-source build</li>
+<li><code>cuda-toolkit</code> from NVIDIA's <code>sbsa</code> repo, because the DLAMI ships a driver but no <code>nvcc</code></li>
+<li>A Rust toolchain, for vLLM's frontend</li>
+<li><strong>An unlanded patch to Triton's attention kernel</strong>, reapplied after every upgrade</li>
+</ol>
+<p>That last one is the interesting failure. Gemma 4 has heterogeneous attention head dimensions — sliding layers at 256, global layers at <strong>512</strong>. Only two vLLM backends support that, and with FA4 unavailable it force-selects Triton:</p>
+<figure><img src="img/aws-code-07-4cdea716.png" alt="Gemma4 model has heterogeneous head dimensions"><figcaption>aws-code-07-4cdea716</figcaption></figure>
+<p>Whose 512-wide tile then asks Turing for memory Turing does not have:</p>
+<figure><img src="img/aws-code-08-a55c14fc.png" alt="triton.runtime.errors.OutOfResources: out of resource: shared memory,"><figcaption>aws-code-08-a55c14fc</figcaption></figure>
+<p>JAX sidesteps all four. <code>pip</code> supplies CUDA, so no build, no toolkit, no Rust. The plugin's precompiled cubins already cover <code>sm_75</code>. And attention is ordinary XLA rather than a hand-tiled Triton kernel, so there is no per-block shared-memory ceiling and no patch to carry.</p>
+<p><strong>The honest trade: 13.10 tok/s against 43, for a 117-second install with nothing to reapply.</strong> For a measurement rig I re-provision constantly on Spot, that was right. For a production endpoint it probably is not.</p>
+<h4>The Number I Did Not Expect</h4>
+<p>I profiled decode with xprof. The kernel table is the whole story:</p>
+<figure><img src="img/aws-code-09-68a4c7a1.png" alt="conversion   54.0%   &lt;-- dtype conversion"><figcaption>aws-code-09-68a4c7a1</figcaption></figure>
+<p><strong>Zero.</strong> 1,466 ms of kernels across 108 distinct kernels on a Tensor Core GPU, and not one Tensor Core fired. Over half of decode went to converting numbers between formats before the math could start.</p>
+<p>The obvious hypothesis was bf16 weights being converted on a chip with no bf16. So this weekend I converted the checkpoint to float16 host-side and re-ran. Parameter dtypes now read <code>{'float16': 541, 'uint8': 1, 'int8': 1}</code> — and <strong>conversion is still 54.0%</strong>.</p>
+<p>The obvious explanation is wrong and I do not yet know the real one. That is the next thing to profile. I would rather publish the open question than a tidy story.</p>
+<p>What I can stand behind is that the measurement is real: the same profile on a <strong>different instance, a different AMI, and a restored cache</strong> landed at 1466.0 ms against 1467.1 ms. <strong>1.1 ms apart on 1467.</strong></p>
+<h4>AWS Services Used</h4>
+<figure><img src="img/aws-table-01-83c52414.png" alt="AWS services used"><figcaption>AWS services used</figcaption></figure>
+<p>Everything goes through <code>boto3</code>. The rig never shells out to the AWS CLI.</p>
+<h4>Clean Up</h4>
+<pre>terminate_g5g_instance(instance_id=&quot;i-...&quot;)</pre>
+<p>Termination is cheap on this rig — there is no built image to lose with the root volume, only a pip install and a model cache, and the compilation cache is already in S3.</p>
+<h4>What I Learned This Summer</h4>
+<p><strong>Check reachability on paper before spending a provisioning cycle.</strong> A nine-step analysis order — does the compute dtype match the chip, is there a fused kernel for that format on that chip — runs in an afternoon. A launch costs a day. It has killed two bad plans before either touched hardware.</p>
+<p><strong>A wrong dtype does not error. It emulates.</strong> bfloat16 on Turing does not fail loudly; it routes through fp32 and quietly eats your decode.</p>
+<p><strong>Refuse early, with the arithmetic attached.</strong> The fused W4A16 kernel wants 550 KiB–1.1 MiB per block and Turing gives you 64 KiB. The rig computes that at startup and refuses with the numbers in the message, rather than dying as a cryptic <code>OutOfResources</code> at the first token.</p>
+<p><strong>The scariest bugs return <code>status: "success"</code>.</strong> A padding-eviction bug in the KV ring cache produced a token loop, not a crash. Nothing in the logs was red. It took a week.</p>
+<h4>Summary</h4>
+<p>The AWS G5g instance provides a genuinely cheap environment for serving open models, and pure JAX reaches a served token on it without a single line of compiled code. The throughput is not competitive with a patched vLLM - but the deployment is 117 seconds, reproducible to 1.1 ms, and has nothing to reapply.</p></body></html>
