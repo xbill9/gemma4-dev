@@ -188,6 +188,21 @@ _SERVING_REQUIREMENTS = (
     "jinja2",
 )
 
+# Profiling, installed on the instance alongside the serving deps.
+#
+# Shipped rather than left to an operator on purpose. The JAX sibling kept its
+# profiling deps in a requirements file that was DELIBERATELY excluded from the
+# deploy payload, so `docs/profiling-recipes.md` told operators to pip install
+# from a path that had never existed on any instance -- xprof "installed" with
+# `Could not open requirements file` and the extraction died on
+# ModuleNotFoundError, both in logs nobody reads. One provisioning round should
+# leave the box able to profile itself.
+#
+# xprof is the OpenXLA profiler and supplies TensorBoard's profile plugin; torch
+# reaches it through `torch.profiler.tensorboard_trace_handler`. Both publish
+# aarch64 wheels. Their install is non-fatal -- see install_runtime.
+_PROFILING_REQUIREMENTS = ("xprof", "tensorboard")
+
 # Where the serving payload lands on the instance.
 APP_DIR = "/opt/torch-g5g"
 # AWS publishes the ARM64 GPU DLAMI as a public SSM parameter. Prefer it: it is
@@ -319,30 +334,33 @@ async def _call(func, **kwargs):
 
 
 def _serve_argv(model: str, instance_type: str) -> str:
-    """Arguments for jax_openai_server.py. Deliberately unlike the L4 rigs' set.
+    """Arguments for torch_openai_server.py -- and ONLY the ones it defines.
 
-    --quant-mode must match the checkpoint, not the chip: a `-w4a16-` export
-    carries packed int4 weights and a dense export does not. QUANT_MODE=fp16 in
-    tpu.env because MODEL_NAME there is the dense reference build.
+    The fork shipped the JAX sibling's set (--kv-cache-dtype, --quant-mode,
+    --max-model-len, --ple-bits, --int8-lm-head, --prefill-chunk-size). Not one
+    of them exists here: `torch_openai_server.py` defines exactly --model,
+    --host, --port and --seq. argparse rejects an unknown flag with exit code 2,
+    so the unit would have crash-looped under `Restart=on-failure` from the very
+    first start, with the reason only in `journalctl`.
 
-    --ple-bits is always emitted, including the 0 default, so the serving command
-    records the choice rather than leaving it to the server's own default. On this
-    chip it is not an independent knob: w4a16 needs ple_bits=4 to fit at all.
+    That is not a cosmetic difference. Those flags name knobs of this repo's own
+    JAX port -- PLE quantisation, a fused W4A16 Pallas path, a KV ring. This rig
+    is `AutoModelForCausalLM`, which has none of them, so there is nothing to
+    forward them to. `tpu.env` still carries the keys (QUANT_MODE, PLE_BITS,
+    INT8_LM_HEAD, ...) because it was forked wholesale; they are inert here and
+    must not be re-plumbed into this command on the strength of existing.
 
-    There is no tensor-parallel flag: the JAX engine is single-device. On the
+    --seq is the static buffer length and IS this rig's one real serving knob,
+    so it comes off MAX_MODEL_LEN rather than the server's own 256 default.
+
+    There is no tensor-parallel flag: the engine is single-device. On the
     two-GPU sizes the second T4G idles, which _tensor_parallel_size() reports
     but nothing acts on yet.
     """
-    argv = (
+    return (
         f"--model {model} --host 0.0.0.0 --port {TORCH_PORT} "
-        f"--kv-cache-dtype {KV_CACHE_DTYPE} --quant-mode {QUANT_MODE} "
-        f"--max-model-len {MAX_MODEL_LEN} --ple-bits {PLE_BITS}"
+        f"--seq {MAX_MODEL_LEN}"
     )
-    if INT8_LM_HEAD:
-        argv += " --int8-lm-head"
-    if PREFILL_CHUNK_SIZE:
-        argv += f" --prefill-chunk-size {PREFILL_CHUNK_SIZE}"
-    return argv
 
 
 # The serving payload. These are this rig's own files, shipped to the instance
@@ -441,7 +459,7 @@ def _user_data(model: str, instance_type: str) -> str:
 
     It installs and then waits: the serving payload arrives separately via
     `deploy_torch_server`, because it is this rig's own source and does not fit in
-    user data. Progress goes to /var/log/jax-install.log and
+    user data. Progress goes to /var/log/torch-install.log and
     {APP_DIR}/INSTALL_DONE appears when the runtime imports and sees the GPU.
 
     Unlike the vLLM rig there is no `serving` mode: there is no stock-vs-build
@@ -473,6 +491,7 @@ fi
     py = f"python{TORCH_PYTHON_VERSION}"
     argv = _serve_argv(model, instance_type)
     serving_reqs = " ".join(_SERVING_REQUIREMENTS)
+    profiling_reqs = " ".join(_PROFILING_REQUIREMENTS)
 
     # Both halves are empty unless JAX_CACHE_S3_URI is set, so the default
     # rendering is byte-identical to what this rig shipped before.
@@ -525,7 +544,7 @@ set -euxo pipefail
 # timings at all -- the model load reports four stages, this reported none. That
 # matters most on spot: AWS reclaimed i-0bd73466d5a07a578 21 minutes in, before
 # the wheels finished, and nothing recorded which step had been reached. These
-# markers are greppable with `grep -F '[stage]' /var/log/jax-install.log`.
+# markers are greppable with `grep -F '[stage]' /var/log/torch-install.log`.
 _T0=$(date +%s); _TLAST=$_T0
 stage() {{
   local now; now=$(date +%s)
@@ -591,37 +610,112 @@ install_runtime() {{
   fi
   stage python-{TORCH_PYTHON_VERSION}
 
+  # THE INTERPRETER IS NOT A FREE CHOICE ON THIS RIG, and this is the one place
+  # it differs structurally from the JAX sibling.
+  #
+  # There, `pip install jax[cuda13]` put the runtime into whichever interpreter
+  # ran it, so any python3.x would do. Here **torch comes from the AMI**, and the
+  # AWS DLAMI does not install it into the system interpreter -- it ships a venv.
+  # Installing transformers into /usr/bin/python3.12 and pointing the unit there
+  # gets `ModuleNotFoundError: No module named 'torch'` AFTER the install has
+  # reported success, which is the same shape as the ExecStart hazard below.
+  #
+  # So: find the interpreter that can already import torch and install into THAT.
+  # Probed rather than hardcoded, because the venv path moves between DLAMI
+  # releases and a wrong guess is only visible at the first token.
+  TORCH_PY=""
+  for cand in /opt/pytorch/bin/python /opt/conda/bin/python \
+              /usr/local/bin/{py} "$(command -v {py} || true)" /usr/bin/python3 \
+              /opt/*/bin/python /opt/*/*/bin/python; do
+    [ -x "$cand" ] || continue
+    if "$cand" -c 'import torch' >/dev/null 2>&1; then
+      TORCH_PY="$cand"
+      echo "torch found in $cand: $("$cand" -c 'import torch; print(torch.__version__, torch.cuda.get_arch_list())')"
+      break
+    fi
+  done
+  if [ -z "$TORCH_PY" ]; then
+    echo "FATAL: no interpreter on this AMI can import torch." >&2
+    echo "This rig gets torch from the DLAMI, never from pip: upstream aarch64" >&2
+    # Single-quoted: backticks inside a double-quoted string are COMMAND
+    # SUBSTITUTION, so the double-quoted version of this line would actually run
+    # `pip install torch` -- installing the CPU-only wheel this message warns
+    # against, from inside the error path that reports it.
+    echo 'wheels omit sm_75, so "pip install torch" would silently serve on CPU.' >&2
+    echo "Candidates probed:" >&2
+    ls -d /opt/*/bin/python /opt/*/*/bin/python 2>/dev/null >&2 || true
+    exit 1
+  fi
+  echo "$TORCH_PY" > {APP_DIR}/PYTHON_BIN
+  stage torch-interpreter
+
   # PEP 668. Ubuntu marks its system interpreter externally-managed from 23.04
-  # on, so on the 24.04/26.04 bases a system-wide `pip install` fails outright
-  # with `error: externally-managed-environment`. This is a single-purpose
-  # serving box installing into the interpreter systemd will run, and the repo
-  # forbids virtualenvs, so the override is the honest answer rather than a
-  # workaround. Harmless on a deadsnakes interpreter that is not marked.
-  PIP="{py} -m pip install --upgrade --break-system-packages"
-  curl -sS https://bootstrap.pypa.io/get-pip.py | {py} - --break-system-packages
+  # on, so a system-wide `pip install` fails outright with
+  # `error: externally-managed-environment`. This is a single-purpose serving box
+  # installing into the interpreter systemd will run, and the repo forbids
+  # virtualenvs, so the override is the honest answer rather than a workaround.
+  # Harmless (and ignored) inside the DLAMI venv, which is not marked.
+  PIP="$TORCH_PY -m pip install --upgrade --break-system-packages"
+  # Conditional: the DLAMI's venv already has pip, and bootstrapping over it is
+  # a needless network dependency on the critical path. The system interpreter
+  # on a bare base image may not, and get-pip.py runs BEFORE $PIP exists so it
+  # needs the PEP 668 flag of its own.
+  "$TORCH_PY" -m pip --version >/dev/null 2>&1 || \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | "$TORCH_PY" - --break-system-packages
   $PIP pip setuptools wheel
   stage pip-bootstrap
-  # The jax extra pulls CUDA from pip wheels (aarch64 published for all of them),
-  # so the DLAMI only supplies the driver. No CUDA toolkit, no compiler, no Rust.
-  # This is the big one: several GB of CUDA wheels, and the step most likely to
-  # be running when a spot reclamation lands.
-  $PIP '{TORCH_PIP_SPEC}'
-  stage jax-wheels
+  # UNQUOTED on purpose. TORCH_PIP_SPEC is "transformers accelerate" -- two
+  # packages, two arguments. The sibling quoted it because its value was
+  # `jax[cuda13]`, one requirement whose brackets the shell would glob; carried
+  # over verbatim, the quotes made pip parse "transformers accelerate" as a
+  # SINGLE requirement and fail. Do not re-add them without checking the value.
+  $PIP {TORCH_PIP_SPEC}
+  stage torch-deps
   $PIP {serving_reqs}
   stage serving-deps
+
+  # Profiling and trace-viewing, installed on the box so a profile can be taken
+  # without a second provisioning round. NOT fatal: xprof publishes aarch64
+  # wheels with a manylinux_2_35 floor (24.04 is glibc 2.39, so there is
+  # headroom) but a missing wheel must not cost the serve -- the whole reason
+  # install.sh dies loudly elsewhere is that `set -e` used to kill it here.
+  # The failure is announced rather than swallowed; grep the marker.
+  if $PIP {profiling_reqs}; then
+    stage profiling-deps
+  else
+    echo "[stage] profiling-deps FAILED -- xprof/tensorboard unavailable, serving unaffected" >&2
+  fi
 }}
 
-# Assert the GPU is actually visible to JAX before declaring the install done.
+# Assert the GPU is actually visible to TORCH before declaring the install done.
 # A driverless ARM64 DLAMI boots fine on a G5g and would otherwise look healthy
 # right up until the first token.
+#
+# This imported `jax` until 2026-08-29 -- inherited verbatim from the sibling,
+# on a rig that installs no jax. It runs under `set -e`, so ModuleNotFoundError
+# killed install.sh here, INSTALL_DONE was never written, and get_install_progress
+# reported "INSTALL IN PROGRESS" forever. The rig had served nothing, so nothing
+# had ever executed this line.
+#
+# The matmul is the point, not the import: `torch.cuda.is_available()` is true on
+# a driver the arch list does not cover, and the failure then surfaces as a kernel
+# error at the first token. sm_75 must be in the arch list AND run.
 verify_gpu() {{
-  {py} - <<'PYCHECK'
-import jax
-devs = jax.devices()
-print("jax", jax.__version__, "devices:", devs)
-assert devs and devs[0].platform in ("gpu", "cuda"), f"no CUDA device visible to JAX: {{devs}}"
-cc = getattr(devs[0], "compute_capability", None)
-print("compute_capability:", cc)
+  "$(cat {APP_DIR}/PYTHON_BIN)" - <<'PYCHECK'
+import torch
+print("torch", torch.__version__, "arch_list", torch.cuda.get_arch_list())
+assert torch.cuda.is_available(), (
+    "no CUDA device visible to torch. On this rig that usually means the AMI is "
+    "an ARM64 DLAMI built for Graviton CPU inference -- it boots fine, has no GPU."
+)
+major, minor = torch.cuda.get_device_capability(0)
+print("device:", torch.cuda.get_device_name(0), f"sm_{{major}}{{minor}}")
+assert f"sm_{{major}}{{minor}}" in torch.cuda.get_arch_list(), (
+    f"torch has no sm_{{major}}{{minor}} cubin: {{torch.cuda.get_arch_list()}}"
+)
+x = torch.randn(256, 256, device="cuda", dtype=torch.float16)
+torch.cuda.synchronize()
+print("fp16 matmul ok:", float((x @ x).sum()) == float((x @ x).sum()))
 PYCHECK
 }}
 
@@ -629,20 +723,25 @@ install_runtime
 verify_gpu
 stage gpu-verify
 {cache_restore}
-# Point the unit at the interpreter that actually received the packages.
+# Point the unit at the interpreter that actually has torch AND received the
+# packages -- the one install_runtime probed, not one re-resolved through PATH.
 #
-# MEASURED 2026-08-19 (on 3.12, but the hazard is not version-specific): the
-# DLAMI may already carry an interpreter of the same version under /usr/local/bin,
-# which precedes /usr/bin on PATH, so the bare `python{TORCH_PYTHON_VERSION}` above
-# installs jax into /usr/local/lib/... while a hardcoded
-# ExecStart=/usr/bin/python{TORCH_PYTHON_VERSION} gets the deadsnakes one and dies with
-# `ModuleNotFoundError: No module named 'jax'` -- after the install has already
-# reported success, because verify_gpu resolves through PATH too.
+# MEASURED 2026-08-19 on the sibling (on 3.12, but the hazard is not version-
+# specific): the DLAMI may carry an interpreter of the same version under
+# /usr/local/bin, which precedes /usr/bin on PATH, so a bare `command -v` and a
+# hardcoded `ExecStart=/usr/bin/python3.12` can resolve to DIFFERENT binaries --
+# the unit then dies with ModuleNotFoundError after the install has already
+# reported success, because verify_gpu resolved through PATH too.
+#
+# On this rig the same hazard has a second edge: the interpreter holding torch is
+# the DLAMI's venv, which is not on PATH as `python3.12` at all. Reading the path
+# install_runtime recorded is what keeps install, verification and ExecStart on
+# one interpreter instead of three.
 #
 # Rewritten here rather than in the unit template because the resolution can only
 # happen after install_runtime has run. Still an absolute path, so systemd is
 # happy and ExecStart never depends on the service's PATH.
-PY_BIN="$(command -v python{TORCH_PYTHON_VERSION})"
+PY_BIN="$(cat {APP_DIR}/PYTHON_BIN)"
 sed -i "s|^ExecStart=[^ ]*|ExecStart=$PY_BIN|" /etc/systemd/system/{SERVICE_NAME}.service
 systemctl daemon-reload
 
@@ -697,14 +796,14 @@ set -x
 
 cat >/etc/systemd/system/{SERVICE_NAME}.service <<'UNITEOF'
 [Unit]
-Description=Gemma 4 E2B on T4G via JAX
+Description=Gemma 4 E2B on T4G via PyTorch
 After=network-online.target
 
 [Service]
 Type=simple
 EnvironmentFile={APP_DIR}/env
 WorkingDirectory={APP_DIR}/app
-ExecStart=/usr/bin/{py} {APP_DIR}/app/jax_openai_server.py {argv}
+ExecStart=/usr/bin/{py} {APP_DIR}/app/torch_openai_server.py {argv}
 Restart=on-failure
 RestartSec=10
 
@@ -713,8 +812,8 @@ WantedBy=multi-user.target
 UNITEOF
 systemctl daemon-reload
 {cache_units}
-nohup bash {APP_DIR}/install.sh >/var/log/jax-install.log 2>&1 &
-echo "JAX runtime install started; follow /var/log/jax-install.log, then deploy_torch_server"
+nohup bash {APP_DIR}/install.sh >/var/log/torch-install.log 2>&1 &
+echo "torch runtime install started; follow /var/log/torch-install.log, then deploy_torch_server"
 """
 
 
@@ -927,7 +1026,8 @@ async def create_g5g_instance(
 ) -> str:
     """Launch one tagged G5g instance using the latest regional ARM64 DLAMI.
 
-    Cloud-init installs the configured Python and jax spec from wheels, asserts JAX
+    Cloud-init resolves the interpreter holding the DLAMI's torch, installs
+    transformers/accelerate and the serving deps into it, asserts torch
     sees the GPU. It does NOT start serving: the payload is this rig's own
     source, so deploy it with deploy_torch_server once the install finishes.
     Spot is the default; pass spot=False for on-demand.
@@ -1047,18 +1147,25 @@ async def terminate_g5g_instance(instance_id: str) -> str:
         return _error(exc)
 
 
-@mcp.tool(title="Verify GPU compute capability and JAX coverage", annotations=READ_ONLY)
+@mcp.tool(title="Verify GPU compute capability and torch coverage", annotations=READ_ONLY)
 async def verify_gpu_arch(instance_id: str) -> str:
-    """Measure whether JAX's CUDA kernels actually cover this GPU.
+    """Measure whether torch's CUDA kernels actually cover this GPU.
 
     This is the rig's central check and the cheapest way to settle the question
     the whole rig turns on. A config flag being accepted proves nothing; a kernel
     either launches or it does not, so this runs a real matmul on the device.
 
-    It reports nvidia-smi's view, JAX's device list and compute capability, the
-    dtype the port selects from it, and the result of one fp16 matmul. Note it
-    asks JAX rather than torch: the DLAMI's torch carries sm_75 already (measured
-    2026-08-12), which says nothing about jaxlib.
+    It reports nvidia-smi's view, torch's version and arch list, the device
+    capability, the dtype this rig selects from it, and the result of one fp16
+    matmul.
+
+    It asks TORCH, not jax -- inverting the sibling, and not a cosmetic swap.
+    Torch here comes from the AMI rather than from pip, so "does this GPU have
+    kernels" is a question about the image that booted, and the arch list is the
+    direct answer: the DLAMI's build carries sm_75 (measured 2026-08-12) while
+    upstream PyPI aarch64 wheels omit it. A `pip install torch` on this box would
+    therefore serve on CPU, silently. Printing the arch list next to the measured
+    capability makes that one glance.
     """
     # The reduction accumulates in float32 on purpose. The exact result,
     # 256**3 = 16,777,216, is far past float16's 65,504 max, so summing in
@@ -1071,20 +1178,30 @@ async def verify_gpu_arch(instance_id: str) -> str:
     # verdict below matches on it; folding it into the device line made that
     # branch unreachable.
     probe = (
-        "import jax, jax.numpy as jnp;"
-        "d = jax.devices()[0];"
-        "print('jax:', jax.__version__);"
-        "print('device:', d);"
-        "print('platform:', d.platform);"
-        "print('capability:', getattr(d, 'compute_capability', None));"
-        "x = jnp.ones((256, 256), jnp.float16);"
+        "import torch;"
+        "print('torch:', torch.__version__);"
+        "print('arch_list:', torch.cuda.get_arch_list());"
+        "avail = torch.cuda.is_available();"
+        "print('platform:', 'cuda' if avail else 'cpu');"
+        "d = torch.device('cuda' if avail else 'cpu');"
+        "print('device:', torch.cuda.get_device_name(0) if avail else 'none');"
+        "cap = torch.cuda.get_device_capability(0) if avail else None;"
+        "print('capability:', cap);"
+        "print('compute_dtype:', 'float16' if (cap and cap < (8, 0)) else 'bfloat16');"
+        "x = torch.ones((256, 256), dtype=torch.float16, device=d);"
         "y = x @ x;"
-        "print('fp16 matmul ok:', float(y.sum(dtype=jnp.float32)) == 256.0 ** 3)"
+        "print('fp16 matmul ok:', float(y.sum(dtype=torch.float32)) == 256.0 ** 3)"
     )
+    # Ask the interpreter install.sh recorded, not one re-resolved through PATH:
+    # torch lives in the DLAMI's venv, which is generally not on PATH at all, so
+    # a bare `python3.12 -c "import torch"` reports a broken GPU on a healthy box.
+    # Falls back to PATH only when the marker is absent (i.e. before install).
     py = f"python{TORCH_PYTHON_VERSION}"
     command = (
         "nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv || true; "
-        f'{py} -c "{probe}" 2>&1 || true'
+        f'PY="$(cat {APP_DIR}/PYTHON_BIN 2>/dev/null || command -v {py})"; '
+        'echo "interpreter: $PY"; '
+        f'"$PY" -c "{probe}" 2>&1 || true'
     )
     try:
         output = await _ssm(instance_id, command, timeout=600)
@@ -1092,27 +1209,33 @@ async def verify_gpu_arch(instance_id: str) -> str:
         if "no kernel image is available" in output:
             verdict = (
                 "\n\n❌ `no kernel image is available for execution on the device` — "
-                "this jaxlib has no SM 7.5 cubin and no PTX to JIT from. That would "
-                "contradict the published arch tables; capture the full log."
+                "this torch build has no SM 7.5 cubin. Check `arch_list` above: if "
+                "sm_75 is missing, a pip torch has shadowed the DLAMI's."
             )
         elif "fp16 matmul ok: True" in output:
-            verdict = "\n\n✅ JAX reached the GPU and a real fp16 matmul executed."
+            verdict = "\n\n✅ torch reached the GPU and a real fp16 matmul executed."
         elif "platform: cpu" in output:
             verdict = (
-                "\n\n❌ JAX fell back to CPU. Either the DLAMI has no NVIDIA driver "
+                "\n\n❌ torch fell back to CPU. Either the DLAMI has no NVIDIA driver "
                 "(AWS ships driverless ARM64 DLAMIs that boot fine here), or the "
-                "CUDA plugin failed to load."
+                "interpreter probed is not the one holding the DLAMI's torch."
+            )
+        elif "No module named 'torch'" in output:
+            verdict = (
+                "\n\n❌ that interpreter has no torch at all. This rig never pip-installs "
+                "torch; it probes for the DLAMI's. Re-check `install.sh`'s torch-interpreter "
+                "stage, or that the AMI really is a PyTorch DLAMI and not the base image."
             )
         return f"### GPU probe on `{instance_id}`\n\n```\n{output}\n```{verdict}"
     except Exception as exc:
         return _error(exc)
 
 
-@mcp.tool(title="Deploy the JAX serving payload", annotations=WRITE)
+@mcp.tool(title="Deploy the PyTorch serving payload", annotations=WRITE)
 async def deploy_torch_server(instance_id: str, restart: bool = True) -> str:
     """Ship this rig's JAX serving code to the instance and start the service.
 
-    The payload is jax_openai_server.py, jax_engine.py and ports/gemma4/*.py —
+    The payload is torch_openai_server.py and torch_generate.py —
     this rig's own source, with no published artifact to pull and no credentials
     on the box to clone the monorepo. It goes over SSM as a gzipped tarball
     (~30 KB of base64); user data could not carry it, at a 16 KB limit.
@@ -1166,7 +1289,7 @@ async def deploy_torch_server(instance_id: str, restart: bool = True) -> str:
 
 @mcp.tool(title="Get JAX runtime install progress", annotations=READ_ONLY)
 async def get_install_progress(instance_id: str, tail: int = 40) -> str:
-    """Tail the jax[cuda13] install started by cloud-init, and cloud-init itself.
+    """Tail the runtime install started by cloud-init, and cloud-init itself.
 
     This is a wheel install, not a build — minutes, not the hours the vLLM
     sibling needs. INSTALL COMPLETE means JAX imported *and* saw the GPU.
@@ -1193,8 +1316,8 @@ async def get_install_progress(instance_id: str, tail: int = 40) -> str:
             "echo '--- cloud-init ---'; "
             "cloud-init status --long 2>&1 || echo 'cloud-init status unavailable'; "
             "echo '--- install log ---'; "
-            "if [ -f /var/log/jax-install.log ]; then "
-            f"tail -n {tail} /var/log/jax-install.log; "
+            "if [ -f /var/log/torch-install.log ]; then "
+            f"tail -n {tail} /var/log/torch-install.log; "
             "else echo 'NO INSTALL LOG: cloud-init never reached install.sh'; "
             "echo '--- cloud-init output (tail 60) ---'; "
             "tail -n 60 /var/log/cloud-init-output.log 2>/dev/null "
@@ -1214,7 +1337,7 @@ async def get_install_progress(instance_id: str, tail: int = 40) -> str:
             )
         elif "NO INSTALL LOG" in output and "status: done" in output:
             verdict = (
-                "\n\n❌ cloud-init finished but never wrote /var/log/jax-install.log, so "
+                "\n\n❌ cloud-init finished but never wrote /var/log/torch-install.log, so "
                 "the bootstrap exited before backgrounding install.sh. Nothing is "
                 "installing. Check the cloud-init output above."
             )
@@ -1438,7 +1561,7 @@ def _parse_prom(text: str) -> tuple[dict, dict, str | None]:
 
 @mcp.tool(title="Get serving metrics", annotations=READ_ONLY)
 async def get_metrics(instance_id: str) -> str:
-    """Read the JAX server's Prometheus metrics, including the decode gauge.
+    """Read the serving process's Prometheus metrics, including the decode gauge.
 
     `tpu_jax_decode_tokens_per_second` is the like-for-like throughput figure
     both of this rig's benchmark reports compare on, because it times decode

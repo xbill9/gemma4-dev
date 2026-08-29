@@ -19,3 +19,14 @@ jinja2
 safetensors
 huggingface_hub
 numpy
+
+# Profiling, installed on the instance and NOT on the control plane. Shipped so
+# one provisioning round leaves the box able to profile itself: the JAX sibling
+# kept these in a file deliberately excluded from the deploy, so its profiling
+# recipe pointed at a path that had never existed on any instance.
+#
+# xprof is the OpenXLA profiler and supplies TensorBoard's profile plugin; torch
+# reaches it via torch.profiler.tensorboard_trace_handler. Their install is
+# non-fatal in install.sh -- a missing aarch64 wheel must not cost the serve.
+xprof
+tensorboard

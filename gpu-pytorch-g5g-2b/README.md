@@ -3,10 +3,20 @@
 Serve **`google/gemma-4-E2B-it`** with **PyTorch + transformers** on **AWS EC2 G5g** — an AWS
 Graviton2 (64-bit Arm) host paired with an **NVIDIA T4G** (Turing, SM 7.5).
 
-> **Status: this rig has served nothing.** Forked from
-> [`gpu-jax-g5g-2b`](../gpu-jax-g5g-2b/) on 2026-08-28. 89 tests pass offline. No instance has
-> been launched, no weights loaded, no token generated, and `benchmarks/` is deliberately empty.
-> Every number quoted below was measured on the **JAX sibling**, not here.
+> **Status: this rig has served, once.** Forked from
+> [`gpu-jax-g5g-2b`](../gpu-jax-g5g-2b/) on 2026-08-28; first serve **2026-08-29** on a
+> `g5g.2xlarge` spot instance — **10.88 tok/s decode, 8/8 cells, 0 degenerate**
+> ([`benchmarks/runs/2026-08-29-first-serve-g5g/`](benchmarks/runs/2026-08-29-first-serve-g5g/)).
+> 92 tests pass offline.
+>
+> That first launch found **six fatal bugs in the deploy path**, none of which the offline tests
+> could see, because none of them asserted on the rendered bootstrap — `verify_gpu` imported
+> `jax`, the systemd unit pointed at `jax_openai_server.py`, `_serve_argv` emitted the JAX port's
+> flags, the pip spec was quoted as one requirement, the payload called
+> `torch.compile(backend="tpu")`, and the DLAMI's torch turned out to live in a **Python 3.13
+> venv** that `TORCH_PYTHON_VERSION=3.12` could never have found. See `CLAUDE.md`.
+>
+> Figures below that are **not** from that run were measured on the **JAX sibling**, not here.
 
 ## Why this exists
 

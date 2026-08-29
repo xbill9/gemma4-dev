@@ -211,7 +211,11 @@ class UserDataTests(BashSyntaxMixin, unittest.TestCase):
         # ModuleNotFoundError -- AFTER the install reported success, because the
         # verify step resolves through PATH too.
         text = user_data()
-        self.assertIn(f'PY_BIN="$(command -v python{server.TORCH_PYTHON_VERSION})"', text)
+        # Since 2026-08-29 the path is READ from the marker install_runtime
+        # wrote rather than re-resolved: on this rig torch lives in the DLAMI's
+        # venv, which is not on PATH as `python3.12` at all, so `command -v`
+        # could not name the interpreter that has it.
+        self.assertIn('PY_BIN="$(cat /opt/torch-g5g/PYTHON_BIN)"', text)
         self.assertIn("ExecStart=$PY_BIN", text)
         # The rewrite has to happen after the install, not in the unit template.
         self.assertLess(text.index("install_runtime\nverify_gpu"), text.index("PY_BIN="))
@@ -277,8 +281,41 @@ class UserDataTests(BashSyntaxMixin, unittest.TestCase):
             for line in (ROOT / "requirements-serving.txt").read_text().splitlines()
             if line.strip() and not line.startswith("#")
         }
-        expected = set(server._SERVING_REQUIREMENTS) | {server.TORCH_PIP_SPEC}
+        expected = (
+            set(server._SERVING_REQUIREMENTS)
+            | set(server._PROFILING_REQUIREMENTS)
+            | {server.TORCH_PIP_SPEC}
+        )
         self.assertEqual(listed, expected)
+
+    def test_bootstrap_installs_the_profiling_tools(self):
+        # Asked for explicitly, and easy to lose: they install in a non-fatal
+        # branch, so a silent drop would leave the box serving and unprofilable.
+        rendered = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        for pkg in server._PROFILING_REQUIREMENTS:
+            self.assertIn(pkg, rendered)
+        self.assertIn("profiling-deps", rendered)
+
+    def test_bootstrap_has_no_jax_left_in_it(self):
+        # Four separate fork-debris breakages lived here until 2026-08-29, and
+        # every one of them was fatal at a different stage: verify_gpu imported
+        # jax (killing install.sh under `set -e`), ExecStart pointed at
+        # jax_openai_server.py, _serve_argv emitted the JAX port's flags, and the
+        # pip spec was quoted as one requirement. None was visible offline
+        # because nothing asserted on the rendered script.
+        rendered = server._user_data("google/gemma-4-E2B-it", "g5g.2xlarge")
+        self.assertNotIn("import jax", rendered)
+        self.assertNotIn("jax_openai_server.py", rendered)
+        self.assertIn("torch_openai_server.py", rendered)
+
+    def test_serve_argv_only_emits_flags_the_server_defines(self):
+        # torch_openai_server.py defines exactly --model/--host/--port/--seq.
+        # argparse exits 2 on an unknown flag, so an extra one here crash-loops
+        # the unit with the reason only in journalctl.
+        argv = server._serve_argv("google/gemma-4-E2B-it", "g5g.2xlarge")
+        allowed = {"--model", "--host", "--port", "--seq"}
+        flags = {tok for tok in argv.split() if tok.startswith("--")}
+        self.assertEqual(flags, allowed)
 
 
 class MetricsParsingTests(unittest.TestCase):
@@ -539,8 +576,12 @@ class LatestVersionPolicyTests(BashSyntaxMixin, unittest.TestCase):
         text = user_data()
         self.assertIn("--break-system-packages", text)
         # get-pip.py runs before PIP is defined and needs the flag of its own.
-        self.assertIn("get-pip.py | python", text)
-        get_pip = [ln for ln in text.splitlines() if "get-pip.py" in ln]
+        self.assertIn("get-pip.py |", text)
+        # Comments mentioning get-pip.py are not invocations of it.
+        get_pip = [
+            ln for ln in text.splitlines()
+            if "get-pip.py" in ln and not ln.lstrip().startswith("#")
+        ]
         self.assertTrue(all("--break-system-packages" in ln for ln in get_pip), get_pip)
 
     def test_a_missing_aws_cli_is_reported_rather_than_silently_tokenless(self):
@@ -633,16 +674,17 @@ class InstallStageTimingTests(BashSyntaxMixin, unittest.TestCase):
 
     def test_every_install_step_emits_a_stage_marker(self):
         text = user_data()
-        for name in ("apt-base", "pip-bootstrap", "jax-wheels", "serving-deps", "gpu-verify"):
+        for name in ("apt-base", "torch-interpreter", "pip-bootstrap", "torch-deps",
+                     "serving-deps", "profiling-deps", "gpu-verify"):
             with self.subTest(stage=name):
                 self.assertIn(f"stage {name}", text)
 
-    def test_jax_wheels_is_timed_separately_from_apt(self):
+    def test_torch_deps_are_timed_separately_from_apt(self):
         # This is the whole point of the split: a spot reclamation at 21 minutes
         # (MEASURED 2026-08-25) left no record of which step was running, and apt
         # and several GB of CUDA wheels are very different things to attack.
         text = user_data()
-        self.assertLess(text.index("stage apt-base"), text.index("stage jax-wheels"))
+        self.assertLess(text.index("stage apt-base"), text.index("stage torch-deps"))
 
     def test_stage_helper_is_defined_before_it_is_called(self):
         text = user_data()
