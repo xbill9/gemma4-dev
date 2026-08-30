@@ -193,8 +193,8 @@ onto the two cheapest whole GPU CUDA instances AWS sells, and compares
 what they cost to run. A suite of Python MCP tools is built to simplify
 management of the vLLM hosted deployment. Everything was measured on
 2026-08-30.</p>
-<h2 id="what-is-this-project-trying-to-do">What is this project trying
-to Do?</h2>
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
 <p>The question is simple: if you want a CUDA GPU on AWS as cheaply as
 possible, which one do you rent?</p>
 <p>Two instance families sit at the bottom of the price list, and they
@@ -204,7 +204,7 @@ x86_64. The GPUs are effectively the same part. The host CPU is the
 variable.</p>
 <p>The answer turns out to depend entirely on whether you are buying
 hours or tokens.</p>
-<h2 id="where-do-i-start">Where do I start?</h2>
+<h4 id="where-do-i-start">Where do I start?</h4>
 <p>Start with price. Every NVIDIA instance type in us-east-1 was priced
 from the AWS Pricing API rather than from documentation:</p>
 <pre><code>aws pricing get-products --region us-east-1 --service-code AmazonEC2 \
@@ -227,15 +227,15 @@ them can map Gemma 4 E2B's 10.2 GB checkpoint. The cheapest slice that
 could, <code>g6f.4xlarge</code> at 11,444 MiB, costs 0.95 per hour.</p>
 <p>So the headline is the Arm box. It is also the wrong number to buy
 on, and the rest of this article is why.</p>
-<h2 id="the-gpus-are-the-same-part">The GPUs Are the Same Part</h2>
+<h4 id="the-gpus-are-the-same-part">The GPUs Are the Same Part</h4>
 <p>Read off the running instances rather than the spec sheets:</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g4dn-2b/medium/img/devto-gemma4-g4dn-t4-turing-table-2.png"
 alt="table" /></p>
 <p>Every measurable property matches, down to vLLM independently
 arriving at a KV cache of exactly 329,579 tokens on both. Whatever
 separates these deployments, it is not the accelerator.</p>
-<h2 id="the-host-cpu-decides-which-kernels-you-get">The Host CPU Decides
-Which Kernels You Get</h2>
+<h4 id="the-host-cpu-decides-which-kernels-you-get">The Host CPU Decides
+Which Kernels You Get</h4>
 <p>This is the mechanism, and it has nothing to do with how fast either
 CPU runs.</p>
 <p><code>vllm/vllm-openai</code> publishes one manifest list with two
@@ -256,8 +256,8 @@ before it serves a token.</p>
 <p>This is a packaging decision by the vLLM project, not a property of
 either CPU, and it is the single largest cost difference between the two
 families.</p>
-<h2 id="the-arm-box-also-has-half-the-ram">The Arm Box Also Has Half the
-RAM</h2>
+<h4 id="the-arm-box-also-has-half-the-ram">The Arm Box Also Has Half the
+RAM</h4>
 <p>G4dn gives you 4 GiB per vCPU. G5g gives you 2:</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g4dn-2b/medium/img/devto-gemma4-g4dn-t4-turing-table-3.png"
 alt="table" /></p>
@@ -270,8 +270,8 @@ Cannot allocate memory (12)</code></pre>
 fixes it. But the cheapest CUDA instance on AWS needs configuration the
 next one up does not. <code>g4dn.xlarge</code> has 16 GiB and maps the
 checkpoint with no swapfile at all.</p>
-<h2 id="at-this-point-you-should-have">At this point you should
-have</h2>
+<h4 id="at-this-point-you-should-have">At this point you should
+have</h4>
 <ul>
 <li>An AWS account with G family spot quota — 16 vCPU here, and
 <code>g4dn.xlarge</code> needs 4</li>
@@ -281,7 +281,7 @@ have</h2>
 <code>AmazonSSMManagedInstanceCore</code></li>
 <li>No inbound SSH rule and no key pair — everything runs over SSM</li>
 </ul>
-<h2 id="setup-the-basic-environment">Setup the Basic Environment</h2>
+<h4 id="setup-the-basic-environment">Setup the Basic Environment</h4>
 <pre><code>git clone https://github.com/xbill9/gemma4-dev
 cd gemma4-dev/gpu-vllm-g4dn-2b
 pip install -r requirements.txt</code></pre>
@@ -294,7 +294,7 @@ data, because instance metadata is readable by anything on the box. The
 fetch is wrapped in <code>set +x</code>, because the bootstrap runs
 under <code>set -x</code> and bash traces assignments with their
 values.</p>
-<h2 id="mcp-stdio-transport">MCP stdio Transport</h2>
+<h4 id="mcp-stdio-transport">MCP stdio Transport</h4>
 <p>The MCP server is a single Python file started over stdio. The
 standard MCP libraries abstract the transport, so the tool
 implementations are identical no matter which client connects.</p>
@@ -305,8 +305,8 @@ A rename that updates three of four leaves an approval gate naming a
 tool that does not exist, and a gate on a tool name that does not exist
 fails open and says nothing.</p>
 <pre><code>./project-setup.sh --server-name gpu-vllm-g4dn-2b</code></pre>
-<h2 id="model-lifecycle-management-via-mcp">Model Lifecycle Management
-via MCP</h2>
+<h4 id="model-lifecycle-management-via-mcp">Model Lifecycle Management
+via MCP</h4>
 <p>Quota first:</p>
 <pre><code>check_g4dn_quotas</code></pre>
 <pre><code>| Running On-Demand G and VT instances (vCPU) | 16 |
@@ -324,7 +324,7 @@ use1-az5  3
 use1-az6  3</code></pre>
 <p><code>use1-az4</code> maps to <code>us-east-1c</code>, which scored 3
 and carried the lowest spot price at 0.3559.</p>
-<h2 id="deploy-the-model">Deploy The Model</h2>
+<h4 id="deploy-the-model">Deploy The Model</h4>
 <pre><code>create_g4dn_instance
   subnet_id=subnet-0c2872fe4182b9ec1
   security_group_id=sg-01ee54036d37aa770
@@ -339,7 +339,7 @@ returned the Deep Learning Base OSS Nvidia Driver GPU AMI on Ubuntu
 26.04, built two days before this run. The base DLAMI is used rather
 than the PyTorch one, because the deployment serves from a container
 carrying its own CUDA and torch.</p>
-<h2 id="checking-install-progress">Checking Install Progress</h2>
+<h4 id="checking-install-progress">Checking Install Progress</h4>
 <pre><code>get_install_progress i-050dca2ed568dcc1b</code></pre>
 <pre><code>[stage] image-pull-start          +0s
 [stage] image-pull-done         +155s
@@ -363,7 +363,7 @@ to 16, and leaves the other three alone.</p>
 float16. Be precise about why: bfloat16 does not fail on Turing, it
 upconverts, and vLLM logs the cast and proceeds. float16 is correct
 because it is what executes.</p>
-<h2 id="verify-the-gpu-architecture">Verify the GPU Architecture</h2>
+<h4 id="verify-the-gpu-architecture">Verify the GPU Architecture</h4>
 <p>Two checks, and passing the first says nothing about the second. The
 arch gap and the shared memory ceiling are independent problems, and the
 Intel host only deletes the first:</p>
@@ -375,7 +375,7 @@ shared mem per block (static): 49152
 fp16 matmul ok: True</code></pre>
 <p>The probe uses float16, not bfloat16. A bfloat16 probe would pass by
 upconversion and tell you nothing about what executes.</p>
-<h2 id="verify-the-turing-patch">Verify the Turing Patch</h2>
+<h4 id="verify-the-turing-patch">Verify the Turing Patch</h4>
 <pre><code>verify_triton_patch i-050dca2ed568dcc1b</code></pre>
 <pre><code>--- image ---             PATCHED IMAGE PRESENT
 --- module in image ---   CLAMP PRESENT
@@ -383,12 +383,12 @@ upconversion and tell you nothing about what executes.</p>
 <p>The third line matters as much as the first two. An image can be
 correctly patched while the container runs the stock tag, and everything
 else still reports healthy.</p>
-<h2 id="checking-system-status">Checking System status</h2>
+<h4 id="checking-system-status">Checking System status</h4>
 <pre><code>GPU KV cache size: 329,579 tokens, Maximum concurrency for 16,384 tokens per request: 20.12x</code></pre>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g4dn-2b/medium/img/devto-gemma4-g4dn-t4-turing-table-4.png"
 alt="table" /></p>
-<h2 id="cross-check-the-deployed-model">Cross Check The Deployed
-Model</h2>
+<h4 id="cross-check-the-deployed-model">Cross Check The Deployed
+Model</h4>
 <p>The health check uses <code>/v1/chat/completions</code>. Raw
 <code>/v1/completions</code> skips the chat template and returns an
 empty body on <code>-it</code> models, so an empty response there is not
@@ -403,7 +403,7 @@ wrong. Testing for a non empty response would have passed it.</p>
 for performance metrics. Here's a breakdown of what the text tells us: *
 <strong>What is being measured:</strong> Throughput and latency.</p>
 </blockquote>
-<h2 id="benchmark-the-local-model">Benchmark the Local Model</h2>
+<h4 id="benchmark-the-local-model">Benchmark the Local Model</h4>
 <p>The client runs on the box against localhost, so no network sits
 between it and the engine under test. 512 input tokens, 128 output,
 <code>ignore_eos</code>, request count scaling at four times
@@ -421,14 +421,14 @@ exactly 128 output tokens.</p>
 0.6 percent while median TTFT rises from 130 milliseconds to 12.7
 seconds. <strong>Concurrency past your <code>max-num-seqs</code> buys
 latency, not throughput.</strong></p>
-<h2 id="compare-to-other-deployments">Compare to Other Deployments</h2>
+<h4 id="compare-to-other-deployments">Compare to Other Deployments</h4>
 <p>The Arm deployment, measured on <code>g5g.4xlarge</code>:</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g4dn-2b/medium/img/devto-gemma4-g4dn-t4-turing-table-6.png"
 alt="table" /></p>
 <p>Both saturate at concurrency 8. The Intel box converts its hour into
 44 percent more output, and it does that on a quarter of the host — 4
 vCPU against 16.</p>
-<h2 id="cost-analysis">Cost Analysis</h2>
+<h4 id="cost-analysis">Cost Analysis</h4>
 <p>Cheapest per hour and cheapest per token are different boxes. That is
 the finding:</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g4dn-2b/medium/img/devto-gemma4-g4dn-t4-turing-table-7.png"
@@ -444,7 +444,7 @@ stream at a time costs 5.7 times more per token on identical
 hardware.</strong> Get your concurrency to <code>max-num-seqs</code>
 before you shop for a cheaper instance — batching is a bigger lever than
 the instance family is.</p>
-<h2 id="and-priceperformance">And Price/Performance?</h2>
+<h4 id="and-priceperformance">And Price/Performance?</h4>
 <p>The two hourly rates are not comparable as operating costs, because
 they buy different amounts of work before you serve anything.</p>
 <p>On the Intel box a launch costs an image pull and a 23 second
@@ -460,7 +460,7 @@ pays most to come back</strong>, and on spot those are the same
 decision.</p>
 <p>If you want the cheapest CUDA hour on AWS, rent the Arm box. If you
 want the cheapest CUDA token, rent the Intel one.</p>
-<h2 id="tear-down">Tear Down</h2>
+<h4 id="tear-down">Tear Down</h4>
 <p>Termination is cheap on the Intel side precisely because nothing was
 compiled:</p>
 <pre><code>terminate_g4dn_instance i-050dca2ed568dcc1b</code></pre>
@@ -473,7 +473,7 @@ aws ec2 describe-volumes --region us-east-1 \
   --filters Name=status,Values=available --query &#39;length(Volumes)&#39; --output text</code></pre>
 <pre><code>0
 0</code></pre>
-<h2 id="summary">Summary</h2>
+<h4 id="summary">Summary</h4>
 <p>The cheapest whole GPU CUDA instance on AWS is
 <code>g5g.xlarge</code> at 0.4200 per hour on demand and 0.1458 on spot,
 with a Graviton2 host. <code>g4dn.xlarge</code> with an Intel host costs
