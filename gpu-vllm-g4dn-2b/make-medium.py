@@ -342,8 +342,13 @@ def convert(src: Path, outdir: Path, img_base: str = "") -> Path:
     return p_embed
 
 
+# Derived from the rig directory this script sits in, never hardcoded: the copy
+# that came from gpu-vllm-g5g-2b carried that rig's path, so the hosted variant
+# pointed every <img> at a sibling rig's URLs -- all of which 404, because the
+# PNGs are written next to *this* article. The embed variant hides the mistake,
+# since its images are inlined.
 DEFAULT_IMG_BASE = ("https://raw.githubusercontent.com/xbill9/gemma4-dev/"
-                    "main/gpu-vllm-g4dn-2b/medium/img/")
+                    f"main/{Path(__file__).resolve().parent.name}/medium/img/")
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
