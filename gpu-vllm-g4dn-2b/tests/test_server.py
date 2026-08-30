@@ -24,6 +24,7 @@ import ast
 import base64
 import filecmp
 import gzip
+import json
 import subprocess
 import sys
 import unittest
@@ -725,10 +726,45 @@ class RepoHygieneTests(unittest.TestCase):
 
     def test_benchmarks_carries_no_other_rigs_runs(self):
         """Benchmark JSON travelled with the forks in this tree, and several rigs
-        carry numbers measured on hardware they are not. This rig has served
-        nothing, so runs/ must be absent or empty."""
+        carry numbers measured on hardware they are not.
+
+        This asserted runs/ was EMPTY, which was the right enforcement only while
+        the rig had measured nothing. It first served on 2026-08-30, so emptiness
+        would now fail on this rig's own results and the standing rule -- carry no
+        other rig's runs -- has to be checked directly instead.
+
+        A run directory here must name this rig's hardware, and any report inside
+        it must say it measured a T4. `<hw-short>` is the hardware MEASURED, never
+        the directory the file happens to sit in.
+        """
         runs = ROOT / "benchmarks" / "runs"
-        self.assertTrue(not runs.exists() or not any(runs.iterdir()))
+        if not runs.exists():
+            return
+        for run in sorted(p for p in runs.iterdir() if p.is_dir()):
+            self.assertTrue(
+                run.name.endswith("-g4dn"),
+                f"{run.name} is not a g4dn run -- benchmark dirs travel with forks",
+            )
+            reports = 0
+            for path in run.glob("*.json"):
+                doc = json.loads(path.read_text())
+                # A run directory also holds EVIDENCE json -- captured API output
+                # cited by the write-ups. Only serving reports carry a schema
+                # version, and only those make a claim about hardware.
+                if not isinstance(doc, dict) or "schema_version" not in doc:
+                    continue
+                reports += 1
+                report, hw = path, doc.get("hardware", {})
+                self.assertIn(
+                    "t4", str(hw.get("accelerator", "")).lower(),
+                    f"{report.name} reports accelerator {hw.get('accelerator')!r}, "
+                    f"which was not measured on this rig",
+                )
+                self.assertEqual(
+                    1, hw.get("chips"),
+                    f"{report.name} claims {hw.get('chips')} chips; this rig has one",
+                )
+            self.assertTrue(reports, f"{run.name} holds no serving report")
 
     def test_skill_is_complete_in_both_copies(self):
         # SKILL.md is a hand-written SOURCE file, but refresh_skill.py only
