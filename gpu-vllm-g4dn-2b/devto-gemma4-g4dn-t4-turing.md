@@ -46,7 +46,7 @@ fractional slice:
 | 🥈 | `g4dn.xlarge` | Intel x86_64 | 0.5260 | 0.3559 | T4 | 15,360 MiB |
 | 🥉 | `g5g.2xlarge` | Graviton2 | 0.5560 | — | T4G | 15,360 MiB |
 | | `g4dn.2xlarge` | Intel | 0.7520 | — | T4 | 15,360 MiB |
-| | `g6.xlarge` | Intel | 0.8048 | 0.7033 | L4 | 22,888 MiB |
+| | `g6.xlarge` | AMD x86_64 | 0.8048 | 0.7033 | L4 | 22,888 MiB |
 
 **The cheapest real CUDA GPU on AWS is an Arm box.** It is 20 percent cheaper per hour on demand
 and 59 percent cheaper on spot.

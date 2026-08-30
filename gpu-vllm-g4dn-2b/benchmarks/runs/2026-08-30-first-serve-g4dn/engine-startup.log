@@ -1,0 +1,45 @@
+# Captured via SSM Run Command from i-050dca2ed568dcc1b (g4dn.xlarge, spot,
+# us-east-1c) on 2026-08-30, from `docker logs` on the vllm-g4dn container and
+# from /var/log/cloud-init-output.log. Verbatim excerpt; the instance has since
+# been terminated, so this file is the artifact those figures cite.
+
+--- cloud-init stages ---
+[stage] image-pull-start +0s
+[stage] image-pull-done +155s
+[stage] patch-resolve +175s
+[stage] patch-applied +176s
+[stage] image-build-done +178s
+[stage] patch-verified-in-image +193s
+[stage] serving-started +195s
+[stage] INSTALL_COMPLETE +195s
+
+--- vLLM engine ---
+(EngineCore pid=102) INFO [cuda.py:426] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=102) INFO [weight_utils.py:521] Time spent downloading weights for google/gemma-4-E2B-it: 30.033043 seconds
+(EngineCore pid=102) INFO [weight_utils.py:858] Filesystem type for checkpoints: OVERLAY. Checkpoint size: 9.54 GiB. Available RAM: 10.57 GiB.
+(EngineCore pid=102) Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:23<00:00, 23.26s/it]
+(EngineCore pid=102) INFO [default_loader.py:430] Loading weights took 23.33 seconds
+(EngineCore pid=102) INFO [model_runner.py:380] Model loading took 9.8 GiB memory and 55.748559 seconds
+(EngineCore pid=102) WARNING [topk_topp_sampler.py:69] FlashInfer top-p/top-k sampling unavailable: unsupported compute capability 7.5; falling back.
+(EngineCore pid=102) INFO [encoder_runner.py:120] Encoder cache will be initialized with a budget of 2496 tokens
+(EngineCore pid=102) INFO [model_runner.py:906] Graph capturing finished in 13 secs, took 0.16 GiB
+(EngineCore pid=102) INFO [kv_cache_utils.py:1869] GPU KV cache size: 329,579 tokens, Maximum concurrency for 16,384 tokens per request: 20.12x
+(EngineCore pid=102) INFO [core.py:347] init engine (profile, create kv cache, warmup model) took 150.90 s (compilation: 82.39 s)
+
+--- device ---
+name, compute_cap, memory.total [MiB], driver_version, pcie.link.gen.max, pcie.link.width.max
+Tesla T4, 7.5, 15360 MiB, 595.91.07, 3, 16
+clocks.max.sm [MHz], clocks.max.memory [MHz], power.max_limit [W]
+1590 MHz, 5001 MHz, 70.00 W
+
+--- image arch coverage (verify_gpu_arch) ---
+torch arch list: ['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120']
+shared mem per block (static): 49152
+fp16 matmul ok: True
+
+--- versions ---
+vllm 0.28.0 / torch 2.13.0+cu130 / CUDA 13.0 / driver 595.91.07
+
+--- registry manifest (vllm/vllm-openai:v0.28.0) ---
+linux/amd64  sha256:2286e8533ca8  TORCH_CUDA_ARCH_LIST=7.5 8.0 8.6 8.9 9.0 10.0 12.0
+linux/arm64  sha256:2a7cde230b59  TORCH_CUDA_ARCH_LIST=8.0 8.7 8.9 9.0 10.0 11.0 12.0

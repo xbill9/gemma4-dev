@@ -23,7 +23,7 @@ fractional slice, the top of the list is short:
 | 2 | g4dn.xlarge | Intel (x86_64) | 0.5260 | 0.3559 | T4 | 15,360 MiB |
 | 3 | g5g.2xlarge | Graviton2 | 0.5560 | — | T4G | 15,360 MiB |
 | 4 | g4dn.2xlarge | Intel | 0.7520 | — | T4 | 15,360 MiB |
-| 5 | g6.xlarge | Intel | 0.8048 | 0.7033 | L4 | 22,888 MiB |
+| 5 | g6.xlarge | AMD | 0.8048 | 0.7033 | L4 | 22,888 MiB |
 
 The three instances cheaper than g5g.xlarge are all fractional L4 slices at 2,861 to 5,722 MiB,
 and none of them can map Gemma 4 E2B's 10.2 GB checkpoint. The cheapest slice that could,
