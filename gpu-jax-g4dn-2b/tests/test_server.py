@@ -406,6 +406,54 @@ class UserDataTests(BashSyntaxMixin, unittest.TestCase):
         expected = set(server._SERVING_REQUIREMENTS) | {server.JAX_PIP_SPEC}
         self.assertEqual(listed, expected)
 
+    def test_profiling_requirements_match_the_mirror_file(self):
+        # Same hazard as the serving pair, and it has already bitten once in a
+        # worse form: requirements-profiling.txt named a path that the deploy
+        # payload excludes, so `pip install -r` failed with `Could not open
+        # requirements file` and the xprof extraction died on ModuleNotFoundError.
+        listed = {
+            line.strip()
+            for line in (ROOT / "requirements-profiling.txt").read_text().splitlines()
+            if line.strip() and not line.startswith("#")
+        }
+        self.assertEqual(listed, set(server._PROFILING_REQUIREMENTS))
+
+    def test_the_profiler_is_installed_but_never_on_the_serving_list(self):
+        """xprof and tensorboard ship at boot, in their OWN non-fatal stage.
+
+        Both halves matter. They must be installed -- the previous on-demand
+        arrangement meant they were never installed at all -- and they must not
+        be in _SERVING_REQUIREMENTS, because that list runs under `set -e` and a
+        broken profiler wheel must not cost a box that can serve.
+        """
+        self.assertEqual(("xprof", "tensorboard"), server._PROFILING_REQUIREMENTS)
+        for pkg in server._PROFILING_REQUIREMENTS:
+            self.assertNotIn(pkg, server._SERVING_REQUIREMENTS)
+
+        script = server._user_data(server.MODEL_NAME, "g4dn.xlarge")
+        self.assertIn("$PIP xprof tensorboard", script)
+        self.assertIn("stage profiling-deps", script)
+        # Non-fatal: the whole install runs under `set -euxo pipefail`, so
+        # without the `||` a profiler wheel failure would kill cloud-init before
+        # INSTALL_DONE is touched -- the exact shape of the mkswap incident.
+        profiling_line = next(
+            ln for ln in script.splitlines() if ln.strip().startswith("$PIP xprof")
+        )
+        self.assertIn("||", profiling_line)
+
+    def test_profiling_install_can_be_turned_off(self):
+        """INSTALL_PROFILING=0 restores a serving-only image, byte for byte."""
+        previous = server.INSTALL_PROFILING
+        server.INSTALL_PROFILING = False
+        try:
+            script = server._user_data(server.MODEL_NAME, "g4dn.xlarge")
+        finally:
+            server.INSTALL_PROFILING = previous
+        self.assertNotIn("xprof", script)
+        self.assertNotIn("stage profiling-deps", script)
+        # And the serving stage is untouched by the switch.
+        self.assertIn("stage serving-deps", script)
+
 
 class MetricsParsingTests(unittest.TestCase):
     """_parse_prom is pure, so the interesting parts pin offline."""

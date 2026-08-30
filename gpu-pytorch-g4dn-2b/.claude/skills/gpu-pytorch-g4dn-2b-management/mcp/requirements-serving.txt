@@ -1,0 +1,34 @@
+# Serving dependencies, installed ON the G4dn instance by cloud-init.
+#
+# Not installed locally: these resolve against the instance's CUDA torch.
+# server.py's _SERVING_REQUIREMENTS is the source of truth for what the bootstrap
+# actually installs; this file mirrors it and a test asserts they match.
+#
+# TORCH IS NOT LISTED, AND THAT IS THE POINT. The x86_64 PyTorch DLAMI ships
+# torch already built for the GPU, and the bootstrap installs INTO that
+# interpreter rather than beside it. A `pip install torch` here would replace a
+# vendor build on a vendor driver with an upstream wheel, which is a change
+# nobody asked for and one this rig has not tested. Run verify_gpu_arch to see
+# what the image's build actually covers.
+transformers accelerate
+fastapi
+uvicorn
+pydantic
+# Chat-template rendering for transformers. A missing jinja2 leaves /health
+# green and fails every generation with a 500 (measured 2026-08-19 on the JAX
+# sibling; the failure is in transformers, so it transfers).
+jinja2
+safetensors
+huggingface_hub
+numpy
+
+# Profiling, installed on the instance and NOT on the control plane. Shipped so
+# one provisioning round leaves the box able to profile itself: the JAX sibling
+# kept these in a file deliberately excluded from the deploy, so its profiling
+# recipe pointed at a path that had never existed on any instance.
+#
+# xprof is the OpenXLA profiler and supplies TensorBoard's profile plugin; torch
+# reaches it via torch.profiler.tensorboard_trace_handler. Their install is
+# non-fatal in install.sh -- a missing wheel must not cost the serve.
+xprof
+tensorboard

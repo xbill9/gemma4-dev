@@ -1,0 +1,40 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The path is relative to the project directory, as in .mcp.json;
+# never pin an absolute cwd, which is how the inf2 rig ended up pointing at a directory that
+# does not exist.
+#
+# WRITTEN FRESH AT THE FORK, not copied, and the reason is a real failure on the JAX rig's
+# identical fork. There the file survived untouched and was wrong three ways at once: wrong
+# server name, a skill path that did not exist, and -- the dangerous one -- approval gates
+# naming `*_g5g_*` tools against actual `*_g4dn_*` tools. The gates matched nothing, so every
+# destructive tool was UNGATED while appearing to be gated.
+#
+# A GATE ON A TOOL NAME THAT DOES NOT EXIST FAILS OPEN AND SAYS NOTHING. Ground truth for
+# tool names: `grep -n "^@mcp.tool" server.py`, and `test_codex_gates_name_tools_that_exist`
+# now checks it.
+[mcp_servers.gpu-vllm-g4dn-2b]
+command = "python3"
+args = [".claude/skills/gpu-vllm-g4dn-2b-management/mcp/server.py"]
+
+[mcp_servers.gpu-vllm-g4dn-2b.env]
+AWS_REGION = "us-east-1"
+MODEL_NAME = "google/gemma-4-E2B-it"
+INSTANCE_TYPE = "g4dn.xlarge"
+MCP_SERVER_NAME = "gpu-vllm-g4dn-2b"
+
+# Launching costs money and a spot instance can be reclaimed under you. Gate the
+# state-changing tools.
+#
+# Termination is CHEAP here, and deliberately not gated for the reason the T4G rig gates it.
+# That rig loses a locally COMPILED SM 7.5 image with the root volume, ~67 minutes of build.
+# Nothing is compiled here: the published amd64 image already carries SM 7.5, and the Turing
+# patch is a pure-Python edit plus a seconds-long derived build. Gated anyway -- it is still
+# destructive, and a one-time spot instance cannot be stopped, only terminated.
+[mcp_servers.gpu-vllm-g4dn-2b.tools.create_g4dn_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-vllm-g4dn-2b.tools.terminate_g4dn_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-vllm-g4dn-2b.tools.stop_g4dn_instance]
+approval_mode = "approve"

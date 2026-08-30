@@ -1,0 +1,17 @@
+# Everything this rig needs, on the one machine it runs on.
+#
+# The cloud siblings split these lists across a machine boundary: the control
+# plane runs here and the serving stack runs on an instance, so installing the
+# serving deps locally would pull GPU wheels onto a laptop. There is no boundary
+# here, so `make install` installs both and the split survives only as the
+# failure boundary documented in requirements-serving.txt.
+#
+# Install SYSTEM-WIDE. The monorepo forbids virtualenvs — these rigs deploy with
+# system-wide site-packages, so a venv diverges the dev environment from the
+# thing that runs. On a PEP 668 interpreter (Ubuntu 23.04+, Debian 12+) that
+# needs `--break-system-packages`.
+-r requirements-serving.txt
+
+# Control plane.
+mcp
+httpx

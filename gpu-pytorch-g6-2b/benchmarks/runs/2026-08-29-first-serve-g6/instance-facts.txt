@@ -1,0 +1,33 @@
+INFO:gpu-pytorch-g6-2b:ssm send_command id=0c772b46-9570-4ac5-8923-ea6f5b8206b4 instance=i-0f5ad4013e7265ee4 timeout=300s
+== nvidia-smi ==
+name, memory.total [MiB], memory.used [MiB], driver_version, compute_cap
+NVIDIA L4, 23034 MiB, 14142 MiB, 595.91.07, 8.9
+== interpreter ==
+/opt/pytorch/bin/python
+python 3.13.15
+torch 2.13.0+cu130
+transformers 5.16.1
+arch_list ['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120']
+bf16 True
+== install stages ==
++ echo '[stage] apt-base +7s (total 7s)'
+[stage] apt-base +7s (total 7s)
++ echo '[stage] python-3.14 +0s (total 7s)'
+[stage] python-3.14 +0s (total 7s)
++ echo '[stage] torch-interpreter +14s (total 21s)'
+[stage] torch-interpreter +14s (total 21s)
++ echo '[stage] pip-bootstrap +2s (total 23s)'
+[stage] pip-bootstrap +2s (total 23s)
++ echo '[stage] torch-deps +13s (total 36s)'
+[stage] torch-deps +13s (total 36s)
++ echo '[stage] serving-deps +3s (total 39s)'
+[stage] serving-deps +3s (total 39s)
++ echo '[stage] profiling-deps +4s (total 43s)'
+[stage] profiling-deps +4s (total 43s)
+== device policy banner ==
+Aug 29 19:36:53 ip-172-31-45-139 python[2530]: 2026-08-29 19:36:53,965 INFO torch device policy: name=NVIDIA L4 compute_capability=8.9 pre_ampere=False compute_dtype=bfloat16
+Aug 29 19:37:29 ip-172-31-45-139 python[2530]: 2026-08-29 19:37:29,853 INFO Loaded google/gemma-4-E2B-it in 27.3s: weights=10.209 GB dtype=bfloat16
+Aug 29 19:37:34 ip-172-31-45-139 python[2530]: 2026-08-29 19:37:34,190 INFO Warmup done in 4.3s
+Aug 29 19:37:34 ip-172-31-45-139 python[2530]: 2026-08-29 19:37:34,380 INFO Serving google/gemma-4-E2B-it on 0.0.0.0:8000 (SEQ=4096)
+/opt/pytorch/lib/python3.13/site-packages/torch/cuda/__init__.py:64: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]

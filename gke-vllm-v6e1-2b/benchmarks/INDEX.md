@@ -9,10 +9,10 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| _none_ | | | | | |
+| `2026-08-25-gemma4-e2b-v6e1.json` | google/gemma-4-E2B-it | tpu-v6e×1 | on-demand | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
-| `2026-08-10-gce-flex-v6e1` | 8 | 3 | 0 | yes |
+| `2026-08-25-gke-first-provision-v6e1` | 1 | 0 | 0 | **no** |

@@ -12,6 +12,16 @@
       "description": "Manage Google Cloud TPU capacity and Gemma 4 serving from Rust on Compute Engine TPU VMs: flex-start provisioning, capacity probing, quotas, cost estimates, and SRE diagnostics via the gce-jaxrust-v6e1-2b MCP server. The engine is Rust \u2014 rlx's JAX-shaped IR lowered to HLO and executed through libtpu's PJRT plugin, no Python in the serving path. Forked from tpu-jax-v6e1-2b 2026-08-28; nothing provisioned or measured on this path yet."
     },
     {
+      "name": "gce-pytorch-v6e1-2b",
+      "source": "./gce-pytorch-v6e1-2b",
+      "description": "Compute Engine DevOps for the PyTorch/XLA Gemma 4 E2B rig: flex-start ct6e-standard-1t provisioning, capacity probing, quotas, cost estimates, and SRE diagnostics via the gce-pytorch-v6e1-2b MCP server. Serves google/gemma-4-E2B-it on one TPU v6e chip through public torch_xla (device \"xla\"), with the xprof + tensorboard profiling kit installed at boot. Forked from tpu-pytorch-v6e1-2b 2026-08-29 and migrated off the Cloud TPU API onto gcloud compute instances."
+    },
+    {
+      "name": "gpu-jax-g4dn-2b",
+      "source": "./gpu-jax-g4dn-2b",
+      "description": "EC2 G4dn DevOps for the pure-JAX Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution, JAX-on-Turing verification, and SRE diagnostics via the gpu-jax-g4dn-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4 (Turing, SM 7.5, 15360 MiB measured). Forked from gpu-jax-g5g-2b 2026-08-28 as the A/B control that separates Turing from Graviton2, and first served 2026-08-29: decode 13.1 tok/s against the T4G's 13.10, weight bytes identical to the byte, and the xprof profile reproducing 54.4% dtype conversion / 32.8% fp32 GEMV / 0.0% TensorCore \u2014 so the sibling's dtype tax is a chip finding, not a host one."
+    },
+    {
       "name": "gpu-jax-g5g-2b",
       "source": "./gpu-jax-g5g-2b",
       "description": "EC2 G5g DevOps for the pure-JAX Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, JAX-on-Turing verification, and SRE diagnostics via the gpu-jax-g5g-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4G (Turing, SM 7.5) behind an AWS Graviton2 host \u2014 no build, no CUDA toolkit, no Triton patch, because jax[cuda12] publishes aarch64 wheels that already carry sm_75."
@@ -22,9 +32,19 @@
       "description": "EC2 G6 DevOps for the pure-JAX Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution, JAX-on-Ada verification, and SRE diagnostics via the gpu-jax-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9, 23034 MiB). Forked from gpu-jax-g5g-2b 2026-08-28 to move the same engine off Turing onto a native bfloat16 datapath: measured the same day at 48.3-48.5 tok/s against the T4G's 12.80 at an identical config, with the 54% dtype-conversion tax at 0.0% and decode at the bandwidth roofline."
     },
     {
+      "name": "gpu-pytorch-g6-2b",
+      "source": "./gpu-pytorch-g6-2b",
+      "description": "EC2 G6 DevOps for the stock-PyTorch Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 PyTorch DLAMI resolution, torch-on-Ada verification, and SRE diagnostics via the gpu-pytorch-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9, 23034 MiB) through HF transformers -- no custom port, no XLA, no build. Retargeted from gpu-pytorch-g5g-2b 2026-08-29 and measured the same day at 20.93 tok/s, a clean 1.92x over the T4G at byte-identical weights. Sits at 71% of the bandwidth roofline where the JAX rig on the same chip reaches 99%: the gap is eager-mode kernel-launch overhead, and batching is untried."
+    },
+    {
       "name": "gpu-jaxrust-g5g-2b",
       "source": "./gpu-jaxrust-g5g-2b",
       "description": "EC2 G5g DevOps for the Rust-driven-XLA Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, Turing verification, and SRE diagnostics via the gpu-jaxrust-g5g-2b MCP server. Forked from gpu-jax-g5g-2b 2026-08-28 to move the engine off CPython onto Rust. The control plane is complete and measured nothing yet \u2014 the Rust engine is not written, and the rig currently runs the inherited Python JAX engine as its fallback and parity oracle."
+    },
+    {
+      "name": "gpu-pytorch-g4dn-2b",
+      "source": "./gpu-pytorch-g4dn-2b",
+      "description": "EC2 G4dn DevOps for the PyTorch/transformers Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 PyTorch DLAMI resolution, torch-on-Turing verification, and SRE diagnostics via the gpu-pytorch-g4dn-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4 (Turing, SM 7.5, 15360 MiB, 14.07 GiB usable). Forked from gpu-pytorch-g5g-2b 2026-08-29 as the fourth corner of the {jax, pytorch} x {g5g, g4dn} square. HAS SERVED NOTHING. Torch comes from the AMI rather than pip \u2014 the bootstrap installs into the DLAMI's own venv \u2014 so the image is a PyTorch DLAMI (2.13 / Ubuntu 26.04) and not the base driver image the JAX rigs use. Now that gpu-jax-g4dn-2b has closed the host axis, this is the runtime A/B on identical hardware: is the 86.9% dtype-plus-fp32-GEMV tax Turing, or XLA?"
     },
     {
       "name": "gpu-vllm-g5g-2b",

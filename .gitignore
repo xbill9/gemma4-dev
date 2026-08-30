@@ -53,6 +53,21 @@ gemma-*/
 *.pth
 *.onnx
 
+# Raw profiler dumps. A single run's .xplane.pb has hit 615 MB against GitHub's
+# 100 MB per-file hard limit (the lesson is recorded in gce-vllm-v6e8-31b/.gitignore,
+# which has ignored these locally since that run). The derived summaries —
+# xprof_kernel_stats.json, xprof_memory_profile.json — and the run logs are the
+# committed record of a profile; the raw dump regenerates from the harness.
+#
+# Covers every raw dump the profilers emit: *.xplane.pb (the trace itself),
+# *.hlo_proto.pb (one per jitted function, 104 in a single g5g run) and
+# ALL_HOSTS.op_stats_v2.pb. No hand-authored .pb exists in this repo.
+*.pb
+# The Chrome-trace export sits beside them and is the same raw dump in another
+# format — regenerable from the .pb, and useless without the profiler UI.
+*.trace.json.gz
+*.trace.json
+
 # Editor and OS noise.
 #
 # Deliberately NO blanket `*.log` rule here: benchmark runs under benchmarks/runs/**

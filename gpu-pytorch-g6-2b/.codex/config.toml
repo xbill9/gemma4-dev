@@ -1,0 +1,44 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The path is relative to the project directory, as in .mcp.json;
+# never pin an absolute cwd, which is how the inf2 rig ended up pointing at a directory that
+# does not exist.
+#
+# THIS FILE IS THE ONE THAT SURVIVES A FORK WRONG. It is not generated, so nothing
+# regenerates it and no test pinned it: the G5g PyTorch rig this was forked from still
+# carried the JAX rig's copy verbatim — wrong server name, a skills/ path that does not
+# exist, and approval gates naming tools that were never in that rig.
+#
+# A GATE ON A TOOL NAME THAT DOES NOT EXIST FAILS OPEN AND SAYS NOTHING. That is the
+# whole hazard: a rename silently converts a safety control into a no-op while it still
+# reads as configured. Ground truth for tool names is always
+# `grep -n "^@mcp.tool" server.py` — the names below were taken from it, not guessed.
+[mcp_servers.gpu-pytorch-g6-2b]
+command = "python3"
+args = [".claude/skills/gpu-pytorch-g6-2b-management/mcp/server.py"]
+
+[mcp_servers.gpu-pytorch-g6-2b.env]
+AWS_REGION = "us-east-1"
+MODEL_NAME = "google/gemma-4-E2B-it"
+INSTANCE_TYPE = "g6.2xlarge"
+MCP_SERVER_NAME = "gpu-pytorch-g6-2b"
+
+# Launching costs money, and a spot instance can be reclaimed under you. Gate the
+# state-changing tools.
+#
+# Termination is NOT expensive here the way it is on the vLLM sibling: this rig builds
+# nothing, so a relaunch costs a pip install and the model download, not a 67-minute
+# compile plus an unlanded Triton patch. Gated anyway — it is still destructive, and a
+# one-time spot instance cannot be stopped, only terminated.
+[mcp_servers.gpu-pytorch-g6-2b.tools.create_g6_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-pytorch-g6-2b.tools.terminate_g6_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-pytorch-g6-2b.tools.stop_g6_instance]
+approval_mode = "approve"
+
+# Ships code to a running instance and restarts the unit. Destructive to whatever is
+# serving there, so it is gated alongside the lifecycle tools.
+[mcp_servers.gpu-pytorch-g6-2b.tools.deploy_torch_server]
+approval_mode = "approve"

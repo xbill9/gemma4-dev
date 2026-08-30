@@ -1,11 +1,31 @@
-# Profiling dependencies. Installed ON the instance, ON DEMAND -- deliberately
-# NOT part of requirements-serving.txt and NOT in server.py's
-# _SERVING_REQUIREMENTS, because nothing here is needed to serve a token and
-# xprof drags in gcsfs + google-cloud-storage behind a 39 MB wheel. A serving
-# image should not carry a profiler.
+# Profiling dependencies. INSTALLED AT BOOT by cloud-init, as their own stage.
 #
-#   sudo python3.14 -m pip install -r requirements-profiling.txt
+# server.py's _PROFILING_REQUIREMENTS is the source of truth for what the
+# bootstrap actually installs; this file mirrors it and a test asserts they
+# match. Set INSTALL_PROFILING=0 to get a serving-only image back.
 #
+# CHANGED 2026-08-29. These used to be on-demand and deliberately excluded from
+# the serving image, on the reasoning that "a serving image should not carry a
+# profiler". In practice that meant they were never installed at all:
+# docs/profiling-recipes.md told operators to
+#
+#   pip install -r /opt/jax-g4dn/requirements-profiling.txt
+#
+# and that path has NEVER existed, because the deploy payload excludes this
+# file. xprof "installed" with `Could not open requirements file` and the
+# extraction then died on ModuleNotFoundError, both in logs nobody reads.
+# tune_loop.py worked around it by shipping the file itself. Installing at boot
+# removes the workaround and the failure mode together.
+#
+# The stage is deliberately NON-FATAL in the bootstrap: the serving deps run
+# under `set -e` and should kill the install if they fail, but a broken profiler
+# wheel must not cost a box that can serve.
+#
+# MEASURED 2026-08-29 on i-02eb43cb99429a8f7: this stage adds 5 SECONDS to a
+# 76-second install. The "GBs of image" objection was never the right size --
+# it is one 39 MB wheel plus xprof's gcsfs/google-cloud-storage tail, and
+# nothing on the serving path imports any of it.
+
 # xprof is the OpenXLA profiler, formerly the TensorFlow profiler. It reads the
 # *.xplane.pb that `jax.profiler.trace()` already writes, so it adds a VIEWER
 # rather than a new measurement path: profile_decode.py parses the Chrome-format
@@ -13,7 +33,9 @@
 # the right tool for the per-kernel question.
 #
 # What xprof adds is the memory viewer -- peak HLO buffers attributed by
-# instruction -- which is the open question in docs/larger-models-on-t4g.md.
+# instruction -- which is the open question in the parent rig's
+# larger-models-on-t4g.md (not inherited here; its arithmetic applies unchanged,
+# because the T4 reports the same 15360 MiB the T4G does -- measured 2026-08-29).
 # profile_prefill.py answers the same question from compiled.memory_analysis()
 # and the optimized HLO without installing anything, so try that FIRST; xprof is
 # the cross-check and the UI.
@@ -21,14 +43,15 @@
 # Serve the UI with `xprof --logdir /tmp/jaxtrace --port 6006` and tunnel it;
 # this rig opens no inbound port for it, and must not.
 #
-# aarch64 note: the wheel is manylinux_2_35_aarch64. On the old Ubuntu 22.04
-# base that was EXACTLY the floor (glibc 2.35) -- it installed, with nothing to
-# spare. The 2026-08-27 move to the Ubuntu 26.04 base clears it comfortably, so
-# this is no longer fragile; it is recorded because a move BACK to an older base
-# would silently lose xprof. jaxlib's own wheels are manylinux_2_27.
+# glibc note: the wheel is manylinux_2_35. The Ubuntu 26.04 base carries glibc
+# 2.43, so there is real headroom -- but the old 22.04 base was EXACTLY on that
+# floor (2.35), so a move BACK to an older base is what would break this. That
+# matters more now than it did on demand: this is on the DEFAULT install path,
+# so losing the wheel fails a stage rather than a command nobody ran.
+# Installed 2.23.1 on 2026-08-29.
 xprof
 
-# TensorBoard, installed alongside xprof by request.
+# TensorBoard, installed alongside xprof.
 #
 # BE CLEAR ABOUT WHAT THIS BUYS: TensorBoard on its own will NOT render these
 # profiles. xprof is the successor to tensorboard-plugin-profile and serves its
@@ -39,6 +62,5 @@ xprof
 # It is here because it is useful for everything OTHER than those traces --
 # scalar logging from a harness, comparing runs over time -- and because having
 # both present removes "is it just not installed?" from a debugging session.
-# Not on the serving path: this file installs ON DEMAND and is deliberately
-# absent from server.py's _SERVING_REQUIREMENTS.
+# Installed 2.21.0 on 2026-08-29.
 tensorboard

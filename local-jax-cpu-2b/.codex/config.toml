@@ -1,0 +1,31 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The path is relative to the project directory, as in .mcp.json;
+# never pin an absolute cwd, which is how the inf2 rig ended up pointing at a directory that
+# does not exist.
+#
+# This file, .mcp.json, .claude-plugin/plugin.json and .claude/settings.local.json's
+# enabledMcpjsonServers must all name the server `local-jax-cpu-2b`. The fork left all four
+# naming a cloud rig — server name, skill path, instance type AND three gated tool names,
+# none of which this rig has. A stale name here is invisible to the tests, because server.py
+# was right the whole time.
+[mcp_servers.local-jax-cpu-2b]
+command = "python3"
+args = [".claude/skills/local-jax-cpu-2b-management/mcp/server.py"]
+
+[mcp_servers.local-jax-cpu-2b.env]
+MODEL_NAME = "google/gemma-4-E2B-it"
+JAX_HOST = "127.0.0.1"
+JAX_PORT = "8000"
+MCP_SERVER_NAME = "local-jax-cpu-2b"
+
+# NOTHING IS GATED, and that is the substantive difference from every sibling.
+#
+# On the cloud rigs the gated tools are the ones that cost money or destroy
+# capacity: create_*_instance, terminate_*, stop_*. This rig provisions nothing
+# and bills nothing, so there is no launch to approve and no reclamation to
+# regret. The two state-changing tools are start_jax_server and stop_jax_server,
+# and both are cheap and immediately reversible — nothing was built, and the warm
+# compilations survive in a disk cache that is not ephemeral here.
+#
+# Do NOT add approval gates by analogy with the siblings. A prompt on an action
+# with no consequence trains the operator to click through the ones that have.

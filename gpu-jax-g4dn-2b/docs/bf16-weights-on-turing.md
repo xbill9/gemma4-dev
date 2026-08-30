@@ -35,7 +35,7 @@ both are worse than the disease.**
 
 ## What was being looked for
 
-`docs/larger-models-on-t4g.md` recorded per-request transient allocations that scale with
+`../gpu-jax-g5g-2b/docs/larger-models-on-t4g.md` (parent rig) recorded per-request transient allocations that scale with
 model size — E2B 4.52 GiB, E4B 5.25 GiB, 12B 12.61 GiB — and could not attribute any of
 them to a tensor. It guessed at "the reference w4a16 path materialising a large fraction of
 the weights in dense form" and correctly marked the cause open.

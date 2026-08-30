@@ -1,4 +1,4 @@
-# gpu-jax-g4dn-2b — EC2 G5g (Graviton2 + NVIDIA T4G) pure-JAX rig.
+# gpu-jax-g4dn-2b — EC2 G4dn (x86_64 + NVIDIA T4) pure-JAX rig.
 #
 # The skill name carries the rig directory: rigs all shipping a skill called
 # "tpu-management" meant `make skill-install` rm -rf'd one shared destination, so
@@ -15,7 +15,7 @@ all: help
 
 help:
 	@echo "========================================================="
-	@echo " gpu-jax-g4dn-2b — EC2 G5g / NVIDIA T4G pure-JAX rig"
+	@echo " gpu-jax-g4dn-2b — EC2 G4dn / NVIDIA T4 pure-JAX rig"
 	@echo "========================================================="
 	@echo "  make install       - pip install -r requirements.txt"
 	@echo "  make test          - offline unittest suite"
@@ -27,8 +27,8 @@ help:
 	@echo "  make medium        - render medium-*.md to paste-ready HTML"
 	@echo "  make init TARGET=/path/to/project [ARGS='--region us-east-1']"
 	@echo "========================================================="
-	@echo "Serving here is a pip install, not a build: jax[cuda12] publishes"
-	@echo "aarch64 wheels whose arch tables carry sm_75. See docs/turing-aarch64-gap.md."
+	@echo "Serving here is a pip install, not a build: the jax CUDA plugin"
+	@echo "ships arch tables carrying sm_75. See the parent rig gpu-jax-g5g-2b."
 
 install:
 	python3 -m pip install -r requirements.txt
@@ -94,9 +94,9 @@ skill-package: skill
 	@echo "Packaged $(DIST_DIR)/$(SKILL_NAME)-skill.zip"
 
 # No `deploy` target on purpose. Provisioning goes through the MCP server's
-# create_g4dn_instance, which resolves an arm64 AMI at launch time — a Makefile
+# create_g4dn_instance, which resolves an x86_64 AMI at launch time — a Makefile
 # recipe would have to hardcode one, and a hardcoded x86_64 AMI id is exactly
 # the bug inherited from the legacy tips-tree rigs.
 deploy:
 	@echo "Use the MCP tool create_g4dn_instance (or get_deployment_config for the CLI form)."
-	@echo "Run verify_gpu_arch first — see docs/turing-aarch64-gap.md."
+	@echo "Run verify_gpu_arch first — it runs a real fp16 matmul on the device."

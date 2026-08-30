@@ -7,16 +7,12 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 ## Reports in this rig
 
-_None._ This rig has measured nothing.
+| File | Model | Hardware measured | Deployment | Valid | Also in |
+|---|---|---|---|---|---|
+| _none_ | | | | | |
 
 ## Run directories in this rig
 
-_None._
-
----
-
-This rig was forked from `gpu-jax-g5g-2b` on 2026-08-28 and the inherited runs and reports —
-nine and three respectively, all measured on that rig's Python JAX engine — were removed rather
-than carried, so `rollup.py` cannot count them against `jaxrust`. Same precedent as
-`tpu-vllm-v5p1-2b`. This file was written by hand in that generated shape; re-run
-`make benchmarks-rollup` at the monorepo root to confirm it.
+| Run | Files | Result files | Infeasible cells | REPORT.md |
+|---|---:|---:|---:|---|
+| _none_ | | | | |

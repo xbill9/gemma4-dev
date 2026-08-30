@@ -1,0 +1,44 @@
+# Profiling dependencies. OPTIONAL, and reported separately by
+# `check_dependencies` so a missing one reads as an aside rather than as a
+# reason the serve cannot start.
+#
+# server.py's _PROFILING_REQUIREMENTS is the source of truth for this list and a
+# test asserts they match.
+#
+# On the cloud siblings these are installed at boot as their own non-fatal
+# cloud-init stage. There is no boot here, so the separation is simply that
+# `make install` does not pull them and you install this file when you want to
+# profile. The failure it is designed against is the same one either way, and it
+# is worth keeping in mind because it was expensive: on the G5g parent,
+# docs/profiling-recipes.md told operators to install from a path inside the
+# deployed app directory that the payload deliberately excluded, so xprof
+# "installed" with `Could not open requirements file` and the extraction then
+# died on ModuleNotFoundError — both in logs nobody reads. A profiling
+# dependency that is absent must SAY it is absent.
+#
+#   python3 -m pip install -r requirements-profiling.txt
+#
+# xprof reads the *.xplane.pb that jax.profiler.trace() already writes. It is the
+# successor to tensorboard-plugin-profile and serves its own UI:
+#
+#   xprof --logdir /tmp/jaxtrace --port 6006
+#
+# WHETHER IT IS WORTH INSTALLING HERE IS AN OPEN QUESTION, and the honest answer
+# is that nobody has checked. Every xprof finding in this rig's inherited prose —
+# the 54.4% dtype conversion share, the 0.0% TensorCore utilisation, the
+# fp32 gemv split — came off a CUDA trace, and xprof's device-side kernel tables
+# have no analogue on an XLA:CPU trace. The host-side timeline still works. Do
+# not assume `summarize_xprof()` in tune_loop.py returns anything meaningful here
+# until a trace has actually been taken.
+xprof
+
+# TensorBoard, alongside xprof.
+#
+# BE CLEAR ABOUT WHAT THIS BUYS: TensorBoard on its own will NOT render these
+# profiles. xprof is the successor to tensorboard-plugin-profile and serves its
+# own UI, so a plain tensorboard pointed at the logdir gives you a TensorBoard
+# with no profile plugin. It is here because it is useful for everything OTHER
+# than those traces — scalar logging from a harness, comparing runs over time —
+# and because having both present removes "is it just not installed?" from a
+# debugging session.
+tensorboard

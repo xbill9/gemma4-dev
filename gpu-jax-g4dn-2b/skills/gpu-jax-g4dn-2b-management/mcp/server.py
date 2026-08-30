@@ -1,41 +1,52 @@
-"""EC2 G5g (Graviton2 + NVIDIA T4G) lifecycle and inference MCP server, JAX path.
+"""EC2 G4dn (x86_64 + NVIDIA T4) lifecycle and inference MCP server, JAX path.
 
 Like the Inf2 sibling, this uses boto3 rather than shelling out to the AWS CLI so
 it works with profiles, environment credentials, IAM roles, and SSO-backed
 credential processes, and uses Systems Manager Run Command for remote
 administration — no inbound SSH rule or private key.
 
-Why this rig exists, next to the vLLM one on identical hardware:
+Why this rig exists, next to the vLLM ones on Turing hardware:
 
-G5g pairs a Graviton2 (aarch64) host with a T4G GPU (Turing, SM 7.5), and the
-vLLM path needs both axes at once from artifacts that each cover only one. It
-gets there, but only via a ~67-minute from-source build, a CUDA toolkit, Rust,
-and an unlanded patch to Triton's attention kernel — because Gemma 4's
-heterogeneous head dims force TRITON_ATTN, whose 512-wide global-attention tile
-wants ~96 KiB of shared memory against Turing's 64 KiB ceiling.
+G4dn pairs an Intel Cascade Lake (x86_64) host with a T4 GPU (Turing, SM 7.5),
+and the vLLM path on Turing needs a ~67-minute from-source build, a CUDA
+toolkit, Rust, and an unlanded patch to Triton's attention kernel — because
+Gemma 4's heterogeneous head dims force TRITON_ATTN, whose 512-wide
+global-attention tile wants ~96 KiB of shared memory against Turing's 64 KiB
+ceiling.
 
 The JAX path sidesteps all four:
 
-  * jaxlib and the jax-cuda plugin/pjrt pair publish aarch64 wheels, and every
+  * jaxlib and the jax-cuda plugin/pjrt pair publish x86_64 wheels, and every
     CUDA dependency (cublas, cudnn, cuda-runtime, cusolver) does too — so pip
     supplies CUDA and the DLAMI only has to supply the driver. No build.
     (Named without a CUDA major on purpose: JAX_PIP_SPEC has already moved 12→13,
-    and the claim is about aarch64 wheels existing, not about which line.)
+    and the claim is about wheels existing, not about which line.)
   * The plugin's arch tables carry sm_75 and its floor is SM 6.0.
   * Attention here is ordinary XLA, not a hand-tiled Triton kernel, so there is
     no per-block shared-memory ceiling to hit and no patch to carry.
 
-What it does NOT sidestep is the same ceiling in a different place: the fused
-W4A16 Pallas kernel is tiled for TPU VMEM and needs 550 KiB - 1.1 MiB per block,
-so it cannot run on Turing either. This rig therefore serves the dense reference
-checkpoint at float16. See docs/turing-aarch64-gap.md and tpu.env.
+The packaging half of that is MUCH weaker evidence here than it was on the G5g
+sibling, and should not be quoted as a finding: that rig ran on aarch64, where a
+missing wheel was a real and recurring hazard. x86_64 + CUDA is the platform
+every one of these projects targets first. What carries across is the Turing
+half — SM 7.5 — not the architecture half.
 
-THIS RIG HAS SERVED, AND THE NUMBERS ARE ITS OWN: 12.4-12.5 tok/s decode on
-g4dn.xlarge across the two runs under benchmarks/runs/ (a spot-check on
-2026-08-23 read 12.3, unrecorded). The wheel/arch facts above are separately
-verified — installability was never the same claim as a served token, and both
-now hold. Warm up before recording anything: cold decode measures several times
-slower, and cold prefill far worse again.
+What JAX does NOT sidestep is the same 64 KiB ceiling in a different place: the
+fused W4A16 Pallas kernel is tiled for TPU VMEM and needs 550 KiB - 1.1 MiB per
+block, so it cannot run on Turing either. This rig therefore serves the dense
+reference checkpoint at float16. See ../gpu-jax-g5g-2b/docs/turing-aarch64-gap.md
+(in the PARENT rig -- not inherited here, because only its Turing half applies) and tpu.env.
+
+PROVENANCE. Every performance number in this file was measured by
+`gpu-jax-g5g-2b` on a T4G, NOT here — this file previously asserted the opposite
+("the numbers are its own", 12.4-12.5 tok/s on g4dn.xlarge) while
+benchmarks/runs/ was empty, which is precisely the fork hazard the monorepo
+CLAUDE.md warns about. The T4 and the T4G are both Turing SM 7.5 with 320 GB/s
+of GDDR6, so chip-level values are expected to carry; the host is not the same
+(Cascade Lake, not Graviton2), so anything host-side — load time, quantization
+cost, apt behaviour — is a prediction until this rig measures it. Warm up before
+recording anything: cold decode measures several times slower, and cold prefill
+far worse again.
 """
 
 import asyncio
@@ -144,8 +155,12 @@ JAX_COMPILATION_CACHE_DIR = os.getenv("JAX_COMPILATION_CACHE_DIR", "/opt/jax-cac
 # "termination is cheap here" true across relaunches rather than only in theory.
 #
 # Opt-in via a URI the operator supplies, in the same spirit as the required
-# subnet/security-group/instance-profile ids: this rig does not create buckets or
-# widen IAM policy. The instance profile must already allow s3 on that prefix.
+# subnet/security-group/instance-profile ids: this rig does not create buckets.
+# The instance profile must already allow s3 on that prefix -- and the shared
+# policy on gpu-jax-g5g-2b-instance-role is deliberately loose about WHICH rig,
+# granting vllm-models-bucket/{jax-cache,benchmarks}/* with the rig segment
+# wildcarded, so a fork does not need an IAM edit before it can cache or upload.
+# See CLAUDE.md's engineering rules; do not narrow it to per-rig prefixes.
 JAX_CACHE_S3_URI = os.getenv("JAX_CACHE_S3_URI", "")
 
 # Upload cadence. A spot reclamation gives ~2 minutes of warning and does not
@@ -186,14 +201,44 @@ _SERVING_REQUIREMENTS = (
     "jinja2",
 )
 
+# Profiling dependencies, installed by the same bootstrap but as their OWN
+# stage, so a failure here is attributable and -- unlike the serving deps -- does
+# not stop the box from serving. requirements-profiling.txt mirrors this list and
+# a test asserts they agree.
+#
+# These were previously ON DEMAND and, in practice, never installed at all:
+# docs/profiling-recipes.md told operators to install from a path inside APP_DIR
+# that the deploy payload deliberately excludes, so `pip install -r` failed with
+# `Could not open requirements file` and the xprof extraction then died on
+# ModuleNotFoundError -- both in logs nobody reads. tune_loop.py works around it
+# by shipping the file itself. Installing at boot removes the workaround and the
+# failure mode together.
+#
+# What each one buys, because they are NOT interchangeable:
+#   * xprof reads the *.xplane.pb that jax.profiler.trace() already writes. It
+#     is the successor to tensorboard-plugin-profile and serves its own UI:
+#     `xprof --logdir /tmp/jaxtrace --port 6006`. This is the one that renders
+#     this rig's traces.
+#   * tensorboard on its own will NOT render them -- pointed at the same logdir
+#     it comes up with no profile plugin. It is here for everything else
+#     (scalar logging from a harness, comparing runs over time) and because
+#     having both present removes "is it just not installed?" from a debugging
+#     session.
+#
+# INSTALL_PROFILING=0 restores the previous serving-only image. The cost of
+# leaving it on is ~39 MB of wheel plus xprof's gcsfs/google-cloud-storage tail;
+# it is not on the serving path and the service does not import it.
+_PROFILING_REQUIREMENTS = ("xprof", "tensorboard")
+INSTALL_PROFILING = os.getenv("INSTALL_PROFILING", "1").lower() in ("1", "true", "yes")
+
 # Where the serving payload lands on the instance.
 APP_DIR = "/opt/jax-g4dn"
-# AWS publishes the ARM64 GPU DLAMI as a public SSM parameter. Prefer it: it is
+# AWS publishes the x86_64 GPU DLAMI as a public SSM parameter. Prefer it: it is
 # single-valued and authoritative, where a describe-images name filter is a fuzzy
-# match over a set that also contains ARM64 DLAMIs with NO NVIDIA driver (built
-# for Graviton CPU inference). Those match a loose "Deep Learning*ARM64*Ubuntu*"
-# pattern, can be the newest by CreationDate, and boot perfectly well on a G5g
-# with no GPU — a failure that looks like a broken container, not a wrong AMI.
+# match over a set that also contains DLAMIs with NO NVIDIA driver. Those can be
+# the newest by CreationDate and boot perfectly well on a G4dn with no GPU
+# visible to JAX — a failure that reads as a broken runtime, not a wrong AMI.
+# verify_gpu in the bootstrap is what converts that into an install-time error.
 # The BASE image -- driver only, no PyTorch. Two independent reasons, and the
 # second one is why the previous parameter was quietly rotting.
 #
@@ -211,17 +256,19 @@ APP_DIR = "/opt/jax-g4dn"
 # version this rig wants -- so the deadsnakes PPA leaves the critical path
 # entirely. 24.04 ships 3.12 and still needs it. Both carry a newer driver and a
 # newer glibc than 22.04, which was sitting exactly ON xprof's manylinux_2_35
-# floor.
+# floor -- and xprof is now installed at boot (_PROFILING_REQUIREMENTS), so that
+# floor is on the default path rather than an on-demand one.
 DLAMI_SSM_PARAMETER = os.getenv(
     "DLAMI_SSM_PARAMETER",
     "/aws/service/deeplearning/ami/x86_64/base-oss-nvidia-driver-gpu-ubuntu-26.04/latest/ami-id",
 )
-# Fallback only. It still requires the driver in the name so the driverless
-# Graviton-CPU images cannot match -- but it no longer requires "ARM64 AMI"
-# CONTIGUOUSLY, because the base images are named "Deep Learning ARM64 Base OSS
-# Nvidia Driver GPU AMI (Ubuntu 26.04)". The old pattern did not match those at
-# all, so leaving it alone while moving the SSM path would have made the fallback
-# silently resolve the OLD PyTorch image -- a revert that looks like a success.
+# Fallback only, and it must stay in step with DLAMI_SSM_PARAMETER above: this
+# pattern requires the NVIDIA driver in the name so a driverless image cannot
+# match, and deliberately does NOT name an architecture, because describe-images
+# is already filtered on Architecture=x86_64 in _resolve_ami. On the G5g sibling
+# these two keys drifted apart once -- the SSM path moved and the name filter did
+# not, so the fallback silently resolved the OLD image, which is a revert that
+# reports success. test_tpu_env_agrees_with_server_defaults covers both.
 DLAMI_NAME = os.getenv("DLAMI_NAME", "Deep Learning Base OSS Nvidia Driver GPU*Ubuntu*")
 
 MANAGED_BY = RIG_NAME
@@ -279,10 +326,17 @@ def _host_memory_gb(instance_type: str) -> int:
 def _needs_swap(instance_type: str) -> bool:
     """True when host RAM is too small to load the checkpoint without swap.
 
-    Two distinct pressures, both real, and the larger one decides:
-      * g5g.xlarge (8 GiB) cannot even mmap the 10.2 GB checkpoint.
-      * g4dn.xlarge (16 GiB) mmaps fine and then dies in quantize_ple_table,
-        which needs >15 GiB of host RSS.
+    Both pressures were measured on the G5g sibling, not here, and neither is
+    GPU-specific -- they are host-RAM pressures against the same checkpoint, so
+    they should transfer to any host with the same RAM:
+      * 8 GiB cannot even mmap the 10.2 GB checkpoint (the kernel refuses the
+        mapping outright; residency is not the issue).
+      * 16 GiB mmaps fine and then dies in quantize_ple_table, which upcasts the
+        4.70 GB PLE table to float32 while the full tree is resident -- measured
+        OOM-killed five times at 14.3 GB anon-RSS.
+
+    g4dn.xlarge, this rig's DEFAULT size, has exactly 16 GiB and so lands in the
+    second case. Every larger g4dn size has >= 32 GiB and takes no swapfile.
     """
     return 0 < _host_memory_gb(instance_type) <= _SWAP_AT_OR_BELOW_HOST_RAM_GB
 
@@ -314,8 +368,8 @@ def _serve_argv(model: str, instance_type: str) -> str:
     chip it is not an independent knob: w4a16 needs ple_bits=4 to fit at all.
 
     There is no tensor-parallel flag: the JAX engine is single-device. On the
-    two-GPU sizes the second T4G idles, which _tensor_parallel_size() reports
-    but nothing acts on yet.
+    multi-GPU sizes (12xlarge is 4 T4s, metal is 8) the extra GPUs idle, which
+    _tensor_parallel_size() reports but nothing acts on yet.
     """
     argv = (
         f"--model {model} --host 0.0.0.0 --port {JAX_PORT} "
@@ -460,6 +514,20 @@ fi
     argv = _serve_argv(model, instance_type)
     serving_reqs = " ".join(_SERVING_REQUIREMENTS)
 
+    # Its own stage, and deliberately NOT fatal. The serving deps above are
+    # load-bearing and `set -e` should kill the install if they fail; the
+    # profiler is not, so a broken xprof wheel must not cost a box that can
+    # serve. The `|| echo` makes that explicit rather than relying on the caller
+    # to notice -- and the failure still lands in /var/log/jax-install.log next
+    # to a stage marker, which is the whole point of installing it here.
+    profiling_install = ""
+    if INSTALL_PROFILING:
+        profiling_reqs = " ".join(_PROFILING_REQUIREMENTS)
+        profiling_install = (
+            f"  $PIP {profiling_reqs} || echo 'WARNING: profiling deps failed; "
+            f"serving is unaffected' >&2\n  stage profiling-deps\n"
+        )
+
     # Both halves are empty unless JAX_CACHE_S3_URI is set, so the default
     # rendering is byte-identical to what this rig shipped before.
     cache_restore = ""
@@ -567,7 +635,9 @@ install_runtime() {{
   if command -v {py} >/dev/null 2>&1; then
     echo "{py} is already present at $(command -v {py}); skipping deadsnakes"
     # Still needed even when the interpreter ships with the distro: a source
-    # build of any dependency without an aarch64 wheel needs the headers.
+    # build of any dependency without a wheel for this interpreter needs the
+    # headers. Far less likely on x86_64 than on the G5g sibling's aarch64, but
+    # a new cp314 dependency can still land without one.
     apt_run install -y {py}-venv {py}-dev || apt_run install -y python3-venv python3-dev
   else
     apt_run install -y software-properties-common
@@ -587,19 +657,21 @@ install_runtime() {{
   curl -sS https://bootstrap.pypa.io/get-pip.py | {py} - --break-system-packages
   $PIP pip setuptools wheel
   stage pip-bootstrap
-  # The jax extra pulls CUDA from pip wheels (aarch64 published for all of them),
-  # so the DLAMI only supplies the driver. No CUDA toolkit, no compiler, no Rust.
+  # The jax extra pulls CUDA from pip wheels, so the DLAMI only supplies the
+  # driver. No CUDA toolkit, no compiler, no Rust. This is the step the vLLM
+  # path replaces with a 67-minute from-source build for SM 7.5.
   # This is the big one: several GB of CUDA wheels, and the step most likely to
   # be running when a spot reclamation lands.
   $PIP '{JAX_PIP_SPEC}'
   stage jax-wheels
   $PIP {serving_reqs}
   stage serving-deps
-}}
+{profiling_install}}}
 
 # Assert the GPU is actually visible to JAX before declaring the install done.
-# A driverless ARM64 DLAMI boots fine on a G5g and would otherwise look healthy
-# right up until the first token.
+# A driverless DLAMI boots fine and would otherwise look healthy right up until
+# the first token -- and so would a jax that resolved CPU-only wheels. INSTALL
+# COMPLETE is an assertion about the device, not about pip's exit code.
 verify_gpu() {{
   {py} - <<'PYCHECK'
 import jax
@@ -683,7 +755,7 @@ set -x
 
 cat >/etc/systemd/system/{SERVICE_NAME}.service <<'UNITEOF'
 [Unit]
-Description=Gemma 4 E2B on T4G via JAX
+Description=Gemma 4 E2B on NVIDIA T4 (G4dn) via JAX
 After=network-online.target
 
 [Service]
@@ -705,12 +777,17 @@ echo "JAX runtime install started; follow /var/log/jax-install.log, then deploy_
 
 
 async def _resolve_ami(ec2=None) -> str:
-    """Resolve the ARM64 **GPU** DLAMI for this region.
+    """Resolve the x86_64 **GPU** DLAMI for this region.
 
-    Two things have to hold and they are separate: the image must be arm64 (the
-    x86_64 DLAMI ids hardcoded by the legacy tips-tree rigs cannot boot on
-    Graviton2 at all), and it must carry the NVIDIA driver (an ARM64 DLAMI built
-    for Graviton CPU inference boots fine on a G5g and simply has no GPU).
+    Two things have to hold and they are separate: the image must be x86_64 (the
+    architecture filter below), and it must carry the NVIDIA driver -- AWS ships
+    plenty of DLAMIs without one, and such an image boots fine on a G4dn and
+    simply has no GPU visible to JAX.
+
+    Never hardcode an AMI id, even though this rig is x86_64 and the legacy
+    tips-tree ids would now at least boot. They pin a frozen image from a dead
+    line, and the G5g sibling separately showed that even an SSM path can rot:
+    `/latest/` is only the latest build WITHIN one PyTorch+Ubuntu line.
 
     The SSM public parameter pins both. describe-images is the fallback.
     """

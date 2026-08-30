@@ -1,4 +1,4 @@
-# Profiling recipes for `gpu-jax-g5g-2b`
+# Profiling recipes for `gpu-jax-g4dn-2b`
 
 `profile_decode.py`'s docstring has pointed here since it was written; the file did not exist
 until 2026-08-26. Everything below is measured on a T4G.
@@ -20,10 +20,10 @@ measurement path.
 It needs the GPU to itself, and it is not part of the deploy payload — ship it first.
 
 ```bash
-systemctl stop jax-g5g
-set -a; . /opt/jax-g5g/env; set +a
-cd /opt/jax-g5g/app
-PYTHONPATH=/opt/jax-g5g/app python3.14 profile_decode.py \
+systemctl stop jax-g4dn
+set -a; . /opt/jax-g4dn/env; set +a
+cd /opt/jax-g4dn/app
+PYTHONPATH=/opt/jax-g4dn/app python3.14 profile_decode.py \
     --ple-bits 4 --int8-lm-head --steps 20 --top 12
 ```
 
@@ -32,26 +32,42 @@ worth profiling most could not be profiled at all.
 
 ## Installing xprof
 
-**On demand only.** It is deliberately excluded from `_SERVING_REQUIREMENTS` and
-`requirements-serving.txt` — a serving image should not carry a profiler, and xprof pulls
-`gcsfs` + `google-cloud-storage` behind a 39 MB wheel.
+**Nothing to do — xprof and tensorboard are installed at boot** by cloud-init, as their own
+stage. CHANGED 2026-08-29; MEASURED the same day at **5 seconds of a 76-second install**
+(xprof 2.23.1, tensorboard 2.21.0). Confirm with:
+
+```bash
+grep -F '[stage] profiling-deps' /var/log/jax-install.log
+python3.14 -m pip show xprof tensorboard
+```
+
+`INSTALL_PROFILING=0` restores the previous serving-only image; then install by hand with
 
 ```bash
 python3.14 -m pip install --break-system-packages -r <path>/requirements-profiling.txt
 ```
 
-**That file is not on the instance unless you put it there.** It is deliberately excluded from
-the deploy payload — a serving image should not carry a profiler — so nothing ships it, and
-this recipe used to name `/opt/jax-g5g/requirements-profiling.txt`, a path that has never
-existed. xprof then "installed" with `Could not open requirements file` and the extraction
-died on `ModuleNotFoundError: No module named 'xprof'`, both in logs nobody read.
-`tune_loop.py --xprof` ships it alongside `profile_decode.py`; by hand, copy it first.
+**and note that file is not on the instance** — it is excluded from the deploy payload, so you
+must copy it there first. `tune_loop.py --xprof` ships it alongside `profile_decode.py`.
+
+**Why this changed, because the old arrangement failed silently.** "On demand only" was the
+rule, on the reasoning that a serving image should not carry a profiler and xprof pulls
+`gcsfs` + `google-cloud-storage` behind a 39 MB wheel. But this recipe named a
+`requirements-profiling.txt` **inside `APP_DIR`, a path that has never existed**, so xprof
+"installed" with `Could not open requirements file` and the extraction then died on
+`ModuleNotFoundError: No module named 'xprof'` — both in logs nobody read. The install was
+never the expensive part; being unable to tell whether it had happened was.
+
+The stage is **non-fatal**: the serving deps run under `set -e` and should kill the install if
+they fail, but a broken profiler wheel must not cost a box that can serve.
 
 `--break-system-packages` is required from the Ubuntu 24.04 base onward — the system
 interpreter is marked externally-managed (PEP 668).
 
-**aarch64 note:** the wheel is `manylinux_2_35_aarch64` and the Ubuntu 22.04 DLAMI base is
-glibc 2.35 — *exactly* at the floor. It installs, but an older base would silently lose it.
+**glibc note:** the wheel is `manylinux_2_35`, and the Ubuntu 26.04 base gives glibc 2.43, so
+there is headroom. The old 22.04 base sat *exactly* at the floor. That matters more now than
+it did on demand: this is the default install path, so losing the wheel fails a stage rather
+than a command nobody ran.
 
 ## Getting data out of xprof without the UI
 
@@ -88,7 +104,7 @@ look at a trace anyway, in preference order:
 
 1. **Locally, off the returned trace.** `tune_loop.py --xprof` brings
    `jaxtrace/plugins/profile/<run>/*.xplane.pb` back inside the run directory, so
-   `pip install xprof && xprof --logdir benchmarks/runs/<run>/jaxtrace --port 6006` serves the
+   `xprof --logdir benchmarks/runs/<run>/jaxtrace --port 6006` serves the
    UI on your own machine with no instance involved. This works after the instance is gone,
    which matters here: G5g is spot and reclamation has ranged from 21 minutes to 19 hours.
 2. **On the box, through SSM port forwarding** — no inbound rule required, because SSM tunnels

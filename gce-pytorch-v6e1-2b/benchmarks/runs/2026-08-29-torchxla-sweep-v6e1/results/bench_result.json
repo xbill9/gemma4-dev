@@ -1,0 +1,119 @@
+{
+  "model": "google/gemma-4-E2B-it",
+  "python": "3.12.13",
+  "torch": "2.9.1+cpu",
+  "torch_xla": "2.9.0",
+  "chips": 1,
+  "weights_load_s": 1.1,
+  "to_device_s": 1.1,
+  "compile_s_by_batch": {
+    "1": 33.4,
+    "4": 35.9,
+    "8": 37.9,
+    "16": 38.1,
+    "32": 39.9
+  },
+  "workload": {
+    "input_len": 1024,
+    "output_len": 128,
+    "runs_per_point": 1
+  },
+  "sweep": [
+    {
+      "concurrency": 1,
+      "input_len": 1024,
+      "output_len": 128,
+      "status": "ok",
+      "ttft_ms": {
+        "median": 83.0
+      },
+      "tpot_ms": {
+        "median": 75.31,
+        "p99": 76.67
+      },
+      "output_tok_per_s": 13.3,
+      "total_tok_per_s": 118.4,
+      "per_stream_tok_per_s": 13.3,
+      "_prefill_s": 0.083,
+      "_decode_s": 9.6433,
+      "_warmup_s": 33.4
+    },
+    {
+      "concurrency": 4,
+      "input_len": 1024,
+      "output_len": 128,
+      "status": "ok",
+      "ttft_ms": {
+        "median": 126.9
+      },
+      "tpot_ms": {
+        "median": 79.59,
+        "p99": 80.41
+      },
+      "output_tok_per_s": 50.2,
+      "total_tok_per_s": 445.9,
+      "per_stream_tok_per_s": 12.5,
+      "_prefill_s": 0.1269,
+      "_decode_s": 10.2068,
+      "_warmup_s": 35.9
+    },
+    {
+      "concurrency": 8,
+      "input_len": 1024,
+      "output_len": 128,
+      "status": "ok",
+      "ttft_ms": {
+        "median": 186.8
+      },
+      "tpot_ms": {
+        "median": 84.28,
+        "p99": 84.8
+      },
+      "output_tok_per_s": 94.9,
+      "total_tok_per_s": 839.2,
+      "per_stream_tok_per_s": 11.9,
+      "_prefill_s": 0.1868,
+      "_decode_s": 10.7947,
+      "_warmup_s": 37.9
+    },
+    {
+      "concurrency": 16,
+      "input_len": 1024,
+      "output_len": 128,
+      "status": "ok",
+      "ttft_ms": {
+        "median": 312.9
+      },
+      "tpot_ms": {
+        "median": 92.53,
+        "p99": 93.3
+      },
+      "output_tok_per_s": 172.9,
+      "total_tok_per_s": 1515.9,
+      "per_stream_tok_per_s": 10.8,
+      "_prefill_s": 0.3129,
+      "_decode_s": 11.8464,
+      "_warmup_s": 38.1
+    },
+    {
+      "concurrency": 32,
+      "input_len": 1024,
+      "output_len": 128,
+      "status": "ok",
+      "ttft_ms": {
+        "median": 605.7
+      },
+      "tpot_ms": {
+        "median": 106.56,
+        "p99": 108.61
+      },
+      "output_tok_per_s": 299.9,
+      "total_tok_per_s": 2584.3,
+      "per_stream_tok_per_s": 9.4,
+      "_prefill_s": 0.6057,
+      "_decode_s": 13.6591,
+      "_warmup_s": 39.9
+    }
+  ],
+  "profile_dir": "/opt/profiles"
+}

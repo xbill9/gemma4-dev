@@ -1,4 +1,4 @@
-# GEMINI.md — `gpu-jax-g5g-2b`
+# GEMINI.md — `gpu-jax-g4dn-2b`
 
 Guidance for coding agents working in this rig. **`CLAUDE.md` is authoritative where these
 disagree**; there is no generator, so a convention change has to be applied to all three of
@@ -6,8 +6,10 @@ disagree**; there is no generator, so a convention change has to be applied to a
 
 ## What this rig is
 
-Serves **`google/gemma-4-E2B-it`** under **pure JAX** on **AWS EC2 G5g** — Graviton2
-(aarch64) host, **NVIDIA T4G** GPU (Turing, SM 7.5, **15360 MiB measured**).
+Serves **`google/gemma-4-E2B-it`** under **pure JAX** on **AWS EC2 G4dn** — an x86_64
+Intel Cascade Lake host, **NVIDIA T4** GPU (Turing, SM 7.5, **15360 MiB measured on this
+rig 2026-08-29** — the same budget the T4G reports, despite `describe_instance_types`
+listing a nominal 16 GB).
 
 No PyTorch, no torch_xla, no vLLM. The engine is this repo's own port (`ports/gemma4/`) via
 `jax_engine.py` behind `jax_openai_server.py`, under **systemd, not docker**. Read logs with
@@ -33,13 +35,20 @@ No PyTorch, no torch_xla, no vLLM. The engine is this repo's own port (`ports/ge
 - Every subprocess goes through `run_command(cmd: list[str])`. **Never `shell=True`.**
 - MCP tools are `async def` returning markdown with emoji status prefixes (✅ ❌ 📡).
 - Require explicit subnet, security-group and instance-profile ids. **Do not create broad
-  network or IAM policy.**
-- Scope instance discovery to `ManagedBy=gpu-jax-g5g-2b`.
+  network or IAM policy** — one exception: the shared S3 policy
+  (`jax-compilation-cache-rw` on `gpu-jax-g5g-2b-instance-role`) is **deliberately loose**,
+  granting `vllm-models-bucket/{jax-cache,benchmarks}/*` with the rig segment wildcarded.
+  It previously enumerated rigs, so every fork was denied its own cache and results until
+  someone edited IAM. **Do not tighten it back to per-rig prefixes.** `CLAUDE.md` has the
+  full note.
+- Scope instance discovery to `ManagedBy=gpu-jax-g4dn-2b`.
 - HF tokens live in Secrets Manager, fetched at boot into a root-only `EnvironmentFile`.
   **Never** in user data — instance metadata is readable by anything on the box.
 - Launches default to spot. Surface capacity errors rather than silently retrying.
-- **Never hardcode an endpoint or an AMI id.** The AMI must be arm64 *and* carry the NVIDIA
-  driver; AWS ships driverless ARM64 DLAMIs that boot fine and have no GPU.
+- **Never hardcode an endpoint or an AMI id.** The AMI must be x86_64 *and* carry the NVIDIA
+  driver; AWS ships driverless DLAMIs that boot fine and have no GPU visible to JAX. Beyond
+  architecture, an SSM parameter path can itself rot: `/latest/` is only the latest build
+  within one PyTorch+Ubuntu line, and AWS freezes those lines.
 
 ## Testing
 
@@ -67,5 +76,6 @@ compares that id against the local payload and reports `STALE DEPLOY`.
 - **Warm up at the shape you measure.** `max_new_tokens` is a `static_argnames` entry.
 - **Do not health-check by testing for a non-empty response** — a broken deploy here returns
   fluent-looking garbage. `verify_model_health` reads the degenerate counter instead.
-- Numbers from `gpu-vllm-g5g-2b` (43.1 / 44.24 tok/s) are a **different runtime** and were
+- Numbers from `gpu-vllm-g5g-2b` (43.1 / 44.24 tok/s) are a **different runtime**, different
+  silicon (T4G), and were
   obtained with reduced Triton tiles. Never quote them as this rig's baseline.

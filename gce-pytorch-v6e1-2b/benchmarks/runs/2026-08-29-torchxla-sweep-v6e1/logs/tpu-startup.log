@@ -1,0 +1,936 @@
++ echo 'Starting the PyTorch TPU backend Bootloader...'
+Starting the PyTorch TPU backend Bootloader...
++ echo -----------------------------------
+-----------------------------------
++ echo 'Project ID: aisprint-491218'
+Project ID: aisprint-491218
++ echo 'Zone: europe-west4-a'
+Zone: europe-west4-a
++ echo 'Pip packages: torch '\''torch_xla[tpu]'\'''
+Pip packages: torch 'torch_xla[tpu]'
++ echo 'Package index: '
+Package index: 
++ echo 'Find-links: https://storage.googleapis.com/libtpu-releases/index.html'
+Find-links: https://storage.googleapis.com/libtpu-releases/index.html
++ echo 'Wheel mirror: '
+Wheel mirror: 
++ echo 'Pip extras: transformers accelerate huggingface_hub compressed-tensors '\''jinja2>=3.1'\'' jax '\''setuptools<81'\'' xprof tensorboard tensorboard-plugin-profile'
+Pip extras: transformers accelerate huggingface_hub compressed-tensors 'jinja2>=3.1' jax 'setuptools<81' xprof tensorboard tensorboard-plugin-profile
++ echo -----------------------------------
+-----------------------------------
++ echo 'Checking internet connectivity...'
+Checking internet connectivity...
++ set +e
+++ seq 1 30
++ for i in $(seq 1 30)
++ echo 'Attempt 1/30: Pinging 8.8.8.8...'
+Attempt 1/30: Pinging 8.8.8.8...
++ ping -c 1 8.8.8.8
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+64 bytes from 8.8.8.8: icmp_seq=1 ttl=115 time=0.314 ms
+
+--- 8.8.8.8 ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.314/0.314/0.314/0.000 ms
++ '[' 0 -eq 0 ']'
++ echo 'Internet connected.'
+Internet connected.
++ break
++ set -e
++ export DEBIAN_FRONTEND=noninteractive
++ DEBIAN_FRONTEND=noninteractive
++ apt-get update -y
+Hit:1 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy InRelease
+Get:2 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates InRelease [128 kB]
+Get:3 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports InRelease [127 kB]
+Get:4 http://security.ubuntu.com/ubuntu jammy-security InRelease [129 kB]
+Get:5 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/universe amd64 Packages [14.1 MB]
+Get:6 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages [3502 kB]
+Get:7 http://security.ubuntu.com/ubuntu jammy-security/main Translation-en [490 kB]
+Get:8 http://security.ubuntu.com/ubuntu jammy-security/restricted amd64 Packages [6273 kB]
+Get:9 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/universe Translation-en [5652 kB]
+Get:10 http://security.ubuntu.com/ubuntu jammy-security/restricted Translation-en [1206 kB]
+Get:11 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages [1047 kB]
+Get:12 http://security.ubuntu.com/ubuntu jammy-security/universe Translation-en [235 kB]
+Get:13 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 c-n-f Metadata [23.2 kB]
+Get:14 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 Packages [69.1 kB]
+Get:15 http://security.ubuntu.com/ubuntu jammy-security/multiverse Translation-en [12.9 kB]
+Get:16 http://security.ubuntu.com/ubuntu jammy-security/multiverse amd64 c-n-f Metadata [544 B]
+Get:17 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/universe amd64 c-n-f Metadata [286 kB]
+Get:18 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/multiverse amd64 Packages [217 kB]
+Get:19 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/multiverse Translation-en [112 kB]
+Get:20 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/multiverse amd64 c-n-f Metadata [8372 B]
+Get:21 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages [3772 kB]
+Get:22 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main Translation-en [559 kB]
+Get:23 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages [1282 kB]
+Get:24 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/universe Translation-en [323 kB]
+Get:25 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/universe amd64 c-n-f Metadata [30.8 kB]
+Get:26 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 Packages [76.5 kB]
+Get:27 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/multiverse Translation-en [15.9 kB]
+Get:28 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/multiverse amd64 c-n-f Metadata [756 B]
+Get:29 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/main amd64 Packages [70.2 kB]
+Get:30 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/main Translation-en [11.4 kB]
+Get:31 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/main amd64 c-n-f Metadata [412 B]
+Get:32 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/restricted amd64 c-n-f Metadata [116 B]
+Get:33 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/universe amd64 Packages [30.8 kB]
+Get:34 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/universe Translation-en [16.9 kB]
+Get:35 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/universe amd64 c-n-f Metadata [676 B]
+Get:36 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports/multiverse amd64 c-n-f Metadata [116 B]
+Fetched 39.8 MB in 1min 28s (453 kB/s)
+Reading package lists...
++ apt-get install -y python3.12 python3.12-venv python3.12-dev
+Reading package lists...
+Building dependency tree...
+Reading state information...
+E: Unable to locate package python3.12
+E: Couldn't find any package by glob 'python3.12'
+E: Couldn't find any package by regex 'python3.12'
+E: Unable to locate package python3.12-venv
+E: Couldn't find any package by glob 'python3.12-venv'
+E: Couldn't find any package by regex 'python3.12-venv'
+E: Unable to locate package python3.12-dev
+E: Couldn't find any package by glob 'python3.12-dev'
+E: Couldn't find any package by regex 'python3.12-dev'
++ echo 'python3.12 not in the stock archive; adding the deadsnakes PPA...'
+python3.12 not in the stock archive; adding the deadsnakes PPA...
++ apt-get install -y software-properties-common
+Reading package lists...
+Building dependency tree...
+Reading state information...
+software-properties-common is already the newest version (0.99.22.9).
+software-properties-common set to manually installed.
+0 upgraded, 0 newly installed, 0 to remove and 5 not upgraded.
++ add-apt-repository -y ppa:deadsnakes/ppa
+Hit:1 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy InRelease
+Hit:2 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates InRelease
+Hit:3 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports InRelease
+Get:4 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy InRelease [18.1 kB]
+Hit:5 http://security.ubuntu.com/ubuntu jammy-security InRelease
+Get:6 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 Packages [37.4 kB]
+Get:7 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main Translation-en [5680 B]
+Fetched 61.2 kB in 0s (137 kB/s)
+Reading package lists...
+Repository: 'deb https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu/ jammy main'
+Description:
+This PPA contains more recent Python versions packaged for Ubuntu.
+
+Disclaimer: there's no guarantee of timely updates in case of security problems or other issues. If you want to use them in a security-or-otherwise-critical environment (say, on a production server), you do so at your own risk.
+
+Update Note
+===========
+Please use this repository instead of ppa:fkrull/deadsnakes.
+
+Reporting Issues
+================
+
+Issues can be reported in the master issue tracker at:
+https://github.com/deadsnakes/issues/issues
+
+Supported Ubuntu and Python Versions
+====================================
+
+- Ubuntu 22.04 (jammy) Python3.7+ (NOT Python3.10)
+- Ubuntu 24.04 (noble) Python3.7+ (NOT Python3.12)
+- Ubuntu 26.04 (resolute) Python3.7+ (NOT Python3.14)
+- Note: Python 3.10 (jammy), Python3.12 (noble), Python3.14 (resolute) are not provided by deadsnakes as upstream ubuntu provides those packages.
+
+Why some packages aren't built:
+- Note: for 22.04+, older python versions requre libssl<3 so they are not currently built
+- If you need these, reach out to asottile to set up a private ppa
+
+The packages may also work on other versions of Ubuntu or Debian, but that is not tested or supported.
+
+Packages
+========
+
+The packages provided here are loosely based on the debian upstream packages with some modifications to make them more usable as non-default pythons and on ubuntu.  As such, the packages follow debian's patterns and often do not include a full python distribution with just `apt install python#.#`.  Here is a list of packages that may be useful along with the default install:
+
+- `python#.#-dev`: includes development headers for building C extensions
+- `python#.#-venv`: provides the standard library `venv` module
+- `python#.#-distutils`: provides the standard library `distutils` module
+- `python#.#-lib2to3`: provides the `2to3-#.#` utility as well as the standard library `lib2to3` module
+- `python#.#-gdbm`: provides the standard library `dbm.gnu` module
+- `python#.#-tk`: provides the standard library `tkinter` module
+
+Third-Party Python Modules
+==========================
+
+Python modules in the official Ubuntu repositories are packaged to work with the Python interpreters from the official repositories. Accordingly, they generally won't work with the Python interpreters from this PPA. As an exception, pure-Python modules for Python 3 will work, but any compiled extension modules won't.
+
+To install 3rd-party Python modules, you should use the common Python packaging tools.  For an introduction into the Python packaging ecosystem and its tools, refer to the Python Packaging User Guide:
+https://packaging.python.org/installing/
+
+Sources
+=======
+The package sources are available at:
+https://github.com/deadsnakes/
+
+Nightly Builds
+==============
+
+For nightly builds, see ppa:deadsnakes/nightly https://launchpad.net/~deadsnakes/+archive/ubuntu/nightly
+More info: https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa
+Adding repository.
+Adding deb entry to /etc/apt/sources.list.d/deadsnakes-ubuntu-ppa-jammy.list
+Adding disabled deb-src entry to /etc/apt/sources.list.d/deadsnakes-ubuntu-ppa-jammy.list
+Adding key to /etc/apt/trusted.gpg.d/deadsnakes-ubuntu-ppa.gpg with fingerprint F23C5A6CF475977595C89F51BA6932366A755776
++ apt-get update -y
+Hit:1 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy InRelease
+Hit:2 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates InRelease
+Hit:3 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-backports InRelease
+Hit:4 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy InRelease
+Hit:5 http://security.ubuntu.com/ubuntu jammy-security InRelease
+Reading package lists...
++ apt-get install -y python3.12 python3.12-venv python3.12-dev
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  bzip2 fontconfig-config fonts-dejavu-core libc-dev-bin libc-devtools
+  libc6-dev libcrypt-dev libdeflate0 libexpat1-dev libfontconfig1 libgd3
+  libjbig0 libjpeg-turbo8 libjpeg8 libnsl-dev libpython3.12 libpython3.12-dev
+  libpython3.12-stdlib libtiff5 libtirpc-dev libwebp7 libxpm4 linux-libc-dev
+  mailcap manpages-dev mime-support rpcsvc-proto
+Suggested packages:
+  bzip2-doc glibc-doc libgd-tools
+The following NEW packages will be installed:
+  bzip2 fontconfig-config fonts-dejavu-core libc-dev-bin libc-devtools
+  libc6-dev libcrypt-dev libdeflate0 libexpat1-dev libfontconfig1 libgd3
+  libjbig0 libjpeg-turbo8 libjpeg8 libnsl-dev libpython3.12 libpython3.12-dev
+  libpython3.12-stdlib libtiff5 libtirpc-dev libwebp7 libxpm4 linux-libc-dev
+  mailcap manpages-dev mime-support python3.12 python3.12-dev python3.12-venv
+  rpcsvc-proto
+0 upgraded, 30 newly installed, 0 to remove and 5 not upgraded.
+Need to get 24.2 MB of archives.
+After this operation, 96.9 MB of additional disk space will be used.
+Get:1 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 bzip2 amd64 1.0.8-5build1 [34.8 kB]
+Get:2 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 fonts-dejavu-core all 2.37-2build1 [1041 kB]
+Get:3 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 fontconfig-config all 2.13.1-4.2ubuntu5 [29.1 kB]
+Get:4 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-dev-bin amd64 2.35-0ubuntu3.14 [20.3 kB]
+Get:5 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 libfontconfig1 amd64 2.13.1-4.2ubuntu5 [131 kB]
+Get:6 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 libjpeg-turbo8 amd64 2.1.2-0ubuntu1 [134 kB]
+Get:7 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 libjpeg8 amd64 8c-2ubuntu10 [2264 B]
+Get:8 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 libdeflate0 amd64 1.10-2 [70.9 kB]
+Get:9 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libjbig0 amd64 2.1-3.1ubuntu0.22.04.1 [29.2 kB]
+Get:10 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libwebp7 amd64 1.2.2-2ubuntu0.22.04.2 [206 kB]
+Get:11 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtiff5 amd64 4.3.0-6ubuntu0.13 [185 kB]
+Get:12 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libxpm4 amd64 1:3.5.12-1ubuntu0.22.04.3 [36.5 kB]
+Get:13 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 libpython3.12-stdlib amd64 3.12.13-1+jammy1 [2866 kB]
+Get:14 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libgd3 amd64 2.3.0-2ubuntu2.3 [129 kB]
+Get:15 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-devtools amd64 2.35-0ubuntu3.14 [29.0 kB]
+Get:16 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 linux-libc-dev amd64 5.15.0-190.200 [1343 kB]
+Get:17 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 libcrypt-dev amd64 1:4.4.27-1 [112 kB]
+Get:18 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 rpcsvc-proto amd64 1.4.2-0ubuntu6 [68.5 kB]
+Get:19 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libtirpc-dev amd64 1.3.2-2ubuntu0.1 [192 kB]
+Get:20 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 libnsl-dev amd64 1.3.0-2build2 [71.3 kB]
+Get:21 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-dev amd64 2.35-0ubuntu3.14 [2100 kB]
+Get:22 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libexpat1-dev amd64 2.4.7-1ubuntu0.7 [148 kB]
+Get:23 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy-updates/main amd64 mailcap all 3.70+nmu1ubuntu1.22.04.1 [23.9 kB]
+Get:24 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 mime-support all 3.66 [3696 B]
+Get:25 http://europe-west4.gce.archive.ubuntu.com/ubuntu jammy/main amd64 manpages-dev all 5.10-1ubuntu1 [2309 kB]
+Get:26 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 libpython3.12 amd64 3.12.13-1+jammy1 [2375 kB]
+Get:27 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 libpython3.12-dev amd64 3.12.13-1+jammy1 [5693 kB]
+Get:28 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 python3.12 amd64 3.12.13-1+jammy1 [2517 kB]
+Get:29 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 python3.12-dev amd64 3.12.13-1+jammy1 [498 kB]
+Get:30 https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy/main amd64 python3.12-venv amd64 3.12.13-1+jammy1 [1796 kB]
+Fetched 24.2 MB in 0s (69.5 MB/s)
+Selecting previously unselected package bzip2.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 66818 files and directories currently installed.)
+Preparing to unpack .../00-bzip2_1.0.8-5build1_amd64.deb ...
+Unpacking bzip2 (1.0.8-5build1) ...
+Selecting previously unselected package fonts-dejavu-core.
+Preparing to unpack .../01-fonts-dejavu-core_2.37-2build1_all.deb ...
+Unpacking fonts-dejavu-core (2.37-2build1) ...
+Selecting previously unselected package fontconfig-config.
+Preparing to unpack .../02-fontconfig-config_2.13.1-4.2ubuntu5_all.deb ...
+Unpacking fontconfig-config (2.13.1-4.2ubuntu5) ...
+Selecting previously unselected package libc-dev-bin.
+Preparing to unpack .../03-libc-dev-bin_2.35-0ubuntu3.14_amd64.deb ...
+Unpacking libc-dev-bin (2.35-0ubuntu3.14) ...
+Selecting previously unselected package libfontconfig1:amd64.
+Preparing to unpack .../04-libfontconfig1_2.13.1-4.2ubuntu5_amd64.deb ...
+Unpacking libfontconfig1:amd64 (2.13.1-4.2ubuntu5) ...
+Selecting previously unselected package libjpeg-turbo8:amd64.
+Preparing to unpack .../05-libjpeg-turbo8_2.1.2-0ubuntu1_amd64.deb ...
+Unpacking libjpeg-turbo8:amd64 (2.1.2-0ubuntu1) ...
+Selecting previously unselected package libjpeg8:amd64.
+Preparing to unpack .../06-libjpeg8_8c-2ubuntu10_amd64.deb ...
+Unpacking libjpeg8:amd64 (8c-2ubuntu10) ...
+Selecting previously unselected package libdeflate0:amd64.
+Preparing to unpack .../07-libdeflate0_1.10-2_amd64.deb ...
+Unpacking libdeflate0:amd64 (1.10-2) ...
+Selecting previously unselected package libjbig0:amd64.
+Preparing to unpack .../08-libjbig0_2.1-3.1ubuntu0.22.04.1_amd64.deb ...
+Unpacking libjbig0:amd64 (2.1-3.1ubuntu0.22.04.1) ...
+Selecting previously unselected package libwebp7:amd64.
+Preparing to unpack .../09-libwebp7_1.2.2-2ubuntu0.22.04.2_amd64.deb ...
+Unpacking libwebp7:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+Selecting previously unselected package libtiff5:amd64.
+Preparing to unpack .../10-libtiff5_4.3.0-6ubuntu0.13_amd64.deb ...
+Unpacking libtiff5:amd64 (4.3.0-6ubuntu0.13) ...
+Selecting previously unselected package libxpm4:amd64.
+Preparing to unpack .../11-libxpm4_1%3a3.5.12-1ubuntu0.22.04.3_amd64.deb ...
+Unpacking libxpm4:amd64 (1:3.5.12-1ubuntu0.22.04.3) ...
+Selecting previously unselected package libgd3:amd64.
+Preparing to unpack .../12-libgd3_2.3.0-2ubuntu2.3_amd64.deb ...
+Unpacking libgd3:amd64 (2.3.0-2ubuntu2.3) ...
+Selecting previously unselected package libc-devtools.
+Preparing to unpack .../13-libc-devtools_2.35-0ubuntu3.14_amd64.deb ...
+Unpacking libc-devtools (2.35-0ubuntu3.14) ...
+Selecting previously unselected package linux-libc-dev:amd64.
+Preparing to unpack .../14-linux-libc-dev_5.15.0-190.200_amd64.deb ...
+Unpacking linux-libc-dev:amd64 (5.15.0-190.200) ...
+Selecting previously unselected package libcrypt-dev:amd64.
+Preparing to unpack .../15-libcrypt-dev_1%3a4.4.27-1_amd64.deb ...
+Unpacking libcrypt-dev:amd64 (1:4.4.27-1) ...
+Selecting previously unselected package rpcsvc-proto.
+Preparing to unpack .../16-rpcsvc-proto_1.4.2-0ubuntu6_amd64.deb ...
+Unpacking rpcsvc-proto (1.4.2-0ubuntu6) ...
+Selecting previously unselected package libtirpc-dev:amd64.
+Preparing to unpack .../17-libtirpc-dev_1.3.2-2ubuntu0.1_amd64.deb ...
+Unpacking libtirpc-dev:amd64 (1.3.2-2ubuntu0.1) ...
+Selecting previously unselected package libnsl-dev:amd64.
+Preparing to unpack .../18-libnsl-dev_1.3.0-2build2_amd64.deb ...
+Unpacking libnsl-dev:amd64 (1.3.0-2build2) ...
+Selecting previously unselected package libc6-dev:amd64.
+Preparing to unpack .../19-libc6-dev_2.35-0ubuntu3.14_amd64.deb ...
+Unpacking libc6-dev:amd64 (2.35-0ubuntu3.14) ...
+Selecting previously unselected package libexpat1-dev:amd64.
+Preparing to unpack .../20-libexpat1-dev_2.4.7-1ubuntu0.7_amd64.deb ...
+Unpacking libexpat1-dev:amd64 (2.4.7-1ubuntu0.7) ...
+Selecting previously unselected package mailcap.
+Preparing to unpack .../21-mailcap_3.70+nmu1ubuntu1.22.04.1_all.deb ...
+Unpacking mailcap (3.70+nmu1ubuntu1.22.04.1) ...
+Selecting previously unselected package mime-support.
+Preparing to unpack .../22-mime-support_3.66_all.deb ...
+Unpacking mime-support (3.66) ...
+Selecting previously unselected package libpython3.12-stdlib:amd64.
+Preparing to unpack .../23-libpython3.12-stdlib_3.12.13-1+jammy1_amd64.deb ...
+Unpacking libpython3.12-stdlib:amd64 (3.12.13-1+jammy1) ...
+Selecting previously unselected package libpython3.12:amd64.
+Preparing to unpack .../24-libpython3.12_3.12.13-1+jammy1_amd64.deb ...
+Unpacking libpython3.12:amd64 (3.12.13-1+jammy1) ...
+Selecting previously unselected package libpython3.12-dev:amd64.
+Preparing to unpack .../25-libpython3.12-dev_3.12.13-1+jammy1_amd64.deb ...
+Unpacking libpython3.12-dev:amd64 (3.12.13-1+jammy1) ...
+Selecting previously unselected package manpages-dev.
+Preparing to unpack .../26-manpages-dev_5.10-1ubuntu1_all.deb ...
+Unpacking manpages-dev (5.10-1ubuntu1) ...
+Selecting previously unselected package python3.12.
+Preparing to unpack .../27-python3.12_3.12.13-1+jammy1_amd64.deb ...
+Unpacking python3.12 (3.12.13-1+jammy1) ...
+Selecting previously unselected package python3.12-dev.
+Preparing to unpack .../28-python3.12-dev_3.12.13-1+jammy1_amd64.deb ...
+Unpacking python3.12-dev (3.12.13-1+jammy1) ...
+Selecting previously unselected package python3.12-venv.
+Preparing to unpack .../29-python3.12-venv_3.12.13-1+jammy1_amd64.deb ...
+Unpacking python3.12-venv (3.12.13-1+jammy1) ...
+Setting up manpages-dev (5.10-1ubuntu1) ...
+Setting up libxpm4:amd64 (1:3.5.12-1ubuntu0.22.04.3) ...
+Setting up libdeflate0:amd64 (1.10-2) ...
+Setting up linux-libc-dev:amd64 (5.15.0-190.200) ...
+Setting up bzip2 (1.0.8-5build1) ...
+Setting up libjbig0:amd64 (2.1-3.1ubuntu0.22.04.1) ...
+Setting up libtirpc-dev:amd64 (1.3.2-2ubuntu0.1) ...
+Setting up rpcsvc-proto (1.4.2-0ubuntu6) ...
+Setting up fonts-dejavu-core (2.37-2build1) ...
+Setting up libjpeg-turbo8:amd64 (2.1.2-0ubuntu1) ...
+Setting up libwebp7:amd64 (1.2.2-2ubuntu0.22.04.2) ...
+Setting up libnsl-dev:amd64 (1.3.0-2build2) ...
+Setting up libcrypt-dev:amd64 (1:4.4.27-1) ...
+Setting up libc-dev-bin (2.35-0ubuntu3.14) ...
+Setting up mailcap (3.70+nmu1ubuntu1.22.04.1) ...
+Setting up libjpeg8:amd64 (8c-2ubuntu10) ...
+Setting up mime-support (3.66) ...
+Setting up libpython3.12-stdlib:amd64 (3.12.13-1+jammy1) ...
+Setting up fontconfig-config (2.13.1-4.2ubuntu5) ...
+Setting up python3.12 (3.12.13-1+jammy1) ...
+Setting up libc6-dev:amd64 (2.35-0ubuntu3.14) ...
+Setting up libtiff5:amd64 (4.3.0-6ubuntu0.13) ...
+Setting up libfontconfig1:amd64 (2.13.1-4.2ubuntu5) ...
+Setting up libpython3.12:amd64 (3.12.13-1+jammy1) ...
+Setting up python3.12-venv (3.12.13-1+jammy1) ...
+Setting up libexpat1-dev:amd64 (2.4.7-1ubuntu0.7) ...
+Setting up libgd3:amd64 (2.3.0-2ubuntu2.3) ...
+Setting up libc-devtools (2.35-0ubuntu3.14) ...
+Setting up libpython3.12-dev:amd64 (3.12.13-1+jammy1) ...
+Setting up python3.12-dev (3.12.13-1+jammy1) ...
+Processing triggers for man-db (2.10.2-1) ...
+Processing triggers for libc-bin (2.35-0ubuntu3.14) ...
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
++ python3.12 -m ensurepip --upgrade
+Looking in links: /tmp/tmpevyyq9s6
+Processing /tmp/tmpevyyq9s6/pip-25.0.1-py3-none-any.whl
+Installing collected packages: pip
+Successfully installed pip-25.0.1
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
++ TORCH_INDEX=
++ INSTALL_OK=0
++ '[' -n '' ']'
++ echo 'Installing public PyTorch/XLA: torch '\''torch_xla[tpu]'\'''
+Installing public PyTorch/XLA: torch 'torch_xla[tpu]'
++ set +e
+++ seq 1 5
++ for i in $(seq 1 5)
++ echo 'Attempt 1/5: python3.12 -m pip install --break-system-packages -f https://storage.googleapis.com/libtpu-releases/index.html torch '\''torch_xla[tpu]'\'''
+Attempt 1/5: python3.12 -m pip install --break-system-packages -f https://storage.googleapis.com/libtpu-releases/index.html torch 'torch_xla[tpu]'
++ python3.12 -m pip install --break-system-packages -f https://storage.googleapis.com/libtpu-releases/index.html torch 'torch_xla[tpu]'
+Looking in links: https://storage.googleapis.com/libtpu-releases/index.html
+Collecting torch
+  Downloading torch-2.13.0-cp312-cp312-manylinux_2_28_x86_64.whl.metadata (38 kB)
+Collecting torch_xla[tpu]
+  Downloading torch_xla-2.9.0-cp312-cp312-manylinux_2_28_x86_64.whl.metadata (18 kB)
+Collecting filelock (from torch)
+  Downloading filelock-3.32.4-py3-none-any.whl.metadata (2.0 kB)
+Collecting typing-extensions>=4.10.0 (from torch)
+  Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting setuptools>=77.0.3 (from torch)
+  Downloading setuptools-84.0.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting sympy>=1.13.3 (from torch)
+  Downloading sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+Collecting networkx>=2.5.1 (from torch)
+  Downloading networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+Requirement already satisfied: jinja2 in /usr/lib/python3/dist-packages (from torch) (3.0.3)
+Collecting fsspec>=0.8.5 (from torch)
+  Downloading fsspec-2026.7.0-py3-none-any.whl.metadata (10 kB)
+Collecting cuda-toolkit==13.0.3 (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading cuda_toolkit-13.0.3.0-py2.py3-none-any.whl.metadata (17 kB)
+Collecting cuda-bindings<14,>=13.0.3 (from torch)
+  Downloading cuda_bindings-13.3.1-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (2.5 kB)
+Collecting nvidia-cudnn-cu13==9.20.0.48 (from torch)
+  Downloading nvidia_cudnn_cu13-9.20.0.48-py3-none-manylinux_2_27_x86_64.whl.metadata (1.9 kB)
+Collecting nvidia-cusparselt-cu13==0.8.1 (from torch)
+  Downloading nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl.metadata (12 kB)
+Collecting nvidia-nccl-cu13==2.29.7 (from torch)
+  Downloading nvidia_nccl_cu13-2.29.7-py3-none-manylinux_2_18_x86_64.whl.metadata (2.1 kB)
+Collecting nvidia-nvshmem-cu13==3.4.5 (from torch)
+  Downloading nvidia_nvshmem_cu13-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.1 kB)
+Collecting triton==3.7.1 (from torch)
+  Downloading triton-3.7.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cublas==13.1.1.3.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-cuda-nvrtc==13.0.88.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cuda-runtime==13.0.96.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cufft==12.0.0.61.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-nvjitlink<14,>=13.0.88 (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_nvjitlink-13.3.33-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-cufile==1.15.1.6.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cufile-1.15.1.6-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cuda-cupti==13.0.85.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-curand==10.4.0.35.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_curand-10.4.0.35-py3-none-manylinux_2_27_x86_64.whl.metadata (1.7 kB)
+Collecting nvidia-cusolver==12.0.4.66.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-cusparse==12.6.3.3.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (1.8 kB)
+Collecting nvidia-nvtx==13.0.85.* (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch)
+  Downloading nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl.metadata (1.8 kB)
+Collecting absl-py>=1.0.0 (from torch_xla[tpu])
+  Downloading absl_py-2.5.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting numpy (from torch_xla[tpu])
+  Downloading numpy-2.5.2-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+Requirement already satisfied: pyyaml in /usr/lib/python3/dist-packages (from torch_xla[tpu]) (5.4.1)
+Requirement already satisfied: requests in /usr/lib/python3/dist-packages (from torch_xla[tpu]) (2.25.1)
+Collecting libtpu==0.0.21 (from torch_xla[tpu])
+  Downloading libtpu-0.0.21-cp312-cp312-manylinux_2_31_x86_64.whl.metadata (1.0 kB)
+Collecting tpu-info (from torch_xla[tpu])
+  Downloading tpu_info-0.14.2-py3-none-any.whl.metadata (16 kB)
+Collecting cuda-pathfinder>=1.4.2 (from cuda-bindings<14,>=13.0.3->torch)
+  Downloading cuda_pathfinder-1.8.0-py3-none-any.whl.metadata (1.9 kB)
+Collecting mpmath<1.4,>=1.1.0 (from sympy>=1.13.3->torch)
+  Downloading mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+Collecting grpcio>=1.65.5 (from tpu-info->torch_xla[tpu])
+  Downloading grpcio-1.83.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (3.7 kB)
+Collecting immutabledict (from tpu-info->torch_xla[tpu])
+  Downloading immutabledict-4.3.1-py3-none-any.whl.metadata (3.5 kB)
+Requirement already satisfied: packaging in /usr/lib/python3/dist-packages (from tpu-info->torch_xla[tpu]) (21.3)
+Collecting prometheus-client>=0.20.0 (from tpu-info->torch_xla[tpu])
+  Downloading prometheus_client-0.26.0-py3-none-any.whl.metadata (2.1 kB)
+Collecting protobuf (from tpu-info->torch_xla[tpu])
+  Downloading protobuf-7.36.0-cp310-abi3-manylinux2014_x86_64.whl.metadata (595 bytes)
+Collecting rich (from tpu-info->torch_xla[tpu])
+  Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting markdown-it-py>=2.2.0 (from rich->tpu-info->torch_xla[tpu])
+  Downloading markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting pygments<3.0.0,>=2.13.0 (from rich->tpu-info->torch_xla[tpu])
+  Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich->tpu-info->torch_xla[tpu])
+  Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Downloading torch-2.13.0-cp312-cp312-manylinux_2_28_x86_64.whl (526.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 526.6/526.6 MB 14.7 MB/s eta 0:00:00
+Downloading cuda_toolkit-13.0.3.0-py2.py3-none-any.whl (2.5 kB)
+Downloading nvidia_cudnn_cu13-9.20.0.48-py3-none-manylinux_2_27_x86_64.whl (366.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 366.2/366.2 MB 14.6 MB/s eta 0:00:00
+Downloading nvidia_cusparselt_cu13-0.8.1-py3-none-manylinux2014_x86_64.whl (170.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 170.1/170.1 MB 12.5 MB/s eta 0:00:00
+Downloading nvidia_nccl_cu13-2.29.7-py3-none-manylinux_2_18_x86_64.whl (206.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 206.0/206.0 MB 11.3 MB/s eta 0:00:00
+Downloading nvidia_nvshmem_cu13-3.4.5-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (60.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.4/60.4 MB 6.9 MB/s eta 0:00:00
+Downloading triton-3.7.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (197.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 197.7/197.7 MB 13.4 MB/s eta 0:00:00
+Downloading nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_x86_64.whl (423.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 423.1/423.1 MB 9.3 MB/s eta 0:00:00
+Downloading nvidia_cuda_cupti-13.0.85-py3-none-manylinux_2_25_x86_64.whl (10.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 10.7/10.7 MB 5.6 MB/s eta 0:00:00
+Downloading nvidia_cuda_nvrtc-13.0.88-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl (90.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.2/90.2 MB 25.8 MB/s eta 0:00:00
+Downloading nvidia_cuda_runtime-13.0.96-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.2/2.2 MB 2.3 MB/s eta 0:00:00
+Downloading nvidia_cufft-12.0.0.61-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (214.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 214.1/214.1 MB 14.3 MB/s eta 0:00:00
+Downloading nvidia_cufile-1.15.1.6-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.2/1.2 MB 417.1 kB/s eta 0:00:00
+Downloading nvidia_curand-10.4.0.35-py3-none-manylinux_2_27_x86_64.whl (59.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 59.5/59.5 MB 10.8 MB/s eta 0:00:00
+Downloading nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_x86_64.whl (200.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 200.9/200.9 MB 27.0 MB/s eta 0:00:00
+Downloading nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (145.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 145.9/145.9 MB 10.9 MB/s eta 0:00:00
+Downloading nvidia_nvtx-13.0.85-py3-none-manylinux1_x86_64.manylinux_2_5_x86_64.whl (148 kB)
+Downloading libtpu-0.0.21-cp312-cp312-manylinux_2_31_x86_64.whl (149.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 149.8/149.8 MB 6.3 MB/s eta 0:00:00
+Downloading absl_py-2.5.0-py3-none-any.whl (137 kB)
+Downloading cuda_bindings-13.3.1-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (6.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.7/6.7 MB 7.2 MB/s eta 0:00:00
+Downloading fsspec-2026.7.0-py3-none-any.whl (206 kB)
+Downloading networkx-3.6.1-py3-none-any.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 2.3 MB/s eta 0:00:00
+Downloading setuptools-84.0.0-py3-none-any.whl (818 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 818.2/818.2 kB 634.2 kB/s eta 0:00:00
+Downloading sympy-1.14.0-py3-none-any.whl (6.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.3/6.3 MB 6.2 MB/s eta 0:00:00
+Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Downloading filelock-3.32.4-py3-none-any.whl (99 kB)
+Downloading numpy-2.5.2-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 16.7/16.7 MB 3.4 MB/s eta 0:00:00
+Downloading torch_xla-2.9.0-cp312-cp312-manylinux_2_28_x86_64.whl (80.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 80.3/80.3 MB 24.3 MB/s eta 0:00:00
+Downloading tpu_info-0.14.2-py3-none-any.whl (44 kB)
+Downloading cuda_pathfinder-1.8.0-py3-none-any.whl (62 kB)
+Downloading grpcio-1.83.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (7.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 7.0/7.0 MB 6.2 MB/s eta 0:00:00
+Downloading mpmath-1.3.0-py3-none-any.whl (536 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 536.2/536.2 kB 322.2 kB/s eta 0:00:00
+Downloading nvidia_nvjitlink-13.3.33-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl (40.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 40.7/40.7 MB 21.0 MB/s eta 0:00:00
+Downloading prometheus_client-0.26.0-py3-none-any.whl (64 kB)
+Downloading immutabledict-4.3.1-py3-none-any.whl (5.0 kB)
+Downloading protobuf-7.36.0-cp310-abi3-manylinux2014_x86_64.whl (340 kB)
+Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 1.1 MB/s eta 0:00:00
+Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Installing collected packages: nvidia-cusparselt-cu13, mpmath, cuda-toolkit, typing-extensions, triton, sympy, setuptools, pygments, protobuf, prometheus-client, nvidia-nvtx, nvidia-nvshmem-cu13, nvidia-nvjitlink, nvidia-nccl-cu13, nvidia-curand, nvidia-cufile, nvidia-cuda-runtime, nvidia-cuda-nvrtc, nvidia-cuda-cupti, numpy, networkx, mdurl, libtpu, immutabledict, fsspec, filelock, cuda-pathfinder, absl-py, torch_xla, nvidia-cusparse, nvidia-cufft, nvidia-cublas, markdown-it-py, grpcio, cuda-bindings, rich, nvidia-cusolver, nvidia-cudnn-cu13, tpu-info, torch
+  Attempting uninstall: setuptools
+    Found existing installation: setuptools 59.6.0
+    Uninstalling setuptools-59.6.0:
+      Successfully uninstalled setuptools-59.6.0
+Successfully installed absl-py-2.5.0 cuda-bindings-13.3.1 cuda-pathfinder-1.8.0 cuda-toolkit-13.0.3.0 filelock-3.32.4 fsspec-2026.7.0 grpcio-1.83.1 immutabledict-4.3.1 libtpu-0.0.21 markdown-it-py-4.2.0 mdurl-0.1.2 mpmath-1.3.0 networkx-3.6.1 numpy-2.5.2 nvidia-cublas-13.1.1.3 nvidia-cuda-cupti-13.0.85 nvidia-cuda-nvrtc-13.0.88 nvidia-cuda-runtime-13.0.96 nvidia-cudnn-cu13-9.20.0.48 nvidia-cufft-12.0.0.61 nvidia-cufile-1.15.1.6 nvidia-curand-10.4.0.35 nvidia-cusolver-12.0.4.66 nvidia-cusparse-12.6.3.3 nvidia-cusparselt-cu13-0.8.1 nvidia-nccl-cu13-2.29.7 nvidia-nvjitlink-13.3.33 nvidia-nvshmem-cu13-3.4.5 nvidia-nvtx-13.0.85 prometheus-client-0.26.0 protobuf-7.36.0 pygments-2.21.0 rich-15.0.0 setuptools-84.0.0 sympy-1.14.0 torch-2.13.0 torch_xla-2.9.0 tpu-info-0.14.2 triton-3.7.1 typing-extensions-4.16.0
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python3.12 -m pip install --upgrade pip
++ '[' 0 -eq 0 ']'
++ INSTALL_OK=1
++ echo 'PyTorch/XLA installed.'
+PyTorch/XLA installed.
++ break
++ set -e
++ '[' 1 -eq 0 ']'
++ TORCH_DEVICE=xla
++ echo TORCH_DEVICE=xla
++ '[' -n 'transformers accelerate huggingface_hub compressed-tensors '\''jinja2>=3.1'\'' jax '\''setuptools<81'\'' xprof tensorboard tensorboard-plugin-profile' ']'
++ echo 'Installing extras: transformers accelerate huggingface_hub compressed-tensors '\''jinja2>=3.1'\'' jax '\''setuptools<81'\'' xprof tensorboard tensorboard-plugin-profile'
+Installing extras: transformers accelerate huggingface_hub compressed-tensors 'jinja2>=3.1' jax 'setuptools<81' xprof tensorboard tensorboard-plugin-profile
++ set +e
++ python3.12 -m pip install --break-system-packages transformers accelerate huggingface_hub compressed-tensors 'jinja2>=3.1' jax 'setuptools<81' xprof tensorboard tensorboard-plugin-profile
+Collecting transformers
+  Downloading transformers-5.16.1-py3-none-any.whl.metadata (32 kB)
+Collecting accelerate
+  Downloading accelerate-1.14.0-py3-none-any.whl.metadata (19 kB)
+Collecting huggingface_hub
+  Downloading huggingface_hub-1.29.0-py3-none-any.whl.metadata (16 kB)
+Collecting compressed-tensors
+  Downloading compressed_tensors-0.18.0-py3-none-any.whl.metadata (4.8 kB)
+Collecting jinja2>=3.1
+  Downloading jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting jax
+  Downloading jax-0.11.1-py3-none-any.whl.metadata (13 kB)
+Collecting setuptools<81
+  Downloading setuptools-80.10.2-py3-none-any.whl.metadata (6.6 kB)
+Collecting xprof
+  Downloading xprof-2.23.1-py3-none-manylinux_2_27_x86_64.whl.metadata (16 kB)
+Collecting tensorboard
+  Downloading tensorboard-2.21.0-py3-none-any.whl.metadata (1.8 kB)
+Collecting tensorboard-plugin-profile
+  Downloading tensorboard_plugin_profile-2.23.1-py3-none-any.whl.metadata (16 kB)
+Requirement already satisfied: numpy>=1.17 in /usr/local/lib/python3.12/dist-packages (from transformers) (2.5.2)
+Requirement already satisfied: packaging>=20.0 in /usr/lib/python3/dist-packages (from transformers) (21.3)
+Requirement already satisfied: pyyaml>=5.1 in /usr/lib/python3/dist-packages (from transformers) (5.4.1)
+Collecting regex>=2025.10.22 (from transformers)
+  Downloading regex-2026.7.19-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (40 kB)
+Collecting tokenizers<0.24.0,>=0.23.1 (from transformers)
+  Downloading tokenizers-0.23.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (9.8 kB)
+Collecting typer (from transformers)
+  Downloading typer-0.27.2-py3-none-any.whl.metadata (16 kB)
+Collecting safetensors>=0.8.0 (from transformers)
+  Downloading safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.2 kB)
+Collecting tqdm>=4.60 (from transformers)
+  Downloading tqdm-4.70.0-py3-none-any.whl.metadata (57 kB)
+Collecting psutil (from accelerate)
+  Downloading psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl.metadata (22 kB)
+Requirement already satisfied: torch>=2.0.0 in /usr/local/lib/python3.12/dist-packages (from accelerate) (2.13.0)
+Collecting click<9.0.0,>=8.4.2 (from huggingface_hub)
+  Downloading click-8.5.0-py3-none-any.whl.metadata (2.6 kB)
+Requirement already satisfied: filelock>=3.10.0 in /usr/local/lib/python3.12/dist-packages (from huggingface_hub) (3.32.4)
+Requirement already satisfied: fsspec>=2023.5.0 in /usr/local/lib/python3.12/dist-packages (from huggingface_hub) (2026.7.0)
+Collecting hf-xet<2.0.0,>=1.5.2 (from huggingface_hub)
+  Downloading hf_xet-1.6.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (4.9 kB)
+Collecting httpx<1,>=0.23.0 (from huggingface_hub)
+  Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+Requirement already satisfied: typing-extensions>=4.1.0 in /usr/local/lib/python3.12/dist-packages (from huggingface_hub) (4.16.0)
+Collecting pydantic>=2.0 (from compressed-tensors)
+  Downloading pydantic-2.13.5-py3-none-any.whl.metadata (110 kB)
+Collecting loguru (from compressed-tensors)
+  Downloading loguru-0.7.3-py3-none-any.whl.metadata (22 kB)
+Requirement already satisfied: MarkupSafe>=2.0 in /usr/lib/python3/dist-packages (from jinja2>=3.1) (2.0.1)
+Collecting jaxlib<=0.11.1,>=0.11.1 (from jax)
+  Downloading jaxlib-0.11.1-cp312-cp312-manylinux_2_27_x86_64.whl.metadata (1.3 kB)
+Collecting ml_dtypes>=0.5.0 (from jax)
+  Downloading ml_dtypes-0.6.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.8 kB)
+Collecting opt_einsum (from jax)
+  Downloading opt_einsum-3.4.0-py3-none-any.whl.metadata (6.3 kB)
+Collecting scipy>=1.15 (from jax)
+  Downloading scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (62 kB)
+Requirement already satisfied: absl-py>=2.1.0 in /usr/local/lib/python3.12/dist-packages (from xprof) (2.5.0)
+Collecting gviz_api>=1.9.0 (from xprof)
+  Downloading gviz_api-1.10.0-py2.py3-none-any.whl.metadata (2.6 kB)
+Requirement already satisfied: protobuf>=3.19.6 in /usr/local/lib/python3.12/dist-packages (from xprof) (7.36.0)
+Requirement already satisfied: six>=1.10.0 in /usr/lib/python3/dist-packages (from xprof) (1.16.0)
+Collecting werkzeug>=0.11.15 (from xprof)
+  Downloading werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+Collecting etils>=1.0.0 (from etils[epath]>=1.0.0->xprof)
+  Downloading etils-1.14.0-py3-none-any.whl.metadata (6.5 kB)
+Collecting cheroot>=10.0.1 (from xprof)
+  Downloading cheroot-11.1.2-py3-none-any.whl.metadata (7.0 kB)
+Collecting gcsfs>=2024.3.1 (from xprof)
+  Downloading gcsfs-2026.8.0-py3-none-any.whl.metadata (4.6 kB)
+Collecting google-cloud-storage>=3.12.0 (from xprof)
+  Downloading google_cloud_storage-3.13.1-py3-none-any.whl.metadata (14 kB)
+Collecting urllib3>=2.7.0 (from xprof)
+  Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+Collecting fire>=0.4.0 (from xprof)
+  Downloading fire-0.7.1-py3-none-any.whl.metadata (5.8 kB)
+Requirement already satisfied: grpcio<2.0,>=1.74.0 in /usr/local/lib/python3.12/dist-packages (from tensorboard) (1.83.1)
+Collecting markdown>=2.6.8 (from tensorboard)
+  Downloading markdown-3.10.3-py3-none-any.whl.metadata (5.1 kB)
+Collecting pillow (from tensorboard)
+  Downloading pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (9.1 kB)
+Collecting tensorboard-data-server<0.8.0,>=0.7.0 (from tensorboard)
+  Downloading tensorboard_data_server-0.7.2-py3-none-manylinux_2_31_x86_64.whl.metadata (1.1 kB)
+Requirement already satisfied: more-itertools>=2.6 in /usr/lib/python3/dist-packages (from cheroot>=10.0.1->xprof) (8.10.0)
+Collecting jaraco.functools (from cheroot>=10.0.1->xprof)
+  Downloading jaraco_functools-4.6.0-py3-none-any.whl.metadata (2.9 kB)
+Requirement already satisfied: zipp in /usr/lib/python3/dist-packages (from etils[epath]>=1.0.0->xprof) (1.0.0)
+Collecting termcolor (from fire>=0.4.0->xprof)
+  Downloading termcolor-3.3.0-py3-none-any.whl.metadata (6.5 kB)
+Collecting aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0 (from gcsfs>=2024.3.1->xprof)
+  Downloading aiohttp-3.14.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (8.3 kB)
+Collecting decorator>4.1.2 (from gcsfs>=2024.3.1->xprof)
+  Downloading decorator-5.3.1-py3-none-any.whl.metadata (3.9 kB)
+Collecting google-auth-oauthlib (from gcsfs>=2024.3.1->xprof)
+  Downloading google_auth_oauthlib-1.4.1-py3-none-any.whl.metadata (2.6 kB)
+Collecting google-auth>=1.2 (from gcsfs>=2024.3.1->xprof)
+  Downloading google_auth-2.57.0-py3-none-any.whl.metadata (6.0 kB)
+Collecting google-cloud-storage-control (from gcsfs>=2024.3.1->xprof)
+  Downloading google_cloud_storage_control-1.14.0-py3-none-any.whl.metadata (9.8 kB)
+Requirement already satisfied: requests in /usr/lib/python3/dist-packages (from gcsfs>=2024.3.1->xprof) (2.25.1)
+Collecting google-api-core<3.0.0,>=2.27.0 (from google-cloud-storage>=3.12.0->xprof)
+  Downloading google_api_core-2.34.0-py3-none-any.whl.metadata (2.9 kB)
+Collecting google-cloud-core<3.0.0,>=2.4.2 (from google-cloud-storage>=3.12.0->xprof)
+  Downloading google_cloud_core-2.7.0-py3-none-any.whl.metadata (2.8 kB)
+Collecting google-resumable-media<3.0.0,>=2.7.2 (from google-cloud-storage>=3.12.0->xprof)
+  Downloading google_resumable_media-2.10.2-py3-none-any.whl.metadata (2.2 kB)
+Collecting google-crc32c<2.0.0,>=1.6.0 (from google-cloud-storage>=3.12.0->xprof)
+  Downloading google_crc32c-1.8.0-cp312-cp312-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl.metadata (1.7 kB)
+Collecting anyio (from httpx<1,>=0.23.0->huggingface_hub)
+  Downloading anyio-4.14.2-py3-none-any.whl.metadata (4.6 kB)
+Requirement already satisfied: certifi in /usr/lib/python3/dist-packages (from httpx<1,>=0.23.0->huggingface_hub) (2020.6.20)
+Collecting httpcore==1.* (from httpx<1,>=0.23.0->huggingface_hub)
+  Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+Requirement already satisfied: idna in /usr/lib/python3/dist-packages (from httpx<1,>=0.23.0->huggingface_hub) (3.3)
+Collecting h11>=0.16 (from httpcore==1.*->httpx<1,>=0.23.0->huggingface_hub)
+  Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Collecting annotated-types>=0.6.0 (from pydantic>=2.0->compressed-tensors)
+  Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.46.5 (from pydantic>=2.0->compressed-tensors)
+  Downloading pydantic_core-2.46.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+Collecting typing-inspection>=0.4.2 (from pydantic>=2.0->compressed-tensors)
+  Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Requirement already satisfied: sympy>=1.13.3 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (1.14.0)
+Requirement already satisfied: networkx>=2.5.1 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (3.6.1)
+Requirement already satisfied: cuda-toolkit==13.0.3 in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (13.0.3.0)
+Requirement already satisfied: cuda-bindings<14,>=13.0.3 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (13.3.1)
+Requirement already satisfied: nvidia-cudnn-cu13==9.20.0.48 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (9.20.0.48)
+Requirement already satisfied: nvidia-cusparselt-cu13==0.8.1 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (0.8.1)
+Requirement already satisfied: nvidia-nccl-cu13==2.29.7 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (2.29.7)
+Requirement already satisfied: nvidia-nvshmem-cu13==3.4.5 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (3.4.5)
+Requirement already satisfied: triton==3.7.1 in /usr/local/lib/python3.12/dist-packages (from torch>=2.0.0->accelerate) (3.7.1)
+Requirement already satisfied: nvidia-cublas==13.1.1.3.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (13.1.1.3)
+Requirement already satisfied: nvidia-cuda-nvrtc==13.0.88.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (13.0.88)
+Requirement already satisfied: nvidia-cuda-runtime==13.0.96.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (13.0.96)
+Requirement already satisfied: nvidia-cufft==12.0.0.61.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (12.0.0.61)
+Requirement already satisfied: nvidia-nvjitlink<14,>=13.0.88 in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (13.3.33)
+Requirement already satisfied: nvidia-cufile==1.15.1.6.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (1.15.1.6)
+Requirement already satisfied: nvidia-cuda-cupti==13.0.85.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (13.0.85)
+Requirement already satisfied: nvidia-curand==10.4.0.35.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (10.4.0.35)
+Requirement already satisfied: nvidia-cusolver==12.0.4.66.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (12.0.4.66)
+Requirement already satisfied: nvidia-cusparse==12.6.3.3.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (12.6.3.3)
+Requirement already satisfied: nvidia-nvtx==13.0.85.* in /usr/local/lib/python3.12/dist-packages (from cuda-toolkit[cublas,cudart,cufft,cufile,cupti,curand,cusolver,cusparse,nvjitlink,nvrtc,nvtx]==13.0.3; platform_system == "Linux"->torch>=2.0.0->accelerate) (13.0.85)
+Collecting MarkupSafe>=2.0 (from jinja2>=3.1)
+  Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.7 kB)
+Collecting shellingham>=1.3.0 (from typer->transformers)
+  Downloading shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+Requirement already satisfied: rich>=13.8.0 in /usr/local/lib/python3.12/dist-packages (from typer->transformers) (15.0.0)
+Collecting annotated-doc>=0.0.2 (from typer->transformers)
+  Downloading annotated_doc-0.0.5-py3-none-any.whl.metadata (6.5 kB)
+Collecting aiohappyeyeballs>=2.5.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->gcsfs>=2024.3.1->xprof)
+  Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+Collecting aiosignal>=1.4.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->gcsfs>=2024.3.1->xprof)
+  Downloading aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+Requirement already satisfied: attrs>=17.3.0 in /usr/lib/python3/dist-packages (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->gcsfs>=2024.3.1->xprof) (21.2.0)
+Collecting frozenlist>=1.1.1 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->gcsfs>=2024.3.1->xprof)
+  Downloading frozenlist-1.8.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (20 kB)
+Collecting multidict<7.0,>=4.5 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->gcsfs>=2024.3.1->xprof)
+  Downloading multidict-6.7.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (5.3 kB)
+Collecting propcache>=0.2.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->gcsfs>=2024.3.1->xprof)
+  Downloading propcache-0.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (16 kB)
+Collecting yarl<2.0,>=1.17.0 (from aiohttp!=4.0.0a0,!=4.0.0a1,>=3.9.0->gcsfs>=2024.3.1->xprof)
+  Downloading yarl-1.24.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (103 kB)
+Requirement already satisfied: cuda-pathfinder>=1.4.2 in /usr/local/lib/python3.12/dist-packages (from cuda-bindings<14,>=13.0.3->torch>=2.0.0->accelerate) (1.8.0)
+Collecting googleapis-common-protos<2.0.0,>=1.69.2 (from google-api-core<3.0.0,>=2.27.0->google-cloud-storage>=3.12.0->xprof)
+  Downloading googleapis_common_protos-1.75.2-py3-none-any.whl.metadata (8.5 kB)
+Collecting proto-plus<2.0.0,>=1.26.1 (from google-api-core<3.0.0,>=2.27.0->google-cloud-storage>=3.12.0->xprof)
+  Downloading proto_plus-1.28.4-py3-none-any.whl.metadata (2.2 kB)
+Collecting requests (from gcsfs>=2024.3.1->xprof)
+  Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in /usr/lib/python3/dist-packages (from google-auth>=1.2->gcsfs>=2024.3.1->xprof) (0.2.1)
+Collecting cryptography>=38.0.3 (from google-auth>=1.2->gcsfs>=2024.3.1->xprof)
+  Downloading cryptography-50.0.1-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.3 kB)
+Collecting charset_normalizer<4,>=2 (from requests->gcsfs>=2024.3.1->xprof)
+  Downloading charset_normalizer-3.5.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (45 kB)
+Collecting certifi (from httpx<1,>=0.23.0->huggingface_hub)
+  Downloading certifi-2026.7.22-py3-none-any.whl.metadata (2.5 kB)
+Requirement already satisfied: markdown-it-py>=2.2.0 in /usr/local/lib/python3.12/dist-packages (from rich>=13.8.0->typer->transformers) (4.2.0)
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /usr/local/lib/python3.12/dist-packages (from rich>=13.8.0->typer->transformers) (2.21.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in /usr/local/lib/python3.12/dist-packages (from sympy>=1.13.3->torch>=2.0.0->accelerate) (1.3.0)
+Collecting requests-oauthlib>=0.7.0 (from google-auth-oauthlib->gcsfs>=2024.3.1->xprof)
+  Downloading requests_oauthlib-2.0.0-py2.py3-none-any.whl.metadata (11 kB)
+Collecting grpc-google-iam-v1<1.0.0,>=0.14.2 (from google-cloud-storage-control->gcsfs>=2024.3.1->xprof)
+  Downloading grpc_google_iam_v1-0.14.5-py3-none-any.whl.metadata (8.8 kB)
+Collecting cffi>=2.0.0 (from cryptography>=38.0.3->google-auth>=1.2->gcsfs>=2024.3.1->xprof)
+  Downloading cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+Collecting grpcio-status<2.0.0,>=1.59.0 (from google-api-core[grpc]<3.0.0,>=2.25.0->google-cloud-storage-control->gcsfs>=2024.3.1->xprof)
+  Downloading grpcio_status-1.83.1-py3-none-any.whl.metadata (1.2 kB)
+Requirement already satisfied: mdurl~=0.1 in /usr/local/lib/python3.12/dist-packages (from markdown-it-py>=2.2.0->rich>=13.8.0->typer->transformers) (0.1.2)
+Requirement already satisfied: oauthlib>=3.0.0 in /usr/lib/python3/dist-packages (from requests-oauthlib>=0.7.0->google-auth-oauthlib->gcsfs>=2024.3.1->xprof) (3.2.0)
+Collecting pycparser (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=1.2->gcsfs>=2024.3.1->xprof)
+  Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+Downloading transformers-5.16.1-py3-none-any.whl (12.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 12.1/12.1 MB 3.3 MB/s eta 0:00:00
+Downloading accelerate-1.14.0-py3-none-any.whl (389 kB)
+Downloading huggingface_hub-1.29.0-py3-none-any.whl (795 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 795.8/795.8 kB 175.4 kB/s eta 0:00:00
+Downloading compressed_tensors-0.18.0-py3-none-any.whl (224 kB)
+Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+Downloading jax-0.11.1-py3-none-any.whl (3.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 1.0 MB/s eta 0:00:00
+Downloading setuptools-80.10.2-py3-none-any.whl (1.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.1/1.1 MB 273.6 kB/s eta 0:00:00
+Downloading xprof-2.23.1-py3-none-manylinux_2_27_x86_64.whl (24.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 24.7/24.7 MB 4.8 MB/s eta 0:00:00
+Downloading tensorboard-2.21.0-py3-none-any.whl (5.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.5/5.5 MB 1.2 MB/s eta 0:00:00
+Downloading tensorboard_plugin_profile-2.23.1-py3-none-any.whl (7.1 kB)
+Downloading cheroot-11.1.2-py3-none-any.whl (109 kB)
+Downloading click-8.5.0-py3-none-any.whl (125 kB)
+Downloading etils-1.14.0-py3-none-any.whl (172 kB)
+Downloading fire-0.7.1-py3-none-any.whl (115 kB)
+Downloading gcsfs-2026.8.0-py3-none-any.whl (91 kB)
+Downloading google_cloud_storage-3.13.1-py3-none-any.whl (341 kB)
+Downloading gviz_api-1.10.0-py2.py3-none-any.whl (13 kB)
+Downloading hf_xet-1.6.0-cp38-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (4.5 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.5/4.5 MB 1.1 MB/s eta 0:00:00
+Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+Downloading jaxlib-0.11.1-cp312-cp312-manylinux_2_27_x86_64.whl (87.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 87.9/87.9 MB 7.6 MB/s eta 0:00:00
+Downloading markdown-3.10.3-py3-none-any.whl (110 kB)
+Downloading ml_dtypes-0.6.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (409 kB)
+Downloading pydantic-2.13.5-py3-none-any.whl (472 kB)
+Downloading pydantic_core-2.46.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 319.4 kB/s eta 0:00:00
+Downloading regex-2026.7.19-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (801 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 801.8/801.8 kB 154.3 kB/s eta 0:00:00
+Downloading safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (516 kB)
+Downloading scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (35.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 35.3/35.3 MB 5.5 MB/s eta 0:00:00
+Downloading tensorboard_data_server-0.7.2-py3-none-manylinux_2_31_x86_64.whl (6.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.6/6.6 MB 3.2 MB/s eta 0:00:00
+Downloading tokenizers-0.23.1-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.3/3.3 MB 3.5 MB/s eta 0:00:00
+Downloading tqdm-4.70.0-py3-none-any.whl (80 kB)
+Downloading urllib3-2.7.0-py3-none-any.whl (131 kB)
+Downloading werkzeug-3.1.8-py3-none-any.whl (226 kB)
+Downloading markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (22 kB)
+Downloading loguru-0.7.3-py3-none-any.whl (61 kB)
+Downloading opt_einsum-3.4.0-py3-none-any.whl (71 kB)
+Downloading pillow-12.3.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (6.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 6.9/6.9 MB 7.2 MB/s eta 0:00:00
+Downloading psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl (155 kB)
+Downloading typer-0.27.2-py3-none-any.whl (123 kB)
+Downloading aiohttp-3.14.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.8/1.8 MB 1.1 MB/s eta 0:00:00
+Downloading annotated_doc-0.0.5-py3-none-any.whl (5.3 kB)
+Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading decorator-5.3.1-py3-none-any.whl (10 kB)
+Downloading google_api_core-2.34.0-py3-none-any.whl (180 kB)
+Downloading google_auth-2.57.0-py3-none-any.whl (259 kB)
+Downloading google_cloud_core-2.7.0-py3-none-any.whl (31 kB)
+Downloading google_crc32c-1.8.0-cp312-cp312-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl (33 kB)
+Downloading google_resumable_media-2.10.2-py3-none-any.whl (81 kB)
+Downloading requests-2.34.2-py3-none-any.whl (73 kB)
+Downloading certifi-2026.7.22-py3-none-any.whl (136 kB)
+Downloading shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading anyio-4.14.2-py3-none-any.whl (125 kB)
+Downloading google_auth_oauthlib-1.4.1-py3-none-any.whl (19 kB)
+Downloading google_cloud_storage_control-1.14.0-py3-none-any.whl (113 kB)
+Downloading jaraco_functools-4.6.0-py3-none-any.whl (11 kB)
+Downloading termcolor-3.3.0-py3-none-any.whl (7.7 kB)
+Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+Downloading aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+Downloading charset_normalizer-3.5.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (248 kB)
+Downloading cryptography-50.0.1-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 3.0 MB/s eta 0:00:00
+Downloading frozenlist-1.8.0-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (242 kB)
+Downloading googleapis_common_protos-1.75.2-py3-none-any.whl (307 kB)
+Downloading grpc_google_iam_v1-0.14.5-py3-none-any.whl (32 kB)
+Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+Downloading multidict-6.7.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (256 kB)
+Downloading propcache-0.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (61 kB)
+Downloading proto_plus-1.28.4-py3-none-any.whl (50 kB)
+Downloading requests_oauthlib-2.0.0-py2.py3-none-any.whl (24 kB)
+Downloading yarl-1.24.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (109 kB)
+Downloading cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+Downloading grpcio_status-1.83.1-py3-none-any.whl (14 kB)
+Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+Installing collected packages: urllib3, typing-inspection, tqdm, termcolor, tensorboard-data-server, shellingham, setuptools, scipy, safetensors, regex, pydantic-core, pycparser, psutil, proto-plus, propcache, pillow, opt_einsum, multidict, ml_dtypes, MarkupSafe, markdown, loguru, jaraco.functools, hf-xet, h11, gviz_api, googleapis-common-protos, google-crc32c, frozenlist, etils, decorator, click, charset_normalizer, certifi, anyio, annotated-types, annotated-doc, aiohappyeyeballs, yarl, werkzeug, requests, pydantic, jinja2, jaxlib, httpcore, grpcio-status, google-resumable-media, fire, cheroot, cffi, aiosignal, typer, tensorboard, requests-oauthlib, jax, httpx, grpc-google-iam-v1, cryptography, aiohttp, huggingface_hub, google-auth, tokenizers, google-auth-oauthlib, google-api-core, accelerate, transformers, google-cloud-core, google-cloud-storage-control, google-cloud-storage, compressed-tensors, gcsfs, xprof, tensorboard-plugin-profile
+  Attempting uninstall: urllib3
+    Found existing installation: urllib3 1.26.5
+    Uninstalling urllib3-1.26.5:
+      Successfully uninstalled urllib3-1.26.5
+  Attempting uninstall: setuptools
+    Found existing installation: setuptools 84.0.0
+    Uninstalling setuptools-84.0.0:
+      Successfully uninstalled setuptools-84.0.0
+  Attempting uninstall: MarkupSafe
+    Found existing installation: MarkupSafe 2.0.1
+    Uninstalling MarkupSafe-2.0.1:
+      Successfully uninstalled MarkupSafe-2.0.1
+  Attempting uninstall: click
+    Found existing installation: click 8.0.3
+    Uninstalling click-8.0.3:
+      Successfully uninstalled click-8.0.3
+  Attempting uninstall: certifi
+    Found existing installation: certifi 2020.6.20
+    Uninstalling certifi-2020.6.20:
+      Successfully uninstalled certifi-2020.6.20
+  Attempting uninstall: requests
+    Found existing installation: requests 2.25.1
+    Uninstalling requests-2.25.1:
+      Successfully uninstalled requests-2.25.1
+  Attempting uninstall: jinja2
+    Found existing installation: Jinja2 3.0.3
+    Uninstalling Jinja2-3.0.3:
+      Successfully uninstalled Jinja2-3.0.3
+  Attempting uninstall: cryptography
+    Found existing installation: cryptography 3.4.8
+    Uninstalling cryptography-3.4.8:
+      Successfully uninstalled cryptography-3.4.8
+Successfully installed MarkupSafe-3.0.3 accelerate-1.14.0 aiohappyeyeballs-2.7.1 aiohttp-3.14.3 aiosignal-1.4.0 annotated-doc-0.0.5 annotated-types-0.8.0 anyio-4.14.2 certifi-2026.7.22 cffi-2.1.1 charset_normalizer-3.5.1 cheroot-11.1.2 click-8.5.0 compressed-tensors-0.18.0 cryptography-50.0.1 decorator-5.3.1 etils-1.14.0 fire-0.7.1 frozenlist-1.8.0 gcsfs-2026.8.0 google-api-core-2.34.0 google-auth-2.57.0 google-auth-oauthlib-1.4.1 google-cloud-core-2.7.0 google-cloud-storage-3.13.1 google-cloud-storage-control-1.14.0 google-crc32c-1.8.0 google-resumable-media-2.10.2 googleapis-common-protos-1.75.2 grpc-google-iam-v1-0.14.5 grpcio-status-1.83.1 gviz_api-1.10.0 h11-0.16.0 hf-xet-1.6.0 httpcore-1.0.9 httpx-0.28.1 huggingface_hub-1.29.0 jaraco.functools-4.6.0 jax-0.11.1 jaxlib-0.11.1 jinja2-3.1.6 loguru-0.7.3 markdown-3.10.3 ml_dtypes-0.6.0 multidict-6.7.1 opt_einsum-3.4.0 pillow-12.3.0 propcache-0.5.2 proto-plus-1.28.4 psutil-7.2.2 pycparser-3.0 pydantic-2.13.5 pydantic-core-2.46.5 regex-2026.7.19 requests-2.34.2 requests-oauthlib-2.0.0 safetensors-0.8.0 scipy-1.18.1 setuptools-80.10.2 shellingham-1.5.4 tensorboard-2.21.0 tensorboard-data-server-0.7.2 tensorboard-plugin-profile-2.23.1 termcolor-3.3.0 tokenizers-0.23.1 tqdm-4.70.0 transformers-5.16.1 typer-0.27.2 typing-inspection-0.4.4 urllib3-2.7.0 werkzeug-3.1.8 xprof-2.23.1 yarl-1.24.5
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python3.12 -m pip install --upgrade pip
++ '[' 0 -ne 0 ']'
++ set -e
++ set +x
+Hugging Face token fetched from Secret Manager.
++ cat
++ echo 'Running the PyTorch TPU backend smoke test (/opt/tpu_smoke.py)...'
+Running the PyTorch TPU backend smoke test (/opt/tpu_smoke.py)...
++ set +e
++ SMOKE_OK=0
+++ seq 1 3
++ for i in $(seq 1 3)
++ TORCH_DEVICE=xla
++ python3.12 /opt/tpu_smoke.py
+Traceback (most recent call last):
+  File "/opt/tpu_smoke.py", line 7, in <module>
+    import torch_xla
+  File "/usr/local/lib/python3.12/dist-packages/torch_xla/__init__.py", line 10, in <module>
+    import _XLAC
+ImportError: /usr/local/lib/python3.12/dist-packages/_XLAC.cpython-312-x86_64-linux-gnu.so: undefined symbol: _ZN5torch8autograd10deleteNodeEPNS0_4NodeE
++ '[' 1 -eq 0 ']'
++ echo 'Smoke test failed (attempt 1/3), retrying in 20 seconds...'
+Smoke test failed (attempt 1/3), retrying in 20 seconds...
++ sleep 20
++ for i in $(seq 1 3)
++ TORCH_DEVICE=xla
++ python3.12 /opt/tpu_smoke.py
+Traceback (most recent call last):
+  File "/opt/tpu_smoke.py", line 7, in <module>
+    import torch_xla
+  File "/usr/local/lib/python3.12/dist-packages/torch_xla/__init__.py", line 10, in <module>
+    import _XLAC
+ImportError: /usr/local/lib/python3.12/dist-packages/_XLAC.cpython-312-x86_64-linux-gnu.so: undefined symbol: _ZN5torch8autograd10deleteNodeEPNS0_4NodeE
++ '[' 1 -eq 0 ']'
++ echo 'Smoke test failed (attempt 2/3), retrying in 20 seconds...'
+Smoke test failed (attempt 2/3), retrying in 20 seconds...
++ sleep 20
++ for i in $(seq 1 3)
++ TORCH_DEVICE=xla
++ python3.12 /opt/tpu_smoke.py
+Traceback (most recent call last):
+  File "/opt/tpu_smoke.py", line 7, in <module>
+    import torch_xla
+  File "/usr/local/lib/python3.12/dist-packages/torch_xla/__init__.py", line 10, in <module>
+    import _XLAC
+ImportError: /usr/local/lib/python3.12/dist-packages/_XLAC.cpython-312-x86_64-linux-gnu.so: undefined symbol: _ZN5torch8autograd10deleteNodeEPNS0_4NodeE
++ '[' 1 -eq 0 ']'
++ echo 'Smoke test failed (attempt 3/3), retrying in 20 seconds...'
+Smoke test failed (attempt 3/3), retrying in 20 seconds...
++ sleep 20
++ set -e
++ '[' 0 -eq 0 ']'
++ echo 'ERROR: the PyTorch TPU backend smoke test failed — torch cannot see or compile for the TPU.'
+ERROR: the PyTorch TPU backend smoke test failed — torch cannot see or compile for the TPU.
++ echo 'Inspect /var/log/tpu-startup.log on the VM or rerun /opt/tpu_smoke.py.'
+Inspect /var/log/tpu-startup.log on the VM or rerun /opt/tpu_smoke.py.
++ exit 1

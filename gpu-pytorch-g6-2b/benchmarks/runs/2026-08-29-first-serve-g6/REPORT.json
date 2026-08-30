@@ -1,0 +1,133 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-29-first-serve-g6",
+    "date": "2026-08-29",
+    "operator": "xbill",
+    "source": "sweep.py + make_report.py in gpu-pytorch-g6-2b",
+    "notes": "First serve for this rig. Driven from the rig-root server.py rather than the registered MCP server, whose snapshot predated the deploy-path fixes."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA L4",
+    "chips": 1,
+    "topology": "single device",
+    "hbm_gb_per_chip": 23.034,
+    "machine_type": "g6.2xlarge",
+    "host": {
+      "cpu": "AMD EPYC (x86_64)",
+      "vcpus": 8,
+      "ram_gb": 32
+    },
+    "pricing": {
+      "rate_per_chip_hour": 0.9408,
+      "currency": "USD",
+      "source": "aws ec2 describe-spot-price-history, us-east-1d, spot, at run time"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "parameters_b": 5.4,
+    "weights_dtype": "bfloat16",
+    "quantization": "none (dense reference checkpoint)",
+    "kv_cache_dtype": "bfloat16",
+    "max_model_len": 4096,
+    "architecture_notes": "E2B: 28 sliding layers at head_dim 256 plus 7 full-attention layers at global_head_dim 512; 8 query heads to 1 KV head. transformers owns the cache here -- there is no hand-written ring and no padding."
+  },
+  "software": {
+    "engine": "pytorch-transformers",
+    "version": "torch 2.12.0+cu132",
+    "backend": "cuda",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "--seq",
+      "4096"
+    ],
+    "container_image": "AMI ami-0d7cd40a7956dd2c4"
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (this rig)",
+      "dataset": "synthetic repeated filler, summarize instruction",
+      "num_prompts": 1,
+      "runs_per_point": 3
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 84,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 21.367,
+        "request_latency_s": 1.605
+      },
+      {
+        "concurrency": 1,
+        "input_len": 84,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 21.444,
+        "request_latency_s": 6.08
+      },
+      {
+        "concurrency": 1,
+        "input_len": 575,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 20.895,
+        "request_latency_s": 1.673
+      },
+      {
+        "concurrency": 1,
+        "input_len": 575,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 20.867,
+        "request_latency_s": 6.268
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1134,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 21.038,
+        "request_latency_s": 1.741
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1134,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 20.913,
+        "request_latency_s": 6.329
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2254,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 20.748,
+        "request_latency_s": 1.96
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2254,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 20.95,
+        "request_latency_s": 6.527
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 14.07,
+    "weights_gib": 9.507,
+    "notes": "Dense float16, no PLE quantisation and no int8 lm_head -- those are JAX-port levers with no analogue here. E2B KV is ~18 KiB/token, so at 4096 the whole cache is tens of MiB and is not the binding constraint."
+  },
+  "issues": [],
+  "notes": [
+    "Decode 20.75-21.44 tok/s across a 84-2254 token context range: flat, so decode is set by the weights rather than by the context.",
+    "Quote the decode figures, not end-to-end: they come from tpu_jax_decode_tokens_per_second, which times decode alone. Both are in sweep.json and they do not agree.",
+    "Degenerate replies over the whole run: 0."
+  ]
+}

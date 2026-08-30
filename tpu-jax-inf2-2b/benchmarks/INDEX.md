@@ -9,19 +9,10 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| `2026-07-21-gemma4-e2b-v6e1.json` | google/gemma-4-E2B-it | tpu-v6e×1 | flex-start | ok | tpu-jax-v5e1-2b, tpu-jax-v6e1-2b, tpu-pytorch-v5e1-12b, tpu-pytorch-v5e1-2b, tpu-pytorch-v6e1-2b, tpu-pytorch-v6e4-2b, tpu-vllm-v6e8-2b |
+| _none_ | | | | | |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
-| `2026-07-25-torchtpu-e2b-v6e1` | 18 | 0 | 0 | yes |
-| `2026-07-25-vllm-sweep-v6e1` | 7 | 0 | 0 | **no** |
-| `2026-07-26-inf2-qat-e2b` | 1 | 0 | 0 | yes |
-| `2026-07-27-inf2-jax-probe` | 1 | 0 | 0 | yes |
-| `2026-07-27-inf2-qat-e2b-batch4` | 1 | 0 | 0 | yes |
-| `2026-07-27-inf2-qat-e2b-int8` | 1 | 0 | 0 | yes |
-| `2026-07-30-neuron-compile-e2b` | 1 | 0 | 0 | yes |
-| `2026-07-31-inf2-jax-parity-e2b` | 1 | 0 | 0 | yes |
-| `2026-07-31-inf2-serving-perf` | 1 | 0 | 0 | yes |
-| `2026-08-02-inf2-latest-stack-e2b` | 10 | 0 | 0 | yes |
+| _none_ | | | | |

@@ -6,7 +6,7 @@ Run it from the RIG DIRECTORY, against a live instance:
     python3 tune_loop.py --instance i-0123 --label baseline
     # ... change the model port ...
     python3 tune_loop.py --instance i-0123 --label bf16-bitshift \\
-        --compare benchmarks/runs/2026-08-27-baseline-g5g
+        --compare benchmarks/runs/2026-08-29-first-serve-g4dn
 
 WHY THIS EXISTS. Every ingredient was already here and none of them composed:
 `sweep.py` lived INSIDE a run directory and was copy-pasted per run, so each
@@ -49,6 +49,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import server
 
 S3_RESULTS = "s3://vllm-models-bucket/benchmarks/gpu-jax-g4dn-2b"
+
+# Slot 3 of the rig directory name (<platform>-<runtime>-<hardware>-<model>),
+# which is what benchmarks/README.md calls <hw-short>. Derived, never a literal:
+# a literal is what silently survives a fork, and here it would mislabel the
+# hardware a measurement came off.
+RIG_NAME = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
+HW_SHORT = RIG_NAME.split("-")[2]
 REMOTE_OUT = "/opt/jax-g4dn/loopout"
 FILLER = "token "
 
@@ -193,7 +200,13 @@ XP
 async def run(args) -> None:
     iid = args.instance
     stamp = datetime.date.today().isoformat()
-    outdir = args.outdir or f"benchmarks/runs/{stamp}-{args.label}-g5g"
+    # The <hw-short> suffix must equal the rig's HARDWARE SLOT, not a literal
+    # carried over from whichever rig this harness was forked from. It was
+    # hardcoded "g5g" here and produced `2026-08-29-first-serve-g5g` inside
+    # gpu-jax-g4dn-2b -- a directory name asserting the run happened on hardware
+    # it did not, which is exactly how benchmark JSON came to travel with the
+    # forks in the first place. Derive it from the rig directory instead.
+    outdir = args.outdir or f"benchmarks/runs/{stamp}-{args.label}-{HW_SHORT}"
     os.makedirs(outdir, exist_ok=True)
     rec: dict = {"label": args.label, "instance": iid, "date": stamp}
 

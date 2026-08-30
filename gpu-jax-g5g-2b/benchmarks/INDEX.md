@@ -20,3 +20,13 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-08-19-first-serve-g5g` | 1 | 0 | 0 | yes |
 | `2026-08-21-cuda13-py314-g5g` | 1 | 0 | 0 | yes |
 | `2026-08-25-context-sweep-g5g` | 10 | 0 | 0 | yes |
+| `2026-08-26-config-sweep-g5g` | 11 | 0 | 0 | yes |
+| `2026-08-26-quant-levers-fixed-g5g` | 15 | 0 | 0 | yes |
+| `2026-08-27-baseline-g5g` | 7 | 0 | 0 | **no** |
+| `2026-08-27-baseline-xprof-g5g` | 11 | 0 | 0 | **no** |
+| `2026-08-27-f16-weights-g5g` | 0 | 0 | 0 | **no** |
+| `2026-08-27-ubuntu2604-base-g5g` | 9 | 0 | 0 | yes |
+| `2026-08-28-f16-loader-only-g5g` | 0 | 0 | 0 | **no** |
+| `2026-08-28-f16-weights-g5g` | 12 | 0 | 0 | **no** |
+| `2026-08-28-f16-weights-released-g5g` | 0 | 0 | 0 | **no** |
+| `2026-08-28-full-run-cached-g5g` | 119 | 0 | 0 | yes |

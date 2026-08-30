@@ -1,0 +1,27 @@
+# Pin the lint rule set so `make lint` is stable across ruff releases.
+# Without this, newer ruff versions widen their implicit defaults and the rig
+# starts failing on rules it never opted into.
+# The control plane's interpreter (3.13 locally), NOT the serving box's. This was
+# py311 by inheritance from tpu-pytorch-inf2-2b, which held back modernization
+# lints for no reason this rig has. Do not raise it to py314 to match
+# TORCH_PYTHON_VERSION: that variable names the SERVING interpreter, and ruff runs
+# here.
+target-version = "py313"
+line-length = 110
+
+[lint]
+select = [
+    "E4",   # imports (incl. E402 — tests/ deliberately imports after sys.path setup)
+    "E7",
+    "E9",
+    "F",    # pyflakes
+    "I",    # import order
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "RUF",
+]
+
+# BLE001 (blind except) is deliberately not selected: every AWS call in server.py
+# catches broadly and returns an error payload to the MCP client instead of
+# killing the server process. PLW1510 likewise — the tests inspect returncode
+# themselves rather than raising on non-zero.

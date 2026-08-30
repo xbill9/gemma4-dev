@@ -1,0 +1,33 @@
+# Serving dependencies — the stack that loads the weights and answers requests.
+#
+# server.py's _SERVING_REQUIREMENTS is the source of truth for what a serve
+# needs importable; this file mirrors it and a test asserts they match.
+#
+# STILL ITS OWN FILE, even though the control plane and the serving process are
+# the same machine here. On the cloud siblings the split is a machine boundary —
+# this list is installed on the instance and requirements.txt is not. Here it is
+# a FAILURE boundary, which is the more useful half of what the split was always
+# doing: `check_dependencies` reports a missing entry from this file as a reason
+# the serve cannot start, and a missing profiling entry as an aside.
+#
+# `jax`, NOT `jax[cuda13]`. That is the whole difference between this rig and its
+# GPU siblings at install time: no CUDA wheels (cublas, cudnn, cuda-runtime,
+# cusolver — around 3 GB), no driver requirement, no arch tables to check. It
+# also means a stray CUDA plugin from a sibling rig's install is the one way this
+# rig could silently stop being a CPU rig, which is why server.py forces
+# JAX_PLATFORMS=cpu and verify_cpu_backend asserts the resolved device.
+#
+# Requires Python >= 3.12.
+jax
+fastapi
+uvicorn
+pydantic
+transformers
+# Chat-template rendering for transformers. A missing jinja2 leaves /health green
+# and fails every generation with a 500 — measured on the G5g parent 2026-08-19.
+# transformers does not pull it in, and it memoizes the availability check at
+# import, so installing it late needs a restart.
+jinja2
+safetensors
+huggingface_hub
+numpy

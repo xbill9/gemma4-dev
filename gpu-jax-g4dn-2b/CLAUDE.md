@@ -1,8 +1,8 @@
-# CLAUDE.md — `gpu-jax-g5g-2b`
+# CLAUDE.md — `gpu-jax-g4dn-2b`
 
-Serving rig: **`google/gemma-4-E2B-it`** under **pure JAX** on **AWS EC2 G5g** — a Graviton2
-(aarch64) host with an **NVIDIA T4G** GPU (Turing, SM 7.5, **15360 MiB** measured, not the
-nominal 16 GB).
+Serving rig: **`google/gemma-4-E2B-it`** under **pure JAX** on **AWS EC2 G4dn** — an x86_64
+Intel Cascade Lake host with an **NVIDIA T4** GPU (Turing, SM 7.5, **15360 MiB measured**, not
+the nominal 16 GB `describe_instance_types` reports).
 
 This is a full rig: `server.py`, an MCP server, a skill, a plugin manifest, and `tpu.env`.
 It is **not** one of the `gpu-vllm-l4-*` artifact rigs, despite sharing the `gpu` platform
@@ -12,54 +12,102 @@ slot with them.
 Gemma 4 port (`ports/gemma4/`) driven by `jax_engine.py` behind an OpenAI-compatible FastAPI
 server (`jax_openai_server.py`), run under systemd — **not docker**.
 
-## This rig has served
+## This rig has served, and it was forked from a rig that had served more
 
-**Five runs, all its own**, on `g5g.2xlarge`. `2026-08-19-first-serve-g5g` is the first
-serve and `2026-08-21-cuda13-py314-g5g` repeats it on CUDA 13 / Python 3.14;
-`2026-08-25-context-sweep-g5g` is the first sweep and the first xprof profile;
-`2026-08-26-config-sweep-g5g` and `2026-08-26-quant-levers-fixed-g5g` break and then fix the
-quantization levers. The headline is **13.1 tok/s single-stream** at the current default,
-**12.8** at the one the first three runs measured. See **Measurement** for the table.
+**Forked from `gpu-jax-g5g-2b` on 2026-08-28. FIRST SERVE 2026-08-29**, on spot
+`i-02eb43cb99429a8f7` (`g4dn.xlarge`, `us-east-1b`), launched → deployed → measured →
+terminated in one ~25-minute cycle. One run so far:
+`benchmarks/runs/2026-08-29-first-serve-g4dn/`, driven end to end by `tune_loop.py`.
+
+**READ THE PROVENANCE RULE BEFORE ANY NUMBER IN THIS FILE.** Most of the findings below were
+measured by the **G5g sibling on a T4G**, not here, and this file inherited them written as
+though they were this rig's. Until 2026-08-29 `server.py`'s own module docstring asserted
+"THIS RIG HAS SERVED, AND THE NUMBERS ARE ITS OWN: 12.4-12.5 tok/s decode on g4dn.xlarge …
+across the two runs under benchmarks/runs/" while `benchmarks/runs/` was **empty**. That is
+exactly the hazard the monorepo `CLAUDE.md` names — "benchmark JSON travelled with the forks"
+— and it was corrected the same day. The split to hold onto:
+
+- **Chip-level findings carry, and are now corroborated here.** T4 and T4G are both Turing
+  SM 7.5 with the same 15360 MiB and the same roofline.
+- **Host-level ones do not automatically.** Install time, load staging and host RSS depend on
+  a CPU this rig does not share with the sibling.
+
+### The A/B came back clean
+
+This rig exists to change exactly one variable against the sibling — same engine, same
+checkpoint, same dtype policy, same SM 7.5, **different host ISA**. The result:
+
+| | `gpu-jax-g5g-2b` (Graviton2 + T4G) | **this rig (x86_64 + T4)** |
+| --- | ---: | ---: |
+| decode, gauge | 13.10 tok/s | **13.1 / 13.2 / 13.1** |
+| `tpu_jax_weight_bytes` | 6.155 GB | **6.155 GB** — exact |
+| dtype conversion | 54.4% / 54.0% | **54.4%** |
+| fp32 GEMV | 32.6% / 32.8% | **32.8%** |
+| TensorCore utilisation | 0.0% | **0.0%** |
+| peak FLOP / HBM / ridge | 65126.4 / 298.083 / 203.479 | **identical to 3 d.p.** |
+| device memory (`nvidia-smi`) | 15360 MiB | **15360 MiB** |
+
+**The host contributes nothing measurable to decode.** That converts the sibling's central
+result — 86.9% of decode in dtype conversion plus fp32 GEMV — from "a finding about a
+Graviton2+T4G box" into **a finding about Turing**, which is the whole reason this rig was
+built. Everything in *High-value optimizations* below therefore applies here unchanged,
+including the 2026-08-28 falsification: at `B=1` decode is a matrix-*vector* product, cuBLAS
+dispatches an all-fp32 `gemvx` kernel with **no half-precision path**, and no storage dtype
+removes it. The route to the ceiling is a GEMM — batching — which `MAX_NUM_SEQS=1` closes.
+
+**One inherited prediction was falsified.** `README.md` claimed the T4 reports a full
+16,384 MiB against the T4G's 15,360 — "a real 1 GiB difference … the kind of thing that
+decides whether a configuration fits". That came from `describe_instance_types`, which
+reports the nominal figure. `nvidia-smi` on the device reports `Tesla T4, 7.5, 15360 MiB`.
+**There is no capacity advantage.** The device is what allocates, so the device is what
+counts.
 
 Two things that still hold and are easy to lose:
 
-- **The grid is still thin in one axis and closed in another.** Context × output length is
-  swept (12 cells, 2026-08-25) and serving config is swept (5 configs, 2026-08-26), but
-  **concurrency is not an axis and cannot be**: `MAX_NUM_SEQS=1`, `Gemma4EModelJAX` raises
-  `NotImplementedError` for `B > 1`, and the decode step donates its KV buffers. `tpu.env`
-  still marks values MEASURED or PREDICTED; respect the split and do not quote a PREDICTED
-  number as a result.
-- **Installability is not a served token.** `jaxlib` and the CUDA plugins publishing
-  `manylinux_2_27_aarch64` wheels, and the PJRT arch tables carrying `sm_75` with an SM 6.0
-  floor (verified 2026-08-18), were never the same claim as "it serves".
+- **The grid is thin in one axis and closed in another.** This rig has swept context only
+  (3 cells: 41 / 521 / 2,057 input tokens at 64 output). **Concurrency is not an axis and
+  cannot be**: `MAX_NUM_SEQS=1`, `Gemma4EModelJAX` raises `NotImplementedError` for `B > 1`,
+  and the decode step donates its KV buffers. The report records that cell as `infeasible`
+  rather than omitting it. `tpu.env` marks values MEASURED or PREDICTED; respect the split.
+- **Installability is not a served token** — and on this rig the installability argument is
+  much weaker than it was on the sibling. `jaxlib` and the CUDA plugins publishing wheels
+  mattered on **aarch64**, where a missing wheel was a real hazard. x86_64 + CUDA is the axis
+  every one of these projects publishes for first. **The load-bearing claim was always
+  `sm_75`**, not the architecture.
 
 `verify_gpu_arch` remains the cheapest way to convert the install into evidence — it runs a
-real fp16 matmul on the device rather than checking that a flag was accepted.
+real fp16 matmul on the device rather than checking that a flag was accepted. It reported
+`Tesla T4, 7.5, 15360 MiB … fp16 matmul ok: True` on 2026-08-29.
 
-**Warm up before recording anything.** Cold prefill measured **56x** slower than warm on
-2026-08-19; a harness that skips warm-up understates this rig by more than 2x on decode.
+**Warm up before recording anything.** Cold prefill measured **56x** slower than warm on the
+sibling 2026-08-19; a harness that skips warm-up understates this rig by more than 2x on
+decode. `tune_loop.py` warms at the shape it measures, because `max_new_tokens` is a
+`static_argnames` entry and warming at a different one was previously a 4x error.
 
-## Why the hardware slot is `g5g` and not `t4g`
+## Why the hardware slot is `g4dn`, and why the sibling's is not `t4g`
 
-Settled 2026-08-12; `NAMING.md` has the carve-out. Do not "correct" this back.
+Slot 3's normal rule is the GPU SKU. Here the two agree closely enough that **no carve-out is
+needed**: the GPU is an NVIDIA **T4**, and `t4` is not an EC2 instance family. The family name
+`g4dn` is still the better slot value, because it also pins the x86_64 host.
 
-The GPU really is an NVIDIA **T4G**, and slot 3's normal rule is the GPU SKU, so `t4g` looks
-right. Two facts outweigh it:
+**Do not generalise that to the sibling.** `gpu-jax-g5g-2b` *needs* its carve-out (settled
+2026-08-12, recorded in `NAMING.md`) for a reason specific to it: its GPU is a **T4G**, and
+`t4g` is already an EC2 instance family — `t4g.nano`…`t4g.2xlarge`, Graviton2 burstable **CPU**
+boxes with no GPU — so in an AWS context that string reads as a cheap CPU instance far more
+often than as a GPU.
 
-- **`t4g` is already an EC2 instance family** — `t4g.nano`…`t4g.2xlarge`, Graviton2
-  burstable **CPU** boxes with no GPU. In an AWS context the string reads as a cheap CPU
-  instance far more often than as a GPU.
-- **G5g is the only Graviton+GPU family AWS ships**, and no Graviton3 or Graviton4 GPU
-  instance exists. So `g5g` is not a lossy stand-in for the chip the way `ec2` or `cloudrun`
-  would be — it names the Graviton2+T4G pairing exactly, and that pairing, not the GPU alone,
-  is what makes this hardware hard.
+The chip is called a T4 everywhere it is the chip being discussed — in this file, in
+`HARDWARE.md`, and in `tpu.env`. Only the slot is `g4dn`.
 
-The chip is still called T4G everywhere it is the chip being discussed — in this file, in
-`HARDWARE.md`, and in `tpu.env`. Only the slot is `g5g`.
+## Why this rig exists next to `gpu-jax-g5g-2b` and `gpu-vllm-g5g-2b`
 
-## Why this rig exists next to `gpu-vllm-g5g-2b`
+Two different comparisons, and they are not the same argument.
 
-Identical hardware, different runtime, and **the runtime is the whole point.**
+**Against `gpu-jax-g5g-2b`: same runtime, different host.** That is the A/B above, and it is
+this rig's actual purpose. It came back clean, so the sibling's numbers are chip numbers.
+
+**Against `gpu-vllm-g5g-2b`: same chip generation, different runtime — and the runtime is the
+whole point.**
 
 The vLLM path gets to a served token, but only through a ~67-minute from-source build for
 SM 7.5, a CUDA toolkit the DLAMI does not ship, a Rust toolchain, and an **unlanded patch to
@@ -70,14 +118,18 @@ shared memory per block against Turing's 64 KiB ceiling.
 
 JAX sidesteps all four:
 
-- **No build.** pip supplies CUDA; the DLAMI only has to supply the driver.
+- **No build.** pip supplies CUDA; the DLAMI only has to supply the driver. Measured here
+  2026-08-29: **76 seconds** from boot to a GPU-verified install, xprof and tensorboard
+  included.
 - **No toolkit and no Rust.** Nothing is compiled on the instance.
 - **No arch gap.** The plugin's cubins cover SM 7.5 already.
 - **No patch to carry.** Attention here is ordinary XLA, not a hand-tiled Triton kernel, so
   there is no per-block shared-memory ceiling in the attention path to hit.
 
-`docs/turing-aarch64-gap.md` is the vLLM-side write-up of all of this and is **measured** —
-it is the sibling's evidence, kept here because it is the reason this rig was built.
+**`../gpu-jax-g5g-2b/docs/turing-aarch64-gap.md`** is the vLLM-side write-up of all of this
+and is **measured**. It is **not in this rig** — it was deliberately not inherited, because
+only half of it applies: the Turing shared-memory analysis carries, the aarch64 packaging half
+does not. Read it in the parent, and read only that half.
 
 ## What JAX does *not* sidestep
 
@@ -139,7 +191,7 @@ mantissa bits, visibly truncates output. Kept for comparison; never serve with i
   `Dict`/`Optional` annotations, which the monorepo `CLAUDE.md` forbids and which would drift
   it away from the sibling copy.
 - **`detect_hardware_profile()` falls back to the TPU profile off-accelerator.** A `HARDWARE`
-  read on a CPU host reports `tpu-v6e-1`, not a T4G. The tests exercise the Turing branch by
+  read on a CPU host reports `tpu-v6e-1`, not a T4. The tests exercise the Turing branch by
   overriding the detected platform under `JAX_PLATFORMS=cpu` — that tests the *policy*, not
   the hardware.
 - Fixes that describe the **model** belong in the root `MODELS.md`; fixes that describe the
@@ -147,32 +199,45 @@ mantissa bits, visibly truncates output. Kept for comparison; never serve with i
 
 ## Instance sizing, and the swapfile
 
-`g5g.2xlarge` is the default. **Every size is supported** — `_validate_instance_type` only
+`g4dn.xlarge` is the default. **Every size is supported** — `_validate_instance_type` only
 enforces the size list.
 
-`_user_data` provisions a swapfile at or below `_SWAP_AT_OR_BELOW_HOST_RAM_GB = 16`, which
-covers **`g5g.xlarge` and the default `g5g.2xlarge`**. Two distinct pressures, both measured,
-and the larger one sets the threshold:
+The size ladder is **not monotonic in GPU count** and must be read from
+`describe_instance_types`, never inferred from the suffix: `g4dn.12xlarge` has **four** T4s
+and `g4dn.16xlarge` has **one**. `_G4DN_SIZES` in `server.py` is the table.
 
-- **`g5g.xlarge` (8 GiB) cannot even mmap the checkpoint** (below).
-- **`g5g.2xlarge` (16 GiB) mmaps fine and then dies in `quantize_ple_table`**, which upcasts
-  the 4.70 GB PLE table to float32 while the full tree is resident. MEASURED 2026-08-26:
-  OOM-killed five times at 14.3 GB anon-RSS under `Restart=on-failure`. The gate was
-  `< 16` and 2xlarge has *exactly* 16, so the rig provisioned swap for the one size that did
-  not need it for this and skipped the one that did. **The threshold was the bug, not the
-  remedy** — the `fallocate`/`mkswap`/`swapon` block already existed.
+`_user_data` provisions a swapfile at or below `_SWAP_AT_OR_BELOW_HOST_RAM_GB = 16`. On
+**g4dn that is the default `g4dn.xlarge` alone** — every larger size has at least 32 GiB. That
+differs from the G5g sibling, where the same threshold covered two sizes, so do not carry over
+"the two smallest hosts" as a description here.
 
-**Making it inclusive immediately exposed a second bug**, which is worth keeping as a pattern:
-the swap block had used `mkswap -q`, a **busybox** flag that util-linux (Ubuntu 22.04) rejects
+**The threshold is inherited from the sibling, not re-measured on this hardware**, and it is
+worth knowing why it is where it is. Two distinct host-RAM pressures, both measured there
+against the same checkpoint, neither of them GPU-specific:
+
+- **8 GiB cannot even mmap the checkpoint** (below).
+- **16 GiB mmaps fine and then dies in `quantize_ple_table`**, which upcasts the 4.70 GB PLE
+  table to float32 while the full tree is resident. MEASURED 2026-08-26: OOM-killed five times
+  at 14.3 GB anon-RSS under `Restart=on-failure`. The gate was `< 16` and that host had
+  *exactly* 16, so the rig provisioned swap for the one size that did not need it for this and
+  skipped the one that did. **The threshold was the bug, not the remedy** — the
+  `fallocate`/`mkswap`/`swapon` block already existed.
+
+`g4dn.xlarge` has exactly 16 GiB and so lands in the second case. CONFIRMED 2026-08-29: it
+loaded cleanly with the swapfile in place, READY 151 s after the service started.
+
+**Making the threshold inclusive immediately exposed a second bug**, which is worth keeping as
+a pattern: the swap block had used `mkswap -q`, a **busybox** flag that util-linux rejects
 with `invalid option -- 'q'`. Under `set -e` that killed cloud-init *before install.sh was
-written*, so the instance booted with an empty `/opt/jax-g5g` and no install log at all. It
-was latent for as long as only `g5g.xlarge` rendered the block and nobody launched one.
+written*, so the instance booted with an empty `APP_DIR` and no install log at all. It was
+latent for as long as only the smallest size rendered the block and nobody launched one.
 Two lessons: **a code path that only renders for a size nobody launches is untested code**,
 and the reason this cost a launch rather than a minute is covered under **Tracing a
-deployment** below.
+deployment** below. `test_swap_block_uses_only_portable_flags` now pins it.
 
-The mmap failure, measured on the vLLM sibling 2026-08-13 with the same checkpoint and host,
-so it carries: without swap the kernel refuses to **mmap** the 10.2 GB checkpoint at all —
+The mmap failure, measured on the vLLM sibling 2026-08-13 with the same checkpoint, so it is
+a checkpoint-and-RAM property rather than a host-ISA one: without swap the kernel refuses to
+**mmap** the 10.2 GB checkpoint at all —
 
 ```
 RuntimeError: unable to mmap 10246621918 bytes from model.safetensors:
@@ -180,28 +245,36 @@ Cannot allocate memory (12)
 ```
 
 — and systemd crash-loops on it. The failure is the *mapping*, not residency; 16 GiB of swap
-took the same instance to a healthy endpoint. **This rig once rejected `g5g.xlarge` outright
-on the theory that 8 GiB "cannot stage 9.5 GiB of weights". The conclusion was right and the
-reason was wrong**, and the remedy is swap rather than a bigger instance — the same fix
+took the same instance to a healthy endpoint. **The sibling once rejected its 8 GiB size
+outright on the theory that it "cannot stage 9.5 GiB of weights". The conclusion was right and
+the reason was wrong**, and the remedy is swap rather than a bigger instance — the same fix
 `tpu-pytorch-inf2-2b` applies for its neff load.
 
-`g5g.16xlarge` and `g5g.metal` carry two T4Gs. **Nothing shards across them.** The engine is
-single-device (`jax.devices()[0]`), `_serve_argv` emits no tensor-parallel flag, and the
-second GPU idles. `_tensor_parallel_size` reports the GPU count and nothing acts on it yet.
+`g4dn.12xlarge` carries four T4s and `g4dn.metal` eight. **Nothing shards across them.** The
+engine is single-device (`jax.devices()[0]`), `_serve_argv` emits no tensor-parallel flag, and
+the payload contains no sharding primitives at all, so the extra GPUs idle.
+`_tensor_parallel_size` reports the GPU count and nothing acts on it yet. **A bigger instance
+buys host RAM and network, not device memory** — the budget is the same 15360 MiB on every
+size.
 
 ## AMI resolution
 
 Two requirements, and they are separate:
 
-1. **arm64** — the `ami-012ba162b9cd2729c` the legacy tips-tree rigs hardcode is x86_64 and
-   cannot boot on Graviton2 at all.
-2. **The NVIDIA driver** — AWS also ships ARM64 DLAMIs built for Graviton *CPU* inference.
-   Those boot perfectly well on a G5g and simply have no GPU, which reads as a broken runtime
-   rather than a wrong AMI.
+1. **x86_64** — pinned by the `/x86_64/` segment of the SSM path and by the `Architecture`
+   filter in `_resolve_ami`'s describe-images fallback.
+2. **The NVIDIA driver** — AWS ships plenty of DLAMIs without one. Such an image boots
+   perfectly well on a G4dn and simply has no GPU visible to JAX, which reads as a broken
+   runtime rather than a wrong AMI. The bootstrap's `verify_gpu` step is what turns that into
+   an install-time failure instead of a first-token one.
 
 `DLAMI_SSM_PARAMETER` pins both and is single-valued, so it is preferred; the `DLAMI_NAME`
 describe-images filter is the fallback and deliberately requires the driver in the name.
-**Never hardcode an AMI id** — resolve it at launch.
+
+**Never hardcode an AMI id** — resolve it at launch. The architecture half of that rule is
+weaker here than on the G5g sibling, where a hardcoded x86_64 id could not boot at all; the
+half that still bites is **rot**, which the next section is about. Resolved
+`ami-0216c4aa131462acf` on 2026-08-29.
 
 ### `/latest/` in a DLAMI parameter path does not mean latest
 
@@ -270,13 +343,19 @@ The tarball is built deterministically (mtime and uid/gid zeroed), which is what
 Order of operations:
 
 ```
-create_g5g_instance → get_install_progress → verify_gpu_arch → deploy_jax_server
-                    → get_jax_logs → verify_model_health
+create_g4dn_instance → get_install_progress → verify_gpu_arch → deploy_jax_server
+                     → get_jax_logs → verify_model_health
 ```
 
 Install progress goes to `/var/log/jax-install.log`; `{APP_DIR}/INSTALL_DONE` appears only
 after JAX **imports and sees the GPU**, so "INSTALL COMPLETE" is an assertion, not a guess.
-The unit is `jax-g5g.service` — read it with `journalctl`, not `docker logs`.
+The unit is `jax-g4dn.service` and `APP_DIR` is `/opt/jax-g4dn` — read logs with
+`journalctl`, not `docker logs`.
+
+**Stage timings, MEASURED 2026-08-29** (`grep -F '[stage]' /var/log/jax-install.log`):
+apt-base 6s, python-3.14 **1s** (already the system interpreter, so deadsnakes was skipped),
+pip-bootstrap 6s, jax-wheels 42s, serving-deps 13s, **profiling-deps 5s**, gpu-verify 3s,
+unit-rewrite 0s — **76 seconds total**. The load then took 151 s from service start to READY.
 
 `jax >= 0.11` needs Python >= 3.12 and the rig runs **3.14**, the newest stable CPython. On
 the Ubuntu 26.04 base that is the *system* interpreter, so the bootstrap uses it directly; on
@@ -300,9 +379,10 @@ forbids virtualenvs, so the override is the honest answer rather than a workarou
 - boto3 and the standard AWS credential provider chain — never shell out to the AWS CLI.
 - SSM Run Command for remote administration; no inbound SSH rule, no private key.
 - Require explicit subnet, security-group, and instance-profile ids. Do not create broad
-  network or IAM policy. (The legacy sample this was scaffolded from auto-creates a security
+  network or IAM policy — with **one deliberate exception, recorded below**. (The legacy
+  sample this was scaffolded from auto-creates a security
   group open to `0.0.0.0/0` — that was not carried over.)
-- Scope instance discovery to `ManagedBy=gpu-jax-g5g-2b`. Unlike the inf2 rig, which keeps a
+- Scope instance discovery to `ManagedBy=gpu-jax-g4dn-2b`. Unlike the inf2 rig, which keeps a
   legacy tag to avoid orphaning instances, this rig is new and uses its own name.
 - Hugging Face tokens live in Secrets Manager and are fetched at boot into a root-only
   `EnvironmentFile`. **Never** in user data — instance metadata is readable by anything on
@@ -313,6 +393,22 @@ forbids virtualenvs, so the override is the honest answer rather than a workarou
   with the root volume, only a pip install and the model cache. Do not import that rig's
   "weigh stop against terminate" reasoning.
 - Never hardcode an endpoint; `get_endpoint` resolves it from the instance.
+- **The shared S3 policy is deliberately LOOSE, and must stay that way.** The instance role
+  (`gpu-jax-g5g-2b-instance-role`, shared across the GPU JAX rigs) carries an inline policy
+  `jax-compilation-cache-rw` granting `s3:{GetObject,PutObject,DeleteObject}` on
+  `vllm-models-bucket/jax-cache/*` and `vllm-models-bucket/benchmarks/*` — **the rig segment
+  is a wildcard, on purpose**.
+
+  It used to enumerate rigs (`jax-cache/gpu-jax-g5g-2b/*`, and likewise for `g6`), which meant
+  **every fork was denied its own cache and results until someone edited IAM**. That is
+  exactly what happened here on 2026-08-29: `tune_loop.py`'s artifact upload — the supported
+  way to get a profile back, because SSM truncates at 24,000 characters — failed for a rig
+  that was otherwise complete. Operator decision, same day: widen it rather than extend it.
+
+  **Do not "tighten" this back to per-rig prefixes.** It reads like a hardening win and it is
+  a regression: it reintroduces an IAM edit into the path of standing up a rig, and the
+  failure it produces (a denied upload, mid-benchmark) is far from the cause. The bucket
+  boundary and the two-prefix scope are the actual controls and neither moved.
 - `verify_model_health` uses `/v1/chat/completions`, because raw `/v1/completions` skips the
   chat template and is unreliable on `-it` models. On the vLLM sibling it was measured
   returning `': ok: ok: ok…'` — degenerate repetition, not the empty body the monorepo
@@ -342,16 +438,19 @@ Three things about it that are easy to get wrong:
 
 ## Commands
 
-Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v` (122 tests,
-all passing as of 2026-08-27). They are fully offline — no AWS, no network, no GPU — and pin
-the facts above: the Turing dtype constraints, the arm64+driver AMI filter, the host-RAM
-floor, the shared-memory ceiling, that the token never reaches user data, that `tpu.env` and
-`server.py` still agree, and that no `VLLM_*`/`TORCH_CUDA*` key survived the fork.
+Tests are **`unittest`, never pytest**: `python3 -m unittest discover -s tests -v` (**140
+tests**, all passing as of 2026-08-29). They are fully offline — no AWS, no network, no GPU —
+and pin the facts above: the Turing dtype constraints, the x86_64+driver AMI filter, the
+host-RAM floor, the shared-memory ceiling, that the token never reaches user data, that
+`tpu.env` and `server.py` still agree, that both requirements mirror files match their tuples
+in `server.py`, that the profiler installs but never on the serving list, and that no
+`VLLM_*`/`TORCH_CUDA*` key survived the fork.
 
 `make lint` runs `ruff check server.py refresh_skill.py jax_engine.py jax_openai_server.py
-profile_decode.py tests`, then `bash -n` on **four** shell scripts (`project-setup.sh`, `init.sh`,
-`set_env.sh`, `save-aws-creds.sh`). **A new top-level module is silently unlinted until it is
-added to that list** — `profile_decode.py` sat outside it and was red for a day. `ports/` is excluded on purpose — see above.
+profile_decode.py profile_prefill.py tune_loop.py tests`, then `bash -n` on **four** shell
+scripts (`project-setup.sh`, `init.sh`, `set_env.sh`, `save-aws-creds.sh`). **A new top-level
+module is silently unlinted until it is added to that list** — `profile_decode.py` sat outside
+it and was red for a day. `ports/` is excluded on purpose — see above.
 
 **`deploy_jax_server` ships the SKILL SNAPSHOT, not the working tree.** `server.py` resolves
 the payload next to itself, and the MCP server runs from `.claude/skills/…/mcp/`, so editing
@@ -368,19 +467,28 @@ requirements files, **and the whole serving payload** (`jax_openai_server.py`,
 the payload next to itself first.
 
 `SKILL.md` sits in the same tree and is a hand-written **source**: `refresh_skill.py` will not
-recreate it. So `rm -rf .claude/skills` destroys it permanently, which is what happened during
-the t4g→g5g rename. `test_skill_is_complete_in_both_copies` now guards both copies, and also
-fails if any of the eight generated files is stale.
+recreate it. So `rm -rf .claude/skills` destroys it permanently, which is what happened on the
+sibling during its `t4g`→`g5g` rename. `test_skill_is_complete_in_both_copies` now guards both
+copies, and also fails if any of the eight generated files is stale.
 
-There is no `make deploy` recipe on purpose: provisioning resolves an arm64 AMI at launch
+There is no `make deploy` recipe on purpose: provisioning resolves an x86_64 AMI at launch
 time, and a Makefile would have to hardcode one. The target exists and prints that.
 
 ## MCP registration lives in four places
 
 `.mcp.json`, `.claude-plugin/plugin.json`, `.codex/config.toml`, and
 `.claude/settings.local.json`'s `enabledMcpjsonServers`. All four must name the server
-`gpu-jax-g5g-2b`, which prefixes every tool as `mcp__gpu-jax-g5g-2b__…`. All four agree as of
-2026-08-18. A mismatch makes `/mcp` and the tool prefix disagree about what this rig is.
+`gpu-jax-g4dn-2b`, which prefixes every tool as `mcp__gpu-jax-g4dn-2b__…`. A mismatch makes
+`/mcp` and the tool prefix disagree about what this rig is.
+
+**The g4dn fork left `.codex/config.toml` entirely unconverted, and it was invisible.** It
+named `gpu-jax-g5g-2b` as the server, pointed at
+`.claude/skills/gpu-jax-g5g-2b-management/mcp/server.py` — a path that does not exist here —
+set `INSTANCE_TYPE=g5g.2xlarge`, and gated three tool names this rig does not have
+(`create_g5g_instance`, `terminate_g5g_instance`, `stop_g5g_instance`). `plugin.json` was
+right on names and paths but its description and keywords still said Graviton2/T4G/aarch64.
+Both fixed 2026-08-29; all four now agree. **Nothing in the test suite caught this**, for the
+same reason as the fork before it: `server.py` was correct throughout.
 
 **Only `.mcp.json` is generated.** `project-setup.sh` writes it (`--server-name` sets both the
 registered key and what the server advertises) and does **not** touch
@@ -397,8 +505,9 @@ directory, matching what the `Makefile` and `refresh_skill.py` already did. Neve
 a literal: the Makefile, `refresh_skill.py`, and this script must agree on one name, and a
 literal is what silently survives a rename.
 
-`server.py` was right throughout (`RIG_NAME = "gpu-jax-g5g-2b"`, asserted by
+`server.py` was right throughout (`RIG_NAME = "gpu-jax-g4dn-2b"`, asserted by
 `test_rig_name_matches_directory`) — which is why the breakage was invisible to the tests.
+The same blind spot recurred on the g4dn fork; see above.
 
 Editing any of the four generated-or-copied files means re-running `make skill`:
 `project-setup.sh` is one of the eight files snapshotted into both skill copies, and
@@ -406,16 +515,21 @@ Editing any of the four generated-or-copied files means re-running `make skill`:
 
 `AGENTS.md` and `GEMINI.md` cover the same ground for other tools. There is no generator:
 **`CLAUDE.md` is authoritative where they disagree**, and a convention change has to be
-applied to all three by hand. Both are currently **still the vLLM rig's copies** and describe
-a runtime this rig does not use.
+applied to all three by hand. Both were rewritten for this rig on 2026-08-29 — they had been
+the G5g rig's copies, describing Graviton2, a T4G and an arm64 AMI requirement.
 
 This rig has no `.claude-plugin/marketplace.json` of its own, which only matters if it is ever
 published standalone. The marketplace `/plugin` actually reads is the **monorepo root** copy,
-and it gained a `gpu-jax-g5g-2b` entry on 2026-08-18.
+and it gained a `gpu-jax-g4dn-2b` entry when the rig was added.
 
 ## How large a model this rig will serve
 
-**`docs/larger-models-on-t4g.md` — measured 2026-08-23. E2B is the ceiling today.**
+**`../gpu-jax-g5g-2b/docs/larger-models-on-t4g.md` — measured 2026-08-23. E2B is the ceiling
+today.** That file is **in the parent, not here**: the fork deleted it on the theory that this
+rig's T4 has a 16,384 MiB budget against the T4G's 15,360, which would have shifted every
+threshold in it. **MEASURED 2026-08-29: the T4 reports 15,360 MiB too**, so its arithmetic
+transfers unchanged and the deletion was the wrong call. Everything below applies here as
+written.
 
 **Its DENSE prefill bracket is superseded.** That document bracketed the dense checkpoint at
 (115, 2015] tokens; the `logits_at` fix lifted it, the 2026-08-25 sweep cleared 4,105, and
@@ -434,7 +548,7 @@ residency, not prefill context.
 Three things worth keeping:
 
 - **The budget is 14.07 GB on every G5g size.** The engine is single-device and the payload
-  contains no sharding primitives at all, so the second T4G on `16xlarge`/`metal` idles.
+  contains no sharding primitives at all, so the extra T4s on `12xlarge`/`metal` idle.
   A bigger instance buys host RAM, not device memory.
 - **E4B and 12B fail on TRANSIENT allocations, not resident weights.** Both fit comfortably.
   That is a tractable class of problem, unlike 26B/31B which are hard-blocked on residency.
@@ -842,7 +956,7 @@ Two optimizations landed with them:
 - **The root volume was left at gp3's 125 MiB/s default and the load sat on it.** MEASURED
   2026-08-25: `read_shards` moved the checkpoint in 73.5 s (~139 MB/s) and the download took
   87.7 s (~116 MB/s). **Two unrelated stages landing on one number is a volume ceiling**, not
-  CPU and not network. Now 500 MiB/s / 6000 IOPS — ~4× baseline, still under `g5g.2xlarge`'s
+  CPU and not network. Now 500 MiB/s / 6000 IOPS — ~4× baseline, still under `g4dn.xlarge`'s
   own EBS cap ("up to" 4.75 Gbps ≈ 593 MB/s) so the smaller sizes stay instance-bound, and
   satisfying gp3's `throughput <= IOPS × 0.25` rule, which is enforced at run-instances time
   and so fails a *launch* rather than slowing a disk. **CONFIRMED 2026-08-27**: `read_shards`
@@ -1000,12 +1114,15 @@ kernel name.
 
 **Two things broke getting there, both silent, both now fixed in the loop:**
 
-- **`requirements-profiling.txt` was never on the instance.** It is deliberately excluded from
-  the deploy payload, and nothing else shipped it — so `docs/profiling-recipes.md` told
-  operators to `pip install -r /opt/jax-g5g/requirements-profiling.txt`, **a path that has
-  never existed.** xprof "installed" with `Could not open requirements file` and the extraction
-  died on `ModuleNotFoundError`, both in logs nobody reads. The loop ships it; the recipe is
-  corrected.
+- **`requirements-profiling.txt` was never on the instance.** It is excluded from the deploy
+  payload, and nothing else shipped it — so `docs/profiling-recipes.md` told operators to
+  `pip install -r <APP_DIR>/requirements-profiling.txt`, **a path that has never existed.**
+  xprof "installed" with `Could not open requirements file` and the extraction died on
+  `ModuleNotFoundError`, both in logs nobody reads. The loop ships it; the recipe is corrected.
+
+  **SUPERSEDED 2026-08-29 — the profiler now installs at boot.** See *The profiler ships with
+  the image* below. `tune_loop.py` still ships the file, which is now belt-and-braces rather
+  than the only path.
 - **`xspace_to_tool_data` returns `bytes`, not `str`.** Passing it through `json.dumps` raises
   `Object of type bytes is not JSON serializable`, the handler catches it, and you get a
   **0-byte file plus a FAILED line** — a profile that looks captured and is empty.
@@ -1222,7 +1339,8 @@ size this rig's context from KV arithmetic.**
 
 **The 512-wide full-attention head is exactly what breaks the vLLM path on this chip.** Gemma 4's
 heterogeneous head dims force `TRITON_ATTN`, whose 512-wide tile wants ~96 KiB of shared memory per
-block against Turing's 64 KiB ceiling — `docs/turing-aarch64-gap.md` is the measured write-up, and it
+block against Turing's 64 KiB ceiling — `../gpu-jax-g5g-2b/docs/turing-aarch64-gap.md` is the
+measured write-up, and it
 is the reason this rig exists.
 
 **JAX does not care, and the reason is specific:** attention here is ordinary XLA ops, not a hand-tiled
@@ -1246,60 +1364,145 @@ Treat it as the family default **above** E4B: a larger sibling that reports miss
 should be checked against this first, and a loader that tolerates `None` there produces a silently
 broken model that still emits fluent text.
 
+## The profiler ships with the image
+
+**CHANGED 2026-08-29. xprof and tensorboard are installed by cloud-init**, as their own stage,
+and `INSTALL_PROFILING=0` restores the previous serving-only image.
+
+They used to be on-demand, and the reasoning was sound on its face — "a serving image should
+not carry a profiler", and xprof drags in gcsfs plus google-cloud-storage behind a 39 MB
+wheel. **In practice it meant they were never installed at all.** The documented command
+pointed at a `requirements-profiling.txt` inside `APP_DIR` that the deploy payload
+deliberately excludes, so `pip install -r` failed with `Could not open requirements file` and
+the xprof extraction then died on `ModuleNotFoundError` — both in logs nobody reads.
+`tune_loop.py` worked around it by shipping the file itself. Installing at boot removes the
+workaround and the failure mode together.
+
+**MEASURED 2026-08-29: the stage costs 5 seconds of a 76-second install** (xprof 2.23.1,
+tensorboard 2.21.0). The "GBs of image" objection was never the right size.
+
+Three things about the shape of the change:
+
+- **It is its own stage, and deliberately NON-FATAL.** The serving deps run under `set -e` and
+  *should* kill the install if they fail; a broken profiler wheel must not cost a box that can
+  serve. The `$PIP xprof tensorboard || echo 'WARNING: …'` line is that distinction, and a
+  test asserts the `||` is there — without it this is the `mkswap` incident again.
+- **`_PROFILING_REQUIREMENTS` is the source of truth**, mirrored by
+  `requirements-profiling.txt`, with a test asserting they agree — the same arrangement as
+  `_SERVING_REQUIREMENTS`. A separate test asserts neither package is *on* the serving list.
+- **xprof's wheel is `manylinux_2_35`.** Ubuntu 26.04 gives glibc 2.43, so there is headroom —
+  but the old 22.04 base sat exactly on that floor. That matters more now than it did
+  on-demand: this is the default path, so losing the wheel fails a stage rather than a command
+  nobody ran.
+
+**TensorBoard will not render these profiles on its own.** xprof is the successor to
+`tensorboard-plugin-profile` and serves its own UI: `xprof --logdir /tmp/jaxtrace --port 6006`,
+tunnelled — this rig opens no inbound port for it and must not. TensorBoard is there for
+everything else, and because having both present removes "is it just not installed?" from a
+debugging session.
+
 ## Measurement
 
-**This rig has eight measurements**, all its own, in `benchmarks/runs/<date>-<what>-g5g/`
-where `<hw-short>` equals the hardware slot:
+**This rig has ONE measurement of its own**, in `benchmarks/runs/<date>-<what>-g4dn/` where
+`<hw-short>` equals the hardware slot:
 
 | Run | Decode | What it added |
+| --- | ---: | --- |
+| `2026-08-29-first-serve-g4dn` | **13.1 tok/s** | First serve. 3 context cells + xprof. Settles the Turing-vs-Graviton2 A/B. |
+
+Report: `benchmarks/reports/2026-08-29-first-serve-g4dn.json`, schema 1.1, validating.
+
+**The eight runs under `gpu-jax-g5g-2b/benchmarks/runs/` are the SIBLING's** and are quoted
+throughout this file as the source of most findings here. They were measured on a T4G behind a
+Graviton2, and their `<hw-short>` is `g5g` for exactly that reason. Do not move one into this
+rig, and do not difference a number from one against a number from the other without saying
+which is which:
+
+| Sibling run | Decode | What it established |
 | --- | ---: | --- |
 | `2026-08-19-first-serve-g5g` | 12.5 tok/s | First serve. CUDA 12 / Python 3.12. |
 | `2026-08-21-cuda13-py314-g5g` | 12.4 tok/s | CUDA 13 / Python 3.14, same AMI. |
 | `2026-08-25-context-sweep-g5g` | 12.80 tok/s | 12 cells, context × output. First xprof. |
 | `2026-08-26-config-sweep-g5g` | 12.8 tok/s | Config sweep: all three levers fail. Locates the prefill ceiling. |
-| `2026-08-26-quant-levers-fixed-g5g` | **13.10 tok/s** | Levers fixed. 5/5 configs, 15/15 cells. Sets the current default. |
+| `2026-08-26-quant-levers-fixed-g5g` | **13.10 tok/s** | Levers fixed. Sets the current default (`ple4+int8head`). |
 | `2026-08-27-ubuntu2604-base-g5g` | 12.80 tok/s | Ubuntu 26.04 base. 80s install, read_shards 3x faster. |
 | `2026-08-27-baseline-g5g` + `-xprof` | 12.80 tok/s | First runs through `tune_loop.py`. |
-| `2026-08-28-full-run-cached-g5g` | 12.9 tok/s | Fresh instance restoring the cache from S3. Profile reproduces to 0.07%. |
+| `2026-08-28-full-run-cached-g5g` | 12.9 tok/s | Fresh instance restoring the cache from S3. |
 
-**The 12.4/12.5/12.8 figures are all the same configuration** (`ple0`, no int8 head) on
-successive stacks, and they are within noise of each other. **13.10 is a different
-configuration**, not an improvement to the old one — see the quantization-lever section.
+**Its 12.4/12.5/12.8 figures are all the same configuration** (`ple0`, no int8 head) on
+successive stacks, and within noise of each other. **13.10 is a different configuration**, not
+an improvement to the old one — see the quantization-lever section. This rig's 13.1 is at that
+same `ple4+int8head` default, which is what makes it comparable.
 
-**The CUDA 13 / 3.14 bump is performance-neutral** — it buys currency, not speed. Compare the
-two on the `tpu_jax_decode_tokens_per_second` gauge, not end-to-end tok/s: the same prompt
-returned 64 completion tokens in one run and 53 in the other, and end-to-end wall includes
-prefill and HTTP, so the token count moves it.
+**The CUDA 13 / 3.14 bump is performance-neutral** — it buys currency, not speed. Compare on
+the `tpu_jax_decode_tokens_per_second` gauge, not end-to-end tok/s: the same prompt returned 64
+completion tokens in one run and 53 in the other, and end-to-end wall includes prefill and
+HTTP, so the token count moves it. **The same caution applies to this rig's own three cells**:
+end-to-end falls 12.67 → 11.65 → 8.75 across the context sweep while the gauge holds at
+13.1/13.2/13.1. **Decode does not degrade with context; TTFT does.** Quote the gauge.
 
 `benchmarks/README.md` and `serving-report.schema.json` are **synced copies** —
 `make benchmarks-sync` at the monorepo root overwrites them, so edit the root originals, never
-these. `reports/` and `runs/` stay in the rig.
+these. `reports/` and `runs/` stay in the rig. `make benchmarks-rollup` regenerates
+`benchmarks/INDEX.md`; do not hand-edit it.
+
+**`tune_loop.py` hardcoded its `<hw-short>` as `g5g`**, so this rig's first run initially
+landed in `benchmarks/runs/2026-08-29-first-serve-g5g` — a directory name asserting hardware
+the run did not happen on, inside the rig whose whole point is that the hardware differs.
+`HW_SHORT` is now derived from slot 3 of the rig directory. **A literal is what silently
+survives a fork**; the same lesson as `SKILL_STEM` in `project-setup.sh`.
 
 Three numbers you will be tempted to reuse, and must not:
 
 - **43.1 / 44.24 tok/s** — the vLLM sibling on `g5g.4xlarge` / `g5g.xlarge`, 2026-08-12/13.
-  Same silicon, different runtime, and the figure was obtained *with reduced Triton tiles*.
-  It is the number this rig exists to beat, not a baseline it inherits.
+  Different runtime, and different silicon (T4G, not T4), and the figure was obtained *with
+  reduced Triton tiles*. It is the number this rig exists to beat, not a baseline it inherits.
 - **~44 tok/s on one Inferentia core** from `~/gemma4-tips-aws` — different harness, different
   silicon.
 - **Anything from `~/gemma4-tips`** — that tree duplicated its own artifacts and its directory
   names misattribute both model and chip. Never read a model or a chip off one.
 
 A config flag being accepted is not evidence it did anything. Cross-check against an absolute
-physical bound — 320 GB/s of GDDR6 and 15360 MiB is the whole envelope here — not against
-another config.
+physical bound — 320 GB/s of GDDR6 and 15360 MiB is the whole envelope here, and xprof puts
+peak HBM at 298.083 GiB/s on this device — not against another config.
 
-## Fork debris — cleared, and why the list stays
+**Spot is the capacity constraint, and price does not predict it.** `us-east-1a` refused with
+`InsufficientInstanceCapacity` on 2026-08-29 while being one of the *cheapest* AZs;
+`us-east-1b` took the request immediately at $0.3724/hr. Retry across AZs; never read
+cheapness as availability. The sibling recorded the same asymmetry with the AZs reversed,
+which is the point — it moves.
 
-This rig was forked from `gpu-vllm-g5g-2b` and the code was rewritten before the prose was.
-**The backlog is empty as of 2026-08-25**: registration files repaired 2026-08-18, and
-`caf89a2` retitled `README.md`, rewrote `AGENTS.md` and `GEMINI.md` (they are no longer
-byte-identical vLLM copies), and gave the monorepo `NAMING.md` and `README.md` their
-`gpu-jax-g5g-2b` entries.
+## Fork debris — the class of error, and this rig's own instance of it
 
-The list stays because the *class* of error keeps recurring and the recurrences are what
-matter — TPU-rig or vLLM-rig prose describing precision this chip cannot run, in a rig whose
-whole premise is which precision the device picked. Cleared 2026-08-23:
+**This rig was forked from `gpu-jax-g5g-2b` on 2026-08-28 and the code was converted before
+the prose was** — the same sequence, one generation on, that the sibling went through when it
+forked from `gpu-vllm-g5g-2b`. The list stays because the *class* of error keeps recurring:
+inherited prose describing hardware the rig does not have, in a rig whose whole premise is
+that the hardware differs.
+
+**Cleared 2026-08-29** (this rig's fork):
+
+- **`server.py`'s module docstring claimed this rig had served and that the numbers were its
+  own** — "12.4-12.5 tok/s decode on g4dn.xlarge across the two runs under `benchmarks/runs/`"
+  — while `benchmarks/runs/` was **empty**. Those were the sibling's T4G numbers relabelled.
+  This is the single worst kind of fork debris, because it is indistinguishable from a result.
+- **`.codex/config.toml` was 100% unconverted**: server name, skill path, `INSTANCE_TYPE`, and
+  three gated tool names this rig does not have. The rig was misregistered for Codex and
+  nothing caught it, because `server.py` was right.
+- **`plugin.json`'s description and keywords** still said Graviton2 / T4G / aarch64.
+- **`AGENTS.md` and `GEMINI.md` were the G5g rig's copies**, describing a Graviton2 host, a
+  T4G, and an arm64 AMI requirement.
+- **`tune_loop.py` hardcoded `<hw-short>` as `g5g`**, so this rig's first run was written to a
+  directory naming hardware it did not run on. Now derived from the rig directory.
+- **`README.md` predicted a 16,384 MiB device budget** off `describe_instance_types`. The
+  device reports **15,360 MiB**, same as the T4G. Falsified by the first launch.
+- Throughout `server.py`, `tpu.env`, `Makefile` and the three requirements files: ARM64 DLAMI
+  reasoning, Graviton-CPU driverless-image warnings, and "aarch64 wheels exist" packaging
+  arguments — all inherited, none of them true here, and the last of them is close to vacuous
+  on x86_64.
+
+**Cleared earlier, on the sibling, and kept because the class recurs** — TPU-rig or vLLM-rig
+prose describing precision this chip cannot run:
 
 - `jax_openai_server.py`'s module docstring claimed "TPU v6e-1", the `-qat-w4a16-ct`
   checkpoint and BF16 activations. It now points at `/health` and the
@@ -1310,4 +1513,9 @@ whole premise is which precision the device picked. Cleared 2026-08-23:
 - `/health` reported `weights="bf16"` and a hardcoded `activations="bfloat16"` on a chip with
   no bf16 datapath, and echoed the *requested* KV dtype (`auto`) rather than what it resolved
   to. All three now come off `ENGINE.precision_info()`.
-- `make lint`'s `B023` in `tests/test_engine.py:42` is fixed; the gate is green.
+
+**The pattern worth extracting:** every one of these was invisible to the test suite, and in
+each case for the same reason — `server.py`'s `RIG_NAME` was correct, so
+`test_rig_name_matches_directory` passed while the files *around* it named another rig. Tests
+that check a rig agrees with itself cannot catch a rig that agrees with itself about the wrong
+hardware. Only a launch settles that, which is what 2026-08-29 was for.

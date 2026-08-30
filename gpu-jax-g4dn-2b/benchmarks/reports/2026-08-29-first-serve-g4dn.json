@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-29-first-serve-g4dn",
+    "date": "2026-08-29",
+    "operator": "xbill",
+    "source": "benchmarks/runs/2026-08-29-first-serve-g4dn/",
+    "notes": "FIRST SERVE ON THIS RIG. Until this run gpu-jax-g4dn-2b had provisioned nothing and measured nothing, and both server.py and README.md carried the G5g sibling's numbers relabelled as this rig's own. Spot i-02eb43cb99429a8f7 in us-east-1b, launched, deployed, measured and terminated in one cycle. Driven end to end by tune_loop.py, so the served build id was asserted equal to the local payload digest (51bc52c9e2e9) before any number was recorded."
+  },
+  "hardware": {
+    "accelerator": "nvidia-t4",
+    "chips": 1,
+    "hbm_gb_per_chip": 15.36,
+    "machine_type": "g4dn.xlarge",
+    "host": {
+      "cpu": "Intel Cascade Lake",
+      "arch": "x86_64",
+      "memory_gb": 16,
+      "vcpus": 4
+    },
+    "pricing": {
+      "currency": "USD",
+      "rate_per_chip_hour": 0.3724,
+      "source": "ec2 describe-spot-price-history, us-east-1b, 2026-08-29 (on-demand list $0.526/hr)"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "revision": "3e22461f65e89153144f8adb70e3b8c2cc9845a7",
+    "weights_dtype": "bfloat16-stored/float16-compute",
+    "quantization": "none (dense reference build); ple_bits=4, int8_lm_head",
+    "kv_cache_dtype": "float16",
+    "max_model_len": 4096,
+    "architecture_notes": "28 sliding layers at head_dim=256, 7 full-attention at global_head_dim=512; 8 query heads to 1 KV head (full MQA). KV sharing from layer 15 collapses to two source caches (13 sliding, 14 full), so 15 caches exist, not 35, and window_kv=True caps the 12 sliding ones at the 512-slot ring. Whole KV cache at 4K is ~30 MiB \u2014 KV is not the binding constraint here, prefill is."
+  },
+  "software": {
+    "engine": "jax",
+    "version": "0.11.1",
+    "backend": "cuda (jax[cuda13], pip-supplied CUDA; DLAMI supplies only the driver)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "--model google/gemma-4-E2B-it",
+      "--host 0.0.0.0",
+      "--port 8000",
+      "--kv-cache-dtype auto",
+      "--quant-mode fp16",
+      "--max-model-len 4096",
+      "--ple-bits 4",
+      "--int8-lm-head"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "tune_loop.py (this rig's harness)",
+      "output_len": 64,
+      "runs_per_point": 3,
+      "noise_floor_pct": 3.0,
+      "notes": "Median of 3, warmed AT THE SHAPE MEASURED \u2014 max_new_tokens is a static_argnames entry, so (bucket, max_tokens) is the compiled shape and warming at a different max_tokens has previously been a 4x error. per_stream_tok_per_s is the server's own tpu_jax_decode_tokens_per_second gauge; output_tok_per_s is end-to-end wall including prefill and HTTP, which is why it falls with context while the gauge does not."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 41,
+        "output_len": 64,
+        "status": "ok",
+        "output_tok_per_s": 12.671,
+        "per_stream_tok_per_s": 13.1
+      },
+      {
+        "concurrency": 1,
+        "input_len": 521,
+        "output_len": 64,
+        "status": "ok",
+        "output_tok_per_s": 11.654,
+        "per_stream_tok_per_s": 13.2
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2057,
+        "output_len": 64,
+        "status": "ok",
+        "output_tok_per_s": 8.748,
+        "per_stream_tok_per_s": 13.1
+      },
+      {
+        "concurrency": 2,
+        "input_len": 41,
+        "output_len": 64,
+        "status": "infeasible",
+        "error": "MAX_NUM_SEQS=1: Gemma4EModelJAX raises NotImplementedError for B > 1, and the decode step donates its KV buffers. Batching is closed by the engine, not by capacity."
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 14.07,
+    "weights_gib": 5.733,
+    "notes": "tpu_jax_weight_bytes 6.155 GB, tpu_jax_hbm_used_bytes 6.197 GB. The T4 reports 15360 MiB via nvidia-smi \u2014 IDENTICAL to the T4G, and NOT the 16384 MiB that describe_instance_types implies. README.md predicted a real 1 GiB advantage here on that basis; the device disagrees, and the device is what allocates."
+  },
+  "startup": {
+    "time_to_healthy_s": 151.0,
+    "notes": "Instance RUNNING 19:01:26Z, service start 19:04:10Z, READY 19:06:41Z. Cloud-init install was 76s TOTAL including xprof and tensorboard: apt-base 6s, python-3.14 1s (already the system interpreter on the Ubuntu 26.04 base, so deadsnakes was skipped), pip-bootstrap 6s, jax-wheels 42s, serving-deps 13s, profiling-deps 5s, gpu-verify 3s. No compilation cache was restored \u2014 JAX_CACHE_S3_URI is empty by default."
+  },
+  "cost": {
+    "notes": "rate_per_chip_hour is the SPOT rate actually paid, $0.3724/hr in us-east-1b, and g4dn.xlarge carries exactly one T4 so instance rate and per-chip rate coincide. On-demand list is $0.526/hr. The whole launch-to-terminate cycle was about 25 minutes, so roughly $0.16. Spot capacity was NOT available in us-east-1a (InsufficientInstanceCapacity) and 1a was not the cheapest AZ, so price remains a bad proxy for capacity \u2014 retry across AZs."
+  },
+  "issues": [
+    {
+      "summary": "tune_loop.py hardcoded the <hw-short> suffix as 'g5g', so this rig's first run landed in benchmarks/runs/2026-08-29-first-serve-g5g \u2014 a directory name asserting hardware the run did not happen on.",
+      "resolution": "HW_SHORT now derives from slot 3 of the rig directory name."
+    },
+    {
+      "summary": "The instance role's S3 policy enumerated per-rig prefixes (gpu-jax-g5g-2b, gpu-jax-g6-2b) and so denied this rig's artifact upload, which tune_loop.py depends on. Every fork needed an IAM edit before it could return a measurement.",
+      "resolution": "jax-compilation-cache-rw was LOOSENED rather than extended: the rig segment is now a wildcard, so the grant is vllm-models-bucket/{jax-cache,benchmarks}/* for any rig. Deliberate operator decision \u2014 a new rig should not need an IAM change to write its own cache and results. Still scoped to those two prefixes inside the one bucket; the bucket boundary did not move."
+    }
+  ],
+  "notes": [
+    "THE A/B LANDED ON TOP OF THE SIBLING. This rig exists to separate Turing from Graviton2: same engine, same checkpoint, same dtype policy, same SM 7.5, different host ISA. Decode 13.1/13.2/13.1 tok/s against gpu-jax-g5g-2b's 13.10 at the identical ple4+int8head config, and tpu_jax_weight_bytes 6.155 GB against 6.155 GB \u2014 exact.",
+    "The xprof profile reproduces the sibling's to within noise: dtype conversion 54.4% (g5g 54.4 / 54.0), fp32 GEMV 32.8% (32.6 / 32.8), TensorCore 0.0% (0.0). Roofline peaks are IDENTICAL to three decimals \u2014 peak FLOP 65126.4, peak HBM 298.083 GiB/s, ridge 203.479.",
+    "CONCLUSION: the host architecture contributes nothing measurable to decode, and the 86.9% dtype-plus-fp32-GEMV tax is purely a Turing property. gpu-jax-g5g-2b's finding is therefore a chip finding, not a Graviton2 one, and its falsification of the weight-dtype fix (2026-08-28: a GEMV has no half path at B=1) carries here unchanged. The route to the ceiling is a GEMM \u2014 batching \u2014 which MAX_NUM_SEQS=1 closes.",
+    "What the host DID change is packaging risk, and it should not be quoted as a finding: on x86_64 the wheel-availability argument that mattered on aarch64 is nearly vacuous. The load-bearing claim was always sm_75.",
+    "xprof 2.23.1 and tensorboard 2.21.0 are now installed AT BOOT as their own non-fatal stage, 5 seconds of a 76-second install. They were previously on-demand via a documented path inside APP_DIR that the deploy payload excludes, so they were in practice never installed at all."
+  ]
+}
