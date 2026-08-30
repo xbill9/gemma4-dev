@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 in Pure JAX: What Changes Between Turing and Ada, and What Doesn't</title>
+  <meta name="description" content="One hand-written Gemma 4 port, no PyTorch and no vLLM, on two NVIDIA GPUs a generation apart. Most of it ports untouched. Two things do not, and one of them was quietly eating 87% of decode." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/medium/img/devto-cover-gde.jpg" alt="Gemma 4 in Pure JAX: What Changes Between Turing and Ada, and What Doesn&#x27;t" /></figure>
+<header id="title-block-header" hidden>
+<h1 class="title">Gemma 4 in Pure JAX: What Changes Between Turing and
+Ada, and What Doesn't</h1>
+</header>
+<p>This article is a measurement report on running a hand-written
+<strong>Gemma 4</strong> port in <strong>pure JAX</strong> across two
+NVIDIA GPUs a generation apart, and on the two places the "it's just
+JAX" abstraction leaks. One of those leaks costs 87% of decode and
+nothing in the logs is red.</p>
+<p>The code is here:</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<h2 id="what-this-article-measures">What This Article Measures</h2>
+<p>One port, one build, one checkpoint, two cards. Everything below
+comes from two archived runs, named so you can check them.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/medium/img/devto-gemma4-turing-ada-gde-table-1.png"
+alt="table" /></p>
+<p>Build id <code>51bc52c9e2e9</code> on both, config
+<code>ple4 + int8_lm_head</code>, and <code>tpu_jax_weight_bytes</code>
+reads <strong>6,155,450,950</strong> on both cards — the same integer.
+Only the chip and its host differ.</p>
+<h2 id="at-this-point-you-should-have">At This Point You Should
+Have</h2>
+<ul>
+<li>An AWS account with spot capacity for <code>g5g.2xlarge</code> and
+<code>g6.2xlarge</code></li>
+<li>A Hugging Face token with access to
+<code>google/gemma-4-E2B-it</code></li>
+<li>Python 3.13 or newer on the instance, system-wide, with no
+virtualenv</li>
+<li>No CUDA toolkit, no Rust toolchain, and no compiler — none of them
+are needed</li>
+</ul>
+<h2 id="why-pure-jax-at-all">Why Pure JAX At All</h2>
+<p>The port lives in <code>ports/gemma4/</code> and is driven by a
+generation loop behind an OpenAI-compatible server. No PyTorch, no vLLM,
+no <code>torch_xla</code>.</p>
+<p>The premise under test is that the same source runs on both cards
+with nothing changed but a config file. It mostly holds. The interesting
+part is where it does not.</p>
+<h2 id="gemma-4-e2b-is-not-a-stock-transformer">Gemma 4 E2B Is Not a
+Stock Transformer</h2>
+<p>Any port has to carry four irregularities, and none of them are
+optional.</p>
+<ol type="1">
+<li><strong>Two attention geometries.</strong> Sliding layers use
+<code>head_dim=256</code>, global layers use <strong>512</strong>. Most
+inference stacks assume one head dimension per model.</li>
+<li><strong>8:1 MQA</strong>, so the KV budget is nothing like the
+parameter count suggests.</li>
+<li><strong>A KV-share map</strong> that collapses <strong>35 layers
+onto 15 caches</strong>.</li>
+<li><strong>A 512-slot sliding ring</strong>, plus per-layer embeddings
+held in a <strong>4.70 GB</strong> table that is quantized to 4 bits on
+load.</li>
+</ol>
+<h2 id="the-geometry-is-what-breaks-other-stacks">The Geometry Is What
+Breaks Other Stacks</h2>
+<p>That first irregularity is the expensive one. On the vLLM path the
+heterogeneous head dims force the Triton attention backend:</p>
+<pre><code>Gemma4 model has heterogeneous head dimensions
+(sliding=256, global=512); falling back to the Triton attention backend</code></pre>
+<p>On a Turing GPU that backend then asks for shared memory the hardware
+does not have:</p>
+<pre><code>triton.runtime.errors.OutOfResources: out of resource: shared memory,
+Required: 147456, Hardware limit: 65536</code></pre>
+<p><strong>JAX never enters that conversation.</strong> Attention is
+ordinary XLA rather than a hand-tiled kernel, so there is no per-block
+shared-memory ceiling in the attention path at all. The irregular
+geometry that is a special case everywhere else is just array shapes
+here.</p>
+<h2 id="leak-one-the-dtype-policy-has-to-read-the-device">Leak One: The
+dtype Policy Has To Read the Device</h2>
+<p>This is the single most expensive lesson in the repository.</p>
+<p><strong>A wrong compute dtype does not raise. It emulates.</strong>
+<code>bfloat16</code> on a pre-Ampere GPU does not fail — XLA routes it
+through fp32 and most of decode disappears into conversion. Nothing in
+the logs is red.</p>
+<p>So the port does not take the dtype from a config file. It reads the
+live compute capability off the device:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>COMPUTE_DTYPE <span class="op">=</span> float16 <span class="cf">if</span> IS_PRE_AMPERE <span class="cf">else</span> bfloat16</span></code></pre></div>
+<p>On the SM 8.9 Ada card that resolves to <code>bfloat16</code>. On the
+SM 7.5 Turing card it resolves to <code>float16</code> — Turing's only
+real 16-bit datapath, since it has neither bf16 nor fp8.</p>
+<h2 id="the-process-states-what-it-decided">The Process States What It
+Decided</h2>
+<p>The first line the server emits is the policy, so a misconfiguration
+is one <code>grep</code> away rather than a mystery in the
+throughput:</p>
+<pre><code>INFO ports.gemma4.jax_e_model: jax_e_model device policy: platform=gpu
+compute_capability=8.9 compute_dtype=bfloat16 pallas_interpret=False</code></pre>
+<p><code>pallas_interpret=False</code> matters just as much. It is the
+difference between serving and silently running a simulator.</p>
+<h2 id="leak-two-pallas-is-not-portable-as-a-memory-model">Leak Two:
+Pallas Is Not Portable as a Memory Model</h2>
+<p>Here is the part that does not port, and it is not a bug. It is a
+real hardware difference wearing a portable API.</p>
+<p>The fused <strong>W4A16 kernel is written in Pallas</strong>, and it
+was tiled for a device with 16 MB of scratchpad per core. At this
+model's shapes the tiles want <strong>550 KiB to 1.1 MiB per
+block</strong>.</p>
+<p>On a GPU, Pallas lowers through Triton, and those tiles become
+<strong>shared memory</strong>. Turing gives you 64 KiB per block. Ada
+raises the ceiling, but nowhere near a megabyte.</p>
+<p>So the fast path runs on <strong>neither card</strong>. The engine
+computes the requirement at startup and refuses with the arithmetic
+attached, rather than dying as a cryptic <code>OutOfResources</code> at
+the first token:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>check_w4a16_fits_scoped_memory()</span></code></pre></div>
+<p>The practical consequence is that both GPU rigs serve the
+<strong>dense reference checkpoint</strong> at 16-bit. <strong>Pallas is
+portable as an API and not portable as a memory model.</strong> That
+boundary is worth knowing before planning a port around a fused
+kernel.</p>
+<h2 id="the-bug-that-returns-200-ok">The Bug That Returns 200 OK</h2>
+<p>A padding-eviction bug in the KV ring cache cost a week, and it is
+the kind only Gemma 4's geometry produces.</p>
+<p>The invariant is that <strong>a cache index is an absolute real
+position, and padding never occupies an index a real position
+uses.</strong> A port that right-pads into the 512-slot ring violates
+it, and the failure mode is not a crash and not a NaN. It is a token
+loop — a clean HTTP <code>200</code>, <code>status: "success"</code>,
+and output like <code>The The The The</code>.</p>
+<p>Nothing in the logs is red. Nothing in the metrics is red. The only
+thing that catches it is a degeneracy check on the output itself, which
+the server now runs on every response.</p>
+<p>The scariest bugs in this project all returned success.</p>
+<h2 id="install-no-build-step">Install: No Build Step</h2>
+<p><code>jax[cuda13]</code> supplies CUDA as wheels, so the install
+needs no CUDA toolkit, no Rust, and no compiler on the box.</p>
+<pre><code>Install: 117 s, with the cache restore included</code></pre>
+<p>XLA's persistent compilation cache ports as-is. On the T4G rig it
+restores <strong>805 files / 12 MB in 6 seconds</strong> onto a fresh
+instance, from a box that had already been terminated.</p>
+<h2 id="warm-up-at-the-shape-you-measure">Warm Up At the Shape You
+Measure</h2>
+<p><code>max_new_tokens</code> is a <code>static_argnames</code> entry,
+so <code>(bucket, max_tokens)</code> is the compiled shape on every
+backend. A harness that does not warm up misreports the rig badly.</p>
+<p>On the T4G the first request off a fresh engine took <strong>18.06 s
+against 4.50 s warm</strong> — a 4.0x whole-request ratio, measured in
+<code>2026-08-21-cuda13-py314-g5g</code>.</p>
+<p>That run also notes something worth repeating: the 56x figure from
+the first-serve baseline is <strong>TTFT specifically</strong>, not the
+same measurement as the whole-request ratio. They are not
+interchangeable.</p>
+<h2 id="the-sweep">The Sweep</h2>
+<p>64 output tokens, concurrency 1, 3 repeats per cell, median. "Decode,
+gauge" is the engine's steady-state counter. "End-to-end" is wall time
+over the whole request, prefill included.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/medium/img/devto-gemma4-turing-ada-gde-table-2.png"
+alt="table" /></p>
+<h2 id="decode-is-flat-end-to-end-is-not">Decode Is Flat; End-To-End Is
+Not</h2>
+<p>Decode moves 0.8% across a 50x context range on the T4G and 0.4% on
+the L4. End-to-end falls hard on both.</p>
+<p>That fall is prefill being linear in the padded bucket, not decode
+degrading. They are two different claims, and conflating them makes a
+benchmark a lie. <strong>Quote the gauge.</strong></p>
+<p>A cost proportional to the <strong>weights</strong> rather than the
+context produces exactly this shape, which is why KV is not what sets
+decode speed on either card — despite Gemma 4's whole KV story.</p>
+<p>On context specifically: <code>MAX_MODEL_LEN=4096</code> is the
+honest number on the T4G. 4,105 prompt tokens serve; 5,120 fails on a
+prefill transient.</p>
+<h2 id="the-profile-87-of-decode-was-not-math">The Profile: 87% of
+Decode Was Not Math</h2>
+<p>Profiling decode with xprof on the Turing card, 20 decode steps with
+the service stopped:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/medium/img/devto-gemma4-turing-ada-gde-table-3.png"
+alt="table" /></p>
+<p>1,466 ms of kernels across 108 distinct kernels on a Tensor Core GPU,
+without one Tensor Core firing. More than half of decode went to
+converting numbers between formats before any math happened.</p>
+<h2 id="the-obvious-explanation-was-wrong">The Obvious Explanation Was
+Wrong</h2>
+<p>The obvious hypothesis was bf16 weights being converted on a chip
+with no bf16 datapath. So the checkpoint was converted to float16
+host-side and re-run. Parameter dtypes read
+<code>{'float16': 541, 'uint8': 1, 'int8': 1}</code> — and
+<strong>conversion stayed at 54.0%</strong>.</p>
+<p>The measurement itself is solid. The same profile on a different
+instance, a different AMI and a restored cache landed at 1466.0 ms
+against 1467.1 ms. <strong>1.1 ms apart on 1467.</strong></p>
+<h2 id="it-was-the-datapath-not-the-checkpoint">It Was the Datapath, Not
+the Checkpoint</h2>
+<p>The Ada card resolves it. Converting the stored weights changed
+nothing because storage dtype was never the problem: Turing has no
+native bf16, and the fp32 <code>gemvx</code> line is the tell — XLA was
+round-tripping through fp32 regardless of what the file on disk
+said.</p>
+<p>Give it a card where storage and compute dtype actually match, and
+the 54% conversion and the 32.8% fp32 path vanish
+<strong>together</strong>. An 87% tax gone, for 3.7x the throughput, and
+a rig sitting at its bandwidth roofline instead of 26% of it.</p>
+<p>The <code>/health</code> endpoint on the L4 reports
+<code>weights=bfloat16 activations=bfloat16 kv_cache=bfloat16 pre_ampere=false</code>
+— storage dtype and compute dtype matching for the first time on this
+engine.</p>
+<h2 id="what-survived-and-is-still-unexplained">What Survived, and Is
+Still Unexplained</h2>
+<p>Tensor Core utilization is <strong>0.0% on the Ada card too</strong>
+— 100 distinct kernels, 362.8 ms of them, and not one Tensor Core
+firing.</p>
+<p>Removing the dtype pressure made the machine roughly four times
+faster without making it touch the hardware it was sold for. That is the
+open question now, and it is a better one than the question this started
+with.</p>
+<h2 id="teardown">Teardown</h2>
+<p>Both rigs run on spot capacity and are terminated after collection.
+The XLA cache is pushed to S3 before teardown, which is what makes the
+6-second restore on a fresh instance possible.</p>
+<h2 id="summary">Summary</h2>
+<p>The goal of this article was to find out which parts of "it's just
+JAX" survive a move between GPU generations. The key to the solution was
+reading the compute dtype off the live device rather than a config file.
+The measured results were:</p>
+<ul>
+<li><strong>The model code ported untouched.</strong> All four Gemma 4
+irregularities, both attention geometries, the KV-share map and the ring
+— identical source on both cards.</li>
+<li><strong>The compilation cache and static-shape discipline ported
+untouched</strong>, including an 805-file restore in 6 seconds onto a
+fresh instance.</li>
+<li><strong>The fused Pallas kernel ported to neither card</strong>,
+because it was written against a 16 MB scratchpad and GPU shared memory
+is 64 KiB per block on Turing.</li>
+<li><strong>The dtype tax was 87% of decode on Turing and 0.0% on
+Ada</strong>, worth 3.7x throughput, with nothing red in any log.</li>
+<li><strong>Tensor Core utilization is 0.0% on both cards</strong> and
+remains unexplained.</li>
+</ul>
+<p>Scope: two spot instances, one in <code>us-east-1d</code>, each
+measured once with 3 repeats per sweep cell and medians reported. The
+two boxes differ in host architecture (aarch64 against x86_64) and base
+image as well as in GPU, so this is not a single-variable experiment;
+the payload is byte-identical across them — same build
+<code>51bc52c9e2e9</code>, same config, same 6,155,450,950 bytes of
+weights — which is the basis for attributing the difference to the chip.
+The Turing profile was reproduced on a second instance at 1466.0 ms
+against 1467.1 ms; the Ada profile was measured once.</p>
+<p>The strategy for using MCP for Gemma 4 serving across GPU generations
+was validated with a incremental step by step approach.</p>
+</body>
+</html>
