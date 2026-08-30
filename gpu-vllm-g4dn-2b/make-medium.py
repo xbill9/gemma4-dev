@@ -214,7 +214,30 @@ def render_mono(lines: list[str], path: Path) -> None:
 BOX = set("┌┐└┘├┤┬┴┼─│")
 
 
-def convert(src: Path, outdir: Path, img_base: str = "") -> Path:
+# Emoji have no glyph in Liberation Sans, so PIL renders them as tofu boxes. The
+# dev.to source uses medal emoji to rank rows, and rendering those tables to PNG
+# turned the whole Rank column into empty squares -- visible only by looking at
+# the output, which is why step one of shipping an image is opening it.
+#
+# Substitute rather than switch fonts: NotoColorEmoji is a CBDT bitmap face that
+# PIL will only draw at one fixed size with embedded_color, and mixing faces
+# inside a table cell to get three glyphs is not worth it.
+#
+# A medal ALONE is a rank, so it becomes its ordinal. A medal BESIDE something is
+# a "this one won" marker, so it becomes a bullet the face actually has.
+_MEDALS = {"\U0001F947": "1", "\U0001F948": "2", "\U0001F949": "3"}
+
+
+def demoji(cell: str) -> str:
+    text = cell.strip()
+    if text and all(ch in _MEDALS or ch.isspace() for ch in text):
+        return " ".join(_MEDALS[ch] for ch in text if ch in _MEDALS)
+    for medal in _MEDALS:
+        text = text.replace(medal, "\u25cf")
+    return text.strip()
+
+
+def convert(src: Path, outdir: Path, img_base: str = "", cover: Path | None = None) -> Path:
     text = src.read_text()
 
     # strip YAML front matter, keep title/description
@@ -263,6 +286,8 @@ def convert(src: Path, outdir: Path, img_base: str = "") -> Path:
             while j < len(lines) and lines[j].strip().startswith("|"):
                 j += 1
             hdr, body = parse_table(lines[i:j])
+            hdr = [demoji(c) for c in hdr]
+            body = [[demoji(c) for c in row] for row in body]
             n_tab += 1
             name = f"{slug}-table-{n_tab}.png"
             render_table(hdr, body, imgdir / name)
@@ -287,6 +312,18 @@ def convert(src: Path, outdir: Path, img_base: str = "") -> Path:
 
     h = base.read_text()
     base.unlink()
+
+    # MEDIUM MAKES THE FIRST IMAGE IN THE BODY THE STORY COVER. Without this the
+    # cover becomes whatever table happened to render first -- a screenshot of a
+    # price table -- while the actual cover art, which only ever lived in dev.to
+    # front matter, never reaches Medium at all. Nothing warns you.
+    if cover and cover.exists():
+        dst = outdir / "img" / cover.name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if cover.resolve() != dst.resolve():
+            dst.write_bytes(cover.read_bytes())
+        h = h.replace("<body>", f'<body>\n<figure><img src="img/{cover.name}" '
+                                f'alt="{html.escape(title)}" /></figure>', 1)
 
     # pandoc repeats the title in a header block; Medium supplies its own.
     h = h.replace('<header id="title-block-header">',
@@ -342,13 +379,25 @@ def convert(src: Path, outdir: Path, img_base: str = "") -> Path:
     return p_embed
 
 
-# Derived from the rig directory this script sits in, never hardcoded: the copy
-# that came from gpu-vllm-g5g-2b carried that rig's path, so the hosted variant
-# pointed every <img> at a sibling rig's URLs -- all of which 404, because the
-# PNGs are written next to *this* article. The embed variant hides the mistake,
-# since its images are inlined.
-DEFAULT_IMG_BASE = ("https://raw.githubusercontent.com/xbill9/gemma4-dev/"
-                    f"main/{Path(__file__).resolve().parent.name}/medium/img/")
+# The hosted variant's <img> URLs are DERIVED, never hardcoded, and this is the
+# single most repeated mistake in this toolchain. A per-project copy of this
+# script used to bake in its own project's path; a copy taken to a new project
+# kept the old one, so every <img> in the hosted HTML pointed at another
+# project's URLs -- all 404. The embed variant hides it completely, because its
+# images are inlined, so the bug ships silently.
+#
+# Now that this script is CENTRAL rather than copied per project, deriving from
+# the script's own location would be wrong too (it would resolve to "scripts").
+# The only correct source is the ARTICLE's own directory.
+#
+# Override with --img-base=<url> whenever the images will not be served from
+# <repo>/<article-dir>/medium/img/.
+DEFAULT_REPO = "https://raw.githubusercontent.com/xbill9/gemma4-dev/main"
+
+
+def default_img_base(src: Path) -> str:
+    return f"{DEFAULT_REPO}/{src.resolve().parent.name}/medium/img/"
+
 
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -356,6 +405,11 @@ if __name__ == "__main__":
              for a in sys.argv[1:] if a.startswith("--")}
     if not args:
         sys.exit(__doc__)
-    img_base = flags.get("--img-base", DEFAULT_IMG_BASE)
+    src = Path(args[0])
+    img_base = flags.get("--img-base") or default_img_base(src)
     outdir = Path(args[1]) if len(args) > 1 else Path("medium")
-    convert(Path(args[0]), outdir, img_base)
+    cov = flags.get("--cover")
+    cover = Path(cov) if cov else next(
+        (c for c in sorted(src.parent.glob("*cover*.jpg")) + sorted(src.parent.glob("*cover*.png"))
+         if "builder" not in c.name), None)
+    convert(src, outdir, img_base, cover)

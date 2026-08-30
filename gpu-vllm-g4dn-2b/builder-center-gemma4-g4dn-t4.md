@@ -17,13 +17,17 @@ Pricing every NVIDIA instance type in us-east-1 from the AWS Pricing API returns
 Sorted by on demand price, and keeping only those that give you a whole GPU rather than a
 fractional slice, the top of the list is short:
 
-| rank | instance | host CPU | $/hr on-demand | $/hr spot | GPU | VRAM |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | g5g.xlarge | Graviton2 (arm64) | **0.4200** | **0.1458** | T4G | 15,360 MiB |
-| 2 | g4dn.xlarge | Intel (x86_64) | 0.5260 | 0.3559 | T4 | 15,360 MiB |
-| 3 | g5g.2xlarge | Graviton2 | 0.5560 | — | T4G | 15,360 MiB |
-| 4 | g4dn.2xlarge | Intel | 0.7520 | — | T4 | 15,360 MiB |
-| 5 | g6.xlarge | AMD | 0.8048 | 0.7033 | L4 | 22,888 MiB |
+| instance | host CPU | $/hr on-demand | $/hr spot | GPU |
+| --- | --- | --- | --- | --- |
+| g5g.xlarge | Graviton2 | **0.4200** | **0.1458** | T4G |
+| g4dn.xlarge | Intel | 0.5260 | 0.3559 | T4 |
+| g5g.2xlarge | Graviton2 | 0.5560 | — | T4G |
+| g4dn.2xlarge | Intel | 0.7520 | — | T4 |
+| g6.xlarge | AMD | 0.8048 | 0.7033 | L4 |
+
+Every Turing entry there carries 15,360 MiB of video memory; the L4 carries 22,888. The Graviton2
+rows are aarch64 and the rest are x86_64, which turns out to matter more than anything else in
+this table.
 
 The three instances cheaper than g5g.xlarge are all fractional L4 slices at 2,861 to 5,722 MiB,
 and none of them can map Gemma 4 E2B's 10.2 GB checkpoint. The cheapest slice that could,
