@@ -9,7 +9,7 @@ SKILL_DIR  := .claude/skills/$(SKILL_NAME)
 PLUGIN_DIR := skills/$(SKILL_NAME)
 DIST_DIR   := dist
 
-.PHONY: all help clean test lint install deploy init skill skill-install skill-package
+.PHONY: all help clean test lint install deploy init skill skill-install skill-package preflight
 
 all: help
 
@@ -88,3 +88,16 @@ skill-package: skill
 deploy:
 	@echo "Use the MCP tool create_g4dn_instance (or get_deployment_config for the CLI form)."
 	@echo "Then verify_gpu_arch and verify_triton_patch — see docs/turing-shared-memory.md."
+
+# Article pre-flight. The evidence set is recorded HERE rather than living in a
+# shell history: check-facts.py can only trace a claim to an artifact it is
+# handed, so an unlisted artifact reads as an unverified fact. The g5g report is
+# in the list because both articles cite that run's numbers as the comparison.
+PUBLISHING ?= $(HOME)/.claude/skills/publishing/scripts
+G5G_BASELINE = ../gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/REPORT.md
+EVIDENCE = benchmarks/runs/2026-08-30-first-serve-g4dn/ tpu.env $(G5G_BASELINE)
+
+preflight:
+	python3 $(PUBLISHING)/check-facts.py devto-gemma4-g4dn-t4-turing.md --evidence $(EVIDENCE)
+	python3 $(PUBLISHING)/check-facts.py builder-center-gemma4-g4dn-t4.md --evidence $(EVIDENCE)
+	python3 $(PUBLISHING)/check-article.py devto-gemma4-g4dn-t4-turing.md --repo-root ..
