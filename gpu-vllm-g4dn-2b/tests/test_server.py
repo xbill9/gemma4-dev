@@ -367,11 +367,27 @@ class TuringPatchTests(unittest.TestCase):
         """site-packages carries the image's python version in its path, and that
         moves with the tag. A hardcoded path silently misses."""
         text = server._user_data("google/gemma-4-E2B-it", "g4dn.xlarge")
-        self.assertIn("print(m.__file__)", text)
+        self.assertIn("m.__file__", text)
         # A hardcoded PATH, not the word: the bootstrap comment says "site-packages
         # carries the image's python version", which is the explanation, not a path.
         self.assertNotIn("/usr/local/lib/python3", text)
         self.assertNotIn("/site-packages", text)
+
+    def test_resolved_path_is_fenced_against_vllm_stdout_logging(self):
+        """REGRESSION, and it cost this rig its first launch (2026-08-30).
+
+        Importing vllm logs to STDOUT, and the resolve container has no `--gpus`,
+        so it always prints `0 active driver(s) found` before the path. A bare
+        capture glued those lines onto TARGET and `cat` died with `File name too
+        long`. The GPU is never attached to THIS container, so the logging is
+        unconditional -- the unfenced form could not have worked on any tag.
+        """
+        text = server._user_data("google/gemma-4-E2B-it", "g4dn.xlarge")
+        self.assertIn('print("__TARGET__" + m.__file__)', text)
+        self.assertIn("__TARGET__//p", text)
+        # And an unresolved path must hard-stop rather than write an empty file
+        # that the patch script then refuses while blaming upstream.
+        self.assertIn("module path did not resolve", text)
 
     def test_a_failed_patch_kills_cloud_init(self):
         """Serving unpatched behind a patched tag reports success for ten minutes

@@ -453,6 +453,32 @@ fi
     # keeps getting bitten by.
     backend_env = f'  -e VLLM_ATTENTION_BACKEND={ATTENTION_BACKEND} \\\n' if ATTENTION_BACKEND else ""
 
+    # WHY THE MODULE-PATH RESOLVE IS SENTINEL-FENCED, kept out here on purpose:
+    # user data is capped at 16 KB by EC2 and comments inside the template are
+    # billed against it, so the reasoning lives in Python and only the code ships.
+    #
+    # MEASURED 2026-08-30 -- this killed the rig's FIRST EVER LAUNCH at this exact
+    # line. Importing vllm emits INFO logging on STDOUT, and the resolve container
+    # deliberately runs WITHOUT `--gpus` (the GPU belongs to the serving container),
+    # so the import finds no driver and announces it:
+    #
+    #   INFO [importing.py:53] Triton is installed but 0 active driver(s) found
+    #                          (expected 1). Disabling Triton to prevent runtime errors.
+    #   INFO [importing.py:88] Triton not installed or not compatible; ...
+    #   /usr/local/lib/python3.12/dist-packages/vllm/.../triton_unified_attention.py
+    #
+    # A bare $(...) captures all three lines, so the next command became
+    # `cat "<2 log lines><path>"` and died with `File name too long`. Because the
+    # resolve container never has a GPU, those lines are ALWAYS emitted: this could
+    # never have worked on any tag. It stayed latent only because the rig had never
+    # been launched -- the arithmetic in CLAUDE.md was all checked, the plumbing
+    # was not, and no test could see it because the failure needs a real docker.
+    #
+    # The sentinel beats `tail -n 1`: logging can interleave on either side of the
+    # print, so line position is not a safe key. The `case` guard exists because an
+    # empty TARGET makes `cat` write an EMPTY file, which the patch script then
+    # refuses for the WRONG REASON -- reporting upstream restructuring when the
+    # actual fault is local plumbing.
     return f"""#!/usr/bin/env bash
 set -euxo pipefail
 {swap}systemctl enable --now docker
@@ -473,11 +499,15 @@ stage image-pull-done
 echo '{_patch_b64()}' | base64 -d | gunzip > {app_dir}/{_PATCH_SCRIPT}
 echo '{_patch_digest()}' > {app_dir}/PATCH_SHA
 
-# Resolved, never hardcoded: site-packages carries the image's python version in
-# its path, and that moves with the tag.
+# Resolved, never hardcoded. Sentinel-fenced: importing vllm logs to STDOUT.
 TARGET=$(docker run --rm --entrypoint python3 {VLLM_IMAGE} -c \\
-  'import vllm.v1.attention.ops.triton_unified_attention as m; print(m.__file__)')
+  'import vllm.v1.attention.ops.triton_unified_attention as m; print("__TARGET__" + m.__file__)' \\
+  | sed -n 's/^__TARGET__//p' | tail -n 1)
 echo "triton_unified_attention.py resolves to $TARGET"
+case "$TARGET" in
+  /*/triton_unified_attention.py) ;;
+  *) echo "FATAL: module path did not resolve (got: '$TARGET')" >&2; exit 1 ;;
+esac
 stage patch-resolve
 
 docker run --rm --entrypoint cat {VLLM_IMAGE} "$TARGET" > {app_dir}/triton_unified_attention.py

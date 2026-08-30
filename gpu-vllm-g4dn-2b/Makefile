@@ -45,7 +45,7 @@ test:
 # patch_triton_turing.py is in it because it is shipped to every instance.
 lint:
 	@command -v ruff >/dev/null || { echo "ruff not found; install with: pip install ruff"; exit 1; }
-	ruff check server.py patch_triton_turing.py refresh_skill.py tests
+	ruff check server.py patch_triton_turing.py benchmarking_suite.py refresh_skill.py tests
 	@for s in project-setup.sh init.sh set_env.sh save-aws-creds.sh; do bash -n $$s || exit 1; done
 	@echo "lint OK"
 

@@ -417,6 +417,16 @@ hosting the file.
   architecture, a from-source build, and it was obtained **with hand-reduced Triton tiles**.
   This rig also reduces tiles, which makes the comparison *closer* than usual and therefore
   more tempting to over-claim. It is the number to beat, not a baseline to inherit.
+  **CORRECTED 2026-08-30 — neither figure is a benchmark, do not compare against either.**
+  `43.1` is one sample from the 2026-08-12 first-serve run, whose own report says "single-run,
+  single-stream, no repeats and no variance figure", taken with a 19-token prompt. `44.24` has
+  **no benchmark artifact anywhere in the tree** — it survives only in `gpu-vllm-g5g-2b/server.py`'s
+  swap comment and `tests/test_server.py`, where it was measured 2026-08-13 to show that
+  `g5g.xlarge` + a 16 GiB swapfile reaches a healthy endpoint at all. The tile-clamp caveat is real
+  but does not distinguish them: it applies to every vLLM-on-T4G number, the good ones included.
+  **Compare against `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`** — `vllm bench
+  serve`, three runs, one `g5g.4xlarge`: c=1 TPOT 31.44 ms (~31.8 tok/s decode), c=4 ~97 tok/s,
+  c=8 168.33 tok/s.
 - **48.3–48.5 tok/s** — `gpu-jax-g6-2b`, MEASURED 2026-08-28. Different chip (L4/Ada) and a
   different runtime.
 - **12.4–13.1 tok/s** — the `gpu-jax-g5g-*` runs. Same chip generation, **pure JAX**, and a
