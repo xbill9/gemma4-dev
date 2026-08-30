@@ -194,6 +194,31 @@ class AdaConstraintTests(unittest.TestCase):
         self.assertNotIn(":v0.26", server.VLLM_IMAGE)
         self.assertTrue(server.VLLM_IMAGE.startswith("vllm/vllm-openai:"))
 
+        # AND THE TAG MUST BE ONE THAT ACTUALLY EXISTS.
+        #
+        # MEASURED 2026-08-30, at the cost of a launch: this rig shipped with
+        # `v0.27.2rc0`, which IS NOT A PUBLISHED IMAGE TAG. cloud-init died on
+        # `failed to resolve reference ... not found`. It is the G5g sibling's
+        # VLLM_REF -- a GIT ref that rig compiled from source -- copied into an
+        # IMAGE TAG field at the fork.
+        #
+        # The three assertions above did not catch it and could not: they name
+        # what is WRONG. A blocklist passes everything it has not heard of, which
+        # is the same failure shape as a Codex approval gate naming a tool that
+        # does not exist. So this is an ALLOWLIST of tags verified to resolve on
+        # Docker Hub. Adding a tag here means checking it first:
+        #   curl -s https://hub.docker.com/v2/repositories/vllm/vllm-openai/tags/\
+        #     ?page_size=100 | grep <tag>
+        # Note there is NO v0.27.2 of any kind; releases go v0.27.1 -> v0.28.0.
+        published = {"v0.28.0"}
+        tag = server.VLLM_IMAGE.split(":", 1)[1].split("@", 1)[0]
+        self.assertIn(
+            tag, published,
+            f"{tag} is not in the set of image tags verified to exist on Docker Hub. "
+            "If it is a real new release, verify it resolves and add it here -- do NOT "
+            "widen this back into a blocklist.",
+        )
+
     def test_attention_backend_is_unpinned(self):
         """Measured on the sibling: vLLM v0.27 does not recognize
         VLLM_ATTENTION_BACKEND at all, and forces TRITON_ATTN for Gemma 4
@@ -397,10 +422,28 @@ class RepoHygieneTests(unittest.TestCase):
 
     def test_benchmarks_carries_no_other_rigs_runs(self):
         """Benchmark JSON travelled with the forks in this tree, and several rigs
-        carry numbers measured on hardware they are not. This rig has served
-        nothing, so runs/ must be absent or empty."""
-        runs = ROOT / "benchmarks" / "runs"
-        self.assertTrue(not runs.exists() or not any(runs.iterdir()))
+        carry numbers measured on hardware they are not.
+
+        Until 2026-08-30 this rig had served nothing and the guard was simply
+        "runs/ is empty". It has now served, so the emptiness check would only
+        block its own results. The GUARD ITSELF IS UNCHANGED IN INTENT -- what it
+        ever protected was that no artifact here was measured on other hardware --
+        so it now asserts the hardware slot instead of the count.
+
+        `<hw-short>` is the hardware MEASURED, not the rig hosting the file.
+        """
+        for sub in ("runs", "reports"):
+            d = ROOT / "benchmarks" / sub
+            if not d.exists():
+                continue
+            for entry in d.iterdir():
+                if entry.name.startswith("."):
+                    continue
+                self.assertTrue(
+                    entry.name.endswith("-g6") or entry.name.endswith("-g6.json"),
+                    f"benchmarks/{sub}/{entry.name} does not carry the -g6 hardware slot; "
+                    "an artifact measured on other hardware must not live here",
+                )
 
     def test_skill_is_complete_in_both_copies(self):
         # SKILL.md is a hand-written SOURCE file, but refresh_skill.py only

@@ -147,6 +147,24 @@ produced the 15 KiB/token error above. Size KV from the config geometry and chec
 with a single KV head is still an extraordinarily cheap configuration. Any model without KV sharing, or
 with real KV heads, costs multiples of this per token.
 
+> **OPEN DISCREPANCY — the vLLM CUDA path reports about half this, 2026-08-30.** Serving E2B under
+> stock vLLM 0.28.0 on an NVIDIA L4 (`gpu-vllm-g6-2b`, `benchmarks/runs/2026-08-30-first-serve-g6/`),
+> the engine allocated a **9.65 GiB KV pool** and reported **1,076,849 tokens** of capacity —
+> **9,622 B/token, a 1.92x gap against the 18,432 B derived above.**
+>
+> **Neither number has been shown wrong, and neither should be edited to match the other.** The
+> 18 KiB derivation is geometry plus two exact TPU cross-checks. The 9.4 KiB figure is a
+> *divided-out average* — pool ÷ reported capacity — taken on a **different serving stack**
+> (`vllm` on CUDA, not `tpu_inference`). The most likely reconciliation is that vLLM v1 charges
+> sliding-window layers only their **window** rather than the full context, in which case the two
+> figures answer different questions and 1.92x is close to what a 12-sliding/3-full split would
+> predict. That is a hypothesis, **not a measurement** — it needs vLLM's KV-cache-group accounting
+> read before anyone relies on it.
+>
+> Practical consequence for sizing: **on the vLLM CUDA path, do not budget KV at 18 KiB/token** —
+> you will under-provision context by ~2x. Size from the engine's own allocation log, which is the
+> rule this section already gives for the TPU path.
+
 ### Three head mismatches
 
 1. **Query:KV is 8:1** — `num_attention_heads=8` against `num_key_value_heads=1`. This is full **MQA**,

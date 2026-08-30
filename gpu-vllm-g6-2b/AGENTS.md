@@ -4,8 +4,10 @@ Serving rig: **`google/gemma-4-E2B-it`** under **vLLM** on **AWS EC2 G6** — an
 with an **NVIDIA L4** GPU (Ada, SM 8.9, 23034 MiB measured on the same silicon by the JAX
 sibling).
 
-**Status: has served nothing.** Forked from `gpu-vllm-g5g-2b` 2026-08-28. `benchmarks/` is
-deliberately empty and a test keeps it that way.
+**Status: SERVED 2026-08-30** on `g6.2xlarge` spot in `us-east-1d`, torn down the same
+session. `benchmarks/runs/2026-08-30-first-serve-g6/` and
+`benchmarks/reports/2026-08-30-gemma4-e2b-g6.json` are its own. **46.09 tok/s single-stream,
+360.17 tok/s at concurrency 8.** Both fork premises held.
 
 **`CLAUDE.md` is authoritative where this file disagrees with it.** There is no generator;
 a convention change has to land in `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` by hand.
@@ -34,7 +36,9 @@ SM 7.5 image and cannot boot a G6.
 
 Gemma 4's heterogeneous head dims (sliding 256, global **512**) force `TRITON_ATTN`, whose
 tile wants **~96 KiB of shared memory per block**. Turing caps a block at 64 KiB; **Ada
-allows ~99 KiB**. Expected to fit unpatched, **UNVERIFIED**, and the margin is narrow.
+allows ~99 KiB**. **SETTLED 2026-08-30: it fits unpatched** — no `OutOfResources`. Do not
+port the sibling's Triton patch. The ~3 KiB margin is still narrow, so this holds for *this*
+tile at *this* head size, not Ada generally.
 
 `VLLM_ATTENTION_BACKEND` is left unpinned — pinning is how the sibling ended up with a patch.
 Measured there: vLLM v0.27 does not recognize the variable at all and forces `TRITON_ATTN`
@@ -54,10 +58,14 @@ weight on load, a mismatch the JAX rig measured at 54% of decode on Turing.
 
 ## Traps carried by the fork
 
-- **`VLLM_IMAGE` must be >= v0.27.2rc0.** v0.26.0 dies with
-  `AmbiguousGlobalPerLayerAttributeError` (Gemma 4's `head_dim` is per-layer). The sibling's
-  `VLLM_STOCK_IMAGE` is `v0.27.1` and it **never served from it** — that tag existed only to
-  reproduce the SM 7.5 failure, so it is below the floor and is the easy value to inherit.
+- **`VLLM_IMAGE` is `v0.28.0`, and `v0.27.2rc0` IS NOT A PUBLISHED TAG.** MEASURED
+  2026-08-30: the tag this rig shipped with does not resolve, and cloud-init died at
+  `failed to resolve reference ... not found`. It is the sibling's **`VLLM_REF`** — a git ref
+  it compiled from source — copied into an image-tag field. Releases go `v0.27.1` →
+  `v0.28.0`; there is no `v0.27.2`. The floor is on the **fix** (v0.26.0 dies with
+  `AmbiguousGlobalPerLayerAttributeError`, Gemma 4's `head_dim` being per-layer), not on that
+  string. The guard test is now an **allowlist of tags verified to resolve** — a blocklist
+  passes anything it has not heard of.
 - **Host RAM doubled at every size suffix.** `g6.xlarge` has 16 GiB where `g5g.xlarge` had 8,
   so the sibling's rejection of xlarge does not carry.
 - **`g6.16xlarge` is single-GPU** where `g5g.16xlarge` had two. GPU count is not monotonic in
@@ -93,6 +101,9 @@ weight on load, a mismatch the JAX rig measured at 54% of decode on Turing.
 
 **None.** Naming will be `benchmarks/runs/<date>-<what>-g6/`, where `<hw-short>` is the
 hardware **measured**. Do not reuse the JAX rig's 48.3–48.5 (different runtime — that is the
-comparison), the T4G sibling's 43.1/44.24 (different silicon, reduced tiles), or anything
+comparison), the T4G sibling's 43.1/44.24 (different silicon — and **corrected 2026-08-30: neither is a
+benchmark.** 43.1 is a single first-serve sample, 44.24 has no artifact and was a swap smoke
+test. The measured T4G figures are c=1 TPOT 31.44 ms / ~31.8 tok/s and c=8 168.33 tok/s, from
+`gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`), or anything
 from the `gpu-vllm-l4-*` artifact rigs (**same GPU and runtime, weakest provenance in the
 tree** — same chip is not same measurement).

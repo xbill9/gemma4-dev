@@ -9,10 +9,10 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| _none_ | | | | | |
+| `2026-08-30-gemma4-e2b-g6.json` | google/gemma-4-E2B-it | NVIDIA L4 (Ada, SM 8.9)×1 | spot | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
-| _none_ | | | | |
+| `2026-08-30-first-serve-g6` | 9 | 0 | 0 | **no** |

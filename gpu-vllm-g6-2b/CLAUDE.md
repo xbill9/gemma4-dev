@@ -8,9 +8,12 @@ This is a full rig: `server.py`, an MCP server, a skill, a plugin manifest, and 
 It is **not** one of the `gpu-vllm-l4-*` artifact rigs, despite sharing the `gpu` platform
 slot, the runtime slot **and the actual GPU** with them. See **Measurement**.
 
-> **THIS RIG HAS SERVED NOTHING.** Forked from `gpu-vllm-g5g-2b` on 2026-08-28. Every number
-> here is arithmetic or inherited from a sibling; `benchmarks/` is deliberately empty and no
-> run directory was copied. **Nothing below has been checked on this hardware.**
+> **THIS RIG SERVED FOR THE FIRST TIME ON 2026-08-30**, on `g6.2xlarge` spot in `us-east-1d`,
+> and was torn down the same session. `benchmarks/runs/2026-08-30-first-serve-g6/` and
+> `benchmarks/reports/2026-08-30-gemma4-e2b-g6.json` are its own, measured on its own hardware
+> slot. **Both of the fork's open premises held** — the published image covers SM 8.9, and
+> Triton's 512-wide tile fits Ada unpatched. Anything NOT marked MEASURED below is still
+> arithmetic or inherited.
 
 ## Why this rig exists
 
@@ -18,10 +21,29 @@ slot, the runtime slot **and the actual GPU** with them. See **Measurement**.
 this exact silicon under pure JAX on 2026-08-28. Same chip, same checkpoint, different
 runtime — which would be **the only clean runtime comparison in this tree.**
 
-The T4G pair was never clean. `gpu-vllm-g5g-2b` reached 43.1/44.24 tok/s, but only *with
-hand-reduced Triton tiles*, so its number and the JAX rig's were never measuring the same
-thing. Here both sides run stock. **That is the whole point, and it is unrealised until this
-rig serves.**
+The T4G pair was never clean — though **not for the reason written here until 2026-08-30.**
+The tile clamp was blamed, but it applies to *every* vLLM-on-T4G number including the good
+ones, so it never distinguished anything. The real defect: **43.1/44.24 are not benchmarks.**
+43.1 is one sample from a first-serve smoke test; 44.24 has no benchmark artifact at all and
+was measured to prove a swapfile lets `g5g.xlarge` boot. The T4G pair does have a clean
+comparison — `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`, three runs of
+`vllm bench serve` on one host: c=1 TPOT 31.44 ms (~31.8 tok/s decode), c=8 168.33 tok/s.
+Here both sides run stock.
+
+**REALISED 2026-08-30: vLLM 0.28.0 measured 46.09 tok/s single-stream against the JAX rig's
+48.3–48.5 — about 5% slower, both sides stock.** No Triton patch, no hand-reduced tiles, no
+from-source build on either side.
+
+**Single-stream is the wrong place to judge vLLM, and this run shows why:** 46.09 → 360.17
+tok/s from concurrency 1 to 8 is **7.8x on 8x the load (98% scaling efficiency)**, TPOT nearly
+flat (19.85 → 21.71 ms). So the runtime question is not "which is faster" but "at what
+concurrency" — and **nothing has measured the JAX side under load, so that half of the
+comparison still does not exist.**
+
+Against that clean T4G sweep, same harness and same runtime: **1.45x at c=1 (31.8 → 46.09),
+1.81x at c=4 (~97 → 175.83), 2.14x at c=8 (168.33 → 360.17).** The gap widens with
+concurrency. Caveat that survives: the T4G side ran with hand-reduced tiles, this side is
+stock.
 
 ## The fork deletes the sibling's reason for existing
 
@@ -75,12 +97,16 @@ Triton at `head_size=512` wants **~96 KiB (98,304 B) of shared memory per block*
 | **Ada (SM 8.9)** | **~99 KiB** | **expected yes — UNVERIFIED** |
 | Ampere (SM 8.0) | 164 KiB | yes |
 
-**Ada's ~99 KiB clears 96 KiB, but not by much.** That is a genuinely narrow margin and the
-reason this is stated as expected rather than settled. If it does not fit, the sibling's
-remedy is a patch to `vllm/v1/attention/ops/triton_unified_attention.py` clamping the KV tile
-on pre-Ampere devices — **which lives only on that rig's instance, is not upstream, and is not
-in this repo.** Note also that on Turing the *static* limit is 48 KiB and a kernel must opt in
-to the dynamic attribute to reach 64; do not assume the nominal figure is what a kernel gets.
+**SETTLED 2026-08-30: IT FITS, UNPATCHED.** vLLM forced `TRITON_ATTN` exactly as predicted,
+and the engine started with **no `OutOfResources`**. Ada's ~99 KiB cleared the ~96 KiB tile.
+**The sibling's patch to `vllm/v1/attention/ops/triton_unified_attention.py` is NOT needed
+here and must not be ported in** — it lives only on that rig's instance, is not upstream, and
+is not in this repo.
+
+The margin is still ~3 KiB, so this is a fact about *this* tile at *this* head size, not a
+general Ada guarantee: a larger `head_size` or a retiled Triton kernel could re-cross it.
+Note also that on Turing the *static* limit is 48 KiB and a kernel must opt in to the dynamic
+attribute to reach 64; do not assume the nominal figure is what a kernel gets.
 
 **`VLLM_ATTENTION_BACKEND` is deliberately unpinned here.** Pinning a backend is how the
 sibling ended up carrying a patch. Two further facts, MEASURED there 2026-08-12: vLLM v0.27
@@ -107,25 +133,52 @@ and compute dtype agreed. Matching the checkpoint is the cheap default.
 On the sibling, note, bfloat16 did not *fail* — PyTorch upconverts and vLLM logs
 `Casting torch.bfloat16 to torch.float16` and proceeds. Silent cost, not an error.
 
-**fp8 KV is newly reachable and is deliberately off.** KV is ~18 KiB/token, so the whole
-cache at 16K context is **~288 MiB against 23034 MiB** — it is not the binding constraint, and
-nothing here has measured its accuracy cost. Enable it with a measurement, not because the
+**fp8 KV is newly reachable and is deliberately off.** MEASURED 2026-08-30: vLLM allocated
+**9.65 GiB of KV = 1,076,849 tokens = 65.73x concurrency at 16K context**, so KV is nowhere
+near the binding constraint, and nothing here has measured fp8's accuracy cost.
+
+**That works out to 9622 B/token (9.40 KiB), and `@MODELS.md` derives 18,432 B — a 1.92x gap
+that is NOT resolved.** Do not "fix" either number from the other. The 18 KiB figure is
+derived from layer geometry (12 sliding x 256 + 3 full x 512) and cross-checked *exactly*
+against `total_hbm_avail_gb` on v5e-1 and to 0.1% on v6e-1, so it is not loose arithmetic.
+The 9.40 KiB figure is a **divided-out average** — vLLM's reported pool over vLLM's reported
+token capacity — on a **different serving path** (vLLM CUDA, not `tpu_inference`), and the
+likely explanation is that vLLM v1 charges sliding-window layers their *window* rather than
+the full context, which makes the two numbers answer different questions. **Whoever needs
+this next should read vLLM's KV-cache-group accounting before treating either as the other's
+correction.** Recorded in `@MODELS.md` as an open discrepancy. Enable it with a measurement, not because the
 part supports it. `fp8_e5m2` in particular is DEGRADED on the L4 artifact rigs: two mantissa
 bits, visibly truncated output.
 
-## The image tag is not the sibling's, and this is an easy mistake
+## The image tag — a source ref in a tag field, and it cost a launch
 
-**`VLLM_IMAGE=vllm/vllm-openai:v0.27.2rc0`.**
+**`VLLM_IMAGE=vllm/vllm-openai:v0.28.0`** (MEASURED 2026-08-30; vLLM 0.28.0, torch 2.13.0+cu130,
+transformers 5.15.1, CUDA 13.0).
 
-The sibling's `VLLM_STOCK_IMAGE` is `v0.27.1`, and a fork naturally inherits it — but that rig
-**never served from that tag.** It used it *only* to reproduce the SM 7.5 failure on real
-hardware, and built its real image from `VLLM_REF=v0.27.2rc0`.
+**The tag this rig shipped with, `v0.27.2rc0`, IS NOT A PUBLISHED IMAGE TAG.** The first launch
+died in cloud-init at:
 
-**MEASURED: v0.26.0 dies** with `AmbiguousGlobalPerLayerAttributeError` against current
-`transformers`, because Gemma 4's `head_dim` is per-layer. The `per_layer_config` handling
-that fixes it landed in **v0.27.2rc0**. That is a constraint of the **model**, not the chip,
-so it carries across the fork unchanged. `test_image_is_at_or_above_the_measured_vllm_floor`
-pins it, and names `v0.27.1` specifically.
+```
+failed to resolve reference "docker.io/vllm/vllm-openai:v0.27.2rc0": not found
+```
+
+`v0.27.2rc0` is the sibling's **`VLLM_REF`** — a *git* ref that rig **compiled from source**,
+which is exactly why it never needed to exist on Docker Hub. The fork copied a **source ref
+into an image-tag field**. Published releases are `v0.27.0`, `v0.27.1`, `v0.28.0`; **there is
+no `v0.27.2` of any kind.** The paragraph below already said the sibling "built its real image
+from `VLLM_REF=v0.27.2rc0`" — the evidence was sitting in the comment the whole time.
+
+**MEASURED on the sibling: v0.26.0 dies** with `AmbiguousGlobalPerLayerAttributeError` against
+current `transformers`, because Gemma 4's `head_dim` is per-layer. The `per_layer_config`
+handling that fixes it landed in **v0.27.2rc0**. That is a constraint of the **model**, not the
+chip, so it carries across the fork unchanged — but it is a floor on **the fix**, not on that
+literal string. `v0.28.0` is above it.
+
+**The guard failed open.** `test_image_is_at_or_above_the_measured_vllm_floor` forbids
+`v0.27.1` and `v0.26` and checks the `vllm/vllm-openai:` prefix — it **never asserts the tag
+resolves**. A blocklist cannot catch a value that is in no list. Same shape as the Codex gates
+naming tools that do not exist: *a check that names only what is wrong passes everything it
+has not heard of.*
 
 ## Instance sizing
 
@@ -287,14 +340,19 @@ must agree on one derived name.
 
 ## Measurement
 
-**This rig has no measurements.** `benchmarks/runs/` is empty and a test keeps it that way
-until something is actually measured here.
+**This rig has exactly one measurement, and it is its own:**
+`benchmarks/runs/2026-08-30-first-serve-g6/` with
+`benchmarks/reports/2026-08-30-gemma4-e2b-g6.json` (schema 1.1, validates). Headline:
+**46.09 tok/s single-stream, 360.17 tok/s at concurrency 8**, on `g6.2xlarge` spot.
 
-That is deliberate. **Benchmark JSON travelled with the forks in this tree**, and several rigs
-carry numbers measured on hardware they are not. The sibling's
-`2026-08-12-first-serve-g5g` and `2026-08-14-rust-frontend-g5g` were **not copied**.
+**Benchmark JSON travelled with the forks in this tree**, and several rigs carry numbers
+measured on hardware they are not. The sibling's `2026-08-12-first-serve-g5g` and
+`2026-08-14-rust-frontend-g5g` were **not copied**.
+`test_benchmarks_carries_no_other_rigs_runs` used to assert `runs/` was *empty*; now that this
+rig has served, it asserts every artifact here carries the **`-g6`** slot instead. The guard's
+intent never changed — it was always about foreign hardware, not about the count.
 
-Naming will be `benchmarks/runs/<date>-<what>-g6/` — `<hw-short>` equals the hardware slot,
+Naming is `benchmarks/runs/<date>-<what>-g6/` — `<hw-short>` equals the hardware slot,
 and it is the hardware **measured**, not the rig hosting the file. The JAX sibling's
 `tune_loop.py` hardcoded `-g5g` through its own fork and filed an L4 result under the T4G's
 name before it was caught.
@@ -309,6 +367,16 @@ name before it was caught.
   though it were this rig's would destroy exactly the thing being measured.
 - **43.1 / 44.24 tok/s** — the T4G sibling, 2026-08-12/13. Different silicon, and obtained
   **with hand-reduced Triton tiles**, so it is not a stock-vLLM figure either.
+  **CORRECTED 2026-08-30 — neither figure is a benchmark, do not compare against either.**
+  `43.1` is one sample from the 2026-08-12 first-serve run, whose own report says "single-run,
+  single-stream, no repeats and no variance figure", taken with a 19-token prompt. `44.24` has
+  **no benchmark artifact anywhere in the tree** — it survives only in `gpu-vllm-g5g-2b/server.py`'s
+  swap comment and `tests/test_server.py`, where it was measured 2026-08-13 to show that
+  `g5g.xlarge` + a 16 GiB swapfile reaches a healthy endpoint at all. The tile-clamp caveat is real
+  but does not distinguish them: it applies to every vLLM-on-T4G number, the good ones included.
+  **Compare against `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`** — `vllm bench
+  serve`, three runs, one `g5g.4xlarge`: c=1 TPOT 31.44 ms (~31.8 tok/s decode), c=4 ~97 tok/s,
+  c=8 168.33 tok/s.
 - **~44 tok/s on one Inferentia core** from `~/gemma4-tips-aws` — different harness,
   different silicon.
 - **Anything from the five `gpu-vllm-l4-*` artifact rigs.** They are the **same GPU and the
@@ -322,13 +390,35 @@ A config flag being accepted is not evidence it did anything. Cross-check agains
 physical bound — **300 GB/s of GDDR6 and 23034 MiB is the whole envelope here** — not against
 another config.
 
+**MEASURED 2026-08-30, and it reframes the comparison this rig exists for: decode is NOT
+bandwidth-bound at B=1.** E2B streams **3.382 GB/token** (matmuls 2.576 + tied LM head 0.805);
+the 4.698 GB PLE table is an indexed **gather**, not a stream — see `@MODELS.md`, *"Resident is
+not streamed"*. At 46.09 tok/s that is 155.9 GB/s of 300, i.e. **52% MBU against an implied
+ceiling of 88.7 tok/s**.
+
+So **vLLM (46.09) and JAX (48.3–48.5) both sit at about half the memory roofline**, and the ~5%
+between them is an **overhead / kernel-launch difference, not a memory-system one.** Do not
+explain that gap with bandwidth. It also explains why batching pays so well here: c=8 reaches
+360.17 tok/s, far past the single-stream ceiling, because streamed weights amortise across the
+batch.
+
+**Never divide resident weights by bandwidth on this checkpoint** — 46.09 tok/s × 9.8 GiB
+resident implies 485 GB/s on a 300 GB/s bus, which is impossible, and that impossibility is
+itself the proof that resident is the wrong denominator.
+
 ## What to do first
 
 1. `check_g6_quotas`, then `get-spot-placement-scores` to pick a size and AZ.
 2. `create_g6_instance` → `get_install_progress`.
-3. **`verify_gpu_arch`.** On this rig it is expected to **pass**, the opposite of the sibling
-   where the same tool confirms an absence. That inversion is the fork's premise and has
-   never been checked.
-4. **Watch for the Triton shared-memory error at engine start.** 96 KiB against Ada's ~99 KiB
-   is the one narrow margin here. If it fails, that is the finding.
-5. `verify_model_health`, then a sweep — and only then is the JAX comparison real.
+3. **`verify_gpu_arch`.** MEASURED 2026-08-30: **it passes** — a real bf16 matmul ran. Read
+   its output carefully though: the arch list is `sm_75/80/86/90/100/120` and **`sm_89` is not
+   in it**; Ada runs the `sm_86` cubins by same-major-version binary compatibility. The matmul
+   is the evidence, not the list.
+4. **The Triton shared-memory error does NOT occur.** SETTLED 2026-08-30 — the ~96 KiB tile
+   fits Ada's ~99 KiB unpatched.
+5. `verify_model_health`, then a sweep. **The single-stream comparison is done (46.09 vs
+   48.3–48.5).** The open work is the other half: **nothing has measured the JAX sibling under
+   concurrency**, and vLLM's 7.8x scaling to c=8 is where the runtimes actually diverge.
+
+**Benchmark from ON the instance against localhost**, as the 2026-08-30 run did — it keeps WAN
+latency out of TTFT/ITL, and it works whether or not the security group lets you in.

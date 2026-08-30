@@ -8,8 +8,10 @@ description: Manage AWS EC2 G6 capacity (x86_64 + NVIDIA L4, Ada SM 8.9) and Gem
 Provision and operate **EC2 G6** (x86_64 host + NVIDIA **L4** GPU, Ada SM 8.9) serving
 `google/gemma-4-E2B-it` under vLLM, through the `gpu-vllm-g6-2b` MCP server.
 
-> **THIS RIG HAS SERVED NOTHING.** Forked from `gpu-vllm-g5g-2b` on 2026-08-28. Everything
-> below is arithmetic or inherited from a sibling. `benchmarks/` is deliberately empty.
+> **SERVED 2026-08-30** on `g6.2xlarge` spot in `us-east-1d`, torn down the same session.
+> **46.09 tok/s single-stream, 360.17 tok/s at concurrency 8**; Triton fits Ada unpatched and
+> the published image covers SM 8.9. See `benchmarks/runs/2026-08-30-first-serve-g6/`.
+> Anything below not marked MEASURED is still arithmetic or inherited.
 
 ## Start here, every time
 
@@ -60,15 +62,20 @@ fp8 KV is newly reachable and **is not enabled**: KV is ~18 KiB/token, so the wh
 16K context is ~288 MiB against 23034 MiB. It is not the binding constraint, and nothing here
 has measured its accuracy cost.
 
-## The image tag is not the sibling's
+## The image tag — `v0.28.0`, and a source ref that cost a launch
 
-The sibling's `VLLM_STOCK_IMAGE` was `v0.27.1`, but it used that tag **only to reproduce the
-SM 7.5 failure** — it never served from it, and built its real image from `v0.27.2rc0`.
+**MEASURED 2026-08-30: `v0.27.2rc0` is NOT a published image tag.** The rig shipped with it
+and cloud-init died at `failed to resolve reference ... not found`. It is the sibling's
+**`VLLM_REF`** — a *git* ref that rig compiled from source — copied into an image-tag field.
+Published releases go `v0.27.1` → **`v0.28.0`**; there is no `v0.27.2` of any kind.
 
 **MEASURED: v0.26.0 dies** with `AmbiguousGlobalPerLayerAttributeError` against current
-transformers, because Gemma 4's `head_dim` is per-layer; the fix landed in **v0.27.2rc0**.
-That is a constraint of the **model**, not the chip, so it carries across the fork unchanged.
-**Do not pin below it** — and note `v0.27.1` is exactly the wrong tag to inherit by mistake.
+transformers, because Gemma 4's `head_dim` is per-layer; the fix landed in `v0.27.2rc0`. That
+is a constraint of the **model**, not the chip — so the floor is on **the fix**, not on that
+literal string, and `v0.28.0` clears it.
+
+**If you change the tag, verify it resolves on Docker Hub first.** The guard test is an
+allowlist for exactly this reason: a blocklist passes any tag it has not heard of.
 
 ## Operating order
 

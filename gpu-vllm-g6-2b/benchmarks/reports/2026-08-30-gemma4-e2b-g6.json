@@ -1,0 +1,405 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-30-gemma4-e2b-g6",
+    "date": "2026-08-30",
+    "operator": "xbill",
+    "source": "gpu-vllm-g6-2b",
+    "notes": "FIRST SERVE ON THIS RIG. Measured on the rig's own hardware slot: EC2 g6.2xlarge (1x NVIDIA L4, Ada SM 8.9), us-east-1d, spot. Benchmark was driven ON THE INSTANCE against localhost, so no WAN latency is in TTFT/ITL. This run exists to be the RUNTIME CONTROL for gpu-jax-g6-2b (48.3-48.5 tok/s, 2026-08-28, same chip and same checkpoint) -- and unlike the T4G pair, BOTH SIDES ARE STOCK: no Triton patch, no hand-reduced tiles, no from-source build."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA L4 (Ada, SM 8.9)",
+    "chips": 1,
+    "topology": "single-gpu",
+    "hbm_gb_per_chip": 22.49,
+    "machine_type": "g6.2xlarge",
+    "host": {
+      "cloud": "aws",
+      "zone": "us-east-1d",
+      "provisioning": "spot",
+      "instance_name": "i-0d09e337977a78287"
+    },
+    "pricing": {
+      "currency": "USD",
+      "rate_per_chip_hour": 0.9412,
+      "source": "aws ec2 describe-spot-price-history, us-east-1d, 2026-08-30T12:00Z"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "parameters_b": 2.0,
+    "weights_dtype": "bfloat16",
+    "quantization": "none",
+    "kv_cache_dtype": "auto (bfloat16)",
+    "max_model_len": 16384,
+    "architecture_notes": "Heterogeneous head dims (sliding_attention 256 / full_attention 512) force TRITON_ATTN: vLLM logs 'FA4 not available, forcing TRITON_ATTN backend'. IT RAN UNPATCHED ON ADA -- no OutOfResources, which is the question this rig was built to answer. 9.8 GiB of weights are resident, but the roofline proves not all of it is streamed per token (see notes[])."
+  },
+  "software": {
+    "engine": "vllm",
+    "version": "0.28.0",
+    "container_image": "vllm/vllm-openai:v0.28.0@sha256:61fc8a896b0a4fbbbdc063bc4b0dbc25ce98e02b5050c24aeb7830ac02039b14",
+    "backend": "TRITON_ATTN (forced by vLLM; VLLM_ATTENTION_BACKEND deliberately unset)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "--dtype bfloat16",
+      "--kv-cache-dtype auto",
+      "--tensor-parallel-size 1",
+      "--gpu-memory-utilization 0.90",
+      "--max-model-len 16384",
+      "--max-num-seqs 8"
+    ]
+  },
+  "load_matrix": [
+    {
+      "model_id": "google/gemma-4-E2B-it",
+      "backend": "TRITON_ATTN",
+      "verdict": "loads",
+      "error": ""
+    }
+  ],
+  "throughput": {
+    "workload": {
+      "tool": "vllm bench serve",
+      "dataset": "random",
+      "output_len": 128,
+      "runs_per_point": 1,
+      "noise_floor_pct": 3.0
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.3601,
+        "output_tok_per_s": 46.09,
+        "per_stream_tok_per_s": 46.09,
+        "ttft_ms": {
+          "mean": 256.43,
+          "median": 101.34,
+          "p99": 1270.12
+        },
+        "tpot_ms": {
+          "mean": 19.85,
+          "median": 19.84,
+          "p99": 19.89
+        },
+        "itl_ms": {
+          "mean": 19.85,
+          "median": 19.89,
+          "p99": 20.55
+        },
+        "raw": {
+          "request_throughput": 0.36006222857559567,
+          "output_throughput": 46.087965257676245,
+          "total_token_throughput": 414.7916873190862,
+          "mean_ttft_ms": 256.43376849998845,
+          "median_ttft_ms": 101.34145050000143,
+          "p99_ttft_ms": 1270.1219663599632,
+          "mean_tpot_ms": 19.84720982283455,
+          "median_tpot_ms": 19.841444677165164,
+          "p99_tpot_ms": 19.885294436220015,
+          "mean_itl_ms": 19.847213169291102,
+          "median_itl_ms": 19.890703999976722,
+          "p99_itl_ms": 20.548600500063685,
+          "total_input_tokens": 8192,
+          "total_output_tokens": 1024,
+          "duration": 22.218381615999988,
+          "completed": 8
+        }
+      },
+      {
+        "concurrency": 2,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.7235,
+        "output_tok_per_s": 92.6,
+        "per_stream_tok_per_s": 46.3,
+        "ttft_ms": {
+          "mean": 109.47,
+          "median": 90.11,
+          "p99": 207.14
+        },
+        "tpot_ms": {
+          "mean": 20.89,
+          "median": 20.73,
+          "p99": 21.44
+        },
+        "itl_ms": {
+          "mean": 20.89,
+          "median": 20.8,
+          "p99": 21.5
+        },
+        "raw": {
+          "request_throughput": 0.7234765096839795,
+          "output_throughput": 92.60499323954937,
+          "total_token_throughput": 833.4449391559444,
+          "mean_ttft_ms": 109.46794687498596,
+          "median_ttft_ms": 90.1148969999781,
+          "p99_ttft_ms": 207.142167499984,
+          "mean_tpot_ms": 20.894315053641783,
+          "median_tpot_ms": 20.734521003936962,
+          "p99_tpot_ms": 21.439431209055094,
+          "mean_itl_ms": 20.894316494094298,
+          "median_itl_ms": 20.799517999989803,
+          "p99_itl_ms": 21.503664690030746,
+          "total_input_tokens": 16384,
+          "total_output_tokens": 2048,
+          "duration": 22.115438145999974,
+          "completed": 16
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.3737,
+        "output_tok_per_s": 175.83,
+        "per_stream_tok_per_s": 43.96,
+        "ttft_ms": {
+          "mean": 168.4,
+          "median": 93.39,
+          "p99": 410.06
+        },
+        "tpot_ms": {
+          "mean": 21.57,
+          "median": 21.09,
+          "p99": 23.17
+        },
+        "itl_ms": {
+          "mean": 21.57,
+          "median": 21.06,
+          "p99": 22.09
+        },
+        "raw": {
+          "request_throughput": 1.373709572981156,
+          "output_throughput": 175.83482534158796,
+          "total_token_throughput": 1582.5134280742916,
+          "mean_ttft_ms": 168.40154399999463,
+          "median_ttft_ms": 93.38995449996901,
+          "p99_ttft_ms": 410.05534570002175,
+          "mean_tpot_ms": 21.569658201525574,
+          "median_tpot_ms": 21.08628815748073,
+          "p99_tpot_ms": 23.16982323212597,
+          "mean_itl_ms": 21.569659813730283,
+          "median_itl_ms": 21.06220499996425,
+          "p99_itl_ms": 22.0915702999514,
+          "total_input_tokens": 32768,
+          "total_output_tokens": 4096,
+          "duration": 23.294589066999947,
+          "completed": 32
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 1024,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 2.8138,
+        "output_tok_per_s": 360.17,
+        "per_stream_tok_per_s": 45.02,
+        "ttft_ms": {
+          "mean": 81.55,
+          "median": 78.21,
+          "p99": 105.4
+        },
+        "tpot_ms": {
+          "mean": 21.71,
+          "median": 21.7,
+          "p99": 21.8
+        },
+        "itl_ms": {
+          "mean": 21.71,
+          "median": 21.82,
+          "p99": 22.67
+        },
+        "raw": {
+          "request_throughput": 2.8138446262387142,
+          "output_throughput": 360.1721121585554,
+          "total_token_throughput": 3241.549009426999,
+          "mean_ttft_ms": 81.55197128125025,
+          "median_ttft_ms": 78.2112779999693,
+          "p99_ttft_ms": 105.398187870004,
+          "mean_tpot_ms": 21.708985902066914,
+          "median_tpot_ms": 21.697295681102638,
+          "p99_tpot_ms": 21.804286174566702,
+          "mean_itl_ms": 21.708987428395737,
+          "median_itl_ms": 21.820889500020257,
+          "p99_itl_ms": 22.666230869978104,
+          "total_input_tokens": 32768,
+          "total_output_tokens": 4096,
+          "duration": 11.372340783000027,
+          "completed": 32
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 4096,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.3383,
+        "output_tok_per_s": 43.3,
+        "per_stream_tok_per_s": 43.3,
+        "ttft_ms": {
+          "mean": 343.37,
+          "median": 346.99,
+          "p99": 352.34
+        },
+        "tpot_ms": {
+          "mean": 20.57,
+          "median": 20.56,
+          "p99": 20.62
+        },
+        "itl_ms": {
+          "mean": 20.57,
+          "median": 20.59,
+          "p99": 21.33
+        },
+        "raw": {
+          "request_throughput": 0.3382746609643895,
+          "output_throughput": 43.29915660344186,
+          "total_token_throughput": 1428.8721679135813,
+          "mean_ttft_ms": 343.37432474998764,
+          "median_ttft_ms": 346.9859164999889,
+          "p99_ttft_ms": 352.344138509975,
+          "mean_tpot_ms": 20.57108439468499,
+          "median_tpot_ms": 20.563826598425198,
+          "p99_tpot_ms": 20.615684678739576,
+          "mean_itl_ms": 20.57108703051164,
+          "median_itl_ms": 20.58890950007708,
+          "p99_itl_ms": 21.334183950028773,
+          "total_input_tokens": 32768,
+          "total_output_tokens": 1024,
+          "duration": 23.6494213819999,
+          "completed": 8
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 4096,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.6236,
+        "output_tok_per_s": 207.83,
+        "per_stream_tok_per_s": 25.98,
+        "ttft_ms": {
+          "mean": 852.19,
+          "median": 882.66,
+          "p99": 2436.63
+        },
+        "tpot_ms": {
+          "mean": 31.84,
+          "median": 35.23,
+          "p99": 39.93
+        },
+        "itl_ms": {
+          "mean": 31.84,
+          "median": 23.75,
+          "p99": 221.26
+        },
+        "raw": {
+          "request_throughput": 1.6236411983951056,
+          "output_throughput": 207.8260733945735,
+          "total_token_throughput": 6858.260422020926,
+          "mean_ttft_ms": 852.192558343738,
+          "median_ttft_ms": 882.6628379999875,
+          "p99_ttft_ms": 2436.6262558600383,
+          "mean_tpot_ms": 31.83609172883859,
+          "median_tpot_ms": 35.227989393700504,
+          "p99_tpot_ms": 39.9269563643307,
+          "mean_itl_ms": 31.8360935029528,
+          "median_itl_ms": 23.75152199999775,
+          "p99_itl_ms": 221.25983350005868,
+          "total_input_tokens": 131072,
+          "total_output_tokens": 4096,
+          "duration": 19.70878789699998,
+          "completed": 32
+        }
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "domain": "reasoning",
+      "verdict": "pass",
+      "probes": [
+        {
+          "name": "3-sentence bandwidth explanation",
+          "verdict": "pass",
+          "observed": "Coherent, on-topic, correct 3 sentences. NOT the degenerate ': ok: ok: ok' repetition this lineage has served before."
+        }
+      ]
+    },
+    {
+      "domain": "long_context",
+      "verdict": "partial",
+      "probes": [
+        {
+          "name": "4096-token input",
+          "verdict": "pass",
+          "observed": "4096-in/128-out ran at both conc=1 and conc=8; 16384 max_model_len not exercised to its limit."
+        }
+      ]
+    }
+  ],
+  "memory": {
+    "usable_hbm_gib": 22.04,
+    "weights_gib": 9.8,
+    "kv_cache_gib": 9.65,
+    "workspace_gib": 0.31,
+    "kv_bytes_per_token": 9622,
+    "resident_kv_tokens": 1076849,
+    "notes": "vLLM saw 22.04 GiB free of 23034 MiB (22.49 GiB) reported by nvidia-smi. Workspace = 0.22 GiB peak activation + 0.09 GiB CUDA graphs. KV MEASURED AT 9622 B/token (9.40 KiB), roughly HALF the ~18 KiB/token this rig's CLAUDE.md carried as arithmetic. 1,076,849 resident KV tokens = 65.73x max concurrency at 16384 ctx, so KV is nowhere near binding and fp8 KV remains unnecessary here."
+  },
+  "startup": {
+    "time_to_healthy_s": 334,
+    "engine_init_s": 124.03,
+    "compile_s": 79.32,
+    "notes": "From corrected-bootstrap start to /health 200. Image pull 105 s; container start +109 s; weights download 37.6 s; model load 40.8 s; engine init 124.03 s (79.32 s compile). EXCLUDES the first launch, which failed outright -- see issues[]."
+  },
+  "cost": {
+    "per_m_output_tokens": [
+      {
+        "operating_point": "concurrency 1, 1024-in/128-out",
+        "output_tok_per_s": 46.09,
+        "usd": 5.672
+      },
+      {
+        "operating_point": "concurrency 8, 1024-in/128-out",
+        "output_tok_per_s": 360.17,
+        "usd": 0.726
+      },
+      {
+        "operating_point": "concurrency 8, 4096-in/128-out",
+        "output_tok_per_s": 207.83,
+        "usd": 1.258
+      }
+    ],
+    "notes": "Whole-instance spot rate on a single-GPU size, so rate_per_chip_hour is the instance rate. No comparisons[] entry is offered against the JAX sibling: it ran on g6.xlarge-class capacity at a different spot price, so a $/token difference would be a PRICE artifact, not a runtime result. Compare tok/s, not dollars."
+  },
+  "issues": [
+    {
+      "summary": "vllm/vllm-openai:v0.27.2rc0 -- the tag this rig shipped with -- IS NOT A PUBLISHED IMAGE TAG. cloud-init died at 'failed to resolve reference ... not found'. It is the G5g sibling's VLLM_REF, a GIT ref that rig compiled from source, copied into an IMAGE TAG field at the fork. Published releases are v0.27.0, v0.27.1, v0.28.0 -- there is no v0.27.2 of any kind. Fixed by moving to v0.28.0, which is above the model's per_layer_config floor.",
+      "status": "fixed"
+    },
+    {
+      "summary": "test_image_is_at_or_above_the_measured_vllm_floor did not catch the above: it forbids the known-bad tags but never asserts the tag RESOLVES. A guard that only blocklists cannot catch a value that is in no list.",
+      "status": "open"
+    },
+    {
+      "summary": "verify_gpu_arch reports 'SM 8.9 is in the arch list' but sm_89 is NOT literally present -- torch was built for sm_75/80/86/90/100/120. Ada runs the sm_86 cubins by same-major-version binary compatibility. The matmul (which passed) is the real evidence; the message overstates what it checked.",
+      "status": "open"
+    }
+  ],
+  "notes": [
+    "ROOFLINE ON STREAMED, NOT RESIDENT, BYTES -- AND DECODE IS NOT BANDWIDTH-BOUND. E2B streams 3.382 GB/token (transformer matmuls 2.576 + tied LM head 0.805); the 4.698 GB PLE table is an indexed GATHER, not a stream (derivation and cross-check in the monorepo MODELS.md, 'Resident is not streamed'). At 46.09 tok/s that is 155.9 GB/s of the L4's 300 GB/s = 52% MBU, so the bandwidth-implied ceiling is 88.7 tok/s and this run sits at 52% of it. Independent confirmation that resident is the wrong denominator: 46.09 tok/s x 9.8 GiB resident would demand 485 GB/s, which the 300 GB/s bus makes physically impossible. CONSEQUENCE FOR THE RUNTIME COMPARISON: vLLM (46.09) and JAX (48.3-48.5) are BOTH at roughly half the memory roofline, so the ~5% gap between them is an overhead / kernel-launch difference at B=1, NOT a memory-system one. Matches the T4G finding that no runtime tested there was bandwidth-bound at B=1.",
+    "RUNTIME COMPARISON, the reason this rig exists: vLLM 46.09 tok/s single-stream vs gpu-jax-g6-2b 48.3-48.5 tok/s (2026-08-28), same L4, same checkpoint. vLLM is ~5% slower at concurrency 1. BOTH SIDES STOCK -- this is the first clean runtime comparison in this tree.",
+    "vLLM's advantage is batching, not single-stream: 46.09 -> 360.17 tok/s from concurrency 1 to 8 is 7.8x on 8x the load (98% scaling efficiency). TPOT stays flat, 19.85 -> 21.71 ms.",
+    "SILICON COMPARISON, same runtime and same harness (vllm bench serve): gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g on a g5g.4xlarge (T4G, Turing) measured c=1 ~31.8 tok/s (TPOT 31.44 ms), c=4 ~97 tok/s, c=8 168.33 tok/s. This L4 run: c=1 46.09, c=4 175.83, c=8 360.17 -- 1.45x / 1.81x / 2.14x. The gap WIDENS with concurrency, which is the Ada/Turing difference plus a much larger KV pool (9.65 GiB vs the T4G's 15360 MiB total device memory). NOTE the T4G side ran with hand-reduced Triton tiles; this side is stock. Do NOT compare against the loose 43.1/44.24 tok/s figures -- CLAUDE.md records that neither is a benchmark.",
+    "Context cost is modest: 1024 -> 4096 input costs 6% of single-stream decode (46.09 -> 43.30) but 42% at concurrency 8 (360.17 -> 207.83), where prefill competes with decode.",
+    "Ada's ~99 KiB of per-block shared memory cleared Triton's ~96 KiB tile UNPATCHED. The G5g sibling's local patch to triton_unified_attention.py is NOT needed here and must not be ported in."
+  ]
+}

@@ -129,7 +129,18 @@ MAX_NUM_SEQS = int(os.getenv("MAX_NUM_SEQS", "8"))
 # against current transformers, because Gemma 4's head_dim is per-layer. The
 # per_layer_config handling that fixes it landed in v0.27.2rc0. DO NOT PIN BELOW
 # THIS -- the constraint is the MODEL, not the chip, so it carries unchanged.
-VLLM_IMAGE = os.getenv("VLLM_IMAGE", "vllm/vllm-openai:v0.27.2rc0")
+#
+# MEASURED HERE 2026-08-30, and it cost a launch: `v0.27.2rc0` IS NOT A PUBLISHED
+# IMAGE TAG. cloud-init died at the pull with
+#   failed to resolve reference "docker.io/vllm/vllm-openai:v0.27.2rc0": not found
+# Note the comment four lines up already says the sibling built its image FROM
+# VLLM_REF=v0.27.2rc0 -- that is a GIT ref, and this rig copied it into an IMAGE
+# TAG field. The sibling never needed it to exist on Docker Hub because it
+# compiled it. Published releases are v0.27.0, v0.27.1, v0.28.0; no v0.27.2.
+#
+# So the floor is a floor on THE FIX, not on that literal string. v0.28.0
+# (2026-08-26) is the newest release and is above it.
+VLLM_IMAGE = os.getenv("VLLM_IMAGE", "vllm/vllm-openai:v0.28.0")
 
 # AWS publishes the x86_64 GPU DLAMI as a public SSM parameter. Prefer it: it is
 # single-valued and authoritative, where a describe-images name filter is a fuzzy
@@ -666,8 +677,15 @@ async def stop_g6_instance(instance_id: str) -> str:
 
 @mcp.tool(title="Terminate G6 instance", annotations=DESTRUCTIVE)
 async def terminate_g6_instance(instance_id: str) -> str:
-    """Terminate a managed instance. Permanent — the locally built SM 7.5 image
-    dies with the root volume and the next launch rebuilds it from source."""
+    """Terminate a managed instance. Permanent, but CHEAP here.
+
+    Nothing is built on this rig, so termination loses only an image pull and the
+    model cache -- MEASURED 2026-08-30 at 105 s for the pull and 37.6 s for the
+    weights. Do NOT import the G5g sibling's "weigh stop against terminate"
+    reasoning: there, a ~67-minute from-source SM 7.5 build died with the volume.
+    That sentence was in this docstring verbatim until 2026-08-30 despite
+    CLAUDE.md forbidding it -- a copy-paste that survived the fork.
+    """
     try:
         await _call(_client("ec2").terminate_instances, InstanceIds=[instance_id])
         return f"🗑️ Terminating `{instance_id}`. The built vLLM image is lost with the volume."
@@ -714,7 +732,14 @@ async def verify_gpu_arch(instance_id: str, image: str = "") -> str:
             "would contradict the published amd64 manifest and is the one result that "
             "would invalidate this rig's premise; check the image tag before concluding it."
             if "8.9" not in output and "arch list" in output
-            else "\n\n✅ SM 8.9 is in the arch list and a real bfloat16 matmul executed."
+            else (
+                "\n\n✅ A real bfloat16 matmul executed on the device.\n\n"
+                "Read the arch list carefully: MEASURED 2026-08-30 it is "
+                "`['sm_75','sm_80','sm_86','sm_90','sm_100','sm_120']` -- **`sm_89` is not in "
+                "it**, and Ada runs the `sm_86` cubins by same-major-version binary "
+                "compatibility. So a literal membership test for the device's own arch would "
+                "report a false negative here. THE MATMUL IS THE EVIDENCE, not the list."
+            )
             if "matmul ok: True" in output
             else ""
         )
