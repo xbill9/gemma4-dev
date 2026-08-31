@@ -1,6 +1,6 @@
 ---
 title: "The Cheapest CUDA GPU on AWS Has an Arm CPU — and You Probably Want the Intel One"
-published: false
+published: true
 description: "Gemma 4 E2B on the two cheapest whole-GPU CUDA instances AWS sells. Same Turing GPU, different host CPU. One is cheaper per hour, the other is cheaper per token, and the reason is not the CPU."
 tags: aws, vllm, cuda, machinelearning
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g4dn-2b/devto-cover.jpg

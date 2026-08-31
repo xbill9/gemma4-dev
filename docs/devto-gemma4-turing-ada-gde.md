@@ -1,6 +1,6 @@
 ---
 title: "Gemma 4 in Pure JAX: What Changes Between Turing and Ada, and What Doesn't"
-published: false
+published: true
 description: "One hand-written Gemma 4 port, no PyTorch and no vLLM, on two NVIDIA GPUs a generation apart. Most of it ports untouched. Two things do not, and one of them was quietly eating 87% of decode."
 tags: jax, gemma, cuda, machinelearning
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/devto-cover-gde.jpg

@@ -1,6 +1,6 @@
 ---
 title: "g5g vs g6 for LLM Serving: the Same Code, and 3.7x the Throughput"
-published: false
+published: true
 description: "Serving Gemma 4 E2B in pure JAX on AWS g5g.2xlarge and g6.2xlarge with a byte-identical payload. The older instance loses 87% of decode to dtype conversion, and nothing in the logs says so."
 tags: aws, jax, cuda, machinelearning
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/devto-cover-aws.jpg
