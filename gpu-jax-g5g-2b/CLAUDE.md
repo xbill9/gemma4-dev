@@ -756,10 +756,25 @@ two of the three quantization bugs below failed with GBs nominally free.
 | `ple0+int8head` | 9.660 GB | +0.403 | 94.8 | 13.10 / 13.00 / 12.80 |
 | **`ple4+int8head` — the current default** | **6.155 GB** | **−3.102** | 95.3 | **13.10 / 13.00 / 12.80** |
 
-**`tpu.env` changed on 2026-08-26 to `PLE_BITS=4` / `INT8_LM_HEAD=1`.** It is strictly better
-than the old default on both axes — 33% less memory and +2.3% throughput — but
+**`tpu.env` changed on 2026-08-26 to `PLE_BITS=4` / `INT8_LM_HEAD=1`.** It is better than the
+old default on both axes — 33% less memory, and throughput up **+1.6% median-to-median** — but
 **`INT8_LM_HEAD` is not numerics-preserving (~0.8% logit error)**, so it is a deliberate trade
 recorded as such, not a free win.
+
+> **CORRECTED 2026-08-31: the throughput gain was quoted as +2.3%, which is the BEST cell.**
+> Recomputed from the raw runs, `ple4+int8head` has per-cell medians 13.10 / 13.00 / 12.80, so
+> its **run median is 13.00**, against `ple0`'s 12.80 — **+1.6%**. Matched per context the gain
+> is +2.3% / +1.6% / +1.6%, so +2.3% is the short-context end of the range, not the typical
+> case. Independently corroborated on 2026-08-31: a fresh instance on this same default config
+> measured a **12.962** gauge median across 10 cells
+> (`benchmarks/runs/2026-08-31-crossrig-jax-g5g/`).
+>
+> **+1.6% is small enough to need a repeat before being called an improvement.** The PyTorch
+> sibling measured this family's host-to-host noise floor at **~1.7%** on 2026-08-31 by running
+> an identical build on two hosts — i.e. the same size as this gain.
+>
+> Note also that the table above mixes statistics: `ple0`'s middle cell reads 12.77, which is
+> the **mean** of [12.8, 12.7, 12.8]; its median is 12.80. Everything else is a median.
 
 Four things worth keeping:
 
@@ -771,7 +786,7 @@ Four things worth keeping:
 - **`int8_lm_head` does not do an int8 matmul.** xprof says the conversion kernel shrank 11%
   rather than disappearing, because `jax_e_model.py` dequantizes the int8 table to fp16 **in
   full — 0.75 GiB — on every decode step** and then runs the same matmul. It halves the bytes
-  *read* and pays a full-table convert regardless. That is the entire +2.3%. **Turing has int8
+  *read* and pays a full-table convert regardless. That is the entire +1.6%. **Turing has int8
   tensor cores (~130 TOPS) and this path never touches them** — a genuine int8 matmul is the
   unexploited win, not a larger PLE. Same shape as the W4A16 result: what is labelled
   quantized execution is really **dequantize-then-matmul**.
@@ -1089,7 +1104,7 @@ other 74% is not physics.
 | 2 | fp32 GEMV has **no half path** at `B=1` | 24.08 ms/step (32.8%) | needs a GEMM, not a dtype | measured |
 | 3 | 854 fusion launches/step | 8.98 ms/step (12.2%) | ≤ 12% | launch-bound, not measured as fixable |
 | 4 | bucket ladder below 512 | ~39% of a short prompt's prefill | TTFT only, not decode | measured 2026-08-25 |
-| 5 | a real int8 LM-head matmul | — | +2.3% is all `int8_lm_head` buys today | measured 2026-08-26 |
+| 5 | a real int8 LM-head matmul | — | +1.6% median is all `int8_lm_head` buys today | measured 2026-08-26, corrected 2026-08-31 |
 
 **1 and 2 were believed to be one fix. They are not, and 1 is not a fix at all.**
 
@@ -1257,14 +1272,15 @@ where `<hw-short>` equals the hardware slot:
 | `2026-08-21-cuda13-py314-g5g` | 12.4 tok/s | CUDA 13 / Python 3.14, same AMI. |
 | `2026-08-25-context-sweep-g5g` | 12.80 tok/s | 12 cells, context × output. First xprof. |
 | `2026-08-26-config-sweep-g5g` | 12.8 tok/s | Config sweep: all three levers fail. Locates the prefill ceiling. |
-| `2026-08-26-quant-levers-fixed-g5g` | **13.10 tok/s** | Levers fixed. 5/5 configs, 15/15 cells. Sets the current default. |
+| `2026-08-26-quant-levers-fixed-g5g` | **13.00 tok/s** | Levers fixed. 5/5 configs, 15/15 cells. Sets the current default. Median; 13.10 is its best cell. |
 | `2026-08-27-ubuntu2604-base-g5g` | 12.80 tok/s | Ubuntu 26.04 base. 80s install, read_shards 3x faster. |
 | `2026-08-27-baseline-g5g` + `-xprof` | 12.80 tok/s | First runs through `tune_loop.py`. |
 | `2026-08-28-full-run-cached-g5g` | 12.9 tok/s | Fresh instance restoring the cache from S3. Profile reproduces to 0.07%. |
 
 **The 12.4/12.5/12.8 figures are all the same configuration** (`ple0`, no int8 head) on
-successive stacks, and they are within noise of each other. **13.10 is a different
-configuration**, not an improvement to the old one — see the quantization-lever section.
+successive stacks, and they are within noise of each other. **13.00 is a different
+configuration**, not an improvement to the old one — see the quantization-lever section. (That
+row read 13.10 until 2026-08-31; 13.10 is the run's best cell, its median is 13.00.)
 
 **The CUDA 13 / 3.14 bump is performance-neutral** — it buys currency, not speed. Compare the
 two on the `tpu_jax_decode_tokens_per_second` gauge, not end-to-end tok/s: the same prompt
@@ -1280,6 +1296,16 @@ Three numbers you will be tempted to reuse, and must not:
 - **43.1 / 44.24 tok/s** — the vLLM sibling on `g5g.4xlarge` / `g5g.xlarge`, 2026-08-12/13.
   Same silicon, different runtime, and the figure was obtained *with reduced Triton tiles*.
   It is the number this rig exists to beat, not a baseline it inherits.
+  **CORRECTED 2026-08-30 — neither figure is a benchmark, do not compare against either.**
+  `43.1` is one sample from the 2026-08-12 first-serve run, whose own report says "single-run,
+  single-stream, no repeats and no variance figure", taken with a 19-token prompt. `44.24` has
+  **no benchmark artifact anywhere in the tree** — it survives only in `gpu-vllm-g5g-2b/server.py`'s
+  swap comment and `tests/test_server.py`, where it was measured 2026-08-13 to show that
+  `g5g.xlarge` + a 16 GiB swapfile reaches a healthy endpoint at all. The tile-clamp caveat is real
+  but does not distinguish them: it applies to every vLLM-on-T4G number, the good ones included.
+  **Compare against `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`** — `vllm bench
+  serve`, three runs, one `g5g.4xlarge`: c=1 TPOT 31.44 ms (~31.8 tok/s decode), c=4 ~97 tok/s,
+  c=8 168.33 tok/s.
 - **~44 tok/s on one Inferentia core** from `~/gemma4-tips-aws` — different harness, different
   silicon.
 - **Anything from `~/gemma4-tips`** — that tree duplicated its own artifacts and its directory

@@ -111,16 +111,22 @@ which boot fine on a G5g with no GPU. **Never hardcode an AMI id.**
 ## There is a prebuilt AMI — use it, do not rebuild
 
 **`ami-0b44b90b3d02430ee`** (us-east-1, 80 GiB). Carries the ~67-minute from-source build, so
-a launch is ~4 minutes instead of hours: CUDA 13.2, vLLM v0.27.2rc0 for `sm_75`, **the Turing
-shared-memory patch**, the E2B model cache (`HF_HUB_OFFLINE=1`), `vllm.service` and
-`vllm-swap.service`.
+a launch is **~24 minutes** instead of hours: CUDA 13.2, vLLM v0.27.2rc0 for `sm_75`, **the
+Turing shared-memory patch**, the E2B model cache (`HF_HUB_OFFLINE=1`), `vllm.service` and
+`vllm-swap.service`. (This read "~4 minutes" until 2026-08-31; see the startup bullet.)
 
 - The Turing patch is **not upstream** — reapply on any vLLM upgrade or the engine won't start.
 - Swap is created at boot, not baked into the image.
 - ~$2/month (EBS bills written blocks, not the 80 GiB nominal). Not the Archive tier: restore
   takes 24–72 h. Not a stopped instance: that's ~$6.40/month and still pays full engine init.
-- Startup: ~50–70 s to SSM, then 177–184 s engine init on `g5g.xlarge` (129 s on a 32 GiB
-  host — the delta is loading 9.5 GiB through swap).
+- Startup, **MEASURED over 3 cold boots on `g5g.2xlarge` 2026-08-31**: launch → health 200 is
+  **1417.8 s = 23m 38s** (median; 1346.8–1525.2, 12.6% spread). **Weight loading alone is 546 s**
+  — a 9.54 GiB checkpoint against 11.19 GiB available RAM, so it thrashes page cache even with
+  no swapfile. Engine init is 207 s; warm `systemctl restart` → health is 264.3 s. First
+  completion is fast, 0.5 s cold. The PyTorch sibling reaches a serving endpoint in **195 s**
+  while *downloading* 9.5 GB, so this rig is 7.3x slower from an image that downloads nothing.
+  The old text here ("~4 minutes", "`g5g.2xlarge` needs no swapfile and buys that time back")
+  was wrong by ~6x. See `benchmarks/runs/2026-08-31-crossrig-vllm-g5g/REPORT.md`.
 - Cloning it smaller needs `sgdisk --partition-guid=` as well as the filesystem UUID and
   label: the initramfs boots by `PARTUUID`, and a fresh one leaves the AMI unbootable.
 

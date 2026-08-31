@@ -4,7 +4,7 @@
     "id": "2026-08-31-crossrig-gemma4-e2b-g5g",
     "date": "2026-08-31",
     "operator": "xbill",
-    "source": "sweep.py + make_report.py in gpu-pytorch-g5g-2b; run dir 2026-08-31-crossrig-torch-g5g",
+    "source": "gpu-pytorch-g5g-2b/sweep.py + make_report.py; rig gpu-pytorch-g5g-2b; run dir 2026-08-31-crossrig-torch-g5g",
     "notes": "PyTorch leg of the first controlled three-runtime comparison on g5g (vLLM / JAX / PyTorch), all three on g5g.2xlarge spot in us-east-1a on the same day, driven by this rig's sweep.py with the new --decode-source flag so all three report the same client-side streaming statistic. Cross-rig analysis is in this run's REPORT.md."
   },
   "hardware": {
@@ -47,7 +47,7 @@
   },
   "throughput": {
     "workload": {
-      "tool": "sweep.py (this rig)",
+      "tool": "gpu-pytorch-g5g-2b/sweep.py (decode-source both)",
       "dataset": "synthetic repeated filler, summarize instruction",
       "num_prompts": 1,
       "runs_per_point": 3
@@ -158,6 +158,7 @@
   "notes": [
     "Decode 9.91-11.04 tok/s across a 92-3746 token context range: flat, so decode is set by the weights rather than by the context.",
     "Quote the decode figures, not end-to-end: they come from tpu_jax_decode_tokens_per_second, which times decode alone. Both are in sweep.json and they do not agree.",
-    "Degenerate replies over the whole run: 0."
+    "Degenerate replies over the whole run: 0.",
+    "Client-side stream statistic reads 0.9543 of this server's own decode gauge on this run. The offset is per-rig -- never borrow another rig's ratio."
   ]
 }

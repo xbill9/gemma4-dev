@@ -149,7 +149,8 @@ Never hardcode an AMI id here; resolve it at launch.
 
 **`ami-0b44b90b3d02430ee`** (`gpu-vllm-g5g-2b-sm75-vllm0272rc0-80g-v2`, us-east-1, 80 GiB).
 Built 2026-08-12/13 and smoke-tested on a fresh `g5g.xlarge`. It carries the ~67-minute
-from-source build, so launching from it turns a multi-hour provision into ~4 minutes.
+from-source build, so launching from it replaces a multi-hour provision — but **not with
+~4 minutes; measured, it is ~24**. See "Boot time, measured" below.
 
 Contents: ARM64 DLAMI PyTorch 2.12 base · CUDA 13.2 toolkit · Rust · vLLM v0.27.2rc0 built
 for `TORCH_CUDA_ARCH_LIST=7.5` · **the Turing shared-memory patch** · the E2B model cache
@@ -163,11 +164,42 @@ for `TORCH_CUDA_ARCH_LIST=7.5` · **the Turing shared-memory patch** · the E2B 
 - Storage is **~$2/month** (39.2 GiB of written blocks; EBS bills blocks, not the 80 GiB
   nominal). Do not move it to the Archive tier — restore takes 24–72 h.
 - Do not keep an instance stopped as a "faster start": an idle 80 GiB volume is ~$6.40/month,
-  three times the AMI, and start still pays the full ~180 s engine init.
+  three times the AMI, and start still pays the full engine init — measured 264 s for a warm
+  restart on 2026-08-31, not the ~180 s this line used to claim.
 
-Startup, measured: boot to SSM ~50–70 s, then engine init **177–184 s** on `g5g.xlarge`
-against **129 s** on a 32 GiB host. The ~50 s delta is loading the 9.5 GiB checkpoint through
-swap. `g5g.2xlarge` (16 GiB) needs no swapfile and buys that time back for ~$0.10/h.
+### Boot time, measured — this AMI does NOT boot in ~4 minutes
+
+**CORRECTED 2026-08-31 from 3 timed cold boots on `g5g.2xlarge`** (see
+`benchmarks/runs/2026-08-31-crossrig-vllm-g5g/REPORT.md` and the campaign harness in the
+PyTorch sibling's `2026-08-31-crossrig-torch-g5g/`). This section previously claimed
+"~4 minutes" and that `g5g.2xlarge` "needs no swapfile and buys that time back". **Both are
+wrong — the real figure is ~6x the claim.**
+
+| | measured |
+| --- | ---: |
+| launch → health 200, median of 3 | **1417.8 s = 23m 38s** [1346.8–1525.2, 12.6%] |
+| of which, weight loading | **546 s median** |
+| engine init (profile, KV, CUDA graphs) | 207 s |
+| warm `systemctl restart` → health | 264.3 s |
+| first chat completion, cold / warm | 0.5 s / 0.2 s |
+
+**The cost is weight loading, and a bigger host will not fix it the way the old text implies.**
+`weight_utils` reports a 9.54 GiB checkpoint against **11.19 GiB of available RAM**, so the load
+thrashes page cache even with no swapfile in play — 546 s to place weights that are already on
+local disk. The PyTorch sibling hit the identical wall on 2026-08-29 and fixed it with
+`device_map={"": 0}`, streaming shard by shard to the GPU: host peak 10.52 GB, zero swap.
+**vLLM has no equivalent knob here**, so on a 16 GiB host this is the floor.
+
+**For scale: the PyTorch sibling reaches a serving endpoint in 195 s median while installing
+from wheels AND downloading 9.5 GB over the network.** This rig, from an image that downloads
+nothing, takes 7.3x longer.
+
+The one thing this rig wins on is first token: 0.5 s cold against the JAX sibling's 22.9 s,
+because CUDA graph capture and AOT compile are paid before the port binds.
+
+Superseded, kept for provenance: boot to SSM ~50–70 s, then engine init **177–184 s** on
+`g5g.xlarge` against **129 s** on a 32 GiB host. Engine init still measures ~207 s, so that part
+held; what did not is treating engine init as the whole story when weight loading is 2.6x it.
 
 An earlier 300 GiB AMI was deregistered on 2026-08-13 after being cloned onto an 80 GiB
 volume. **The clone's first attempt did not boot**: the initramfs finds root by `PARTUUID`

@@ -1,0 +1,165 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-31-crossrig-gemma4-e2b-g5g",
+    "date": "2026-08-31",
+    "operator": "xbill",
+    "source": "gpu-pytorch-g5g-2b/sweep.py + make_report.py; rig gpu-vllm-g5g-2b; run dir 2026-08-31-crossrig-vllm-g5g",
+    "notes": "vLLM leg of the first controlled three-runtime comparison on g5g, and this rig's first schema-valid report of any kind: the 2026-08-14 run left only a REPORT.md, so its numbers could not be recomputed. Measured at concurrency 1 with the shared harness; --decode-source auto correctly selected the client-side stream path because vLLM emits no decode gauge. Full analysis in gpu-pytorch-g5g-2b/benchmarks/runs/2026-08-31-crossrig-torch-g5g/REPORT.md."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA T4G",
+    "chips": 1,
+    "topology": "single device",
+    "hbm_gb_per_chip": 15.36,
+    "machine_type": "g5g.2xlarge",
+    "host": {
+      "cpu": "AWS Graviton2 (aarch64)",
+      "vcpus": 8,
+      "ram_gb": 16
+    },
+    "pricing": {
+      "rate_per_chip_hour": 0.4416,
+      "currency": "USD",
+      "source": "aws ec2 describe-spot-price-history, us-east-1a, spot, at run time"
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "parameters_b": 5.4,
+    "weights_dtype": "float16",
+    "quantization": "none (dense reference checkpoint)",
+    "kv_cache_dtype": "float16",
+    "max_model_len": 16384,
+    "architecture_notes": "E2B under vLLM v0.27.2rc0 built for TORCH_CUDA_ARCH_LIST=7.5 with the out-of-tree Turing shared-memory patch. Paged KV, block_size 16, 32266 GPU blocks."
+  },
+  "software": {
+    "engine": "vllm",
+    "version": "v0.27.2rc0 (SM 7.5 from-source build)",
+    "backend": "cuda",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "--seq",
+      "16384"
+    ],
+    "container_image": "AMI ami-0b44b90b3d02430ee"
+  },
+  "throughput": {
+    "workload": {
+      "tool": "gpu-pytorch-g5g-2b/sweep.py (decode-source stream)",
+      "dataset": "synthetic repeated filler, summarize instruction",
+      "num_prompts": 1,
+      "runs_per_point": 3
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 92,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 36.151,
+        "request_latency_s": 0.953
+      },
+      {
+        "concurrency": 1,
+        "input_len": 92,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 33.898,
+        "request_latency_s": 2.26
+      },
+      {
+        "concurrency": 1,
+        "input_len": 633,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 35.215,
+        "request_latency_s": 1.0
+      },
+      {
+        "concurrency": 1,
+        "input_len": 633,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 32.152,
+        "request_latency_s": 2.668
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1259,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 33.007,
+        "request_latency_s": 1.059
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1259,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 32.602,
+        "request_latency_s": 2.634
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2501,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 32.741,
+        "request_latency_s": 1.087
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2501,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 32.453,
+        "request_latency_s": 2.73
+      },
+      {
+        "concurrency": 1,
+        "input_len": 3746,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 29.82,
+        "request_latency_s": 1.22
+      },
+      {
+        "concurrency": 1,
+        "input_len": 3746,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 29.78,
+        "request_latency_s": 3.001
+      },
+      {
+        "concurrency": 1,
+        "input_len": 4630,
+        "output_len": 32,
+        "status": "ok",
+        "output_tokens_per_second": 28.216,
+        "request_latency_s": 1.315
+      },
+      {
+        "concurrency": 1,
+        "input_len": 4630,
+        "output_len": 128,
+        "status": "ok",
+        "output_tokens_per_second": 27.94,
+        "request_latency_s": 3.224
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 14.07,
+    "weights_gib": 9.8,
+    "notes": "weights_gib is vLLM's own 'Model loading took 9.8 GiB' (weights plus non-torch), not a checkpoint size. KV cache 329,579 tokens at gpu_memory_utilization 0.90 - identical to the 2026-08-14 run, confirming the engine config has not drifted."
+  },
+  "issues": [],
+  "notes": [
+    "Decode 27.94-36.15 tok/s across a 92-4630 token context range: flat, so decode is set by the weights rather than by the context.",
+    "Quote the decode figures, not end-to-end: they come from tpu_jax_decode_tokens_per_second, which times decode alone. Both are in sweep.json and they do not agree.",
+    "Degenerate replies over the whole run: 0."
+  ]
+}

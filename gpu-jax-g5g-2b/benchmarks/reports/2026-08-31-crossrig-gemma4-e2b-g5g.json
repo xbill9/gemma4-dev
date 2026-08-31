@@ -4,8 +4,8 @@
     "id": "2026-08-31-crossrig-gemma4-e2b-g5g",
     "date": "2026-08-31",
     "operator": "xbill",
-    "source": "gpu-pytorch-g5g-2b/sweep.py + make_report.py; rig gpu-pytorch-g5g-2b; run dir 2026-08-31-crossrig-torch-g5g",
-    "notes": "PyTorch leg of the first controlled three-runtime comparison on g5g (vLLM / JAX / PyTorch), all three on g5g.2xlarge spot in us-east-1a on the same day, driven by this rig's sweep.py with the new --decode-source flag so all three report the same client-side streaming statistic. Cross-rig analysis is in this run's REPORT.md."
+    "source": "gpu-pytorch-g5g-2b/sweep.py + make_report.py; rig gpu-jax-g5g-2b; run dir 2026-08-31-crossrig-jax-g5g",
+    "notes": "JAX leg of the first controlled three-runtime comparison on g5g (vLLM / JAX / PyTorch), all three on g5g.2xlarge in us-east-1a on the same day, driven by gpu-pytorch-g5g-2b/sweep.py with --decode-source both so every rig reports the same client-side streaming statistic. Config is this rig's shipped default, ple4+int8head, which is quantised where the other two legs are dense - see the cross-rig REPORT.md for that fairness caveat. Full analysis in gpu-pytorch-g5g-2b/benchmarks/runs/2026-08-31-crossrig-torch-g5g/REPORT.md."
   },
   "hardware": {
     "accelerator": "NVIDIA T4G",
@@ -29,21 +29,21 @@
     "family": "gemma-4",
     "parameters_b": 5.4,
     "weights_dtype": "float16",
-    "quantization": "none (dense reference checkpoint)",
+    "quantization": "PLE 4-bit, int8 lm_head (not numerics-preserving)",
     "kv_cache_dtype": "float16",
     "max_model_len": 4096,
-    "architecture_notes": "E2B: 28 sliding layers at head_dim 256 plus 7 full-attention layers at global_head_dim 512; 8 query heads to 1 KV head. transformers owns the cache here -- there is no hand-written ring and no padding."
+    "architecture_notes": "E2B under the rig's own JAX port (ports/gemma4), not transformers: hand-written KV ring with a bucket ladder, so pad_len and bucket_size are recorded per request."
   },
   "software": {
-    "engine": "pytorch-transformers",
-    "version": "torch 2.12.0+cu132",
+    "engine": "jax",
+    "version": "build 53e79b8f40f3 (jax version not reported by /health)",
     "backend": "cuda",
     "tensor_parallel_size": 1,
     "serve_args": [
       "--seq",
       "4096"
     ],
-    "container_image": "AMI ami-07a66fa2acbcfea88"
+    "container_image": "AMI ami-04ef5d103c30e7e9f"
   },
   "throughput": {
     "workload": {
@@ -58,107 +58,107 @@
         "input_len": 92,
         "output_len": 32,
         "status": "ok",
-        "output_tokens_per_second": 9.912,
-        "request_latency_s": 3.395
+        "output_tokens_per_second": 13.102,
+        "request_latency_s": 2.663
       },
       {
         "concurrency": 1,
         "input_len": 92,
         "output_len": 128,
         "status": "ok",
-        "output_tokens_per_second": 10.329,
-        "request_latency_s": 7.72
+        "output_tokens_per_second": 12.86,
+        "request_latency_s": 5.13
       },
       {
         "concurrency": 1,
         "input_len": 633,
         "output_len": 32,
         "status": "ok",
-        "output_tokens_per_second": 10.965,
-        "request_latency_s": 3.255
+        "output_tokens_per_second": 13.198,
+        "request_latency_s": 3.194
       },
       {
         "concurrency": 1,
         "input_len": 633,
         "output_len": 128,
         "status": "ok",
-        "output_tokens_per_second": 11.014,
-        "request_latency_s": 8.241
+        "output_tokens_per_second": 12.792,
+        "request_latency_s": 7.173
       },
       {
         "concurrency": 1,
         "input_len": 1259,
         "output_len": 32,
         "status": "ok",
-        "output_tokens_per_second": 11.035,
-        "request_latency_s": 3.554
+        "output_tokens_per_second": 13.181,
+        "request_latency_s": 4.043
       },
       {
         "concurrency": 1,
         "input_len": 1259,
         "output_len": 128,
         "status": "ok",
-        "output_tokens_per_second": 11.044,
-        "request_latency_s": 8.532
+        "output_tokens_per_second": 12.774,
+        "request_latency_s": 8.109
       },
       {
         "concurrency": 1,
         "input_len": 2501,
         "output_len": 32,
         "status": "ok",
-        "output_tokens_per_second": 10.607,
-        "request_latency_s": 4.393
+        "output_tokens_per_second": 13.128,
+        "request_latency_s": 5.805
       },
       {
         "concurrency": 1,
         "input_len": 2501,
         "output_len": 128,
         "status": "ok",
-        "output_tokens_per_second": 10.663,
-        "request_latency_s": 9.719
+        "output_tokens_per_second": 12.717,
+        "request_latency_s": 9.953
       },
       {
         "concurrency": 1,
         "input_len": 3746,
         "output_len": 32,
         "status": "ok",
-        "output_tokens_per_second": 10.603,
-        "request_latency_s": 5.352
+        "output_tokens_per_second": 13.064,
+        "request_latency_s": 7.791
       },
       {
         "concurrency": 1,
         "input_len": 3746,
         "output_len": 128,
         "status": "ok",
-        "output_tokens_per_second": 11.006,
-        "request_latency_s": 10.43
+        "output_tokens_per_second": 12.658,
+        "request_latency_s": 11.978
       },
       {
         "concurrency": 1,
         "input_len": 3800,
         "output_len": 32,
         "status": "infeasible",
-        "error": "HTTP Error 400: Bad Request {\"detail\":\"prompt is 4630 tokens and the context bound is 4096, leaving no room to decode. Start the server with a larger --seq.\"}"
+        "error": "HTTP Error 500: Internal Server Error {\"detail\":\"[chatcmpl-jax-1788194480652] Prompt of 4630 tokens leaves no room within max_model_len=4096\"}"
       },
       {
         "concurrency": 1,
         "input_len": 3800,
         "output_len": 128,
         "status": "infeasible",
-        "error": "HTTP Error 400: Bad Request {\"detail\":\"prompt is 4630 tokens and the context bound is 4096, leaving no room to decode. Start the server with a larger --seq.\"}"
+        "error": "HTTP Error 500: Internal Server Error {\"detail\":\"[chatcmpl-jax-1788194480745] Prompt of 4630 tokens leaves no room within max_model_len=4096\"}"
       }
     ]
   },
   "memory": {
     "usable_hbm_gib": 14.07,
-    "weights_gib": 9.507,
-    "notes": "Dense float16, no PLE quantisation and no int8 lm_head -- those are JAX-port levers with no analogue here. E2B KV is ~18 KiB/token, so at 4096 the whole cache is tens of MiB and is not the binding constraint."
+    "weights_gib": 5.733,
+    "notes": "PLE 4-bit plus int8 lm_head: 6.155 GB resident against the dense rig's 10.209 GB. The PLE table is a gather, never a matmul, so it is resident but not streamed during decode."
   },
   "issues": [],
   "notes": [
-    "Decode 9.91-11.04 tok/s across a 92-3746 token context range: flat, so decode is set by the weights rather than by the context.",
+    "Decode 12.66-13.20 tok/s across a 92-3746 token context range: flat, so decode is set by the weights rather than by the context.",
     "Quote the decode figures, not end-to-end: they come from tpu_jax_decode_tokens_per_second, which times decode alone. Both are in sweep.json and they do not agree.",
     "Degenerate replies over the whole run: 0.",
-    "Client-side stream statistic reads 0.9543 of this server's own decode gauge on this run. The offset is per-rig -- never borrow another rig's ratio."
+    "Client-side stream statistic reads 0.9799 of this server's own decode gauge on this run. The offset is per-rig -- never borrow another rig's ratio."
   ]
 }
