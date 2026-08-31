@@ -260,7 +260,7 @@ nothing in the logs is red.</p>
 <p>The code is here:</p>
 <p><a
 href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
-<h2 id="what-this-article-measures">What This Article Measures</h2>
+<h4 id="what-this-article-measures">What This Article Measures</h4>
 <p>One port, one build, one checkpoint, two cards. Everything below
 comes from two archived runs, named so you can check them.</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/medium/img/devto-gemma4-turing-ada-gde-table-1.png"
@@ -269,8 +269,8 @@ alt="table" /></p>
 <code>ple4 + int8_lm_head</code>, and <code>tpu_jax_weight_bytes</code>
 reads <strong>6,155,450,950</strong> on both cards — the same integer.
 Only the chip and its host differ.</p>
-<h2 id="at-this-point-you-should-have">At This Point You Should
-Have</h2>
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have</h4>
 <ul>
 <li>An AWS account with spot capacity for <code>g5g.2xlarge</code> and
 <code>g6.2xlarge</code></li>
@@ -281,15 +281,15 @@ virtualenv</li>
 <li>No CUDA toolkit, no Rust toolchain, and no compiler — none of them
 are needed</li>
 </ul>
-<h2 id="why-pure-jax-at-all">Why Pure JAX At All</h2>
+<h4 id="why-pure-jax-at-all">Why Pure JAX At All</h4>
 <p>The port lives in <code>ports/gemma4/</code> and is driven by a
 generation loop behind an OpenAI-compatible server. No PyTorch, no vLLM,
 no <code>torch_xla</code>.</p>
 <p>The premise under test is that the same source runs on both cards
 with nothing changed but a config file. It mostly holds. The interesting
 part is where it does not.</p>
-<h2 id="gemma-4-e2b-is-not-a-stock-transformer">Gemma 4 E2B Is Not a
-Stock Transformer</h2>
+<h4 id="gemma-4-e2b-is-not-a-stock-transformer">Gemma 4 E2B Is Not a
+Stock Transformer</h4>
 <p>Any port has to carry four irregularities, and none of them are
 optional.</p>
 <ol type="1">
@@ -304,8 +304,8 @@ onto 15 caches</strong>.</li>
 held in a <strong>4.70 GB</strong> table that is quantized to 4 bits on
 load.</li>
 </ol>
-<h2 id="the-geometry-is-what-breaks-other-stacks">The Geometry Is What
-Breaks Other Stacks</h2>
+<h4 id="the-geometry-is-what-breaks-other-stacks">The Geometry Is What
+Breaks Other Stacks</h4>
 <p>That first irregularity is the expensive one. On the vLLM path the
 heterogeneous head dims force the Triton attention backend:</p>
 <pre><code>Gemma4 model has heterogeneous head dimensions
@@ -319,8 +319,8 @@ ordinary XLA rather than a hand-tiled kernel, so there is no per-block
 shared-memory ceiling in the attention path at all. The irregular
 geometry that is a special case everywhere else is just array shapes
 here.</p>
-<h2 id="leak-one-the-dtype-policy-has-to-read-the-device">Leak One: The
-dtype Policy Has To Read the Device</h2>
+<h4 id="leak-one-the-dtype-policy-has-to-read-the-device">Leak One: The
+dtype Policy Has To Read the Device</h4>
 <p>This is the single most expensive lesson in the repository.</p>
 <p><strong>A wrong compute dtype does not raise. It emulates.</strong>
 <code>bfloat16</code> on a pre-Ampere GPU does not fail — XLA routes it
@@ -333,8 +333,8 @@ class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a hr
 <p>On the SM 8.9 Ada card that resolves to <code>bfloat16</code>. On the
 SM 7.5 Turing card it resolves to <code>float16</code> — Turing's only
 real 16-bit datapath, since it has neither bf16 nor fp8.</p>
-<h2 id="the-process-states-what-it-decided">The Process States What It
-Decided</h2>
+<h4 id="the-process-states-what-it-decided">The Process States What It
+Decided</h4>
 <p>The first line the server emits is the policy, so a misconfiguration
 is one <code>grep</code> away rather than a mystery in the
 throughput:</p>
@@ -342,8 +342,8 @@ throughput:</p>
 compute_capability=8.9 compute_dtype=bfloat16 pallas_interpret=False</code></pre>
 <p><code>pallas_interpret=False</code> matters just as much. It is the
 difference between serving and silently running a simulator.</p>
-<h2 id="leak-two-pallas-is-not-portable-as-a-memory-model">Leak Two:
-Pallas Is Not Portable as a Memory Model</h2>
+<h4 id="leak-two-pallas-is-not-portable-as-a-memory-model">Leak Two:
+Pallas Is Not Portable as a Memory Model</h4>
 <p>Here is the part that does not port, and it is not a bug. It is a
 real hardware difference wearing a portable API.</p>
 <p>The fused <strong>W4A16 kernel is written in Pallas</strong>, and it
@@ -364,7 +364,7 @@ class="sourceCode python"><code class="sourceCode python"><span id="cb5-1"><a hr
 portable as an API and not portable as a memory model.</strong> That
 boundary is worth knowing before planning a port around a fused
 kernel.</p>
-<h2 id="the-bug-that-returns-200-ok">The Bug That Returns 200 OK</h2>
+<h4 id="the-bug-that-returns-200-ok">The Bug That Returns 200 OK</h4>
 <p>A padding-eviction bug in the KV ring cache cost a week, and it is
 the kind only Gemma 4's geometry produces.</p>
 <p>The invariant is that <strong>a cache index is an absolute real
@@ -377,15 +377,15 @@ and output like <code>The The The The</code>.</p>
 thing that catches it is a degeneracy check on the output itself, which
 the server now runs on every response.</p>
 <p>The scariest bugs in this project all returned success.</p>
-<h2 id="install-no-build-step">Install: No Build Step</h2>
+<h4 id="install-no-build-step">Install: No Build Step</h4>
 <p><code>jax[cuda13]</code> supplies CUDA as wheels, so the install
 needs no CUDA toolkit, no Rust, and no compiler on the box.</p>
 <pre><code>Install: 117 s, with the cache restore included</code></pre>
 <p>XLA's persistent compilation cache ports as-is. On the T4G rig it
 restores <strong>805 files / 12 MB in 6 seconds</strong> onto a fresh
 instance, from a box that had already been terminated.</p>
-<h2 id="warm-up-at-the-shape-you-measure">Warm Up At the Shape You
-Measure</h2>
+<h4 id="warm-up-at-the-shape-you-measure">Warm Up At the Shape You
+Measure</h4>
 <p><code>max_new_tokens</code> is a <code>static_argnames</code> entry,
 so <code>(bucket, max_tokens)</code> is the compiled shape on every
 backend. A harness that does not warm up misreports the rig badly.</p>
@@ -396,14 +396,14 @@ against 4.50 s warm</strong> — a 4.0x whole-request ratio, measured in
 the first-serve baseline is <strong>TTFT specifically</strong>, not the
 same measurement as the whole-request ratio. They are not
 interchangeable.</p>
-<h2 id="the-sweep">The Sweep</h2>
+<h4 id="the-sweep">The Sweep</h4>
 <p>64 output tokens, concurrency 1, 3 repeats per cell, median. "Decode,
 gauge" is the engine's steady-state counter. "End-to-end" is wall time
 over the whole request, prefill included.</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/medium/img/devto-gemma4-turing-ada-gde-table-2.png"
 alt="table" /></p>
-<h2 id="decode-is-flat-end-to-end-is-not">Decode Is Flat; End-To-End Is
-Not</h2>
+<h4 id="decode-is-flat-end-to-end-is-not">Decode Is Flat; End-To-End Is
+Not</h4>
 <p>Decode moves 0.8% across a 50x context range on the T4G and 0.4% on
 the L4. End-to-end falls hard on both.</p>
 <p>That fall is prefill being linear in the padded bucket, not decode
@@ -415,8 +415,8 @@ decode speed on either card — despite Gemma 4's whole KV story.</p>
 <p>On context specifically: <code>MAX_MODEL_LEN=4096</code> is the
 honest number on the T4G. 4,105 prompt tokens serve; 5,120 fails on a
 prefill transient.</p>
-<h2 id="the-profile-87-of-decode-was-not-math">The Profile: 87% of
-Decode Was Not Math</h2>
+<h4 id="the-profile-87-of-decode-was-not-math">The Profile: 87% of
+Decode Was Not Math</h4>
 <p>Profiling decode with xprof on the Turing card, 20 decode steps with
 the service stopped:</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/medium/img/devto-gemma4-turing-ada-gde-table-3.png"
@@ -424,8 +424,8 @@ alt="table" /></p>
 <p>1,466 ms of kernels across 108 distinct kernels on a Tensor Core GPU,
 without one Tensor Core firing. More than half of decode went to
 converting numbers between formats before any math happened.</p>
-<h2 id="the-obvious-explanation-was-wrong">The Obvious Explanation Was
-Wrong</h2>
+<h4 id="the-obvious-explanation-was-wrong">The Obvious Explanation Was
+Wrong</h4>
 <p>The obvious hypothesis was bf16 weights being converted on a chip
 with no bf16 datapath. So the checkpoint was converted to float16
 host-side and re-run. Parameter dtypes read
@@ -434,8 +434,8 @@ host-side and re-run. Parameter dtypes read
 <p>The measurement itself is solid. The same profile on a different
 instance, a different AMI and a restored cache landed at 1466.0 ms
 against 1467.1 ms. <strong>1.1 ms apart on 1467.</strong></p>
-<h2 id="it-was-the-datapath-not-the-checkpoint">It Was the Datapath, Not
-the Checkpoint</h2>
+<h4 id="it-was-the-datapath-not-the-checkpoint">It Was the Datapath, Not
+the Checkpoint</h4>
 <p>The Ada card resolves it. Converting the stored weights changed
 nothing because storage dtype was never the problem: Turing has no
 native bf16, and the fp32 <code>gemvx</code> line is the tell — XLA was
@@ -449,8 +449,8 @@ a rig sitting at its bandwidth roofline instead of 26% of it.</p>
 <code>weights=bfloat16 activations=bfloat16 kv_cache=bfloat16 pre_ampere=false</code>
 — storage dtype and compute dtype matching for the first time on this
 engine.</p>
-<h2 id="what-survived-and-is-still-unexplained">What Survived, and Is
-Still Unexplained</h2>
+<h4 id="what-survived-and-is-still-unexplained">What Survived, and Is
+Still Unexplained</h4>
 <p>Tensor Core utilization is <strong>0.0% on the Ada card too</strong>
 — 100 distinct kernels, 362.8 ms of them, and not one Tensor Core
 firing.</p>
@@ -458,11 +458,11 @@ firing.</p>
 faster without making it touch the hardware it was sold for. That is the
 open question now, and it is a better one than the question this started
 with.</p>
-<h2 id="teardown">Teardown</h2>
+<h4 id="teardown">Teardown</h4>
 <p>Both rigs run on spot capacity and are terminated after collection.
 The XLA cache is pushed to S3 before teardown, which is what makes the
 6-second restore on a fresh instance possible.</p>
-<h2 id="summary">Summary</h2>
+<h4 id="summary">Summary</h4>
 <p>The goal of this article was to find out which parts of "it's just
 JAX" survive a move between GPU generations. The key to the solution was
 reading the compute dtype off the live device rather than a config file.
@@ -492,6 +492,6 @@ weights — which is the basis for attributing the difference to the chip.
 The Turing profile was reproduced on a second instance at 1466.0 ms
 against 1467.1 ms; the Ada profile was measured once.</p>
 <p>The strategy for using MCP for Gemma 4 serving across GPU generations
-was validated with a incremental step by step approach.</p>
+was validated with an incremental step by step approach.</p>
 </body>
 </html>

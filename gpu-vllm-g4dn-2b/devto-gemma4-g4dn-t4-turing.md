@@ -439,5 +439,5 @@ serve`; the Intel figures from a `g4dn.xlarge` running vLLM 0.28.0 from the publ
 under this rig's harness. These are properties of these two deployments on their measurement
 dates.
 
-The strategy for using MCP for Gemma 4 deployment on AWS EC2 G4dn was validated with a
+The strategy for using MCP for Gemma 4 deployment on AWS EC2 G4dn was validated with an
 incremental step by step approach.

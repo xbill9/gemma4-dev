@@ -199,4 +199,4 @@ instance at 1466.0 ms against 1467.1 ms; the g6 profile was measured once. Price
 and price-per-token were not measured and are not claimed here.
 
 The strategy for using MCP for Gemma 4 serving across AWS GPU instance families was
-validated with a incremental step by step approach.
+validated with an incremental step by step approach.

@@ -301,4 +301,4 @@ on a second instance at 1466.0 ms against 1467.1 ms; the Ada profile was measure
 once.
 
 The strategy for using MCP for Gemma 4 serving across GPU generations was validated
-with a incremental step by step approach.
+with an incremental step by step approach.
