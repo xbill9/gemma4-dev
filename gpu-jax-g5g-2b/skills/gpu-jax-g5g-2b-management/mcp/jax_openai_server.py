@@ -566,7 +566,7 @@ def metrics():
         "",
         "# HELP tpu_jax_decode_tokens_per_second Decode throughput of the last request",
         "# TYPE tpu_jax_decode_tokens_per_second gauge",
-        f'tpu_jax_decode_tokens_per_second{{model="{MODEL_ID}"}} {METRICS["last_tokens_per_second"]:.1f}',
+        f'tpu_jax_decode_tokens_per_second{{model="{MODEL_ID}"}} {METRICS["last_tokens_per_second"]:.4f}',
         "",
         "# HELP tpu_jax_prefill_milliseconds Prefill (TTFT) of the last request",
         "# TYPE tpu_jax_prefill_milliseconds gauge",
@@ -690,7 +690,7 @@ def chat_completions(req: ChatCompletionRequest, response: Response):
                 "total_tokens": stats.prompt_tokens + stats.completion_tokens,
                 "latency_seconds": round(elapsed, 3),
                 "prefill_ms": round(stats.prefill_ms, 1),
-                "decode_tokens_per_second": round(stats.decode_tok_per_s, 1),
+                "decode_tokens_per_second": round(stats.decode_tok_per_s, 4),
                 # Shape facts, not performance. bucket/pad are what distinguish a
                 # correct answer from the KV-ring eviction failure, and cold_shape
                 # is what distinguishes a slow request from a broken one.

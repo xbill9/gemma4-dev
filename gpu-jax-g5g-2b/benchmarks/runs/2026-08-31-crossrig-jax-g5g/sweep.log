@@ -1,0 +1,25 @@
+health: {"status": "ok", "backend": "jax", "device": "cuda:0", "model": "google/gemma-4-E2B-it", "build_id": "53e79b8f40f3", "precision": {"weights": "float16", "activations": "float16", "kv_cache": "float16", "kv_cache_requested": "auto", "quant_mode": "fp16", "ple_bits": 4, "int8_lm_head": true, "pre_ampere": true}}
+decode-source: both -> both
+ctx~64 out=32: in=92 out=32 decode=13.10 tok/s  e2e=12.02 tok/s (warmup 3.62)  stream/usage=0.9640
+ctx~64 out=128: in=92 out=63 decode=12.86 tok/s  e2e=12.28 tok/s (warmup 5.74)  stream/usage=0.9950
+ctx~512 out=32: in=633 out=32 decode=13.20 tok/s  e2e=10.02 tok/s (warmup 3.64)  stream/usage=0.9648
+ctx~512 out=128: in=633 out=82 decode=12.79 tok/s  e2e=11.43 tok/s (warmup 6.36)  stream/usage=0.9953
+ctx~1024 out=32: in=1259 out=32 decode=13.18 tok/s  e2e=7.92 tok/s (warmup 3.56)  stream/usage=0.9646
+ctx~1024 out=128: in=1259 out=83 decode=12.77 tok/s  e2e=10.23 tok/s (warmup 6.51)  stream/usage=0.9954
+ctx~2048 out=32: in=2501 out=32 decode=13.13 tok/s  e2e=5.51 tok/s (warmup 3.56)  stream/usage=0.9644
+ctx~2048 out=128: in=2501 out=84 decode=12.72 tok/s  e2e=8.44 tok/s (warmup 6.46)  stream/usage=0.9950
+ctx~3072 out=32: in=3746 out=32 decode=13.06 tok/s  e2e=4.11 tok/s (warmup 3.42)  stream/usage=0.9646
+ctx~3072 out=128: in=3746 out=84 decode=12.66 tok/s  e2e=7.01 tok/s (warmup 6.46)  stream/usage=0.9955
+ctx~3800 out=32: FAILED HTTP Error 500: Internal Server Error {"detail":"[chatcmpl-jax-1788194480652] Prompt of 4630 tokens leaves no room within max_model_len=4096"}
+ctx~3800 out=128: FAILED HTTP Error 500: Internal Server Error {"detail":"[chatcmpl-jax-1788194480745] Prompt of 4630 tokens leaves no room within max_model_len=4096"}
+
+{
+  "cells_ok": 10,
+  "cells_total": 12,
+  "decode_source": "both",
+  "decode_tps_min": 12.658,
+  "decode_tps_max": 13.198,
+  "decode_tps_median": 12.962,
+  "degenerate_responses": 0.0,
+  "stream_over_usage_median": 0.9799
+}

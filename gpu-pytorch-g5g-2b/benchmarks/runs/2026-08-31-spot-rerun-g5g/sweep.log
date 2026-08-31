@@ -1,0 +1,22 @@
+health: {"status": "ok", "model": "google/gemma-4-E2B-it", "warm": true, "seq": 4096, "build_id": "060a572aeb55", "rig": "gpu-pytorch-g5g-2b", "compute_dtype": "float16", "compute_capability": "7.5", "pre_ampere": true, "weight_bytes": 10208595008}
+ctx~64 out=32: in=92 out=32 decode=10.67 tok/s  e2e=10.14 tok/s (warmup 10.64)
+ctx~64 out=128: in=92 out=78 decode=10.69 tok/s  e2e=10.47 tok/s (warmup 10.72)
+ctx~512 out=32: in=633 out=32 decode=11.33 tok/s  e2e=10.06 tok/s (warmup 11.24)
+ctx~512 out=128: in=633 out=87 decode=10.99 tok/s  e2e=10.52 tok/s (warmup 11.25)
+ctx~1024 out=32: in=1259 out=32 decode=11.09 tok/s  e2e=8.96 tok/s (warmup 10.85)
+ctx~1024 out=128: in=1259 out=87 decode=11.05 tok/s  e2e=10.15 tok/s (warmup 11.19)
+ctx~2048 out=32: in=2501 out=32 decode=10.97 tok/s  e2e=7.34 tok/s (warmup 10.82)
+ctx~2048 out=128: in=2501 out=89 decode=11.17 tok/s  e2e=9.46 tok/s (warmup 11.13)
+ctx~3072 out=32: in=3746 out=32 decode=11.20 tok/s  e2e=6.00 tok/s (warmup 11.20)
+ctx~3072 out=128: in=3746 out=89 decode=10.95 tok/s  e2e=8.39 tok/s (warmup 11.16)
+ctx~3800 out=32: FAILED HTTP Error 400: Bad Request {"detail":"prompt is 4630 tokens and the context bound is 4096, leaving no room to decode. Start the server with a larger --seq."}
+ctx~3800 out=128: FAILED HTTP Error 400: Bad Request {"detail":"prompt is 4630 tokens and the context bound is 4096, leaving no room to decode. Start the server with a larger --seq."}
+
+{
+  "cells_ok": 10,
+  "cells_total": 12,
+  "decode_tps_min": 10.669,
+  "decode_tps_max": 11.327,
+  "decode_tps_median": 11.021,
+  "degenerate_responses": 0.0
+}
