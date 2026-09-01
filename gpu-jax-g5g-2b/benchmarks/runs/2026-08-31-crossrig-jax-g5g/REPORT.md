@@ -78,3 +78,31 @@ The compile does not disappear on a warm redeploy either.
 **Real revision cycle: 74.1 + 9.2 = 83 s**, against PyTorch's 25 s on the same mechanism.
 Full three-runtime table and method in
 `gpu-pytorch-g5g-2b/benchmarks/runs/2026-08-31-crossrig-torch-g5g/REPORT.md`.
+
+## Prefill: this rig is 2.4x slower than the PyTorch sibling
+
+**The one prefill result that survived the cross-rig run**, and it is about this rig.
+
+| | TTFT slope | TTFT at 92 tok | at 3,746 tok | growth |
+| --- | ---: | ---: | ---: | ---: |
+| **JAX (this rig)** | **1.403 ms/token** | 225 ms | **5,352 ms** | 23.8x |
+| PyTorch sibling | 0.595 ms/token | 164 ms | 2,339 ms | 14.3x |
+
+Consistent across all five shared context lengths, and **the comparison is fair**: neither
+engine has a prefix cache, both saw identical prompts, both ran the same harness on the same
+instance shape in the same AZ on the same day.
+
+**Do not compare either against the vLLM leg's TTFT.** That rig ships
+`enable_prefix_caching=True` and answered 94.7% of its requests from cache
+(97,440 hits / 102,898 queries), because `sweep.py` reused one prompt per cell across the
+warm-up and all repeats. Its apparent 0.025 ms/token is a cache-hit workload, not prefill.
+`sweep.py --prompt-mode` now defaults to `unique` so this cannot recur; every number in this
+run was taken under the old `fixed` behaviour.
+
+**5.35 s to first token at 3,746 input tokens is this rig's weakest measured result** — worse
+relative to the sibling than its decode advantage (1.24x in this rig's favour) is good. On any
+interactive workload with real context, prefill dominates the user-visible latency and this is
+where the JAX port loses.
+
+Note the separate readiness cost that compounds it: **22.9 s of XLA compile on the first
+request after a cold start, 9.2 s after a warm redeploy** (see the boot section above).
