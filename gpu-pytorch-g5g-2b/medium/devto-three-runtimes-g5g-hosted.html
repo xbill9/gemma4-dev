@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Three Gemma 4 Deployments on One T4G for Under $3: What the Runtime Changes, and What It Doesn't</title>
+  <meta name="description" content="vLLM, JAX and PyTorch serving the same Gemma 4 E2B checkpoint on the same AWS G5g GPU, on one harness and one statistic. The decode ranking reverses on boot time. Nineteen instances, four and a half instance-hours, under $3 - which is what let five wrong claims get caught." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<header id="title-block-header" hidden>
+<h1 class="title">Three Gemma 4 Deployments on One T4G for Under $3:
+What the Runtime Changes, and What It Doesn't</h1>
+</header>
+<p>This article provides a step by step comparison of three Gemma 4
+deployments on a single AWS hosted GPU enabled system. A suite of Python
+MCP tools is built to simplify management of each deployment, and one
+benchmark harness is shared across all three so that the runtime is the
+only variable.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p>The whole exercise cost under three dollars, and that is the part
+worth keeping. Nineteen instances and about four and a half
+instance-hours bought three serving sweeps, nine timed boots and a
+handful of A/B restarts. It also bought five wrong claims, each caught
+by measuring instead of reasoning. On hardware where a run is expensive,
+the cheapest of those five would have shipped with a caveat
+attached.</p>
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
+<p>Three rigs in this monorepo serve <code>google/gemma-4-E2B-it</code>
+on an AWS G5g instance. One runs vLLM, one runs a pure JAX port, one
+runs PyTorch with transformers. The hardware is identical and only the
+runtime slot moves, so this should be the cleanest A/B available.</p>
+<p>For months it was not, because each rig measured itself with its own
+harness and quoted its own number. Three harnesses computing three
+statistics is not a comparison.</p>
+<h4 id="prerequisites">Prerequisites</h4>
+<ul>
+<li>An AWS account with G-family quota in <code>us-east-1</code>. Each
+<code>g5g.2xlarge</code> is 8 vCPU, so 16 vCPU of spot quota runs two at
+once.</li>
+<li>A subnet, a security group opening TCP 8000, and an instance profile
+carrying <code>AmazonSSMManagedInstanceCore</code> plus read on the
+Hugging Face token secret.</li>
+<li>A Hugging Face token in Secrets Manager. It is fetched at boot into
+a root-only <code>EnvironmentFile</code> and never appears in user
+data.</li>
+<li><code>boto3</code> and the standard credential chain. No AWS CLI
+shell-outs, no inbound SSH rule, and no private key anywhere in the
+flow.</li>
+</ul>
+<h4 id="aws-ec2-g5g">AWS EC2 G5g</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-1.png"
+alt="table" /></p>
+<p>G5g is the only family AWS ships that puts an NVIDIA GPU behind a
+Graviton host, which makes it the only place to get aarch64 and compute
+capability 7.5 together.</p>
+<h4 id="gemma-4-e2b">Gemma 4 E2B</h4>
+<p><code>google/gemma-4-E2B-it</code> is the reference instruction-tuned
+release. It is 2B effective from about 5B total, and the split matters
+here: most of what is resident is a per-layer-embedding table that
+decode reads as a gather and never streams through a matmul.</p>
+<p>The dense checkpoint fits. 9.5 GiB of float16 weights go into 15,360
+MiB of device memory with room for the KV cache, which at roughly 18 KiB
+per token is tens of megabytes at this context and never the binding
+constraint.</p>
+<h4 id="the-three-runtimes">The Three Runtimes</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-2.png"
+alt="table" /></p>
+<p>Turing has no bfloat16 datapath, so all three run float16. It has no
+fp8 either, which rules out the KV-cache tricks that work on newer
+parts.</p>
+<h4 id="check-the-quotas">Check the Quotas</h4>
+<pre><code>check_g5g_quotas</code></pre>
+<pre><code>| Quota | vCPUs |
+| Running On-Demand G and VT instances (vCPU) | 16 |
+| All G and VT Spot Instance Requests (vCPU) | 16 |
+
+`g5g.2xlarge` needs 8 vCPUs.</code></pre>
+<p>That is the constraint behind every launch below: two rigs in
+parallel, and no more.</p>
+<h4 id="the-sweep-could-not-see-vllm">The Sweep Could Not See vLLM</h4>
+<p>The sweep script read its throughput figure straight out of the
+response body:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">&quot;decode_tps&quot;</span>: usage.get(<span class="st">&quot;decode_tokens_per_second&quot;</span>, <span class="fl">0.0</span>),</span></code></pre></div>
+<p><code>usage.decode_tokens_per_second</code> is a field our own
+servers invent. vLLM does not emit it, and neither does anything else,
+so the harness could not be pointed at the vLLM rig at all. The
+three-way comparison had never actually been run.</p>
+<p>Re-running a rig does not fix that. Only a common statistic does.</p>
+<h4 id="one-statistic-three-servers">One Statistic, Three Servers</h4>
+<p>Every OpenAI-compatible server streams, so the portable measurement
+is the gap between tokens on the wire.</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> sweep.py <span class="at">--help</span> <span class="kw">|</span> <span class="fu">grep</span> <span class="at">-A2</span> decode-source</span></code></pre></div>
+<pre><code>  --decode-source {auto,usage,stream,both}
+                        where the decode figure comes from; see the module
+                        docstring</code></pre>
+<p>The <code>stream</code> path uses <code>vllm bench serve</code>'s
+exact TPOT definition, <code>(latency - ttft) / (output_len - 1)</code>,
+so a number from this harness is directly comparable to that tool's
+published figures. <code>auto</code> probes the endpoint once and picks
+<code>both</code> where the server emits its own gauge,
+<code>stream</code> where it does not.</p>
+<h4 id="is-the-calibration-transferable">Is the Calibration
+Transferable?</h4>
+<p>No, and that is worth a measurement rather than an assumption.
+Running <code>both</code> measures each rig's offset between the two
+statistics.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-3.png"
+alt="table" /></p>
+<p>Two percent against 4.6 percent, on the same day and the same
+instance shape. Borrowing one rig's ratio to convert the other's number
+would inject a 2.6 percent error into a comparison whose smallest
+interesting gap is 24 percent. The cross-rig table below is therefore
+built from <code>stream</code> throughout.</p>
+<h4 id="a-gauge-rounded-to-one-decimal">A Gauge Rounded to One
+Decimal</h4>
+<p>The JAX server emitted its decode gauge with one decimal place:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ss">f&#39;tpu_jax_decode_tokens_per_second</span><span class="ch">{{</span><span class="ss">model=&quot;</span><span class="sc">{</span>MODEL_ID<span class="sc">}</span><span class="ss">&quot;</span><span class="ch">}}</span><span class="ss"> </span><span class="sc">{</span>METRICS[<span class="st">&quot;last_tokens_per_second&quot;</span>]<span class="sc">:.1f}</span><span class="ss">&#39;</span>,</span></code></pre></div>
+<p>At about 13 tok/s, one decimal is 0.78 percent resolution. Every
+sweep that rig had produced showed all three repeats of a cell as
+byte-identical: 12.8, 12.8, 12.8. That is not reproducibility, it is the
+measurement floor. The rig had been used to argue about two percent
+effects it could not resolve.</p>
+<p>Two characters fixed it. The first run afterwards reads 12.962, where
+before it would have said 13.0.</p>
+<h4 id="launch-the-instance">Launch the Instance</h4>
+<p>Capacity for the whole G5g family was exhausted across all four
+availability zones several times, so the launcher cycles them with a
+sixty second backoff.</p>
+<pre><code>[12:51:45] round 5 us-east-1c: ❌ AWS InsufficientInstanceCapacity
+[12:52:47] us-east-1a: ✅ Launching `i-02e79988a6cbeecbf` (g5g.2xlarge, spot, 1x T4G) in `us-east-1`.</code></pre>
+<p>The walkthrough from here follows the PyTorch rig on
+<code>i-02e79988a6cbeecbf</code>; the other two run the same steps
+against their own instances. All three landed in <code>us-east-1a</code>
+within hours of each other. Note that AWS names the other zones as
+available in every one of those errors — that text describes on-demand
+capacity and says nothing about spot.</p>
+<h4 id="watch-the-install">Watch the Install</h4>
+<p>Cloud-init installs the runtime and then backgrounds itself, so the
+progress tool reports cloud-init's own state as well as the install log.
+A dead bootstrap and a slow one must not render identically.</p>
+<pre><code>get_install_progress i-02e79988a6cbeecbf</code></pre>
+<pre><code>INSTALL COMPLETE
+--- cloud-init ---
+status: done
+errors: []</code></pre>
+<p>This is a wheel install, not a build. Across the three timed boots
+the install finishes a median 113.55 s after launch, against the hours
+the vLLM rig needs for a from-source build.</p>
+<h4 id="verify-the-gpu">Verify the GPU</h4>
+<p>A config flag being accepted proves nothing, so the probe runs a real
+matmul on the device.</p>
+<pre><code>verify_gpu_arch i-02e79988a6cbeecbf</code></pre>
+<pre><code>NVIDIA T4G, 7.5, 15360 MiB
+torch: 2.12.0+cu132
+arch_list: [&#39;sm_75&#39;, &#39;sm_80&#39;, &#39;sm_90&#39;, &#39;sm_100&#39;, &#39;sm_110&#39;, &#39;sm_120&#39;]
+capability: (7, 5)
+compute_dtype: float16
+fp16 matmul ok: True
+
+✅ torch reached the GPU and a real fp16 matmul executed.</code></pre>
+<p>The DLAMI's torch carries <code>sm_75</code>. Upstream PyPI aarch64
+wheels do not, so a <code>pip install torch</code> on this box would
+serve on CPU without saying so.</p>
+<h4 id="deploy-the-server">Deploy the Server</h4>
+<p>The payload is the rig's own source, shipped over SSM as a gzipped
+tarball because user data caps at 16 KiB.</p>
+<pre><code>deploy_torch_server i-02e79988a6cbeecbf</code></pre>
+<pre><code>✅ Deployed 3 files (16 KiB base64) to `i-02e79988a6cbeecbf`.
+
+Payload root: `/home/xbill/gemma4-dev/gpu-pytorch-g5g-2b`
+Build id: `060a572aeb55` — verify_model_health checks the running server reports this.</code></pre>
+<h4 id="verify-the-installation">Verify the Installation</h4>
+<p>A non-empty reply is not evidence of health. One sibling was once
+measured answering <code>': ok: ok: ok…'</code>, so the check reads the
+server's own degenerate-response counter either side of its probe, and
+compares the served build id against the local payload.</p>
+<pre><code>verify_model_health i-02e79988a6cbeecbf</code></pre>
+<pre><code>✅ health=200 tokens=5 reply=&#39;ok&#39;
+
+- Degenerate (server&#39;s own verdict on the full text): **no**
+- Build id served: `060a572aeb55`
+- Build id matches the local payload (`060a572aeb55`).</code></pre>
+<h4 id="run-the-sweep">Run the Sweep</h4>
+<p>The same command runs against all three rigs. Only the endpoint
+changes.</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> sweep.py <span class="at">--base</span> http://<span class="op">&lt;</span>ip<span class="op">&gt;</span>:8000/v1 <span class="at">--out</span> benchmarks/runs/<span class="op">&lt;</span>run<span class="op">&gt;</span> <span class="dt">\</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--contexts</span> 64,512,1024,2048,3072,3800 <span class="at">--outputs</span> 32,128 <span class="at">--repeats</span> 3 <span class="dt">\</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--decode-source</span> both</span></code></pre></div>
+<pre><code>decode-source: both -&gt; both
+ctx~512 out=32: in=633 out=32 decode=10.96 tok/s  e2e=9.83 tok/s (warmup 11.08)  stream/usage=0.9616
+ctx~2048 out=128: in=2501 out=89 decode=10.66 tok/s  e2e=9.16 tok/s (warmup 10.61)  stream/usage=0.9540
+ctx~3800 out=32: FAILED HTTP Error 400 {&quot;detail&quot;:&quot;prompt is 4630 tokens and the context
+  bound is 4096, leaving no room to decode. Start the server with a larger --seq.&quot;}</code></pre>
+<p>Cells that cannot exist on the hardware are recorded as
+<code>infeasible</code> rather than dropped. An absent cell is
+indistinguishable from an untried one, which is how a sweep overstates
+its own coverage.</p>
+<h4 id="decode-at-concurrency-one">Decode at Concurrency One</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-4.png"
+alt="table" /></p>
+<h4 id="how-close-is-that-to-the-hardware">How Close Is That to the
+Hardware?</h4>
+<p>The ceiling is arithmetic, not a measurement. E2B streams 4.514 GB of
+weights per decode step against a measured 277 GB/s, giving 16.30 ms per
+step and <strong>61.4 tok/s</strong>.</p>
+<p>The PLE table is excluded from that figure because it is a gather and
+never a matmul. Quantising it from 9.257 GB to 5.752 GB moved decode by
+0.00 tok/s across three cells, which is what confirms it never
+streams.</p>
+<p>All three runtimes sit far below the ceiling, so <strong>none of them
+is bandwidth-bound at batch one</strong>. The PyTorch profile shows why:
+about 5,650 kernel launches per step at one to three microseconds each,
+on a chip whose launch overhead is five to ten.</p>
+<h4 id="the-number-i-did-not-expect">The Number I Did Not Expect</h4>
+<p>Time to first token was the result of the run, right up until it was
+checked.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-5.png"
+alt="table" /></p>
+<p>A 30x advantage, far larger than the 3.2x on decode. It is also
+impossible. Prefill at 3,746 tokens is roughly 14 TFLOP against a T4G's
+realistic 20 to 30 TFLOP/s, which is 460 ms at best. vLLM's row says 178
+ms.</p>
+<p>It did not. vLLM ships <code>enable_prefix_caching=True</code>, and
+its own metrics say so:</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-E</span> <span class="st">&quot;^vllm:prefix_cache_(queries|hits)_total&quot;</span> metrics.prom</span></code></pre></div>
+<pre><code>vllm:prefix_cache_queries_total{engine=&quot;0&quot;} 102898.0
+vllm:prefix_cache_hits_total{engine=&quot;0&quot;}     97440.0</code></pre>
+<p><strong>A 94.7 percent hit rate.</strong> vLLM genuinely prefilled
+5.3 percent of the tokens it was sent, because the harness reused one
+prompt for a cell's warm-up and all three repeats. Neither sibling has a
+prefix cache, so both paid full prefill every time.</p>
+<p>The fix places a nonce first in the prompt, since a shared prefix is
+exactly what the cache keys on and a trailing nonce would not have
+defeated it. That property is now a unit test.</p>
+<h4 id="what-the-prefill-data-does-support">What the Prefill Data Does
+Support</h4>
+<p>Strip the contaminated column and a real result remains. Neither of
+the other two runtimes caches prefixes, and both saw identical
+prompts.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-6.png"
+alt="table" /></p>
+<p><strong>JAX prefills 2.4x slower than PyTorch</strong>, consistently
+across all five shared context lengths. On an interactive workload with
+real context that dominates user-visible latency, and it runs in the
+opposite direction to the 1.24x decode advantage the same rig
+enjoys.</p>
+<h4 id="boot-time-reverses-the-ranking">Boot Time Reverses the
+Ranking</h4>
+<p>Nine cold boots, three per runtime, plus nine warm reloads. The start
+line is the moment <code>run_instances</code> returns an id, because
+capacity wait measures AWS rather than the rig.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-7.png"
+alt="table" /></p>
+<p><strong>vLLM takes 23m 38s to serve, from a prebuilt AMI that
+downloads nothing.</strong> PyTorch installs its runtime from wheels and
+pulls the 9.54 GiB checkpoint over the network, and is still 7.3x
+faster.</p>
+<p>Boot variance is 11.5, 11.8 and 12.6 percent — too consistent across
+three different runtimes to be a property of any of them. This family's
+decode noise floor is 1.7 percent, measured by running an identical
+build on two hosts, so boot is about seven times noisier and a single
+boot measurement is close to worthless.</p>
+<h4 id="is-health-200-the-same-as-ready">Is Health 200 the Same as
+Ready?</h4>
+<p>Not on every runtime, which is why the harness records two stop
+lines.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-8.png"
+alt="table" /></p>
+<p>JAX returns health 200 and then compiles XLA per shape bucket on the
+first real request. Quoting health alone understates its time to serving
+by 22 seconds, and the cost does not vanish when warm. vLLM is the
+mirror image: slowest to boot, fastest first token, because graph
+capture is paid before the port binds.</p>
+<h4 id="what-does-a-code-change-cost">What Does a Code Change Cost?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-9.png"
+alt="table" /></p>
+<p>vLLM's 264 s warm figure is a <code>systemctl restart</code>, not a
+code change, so it flatters the comparison. <strong>vLLM wins decode
+3.2x and loses the iteration loop by 3 to 100x.</strong></p>
+<h4 id="five-theories-about-546-seconds">Five Theories About 546
+Seconds</h4>
+<p>vLLM's cold boot is dominated by weight loading: 468 to 561 seconds
+across four measurements. Explaining it took five attempts, four of
+which were wrong.</p>
+<ol type="1">
+<li><em><code>g5g.2xlarge</code> needs no swapfile and buys that time
+back.</em> The rig's own documentation. Falsified by the three-boot
+campaign at 23m 38s.</li>
+<li><em>A bigger host will not fix it.</em> Retracted the same day — no
+large host had been measured.</li>
+<li><em>A larger host would very plausibly fix it.</em> Falsified by one
+<code>g5g.4xlarge</code> boot: available RAM 11.19 to 26.49 GiB, weight
+loading 546 to 468 s, and total boot 4.7 percent lower, inside the noise
+band.</li>
+<li><em>It is the loader; vLLM's log says auto-prefetch is disabled on
+EXT4.</em> Falsified by a within-box A/B — 76.13 s as shipped against
+75.12 s with <code>--safetensors-load-strategy=prefetch</code>, which is
+1.3 percent and therefore nothing.</li>
+</ol>
+<p>What that last run did find is the useful part.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-10.png"
+alt="table" /></p>
+<p>Same volume, same filesystem, same engine, differing only in whether
+the blocks had been read once. 9.54 GiB in 468 s is about 21 MiB/s,
+which is absurd for gp3 steady state and ordinary for first-touch reads
+against a snapshot-backed volume.</p>
+<p>Theory five is EBS lazily hydrating the volume from the AMI snapshot,
+and it is written down as untested. Given the strike rate it does not
+get promoted by reasoning.</p>
+<h4 id="why-the-first-campaign-was-thrown-away">Why the First Campaign
+Was Thrown Away</h4>
+<p>The first boot campaign was discarded and re-run. Two independent
+instances had reported 214.4 s and 125.1 s, identical to the tenth. That
+is not consistency. It is a five second poll quantising two similar
+boots onto the same tick.</p>
+<p>The data was not wrong; the campaign log shows 215 s and 216 s of
+wall clock. It was unusably coarse. Health polling went to half a
+second, and the next pair of boots came in at 216.90 s and 193.86 s — an
+11.9 percent spread the old harness could not see.</p>
+<h4 id="and-priceperformance">And Price/Performance?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-11.png"
+alt="table" /></p>
+<p>The whole exercise — 19 instances, 4.06 hours of
+<code>g5g.2xlarge</code> plus 0.38 of <code>g5g.4xlarge</code>, a
+serving sweep, three cross-rig runs, nine boots and three A/B restarts —
+came to under $3. That is arithmetic rather than a bill: AWS drops
+terminated instances after an hour, so the derivation in
+<code>cost_derivation.md</code> bounds it at $1.84 all-spot and $2.68
+all-on-demand.</p>
+<p>That 26 to 46 percent premium is the entire spot versus on-demand
+decision on this hardware, which is to say there is not one. Try spot,
+fall back, keep working; the automatic fallback cost about $0.24 across
+a nine-boot campaign.</p>
+<p><strong>Cheap hardware is what made the method possible, not merely
+affordable.</strong> Discarding a completed campaign over a
+poll-interval bug cost twenty minutes and pennies. Where a run is
+expensive, the same discovery argues for shipping the numbers with a
+caveat instead.</p>
+<h4 id="aws-services-used">AWS Services Used</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/medium/img/devto-three-runtimes-g5g-table-12.png"
+alt="table" /></p>
+<h4 id="clean-up">Clean Up</h4>
+<p>Every instance is terminated as soon as its artifacts are captured.
+There is no built image to lose, only a pip install and a model
+cache.</p>
+<pre><code>terminate_g5g_instance i-02e79988a6cbeecbf</code></pre>
+<pre><code>🗑️ Terminating `i-02e79988a6cbeecbf`. Relaunch costs a pip install, not a build.</code></pre>
+<div class="sourceCode" id="cb22"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ex">aws</span> ec2 describe-instances <span class="at">--filters</span> <span class="st">&quot;Name=instance-state-name,Values=running&quot;</span> <span class="dt">\</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--query</span> <span class="st">&#39;Reservations[].Instances[?starts_with(InstanceType,`g5g`)].InstanceId&#39;</span> <span class="dt">\</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--output</span> text <span class="kw">|</span> <span class="fu">grep</span> . <span class="kw">||</span> <span class="bu">echo</span> <span class="st">&quot;🟢 none running&quot;</span></span></code></pre></div>
+<pre><code>🟢 none running</code></pre>
+<h4 id="what-this-does-not-cover">What This Does Not Cover</h4>
+<p>Everything above is concurrency one, which makes it a latency
+comparison rather than a serving one. Continuous batching is vLLM's
+whole value proposition and it is untested here.</p>
+<p>Only vLLM can serve concurrently at all today. The PyTorch server
+holds an <code>asyncio.Lock</code> with the comment <em>"one GPU, one
+process -&gt; serialize requests"</em>, and the JAX rig has no batching
+machinery whatever. The engine-level batch sweep suggests what is on the
+table — batch eight reaches 84.16 tok/s for an extra 0.258 GB, with
+per-step time growing two percent across an eight-fold batch — but that
+number never leaves the engine.</p>
+<p>Three further gaps: the JAX leg ran its shipped quantised
+configuration against two dense runtimes; no output-quality axis was
+measured at all, on a comparison where one runtime uses a deliberately
+lossy LM head; and every TTFT figure predates the prompt-uniqueness fix,
+so only the JAX versus PyTorch half of that table is sound.</p>
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to compare three inference runtimes on
+identical silicon without the harness being a variable. The key to the
+solution was a single client-side statistic that every OpenAI-compatible
+server can produce. The measured results were:</p>
+<ul>
+<li>Decode at concurrency one: vLLM 32.53, JAX 12.69, PyTorch 10.24
+tok/s — 53, 21 and 17 percent of a 61.4 tok/s bandwidth ceiling, so none
+is bandwidth-bound.</li>
+<li>The ranking reverses on lifecycle. Cold boot 195.2 s for PyTorch
+against 1417.8 s for vLLM; a code change costs 25 s against a
+from-source rebuild.</li>
+<li>JAX prefills 2.4x slower than PyTorch, 1.403 against 0.595
+ms/token.</li>
+<li>A 94.7 percent prefix-cache hit rate turned a 29x TTFT result into a
+harness artifact.</li>
+<li>Calibration offsets are per-rig, 0.9799 and 0.9543, and are not
+transferable.</li>
+<li>Boot variance is about 12 percent on this platform regardless of
+runtime.</li>
+<li>The whole exercise cost under $3 in total. That is what made
+discarding a finished campaign over a poll-interval bug a twenty minute
+decision rather than an argument.</li>
+</ul>
+<p>Scope: the decode and boot numbers are one <code>g5g.2xlarge</code>
+per runtime in <code>us-east-1a</code> on 2026-08-31, three repeats per
+cell and three repeats per boot, mixed spot and on-demand with the
+market recorded per run. Three things differed between the legs and are
+named where they matter: vLLM ran <code>max_model_len</code> 16384
+against 4096 for the other two; the JAX leg ran its shipped quantised
+configuration against two dense runtimes; and vLLM booted from a
+prebuilt AMI carrying its model cache while the other two installed from
+wheels and downloaded the checkpoint, which is the point of the boot
+comparison rather than a flaw in it. Two runs sit outside that envelope
+and say so in the text: the RAM test was a single
+<code>g5g.4xlarge</code>, and the prefetch A/B ran 2026-09-01 on
+on-demand after a spot reclamation killed the first attempt. Decode is
+unaffected by the prefix-cache issue, which changes prefill only.</p>
+<p>The strategy for using MCP for multi-runtime comparison was validated
+with a incremental step by step approach.</p>
+</body>
+</html>
