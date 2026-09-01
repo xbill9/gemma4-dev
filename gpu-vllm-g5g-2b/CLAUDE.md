@@ -183,12 +183,22 @@ wrong — the real figure is ~6x the claim.**
 | warm `systemctl restart` → health | 264.3 s |
 | first chat completion, cold / warm | 0.5 s / 0.2 s |
 
-**The cost is weight loading, and a bigger host will not fix it the way the old text implies.**
-`weight_utils` reports a 9.54 GiB checkpoint against **11.19 GiB of available RAM**, so the load
-thrashes page cache even with no swapfile in play — 546 s to place weights that are already on
-local disk. The PyTorch sibling hit the identical wall on 2026-08-29 and fixed it with
-`device_map={"": 0}`, streaming shard by shard to the GPU: host peak 10.52 GB, zero swap.
-**vLLM has no equivalent knob here**, so on a 16 GiB host this is the floor.
+**The cost is weight loading, and it is a RAM-pressure effect.** `weight_utils` reports a
+9.54 GiB checkpoint against **11.19 GiB of available RAM**, so the load thrashes page cache even
+with no swapfile in play — 546 s to place weights that are already on local disk. The PyTorch
+sibling hit the identical wall on 2026-08-29 and fixed it with `device_map={"": 0}`, streaming
+shard by shard to the GPU: host peak 10.52 GB, zero swap. **vLLM has no equivalent knob here**,
+so on a 16 GiB host this is the floor.
+
+**A larger host was NOT tested and would very plausibly fix it.** All three timed boots were
+`g5g.2xlarge` (16 GiB). On a `g5g.4xlarge` (32 GiB) the 9.54 GiB checkpoint fits page cache
+comfortably, and the superseded text's **129 s on a 32 GiB host** is consistent with exactly
+that. So read "23m 38s" as *the cost on a 16 GiB host*, not as a property of the AMI.
+**Measuring one 32 GiB boot is the cheapest open experiment in this rig.**
+
+> An earlier revision of this section asserted "a bigger host will not fix it" — that was
+> unsupported by any measurement here and is retracted (2026-08-31). It was written in the same
+> pass that corrected an unsupported claim, which is the failure mode to watch for.
 
 **For scale: the PyTorch sibling reaches a serving endpoint in 195 s median while installing
 from wheels AND downloading 9.5 GB over the network.** This rig, from an image that downloads
