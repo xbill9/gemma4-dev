@@ -1,5 +1,5 @@
 ---
-title: "Comparing Three Gemma 4 Deployments on One NVIDIA T4G: what the runtime changes and what it doesn't"
+title: "Three Gemma 4 Deployments on One T4G: What the Runtime Changes, and What It Doesn't"
 published: false
 description: "vLLM, JAX and PyTorch serving the same Gemma 4 E2B checkpoint on the same AWS G5g GPU, driven by one harness and one statistic. The decode ranking reverses on boot time, and five claims were falsified on the way."
 tags: aws, machinelearning, benchmarking, python
@@ -13,7 +13,7 @@ only variable.
 
 https://github.com/xbill9/gemma4-dev
 
-## Where Do I Start?
+#### What is this project trying to Do?
 
 Three rigs in this monorepo serve `google/gemma-4-E2B-it` on an AWS G5g instance. One runs
 vLLM, one runs a pure JAX port, one runs PyTorch with transformers. The hardware is identical
@@ -22,7 +22,7 @@ and only the runtime slot moves, so this should be the cleanest A/B available.
 For months it was not, because each rig measured itself with its own harness and quoted its
 own number. Three harnesses computing three statistics is not a comparison.
 
-## At This Point You Should Have...
+#### Prerequisites
 
 - An AWS account with G-family quota in `us-east-1`. Each `g5g.2xlarge` is 8 vCPU, so 16 vCPU
   of spot quota runs two at once.
@@ -33,7 +33,7 @@ own number. Three harnesses computing three statistics is not a comparison.
 - `boto3` and the standard credential chain. No AWS CLI shell-outs, no inbound SSH rule, and
   no private key anywhere in the flow.
 
-## The Hardware Under All Three
+#### AWS EC2 G5g
 
 | | |
 |---|---|
@@ -46,7 +46,45 @@ own number. Three harnesses computing three statistics is not a comparison.
 G5g is the only family AWS ships that puts an NVIDIA GPU behind a Graviton host, which makes
 it the only place to get aarch64 and compute capability 7.5 together.
 
-## Why the Comparison Did Not Exist
+#### Gemma 4 E2B
+
+`google/gemma-4-E2B-it` is the reference instruction-tuned release. It is 2B effective from
+about 5B total, and the split matters here: most of what is resident is a per-layer-embedding
+table that decode reads as a gather and never streams through a matmul.
+
+The dense checkpoint fits. 9.5 GiB of float16 weights go into 15,360 MiB of device memory with
+room for the KV cache, which at roughly 18 KiB per token is tens of megabytes at this context
+and never the binding constraint.
+
+#### The Three Runtimes
+
+| runtime | engine | how it serves |
+|---|---|---|
+| vLLM | v0.27.2rc0, built from source for `sm_75` | continuous batching, paged KV, prefix caching |
+| JAX | this project's own port | hand-written KV ring with a bucket ladder |
+| PyTorch | `AutoModelForCausalLM` + transformers | `past_key_values`, one request at a time |
+
+Turing has no bfloat16 datapath, so all three run float16. It has no fp8 either, which rules
+out the KV-cache tricks that work on newer parts.
+
+#### Check the Quotas
+
+```
+check_g5g_quotas
+```
+
+```
+| Quota | vCPUs |
+| Running On-Demand G and VT instances (vCPU) | 16 |
+| All G and VT Spot Instance Requests (vCPU) | 16 |
+
+`g5g.2xlarge` needs 8 vCPUs.
+```
+
+Sixteen vCPUs of spot is two `g5g.2xlarge` at once, which is what lets two rigs run in
+parallel when capacity allows.
+
+#### The Sweep Could Not See vLLM
 
 The sweep script read its throughput figure straight out of the response body:
 
@@ -60,7 +98,7 @@ three-way comparison had never actually been run.
 
 Re-running a rig does not fix that. Only a common statistic does.
 
-## One Harness, One Statistic
+#### One Statistic, Three Servers
 
 Every OpenAI-compatible server streams, so the portable measurement is the gap between tokens
 on the wire.
@@ -80,7 +118,7 @@ The `stream` path uses `vllm bench serve`'s exact TPOT definition,
 that tool's published figures. `auto` probes the endpoint once and picks `both` where the
 server emits its own gauge, `stream` where it does not.
 
-## Is the Calibration Transferable?
+#### Is the Calibration Transferable?
 
 No, and that is worth a measurement rather than an assumption. Running `both` measures each
 rig's offset between the two statistics.
@@ -95,7 +133,7 @@ rig's ratio to convert the other's number would inject a 2.6 percent error into 
 whose smallest interesting gap is 24 percent. The cross-rig table below is therefore built
 from `stream` throughout.
 
-## A Gauge That Could Not See Its Own Experiments
+#### A Gauge Rounded to One Decimal
 
 The JAX server emitted its decode gauge with one decimal place:
 
@@ -104,14 +142,14 @@ f'tpu_jax_decode_tokens_per_second{{model="{MODEL_ID}"}} {METRICS["last_tokens_p
 ```
 
 At about 13 tok/s, one decimal is 0.78 percent resolution. Every sweep that rig had produced
-showed all three repeats of a cell as byte-identical — 12.8, 12.8, 12.8 — which reads as
-perfect reproducibility and is really the measurement floor. That rig had been used to argue
-about two percent effects it could not see.
+showed all three repeats of a cell as byte-identical: 12.8, 12.8, 12.8. That is not
+reproducibility, it is the measurement floor. The rig had been used to argue about two percent
+effects it could not resolve.
 
 Two characters fixed it. The first run afterwards reads 12.962, where before it would have
 said 13.0.
 
-## Launching the First Rig
+#### Launch the Instance
 
 Capacity for the whole G5g family was exhausted across all four availability zones several
 times, so the launcher cycles them with a sixty second backoff.
@@ -125,7 +163,27 @@ All three rigs landed in `us-east-1a` within hours of each other. Note that AWS 
 other zones as available in every one of those errors — that text describes on-demand capacity
 and says nothing about spot.
 
-## Does Torch Actually Have Kernels for This GPU?
+#### Watch the Install
+
+Cloud-init installs the runtime and then backgrounds itself, so the progress tool reports
+cloud-init's own state as well as the install log. A dead bootstrap and a slow one must not
+render identically.
+
+```
+get_install_progress i-02e79988a6cbeecbf
+```
+
+```
+INSTALL COMPLETE
+--- cloud-init ---
+status: done
+errors: []
+```
+
+This is a wheel install, not a build: about 95 seconds, against the hours the vLLM rig needs
+for a from-source build.
+
+#### Verify the GPU
 
 A config flag being accepted proves nothing, so the probe runs a real matmul on the device.
 
@@ -147,7 +205,7 @@ fp16 matmul ok: True
 The DLAMI's torch carries `sm_75`. Upstream PyPI aarch64 wheels do not, so a `pip install
 torch` on this box would serve on CPU without saying so.
 
-## Deploying the Serving Code
+#### Deploy the Server
 
 The payload is the rig's own source, shipped over SSM as a gzipped tarball because user data
 caps at 16 KiB.
@@ -163,7 +221,7 @@ Payload root: `/home/xbill/gemma4-dev/gpu-pytorch-g5g-2b`
 Build id: `060a572aeb55` — verify_model_health checks the running server reports this.
 ```
 
-## Validating the Endpoint
+#### Verify the Installation
 
 A non-empty reply is not evidence of health. One sibling was once measured answering
 `': ok: ok: ok…'`, so the check reads the server's own degenerate-response counter either side
@@ -181,7 +239,7 @@ verify_model_health i-02e79988a6cbeecbf
 - Build id matches the local payload (`060a572aeb55`).
 ```
 
-## Running the Benchmark Sweep
+#### Run the Sweep
 
 The same command runs against all three rigs. Only the endpoint changes.
 
@@ -203,7 +261,7 @@ Cells that cannot exist on the hardware are recorded as `infeasible` rather than
 absent cell is indistinguishable from an untried one, which is how a sweep overstates its own
 coverage.
 
-## Decode at Concurrency One
+#### Decode at Concurrency One
 
 | | runtime | decode tok/s | % of ceiling | vs PyTorch | cells |
 |---|---|---:|---:|---:|---:|
@@ -211,7 +269,7 @@ coverage.
 | 🥈 | JAX | 12.69 | 20.7% | 1.24x | 10/12 |
 | 🥉 | PyTorch + transformers | 10.24 | 16.7% | 1.00x | 10/12 |
 
-## How Close Is That to the Hardware?
+#### How Close Is That to the Hardware?
 
 The ceiling is arithmetic, not a measurement. E2B streams 4.514 GB of weights per decode step
 against a measured 277 GB/s, giving 16.30 ms per step and **61.4 tok/s**.
@@ -224,9 +282,9 @@ All three runtimes sit far below the ceiling, so **none of them is bandwidth-bou
 one**. The PyTorch profile shows why: about 5,650 kernel launches per step at one to three
 microseconds each, on a chip whose launch overhead is five to ten.
 
-## The Number That Was Almost a Headline
+#### The Number I Did Not Expect
 
-Time to first token looked like the result of the run.
+Time to first token was the result of the run, right up until it was checked.
 
 | input tok | vLLM | JAX | PyTorch |
 |---:|---:|---:|---:|
@@ -256,7 +314,7 @@ sibling has a prefix cache, so both paid full prefill every time.
 The fix places a nonce first in the prompt, since a shared prefix is exactly what the cache
 keys on and a trailing nonce would not have defeated it. That property is now a unit test.
 
-## What the Prefill Data Does Support
+#### What the Prefill Data Does Support
 
 Strip the contaminated column and a real result remains. Neither of the other two runtimes
 caches prefixes, and both saw identical prompts.
@@ -270,7 +328,7 @@ caches prefixes, and both saw identical prompts.
 lengths. On an interactive workload with real context that dominates user-visible latency, and
 it runs in the opposite direction to the 1.24x decode advantage the same rig enjoys.
 
-## Boot Time Reverses the Ranking
+#### Boot Time Reverses the Ranking
 
 Nine cold boots, three per runtime, plus nine warm reloads. The start line is the moment
 `run_instances` returns an id, because capacity wait measures AWS rather than the rig.
@@ -289,7 +347,7 @@ Boot variance is 11.5, 11.8 and 12.6 percent — too consistent across three dif
 to be a property of any of them. That is roughly six times the decode noise floor, which makes
 a single boot measurement nearly worthless.
 
-## Is Health 200 the Same as Ready to Serve?
+#### Is Health 200 the Same as Ready?
 
 Not on every runtime, which is why the harness records two stop lines.
 
@@ -304,7 +362,7 @@ Quoting health alone understates its time to serving by 22 seconds, and the cost
 vanish when warm. vLLM is the mirror image: slowest to boot, fastest first token, because
 graph capture is paid before the port binds.
 
-## What Does a Code Change Cost?
+#### What Does a Code Change Cost?
 
 | runtime | to change serving code |
 |---|---|
@@ -315,7 +373,7 @@ graph capture is paid before the port binds.
 vLLM's 264 s warm figure is a `systemctl restart`, not a code change, so it flatters the
 comparison. **vLLM wins decode 3.2x and loses the iteration loop by 3 to 100x.**
 
-## Five Theories About 546 Seconds
+#### Five Theories About 546 Seconds
 
 vLLM's cold boot is dominated by weight loading: 468 to 561 seconds across four measurements.
 Explaining it took five attempts, four of which were wrong.
@@ -344,17 +402,17 @@ first-touch reads against a snapshot-backed volume.
 Theory five is EBS lazily hydrating the volume from the AMI snapshot, and it is written down
 as untested. Given the strike rate it does not get promoted by reasoning.
 
-## A Measurement Floor That Looked Like Reproducibility
+#### Why the First Campaign Was Thrown Away
 
 The first boot campaign was discarded and re-run. Two independent instances had reported
-214.4 s and 125.1 s, identical to the tenth, which reads as extraordinary consistency and is
-really a five second poll quantising two similar boots onto the same tick.
+214.4 s and 125.1 s, identical to the tenth. That is not consistency. It is a five second
+poll quantising two similar boots onto the same tick.
 
 The data was not wrong; the campaign log shows 215 s and 216 s of wall clock. It was unusably
 coarse. Health polling went to half a second, and the next pair of boots came in at 216.90 s
 and 193.86 s — an 11.9 percent spread the old harness could not see.
 
-## And Price/Performance?
+#### And Price/Performance?
 
 | | $/hr |
 |---|---:|
@@ -372,7 +430,17 @@ cost about $0.24 across a nine-boot campaign.
 completed campaign over a poll-interval bug cost twenty minutes and pennies. Where a run is
 expensive, the same discovery argues for shipping the numbers with a caveat instead.
 
-## Tearing It Down
+#### AWS Services Used
+
+| service | what it does here |
+|---|---|
+| EC2 | the `g5g.2xlarge` instances, spot and on-demand |
+| Systems Manager | every remote command; there is no inbound SSH rule and no private key |
+| Secrets Manager | the Hugging Face token, fetched at boot into a root-only `EnvironmentFile` |
+| IAM | one instance profile, `AmazonSSMManagedInstanceCore` plus read on that one secret |
+| EBS | gp3 root volumes, and the AMI snapshot behind the vLLM boot mystery |
+
+#### Clean Up
 
 Every instance is terminated as soon as its artifacts are captured. There is no built image to
 lose, only a pip install and a model cache.
@@ -394,7 +462,7 @@ aws ec2 describe-instances --filters "Name=instance-state-name,Values=running" \
 🟢 no g5g instances running
 ```
 
-## What This Does Not Cover
+#### What This Does Not Cover
 
 Everything above is concurrency one, which makes it a latency comparison rather than a serving
 one. Continuous batching is vLLM's whole value proposition and it is untested here.
@@ -410,7 +478,7 @@ runtimes; no output-quality axis was measured at all, on a comparison where one 
 deliberately lossy LM head; and every TTFT figure predates the prompt-uniqueness fix, so only
 the JAX versus PyTorch half of that table is sound.
 
-## The Short Version
+#### Summary
 
 The goal of this article was to compare three inference runtimes on identical silicon without
 the harness being a variable. The key to the solution was a single client-side statistic that
