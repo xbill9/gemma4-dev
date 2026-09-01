@@ -17,7 +17,7 @@ https://github.com/xbill9/gemma4-dev
 | | |
 |---|---|
 | Model | `google/gemma-4-E2B-it` |
-| Hardware | `g5g.2xlarge` — Graviton2 + 1x NVIDIA T4G (SM **7.5**, 15,360 MiB) |
+| Hardware | `g5g.2xlarge` — Graviton2 + 1x NVIDIA T4G (SM **7.5**, 15,360 MiB per `nvidia-smi`; AWS lists 16,384 nominal) |
 | Runtimes | vLLM v0.27.2rc0 · JAX · PyTorch + transformers (torch 2.12.0+cu132) |
 | Method | one harness, one statistic, same AZ, same day, 3 repeats per cell |
 | Result | decode **32.53 / 12.69 / 10.24** tok/s · cold boot **1417.8 / 242.2 / 195.2** s |
@@ -322,11 +322,16 @@ OpenAI-compatible server can produce. The measured results were:
 - **Calibration offsets are per-rig** — 0.9799 and 0.9543 — and are not transferable.
 - **Boot variance is ~12%** on this platform regardless of runtime.
 
-Scope: one `g5g.2xlarge` per runtime in `us-east-1a` on 2026-08-31, three repeats per cell and
-three repeats per boot, mixed spot and on-demand with the market recorded per run. The vLLM leg
-ran `max_model_len` 16384 against 4096 for the other two, and its quantisation configuration
-differed from JAX's; both are named where they matter. Decode is unaffected by the prefix-cache
-issue, which changes prefill only.
+Scope: the decode and boot numbers are one `g5g.2xlarge` per runtime in `us-east-1a` on
+2026-08-31 — three repeats per cell, three repeats per boot, mixed spot and on-demand with the
+market recorded per run. Three things differed between the legs and are named where they
+matter: the vLLM leg ran `max_model_len` 16384 against 4096 for the other two; the JAX leg ran
+its shipped quantised configuration against two dense runtimes; and vLLM booted from a prebuilt
+AMI carrying its model cache while the other two installed from wheels and downloaded the
+checkpoint, which is the whole point of the boot comparison rather than a flaw in it. Two runs
+sit outside that envelope and say so in the text: the RAM test was a single `g5g.4xlarge`, and
+the prefetch A/B ran 2026-09-01 on on-demand after a spot reclamation killed the first attempt.
+Decode is unaffected by the prefix-cache issue, which changes prefill only.
 
 The strategy for using MCP for multi-runtime comparison was validated with a incremental step
 by step approach.

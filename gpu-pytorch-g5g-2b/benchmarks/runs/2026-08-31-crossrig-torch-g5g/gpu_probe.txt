@@ -1,0 +1,24 @@
+# verify_gpu_arch output — the citation for this run's identity claims
+#
+# Captured 2026-08-31 from the gpu-pytorch-g5g-2b MCP server against
+# i-0a3295d189ba6fc28 (g5g.2xlarge spot, us-east-1a, AMI ami-07a66fa2acbcfea88).
+# The cross-rig instance i-02e79988a6cbeecbf booted from the same AMI and the
+# same instance type and reported the same header lines.
+#
+# Archived verbatim because torch version, compute capability and the CUDA arch
+# list are asserted in the write-up and the instances are long gone.
+
+name, compute_cap, memory.total [MiB]
+NVIDIA T4G, 7.5, 15360 MiB
+interpreter: /opt/pytorch/bin/python
+torch: 2.12.0+cu132
+arch_list: ['sm_75', 'sm_80', 'sm_90', 'sm_100', 'sm_110', 'sm_120']
+platform: cuda
+device: NVIDIA T4G
+capability: (7, 5)
+compute_dtype: float16
+fp16 matmul ok: True
+
+# Note the 15,360 MiB: that is what nvidia-smi reports. AWS's
+# describe-instance-types gives TotalGpuMemoryInMiB 16384 for g5g.2xlarge --
+# the nominal figure. HARDWARE.md records the same split.
