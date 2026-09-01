@@ -201,17 +201,37 @@ so on a 16 GiB host this is the floor.
 **So RAM pressure is not the cause.** 9.54 GiB fits 26.49 GiB with room to spare and the load
 still took nearly eight minutes.
 
-**The real number is 9.54 GiB / 468 s = 20.9 MB/s off local disk**, far below gp3 baseline —
-neither RAM nor disk bandwidth, but the loader. vLLM names the cause in every one of these boot
-logs: *"Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS
-… start vLLM with `--safetensors-load-strategy=prefetch`"*. **That one-line change to
-`/opt/serve.sh` is the next experiment**, and it is untested.
+**It is not the loader either — `--safetensors-load-strategy=prefetch` does nothing.** Tested
+2026-09-01 as a within-box A/B (`benchmarks/runs/2026-09-01-prefetch-ab-g5g/`): weight load
+76.13 s as shipped against **75.12 s with the flag, −1.3%**. vLLM's own log suggests that flag
+in every boot; it is a dead end here.
+
+**What that run did find is a 6x cold/warm gap on identical hardware:**
+
+| | weight load | n |
+| --- | ---: | --- |
+| cold boot (fresh instance) | **468–561 s** | 4 |
+| warm restart (same box) | **32–76 s** | 3 |
+
+Same volume, same EXT4, same engine. The only difference is that the blocks had been read once.
+**Leading hypothesis: EBS is lazily hydrating the volume from the AMI snapshot** — first touch
+of each block fetches from S3. It fits everything measured: RAM does not help (not page cache),
+the loader's read strategy does not help (the bytes are not on the volume yet), successive
+restarts get faster (76 → 75 → 32, progressive hydration), and 20.9 MB/s is ordinary for
+first-touch snapshot reads while being absurd for gp3 steady state.
+
+**Untested, and it is the fourth theory about these seconds.** The test: on a fresh instance
+`dd if=/dev/nvme0n1 of=/dev/null bs=1M` before starting vLLM, and see whether weight load drops
+to ~76 s. If it does, the fix is a volume pre-warm or **EBS Fast Snapshot Restore on the AMI** —
+not a vLLM change at all.
 
 > **Three statements about these 546 seconds have now been wrong**, each written more carefully
 > than the last: "needs no swapfile and buys that time back" (falsified by the 3-boot campaign),
-> "a bigger host will not fix it" (retracted as unsupported), and "a larger host would very
-> plausibly fix it" (falsified by the run above). Do not add a fourth by reasoning about the
-> cause — the box is $0.56/hour and an answer takes 25 minutes.
+> "a bigger host will not fix it" (retracted as unsupported), "a larger host would very plausibly
+> fix it" (falsified 2026-08-31), and "it is the loader, use --safetensors-load-strategy=prefetch"
+> (falsified 2026-09-01, −1.3%). The snapshot-hydration hypothesis above is the FIFTH and is
+> explicitly untested. Do not promote it by reasoning — the box is $0.56/hour and an answer takes
+> 25 minutes.
 
 **For scale: the PyTorch sibling reaches a serving endpoint in 195 s median while installing
 from wheels AND downloading 9.5 GB over the network.** This rig, from an image that downloads
