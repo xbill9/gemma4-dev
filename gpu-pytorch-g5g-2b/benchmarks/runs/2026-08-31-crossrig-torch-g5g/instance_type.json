@@ -1,0 +1,40 @@
+{
+  "_comment": [
+    "Verbatim output of `aws ec2 describe-instance-types --region us-east-1",
+    "--instance-types g5g.2xlarge`, captured 2026-09-01.",
+    "Archived because the write-up asserts the vCPU count, host RAM, host CPU",
+    "architecture and the nominal GPU memory, and AWS is the authority for all four.",
+    "Note TotalGpuMemoryInMiB 16384 is the NOMINAL figure; nvidia-smi on the running",
+    "instance reports 15360 (see gpu_probe.txt). Both appear in the article.",
+    "Note also Manufacturer reads 'AWS', not 'Graviton2' -- the generation is not in",
+    "this API. 2.5 GHz aarch64 is consistent with Graviton2, which HARDWARE.md records."
+  ],
+  "InstanceType": "g5g.2xlarge",
+  "ProcessorInfo": {
+    "SupportedArchitectures": [
+      "arm64"
+    ],
+    "SustainedClockSpeedInGhz": 2.5,
+    "Manufacturer": "AWS"
+  },
+  "VCpuInfo": {
+    "DefaultVCpus": 8
+  },
+  "MemoryInfo": {
+    "SizeInMiB": 16384
+  },
+  "GpuInfo": {
+    "Gpus": [
+      {
+        "Name": "T4g",
+        "Manufacturer": "NVIDIA",
+        "Count": 1,
+        "MemoryInfo": {
+          "SizeInMiB": 16384
+        }
+      }
+    ],
+    "TotalGpuMemoryInMiB": 16384
+  },
+  "_summary": "g5g.2xlarge: 8 vCPU, 16 GiB host RAM, arm64 at 2.5 GHz, 1x NVIDIA T4g, 16384 MiB nominal GPU memory."
+}
