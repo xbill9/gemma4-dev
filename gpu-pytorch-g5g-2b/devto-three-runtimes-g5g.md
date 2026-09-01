@@ -1,7 +1,7 @@
 ---
-title: "Three Gemma 4 Deployments on One T4G: What the Runtime Changes, and What It Doesn't"
+title: "Three Gemma 4 Deployments on One T4G for Under $2: What the Runtime Changes, and What It Doesn't"
 published: false
-description: "vLLM, JAX and PyTorch serving the same Gemma 4 E2B checkpoint on the same AWS G5g GPU, driven by one harness and one statistic. The decode ranking reverses on boot time, and five claims were falsified on the way."
+description: "vLLM, JAX and PyTorch serving the same Gemma 4 E2B checkpoint on the same AWS G5g GPU, on one harness and one statistic. The decode ranking reverses on boot time. Fifteen instances, four instance-hours, under $2 - which is what let five wrong claims get caught."
 tags: aws, machinelearning, benchmarking, python
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/devto-cover.jpg
 ---
@@ -12,6 +12,12 @@ deployment, and one benchmark harness is shared across all three so that the run
 only variable.
 
 https://github.com/xbill9/gemma4-dev
+
+The whole exercise cost under two dollars, and that is the part worth keeping. Fifteen
+instances and about four instance-hours bought three serving sweeps, nine timed boots and a
+handful of A/B restarts. It also bought five wrong claims, each caught by measuring instead of
+reasoning. On hardware where a run is expensive, the cheapest of those five would have shipped
+with a caveat attached.
 
 #### What is this project trying to Do?
 
@@ -492,6 +498,8 @@ every OpenAI-compatible server can produce. The measured results were:
 - A 94.7 percent prefix-cache hit rate turned a 29x TTFT result into a harness artifact.
 - Calibration offsets are per-rig, 0.9799 and 0.9543, and are not transferable.
 - Boot variance is about 12 percent on this platform regardless of runtime.
+- The whole exercise cost under $2, which is what made discarding a finished campaign over a
+  poll-interval bug a twenty minute decision rather than an argument.
 
 Scope: the decode and boot numbers are one `g5g.2xlarge` per runtime in `us-east-1a` on
 2026-08-31, three repeats per cell and three repeats per boot, mixed spot and on-demand with
