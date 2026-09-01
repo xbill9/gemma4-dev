@@ -1,7 +1,7 @@
 ---
-title: "Three Gemma 4 Deployments on One T4G for Under $2: What the Runtime Changes, and What It Doesn't"
+title: "Three Gemma 4 Deployments on One T4G for Under $3: What the Runtime Changes, and What It Doesn't"
 published: false
-description: "vLLM, JAX and PyTorch serving the same Gemma 4 E2B checkpoint on the same AWS G5g GPU, on one harness and one statistic. The decode ranking reverses on boot time. Fifteen instances, four instance-hours, under $2 - which is what let five wrong claims get caught."
+description: "vLLM, JAX and PyTorch serving the same Gemma 4 E2B checkpoint on the same AWS G5g GPU, on one harness and one statistic. The decode ranking reverses on boot time. Nineteen instances, four and a half instance-hours, under $3 - which is what let five wrong claims get caught."
 tags: aws, machinelearning, benchmarking, python
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-pytorch-g5g-2b/devto-cover.jpg
 ---
@@ -13,9 +13,9 @@ only variable.
 
 https://github.com/xbill9/gemma4-dev
 
-The whole exercise cost under two dollars, and that is the part worth keeping. Fifteen
-instances and about four instance-hours bought three serving sweeps, nine timed boots and a
-handful of A/B restarts. It also bought five wrong claims, each caught by measuring instead of
+The whole exercise cost under three dollars, and that is the part worth keeping. Nineteen
+instances and about four and a half instance-hours bought three serving sweeps, nine timed
+boots and a handful of A/B restarts. It also bought five wrong claims, each caught by measuring instead of
 reasoning. On hardware where a run is expensive, the cheapest of those five would have shipped
 with a caveat attached.
 
@@ -425,8 +425,10 @@ and 193.86 s — an 11.9 percent spread the old harness could not see.
 | `g5g.2xlarge` on-demand | $0.556 |
 | spot, measured across four AZs | $0.3813 - $0.4416 |
 
-The whole exercise — roughly 15 instances, 3.5 to 4 instance-hours, a serving sweep, three
-cross-rig runs, nine boots and three A/B restarts — came to under $2.
+The whole exercise — 19 instances, 4.06 hours of `g5g.2xlarge` plus 0.38 of `g5g.4xlarge`, a
+serving sweep, three cross-rig runs, nine boots and three A/B restarts — came to under $3.
+That is arithmetic rather than a bill: AWS drops terminated instances after an hour, so the
+derivation in `cost_derivation.md` bounds it at $1.84 all-spot and $2.68 all-on-demand.
 
 That 26 to 46 percent premium is the entire spot versus on-demand decision on this hardware,
 which is to say there is not one. Try spot, fall back, keep working; the automatic fallback
@@ -498,8 +500,8 @@ every OpenAI-compatible server can produce. The measured results were:
 - A 94.7 percent prefix-cache hit rate turned a 29x TTFT result into a harness artifact.
 - Calibration offsets are per-rig, 0.9799 and 0.9543, and are not transferable.
 - Boot variance is about 12 percent on this platform regardless of runtime.
-- The whole exercise cost under $2, which is what made discarding a finished campaign over a
-  poll-interval bug a twenty minute decision rather than an argument.
+- The whole exercise cost under $3 in total. That is what made discarding a finished campaign
+  over a poll-interval bug a twenty minute decision rather than an argument.
 
 Scope: the decode and boot numbers are one `g5g.2xlarge` per runtime in `us-east-1a` on
 2026-08-31, three repeats per cell and three repeats per boot, mixed spot and on-demand with

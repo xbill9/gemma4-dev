@@ -240,6 +240,9 @@ is dominated by deterministic compile work, so it is tighter but 3x slower.
   rep 3 ran on-demand at 242.21 s, between its two spot reps at 237.66 and 265.52.
 - **g5g spot was exhausted region-wide four separate times**, 5-11 minutes each. On-demand is
   **$0.556/hr** against measured spot of $0.3813-$0.4416 — a 26-46% premium — so the fallback cost
-  ~$0.24 across the whole campaign. The entire day, ~15 instances and ~3.5-4 instance-hours, came
-  to under $2. **Cheap hardware is what made discarding a bad campaign a 20-minute decision
-  rather than an argument.**
+  ~$0.24 across the whole campaign. The entire day was **19 instances**, 4.06 hours of
+  `g5g.2xlarge` plus 0.38 of `g5g.4xlarge`, and came to **under $3** — bounded at $1.84
+  all-spot and $2.68 all-on-demand; see `cost_derivation.md`. An earlier revision said
+  "~15 instances" and "under $2"; both were estimates that the artifacts do not support.
+  **Cheap hardware is what made discarding a bad campaign a 20-minute decision rather than an
+  argument**, and that holds at either bound.
