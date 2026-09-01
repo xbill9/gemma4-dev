@@ -55,6 +55,7 @@ whenever the stream carries a usage block.
 """
 
 import argparse
+import concurrent.futures
 import itertools
 import json
 import os
@@ -220,6 +221,52 @@ def one_stream(base: str, model: str, prompt: str, max_tokens: int,
     }
 
 
+def concurrency_point(base: str, model: str, ctx: int, out_len: int,
+                      c: int, unique: bool) -> dict:
+    """Fire c requests at once and report what the SERVER sustained.
+
+    Aggregate throughput is total output tokens over the wall time of the whole
+    batch, which is `vllm bench serve`'s "Output token throughput" and not the
+    mean of the per-request rates -- those two differ whenever requests queue,
+    which above saturation is the entire point of the measurement.
+
+    Only vLLM can serve concurrently on this hardware today: the PyTorch server
+    holds one asyncio.Lock and the JAX rig has no batching at all. Both are
+    expected to hold flat while latency grows linearly, and that IS the result --
+    it prices continuous batching rather than asserting it.
+    """
+    prompts = [prompt_for(ctx, unique) for _ in range(c)]
+    t0 = time.perf_counter()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=c) as pool:
+        futures = [pool.submit(one_stream, base, model, p, out_len) for p in prompts]
+        runs = []
+        for f in futures:
+            try:
+                runs.append(f.result())
+            except Exception as exc:                      # one failure must not void the cell
+                runs.append({"error": f"{type(exc).__name__}: {exc}"})
+    wall = time.perf_counter() - t0
+    ok = [r for r in runs if "error" not in r and r.get("stream_chunks")]
+    if not ok:
+        return {"concurrency": c, "status": "failed",
+                "error": (runs[0].get("error") if runs else "no responses")[:200]}
+    tokens = sum(r["completion_tokens"] for r in ok)
+    return {
+        "concurrency": c,
+        "status": "ok",
+        "requests": len(runs),
+        "requests_ok": len(ok),
+        "output_tokens_total": tokens,
+        # the headline: what the server sustained across the whole batch
+        "output_tokens_per_second": round(tokens / wall, 3) if wall else 0.0,
+        "duration_s": round(wall, 3),
+        "ttft_ms_median": round(statistics.median(r["ttft_ms"] for r in ok), 2),
+        "ttft_ms_p99": round(sorted(r["ttft_ms"] for r in ok)[int(len(ok) * 0.99) - 1], 2),
+        "tpot_ms_median": round(statistics.median(r["tpot_ms"] for r in ok), 3),
+        "per_stream_tps_median": round(statistics.median(r["decode_tps"] for r in ok), 3),
+    }
+
+
 def probe_source(base: str, model: str) -> str:
     """Does this server emit its own decode gauge? Decides `auto`."""
     try:
@@ -277,6 +324,17 @@ def main() -> int:
     # only 5.3% of the tokens it was sent. Its TTFT read 0.025 ms/token against
     # JAX's 1.403 -- a 56x "advantage" that is mostly the harness, since neither
     # sibling has a prefix cache to hit. `fixed` reproduces that older behaviour.
+    # Everything before this flag was concurrency 1, which measures latency and
+    # not serving. Batching is vLLM's whole value proposition and was untested.
+    ap.add_argument("--concurrency", default="",
+                    help="comma-separated levels, e.g. 1,2,4,8,16,32. Runs a "
+                         "concurrency sweep at fixed shape INSTEAD of the context "
+                         "sweep; context and concurrency confound each other.")
+    ap.add_argument("--conc-input", type=int, default=512,
+                    help="input length for the concurrency sweep (default 512, "
+                         "matching vllm bench serve's --random-input-len)")
+    ap.add_argument("--conc-output", type=int, default=128,
+                    help="output length for the concurrency sweep (default 128)")
     ap.add_argument("--prompt-mode", choices=("unique", "fixed"), default="unique",
                     help="unique (default) puts a per-request nonce FIRST so a prefix "
                          "cache cannot hit; fixed reproduces pre-2026-08-31 runs")
@@ -306,6 +364,57 @@ def main() -> int:
     degen_before = gauge(metrics_before, "tpu_jax_degenerate_responses_total")
 
     unique = args.prompt_mode == "unique"
+
+    if args.concurrency:
+        levels = [int(c) for c in args.concurrency.split(",")]
+        points = []
+        # warm at the shape being measured, and never average the warm-up in
+        concurrency_point(args.base, args.model, args.conc_input,
+                          args.conc_output, 1, unique)
+        for c in levels:
+            pt = concurrency_point(args.base, args.model, args.conc_input,
+                                   args.conc_output, c, unique)
+            points.append(pt)
+            if pt["status"] == "ok":
+                print(f"c={c:<3d} {pt['output_tokens_per_second']:8.2f} tok/s aggregate  "
+                      f"TTFT {pt['ttft_ms_median']:8.1f} ms  TPOT {pt['tpot_ms_median']:6.2f} ms  "
+                      f"per-stream {pt['per_stream_tps_median']:6.2f}", flush=True)
+            else:
+                print(f"c={c:<3d} FAILED {pt.get('error','')[:110]}", flush=True)
+        try:
+            metrics = get_text(root + "/metrics")
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
+            metrics = ""
+        best = max((p for p in points if p["status"] == "ok"),
+                   key=lambda p: p["output_tokens_per_second"], default=None)
+        result = {
+            "rig": health.get("rig") or args.rig,
+            "build_id": health.get("build_id"),
+            "model": args.model,
+            "health": health,
+            "mode": "concurrency",
+            "shape": {"input": args.conc_input, "output": args.conc_output},
+            "prompt_mode": args.prompt_mode,
+            "concurrency": points,
+            "summary": {
+                "levels": levels,
+                "peak_output_tokens_per_second": best["output_tokens_per_second"] if best else 0,
+                "peak_at_concurrency": best["concurrency"] if best else None,
+                "scaling_1_to_peak": (
+                    round(best["output_tokens_per_second"]
+                          / next(p["output_tokens_per_second"] for p in points
+                                 if p["concurrency"] == 1 and p["status"] == "ok"), 3)
+                    if best and any(p["concurrency"] == 1 and p["status"] == "ok" for p in points)
+                    else None),
+            },
+        }
+        with open(os.path.join(args.out, "concurrency.json"), "w") as fh:
+            json.dump(result, fh, indent=2)
+        with open(os.path.join(args.out, "metrics.prom"), "w") as fh:
+            fh.write(metrics)
+        print("\n" + json.dumps(result["summary"], indent=2), flush=True)
+        return 0
+
     for ctx in [int(c) for c in args.contexts.split(",")]:
         for out_len in [int(o) for o in args.outputs.split(",")]:
             prompt = prompt_for(ctx, unique)

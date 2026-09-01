@@ -127,3 +127,63 @@ class GaugeParsingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConcurrencyPointTests(unittest.TestCase):
+    """The concurrency sweep is the difference between a latency benchmark and a
+    serving one, and its headline number is easy to compute wrongly."""
+
+    def _fake_stream(self, tokens, per_request_s):
+        def fake(base, model, prompt, out_len, timeout=900):
+            import time as _t
+            _t.sleep(per_request_s)
+            return {"source": "stream", "completion_tokens": tokens, "stream_chunks": tokens,
+                    "decode_tps": tokens / per_request_s, "ttft_ms": 10.0,
+                    "tpot_ms": per_request_s * 1000 / max(tokens - 1, 1),
+                    "wall_s": per_request_s, "end_to_end_tps": tokens / per_request_s,
+                    "chunks_match_usage": True, "text_head": "x"}
+        return fake
+
+    def test_aggregate_is_tokens_over_wall_not_mean_of_rates(self):
+        """Above saturation those two diverge, which is the whole point."""
+        with mock.patch.object(sweep, "one_stream", self._fake_stream(64, 0.2)):
+            pt = sweep.concurrency_point("http://x/v1", "m", 512, 64, 4, True)
+        self.assertEqual(pt["output_tokens_total"], 256)
+        # 4 requests in parallel, so wall is ~one request, not four
+        self.assertGreater(pt["output_tokens_per_second"], 256 / 0.5)
+        self.assertEqual(pt["requests_ok"], 4)
+
+    def test_one_failure_does_not_void_the_cell(self):
+        calls = {"n": 0}
+        good = self._fake_stream(32, 0.05)
+
+        def flaky(*a, **k):
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise TimeoutError("boom")
+            return good(*a, **k)
+
+        with mock.patch.object(sweep, "one_stream", flaky):
+            pt = sweep.concurrency_point("http://x/v1", "m", 512, 32, 4, True)
+        self.assertEqual(pt["status"], "ok")
+        self.assertEqual(pt["requests_ok"], 3)
+        self.assertEqual(pt["requests"], 4)
+
+    def test_all_failures_report_failed_rather_than_zero(self):
+        with mock.patch.object(sweep, "one_stream", side_effect=TimeoutError("nope")):
+            pt = sweep.concurrency_point("http://x/v1", "m", 512, 32, 2, True)
+        self.assertEqual(pt["status"], "failed")
+        self.assertIn("TimeoutError", pt["error"])
+
+    def test_each_stream_gets_its_own_prompt_in_unique_mode(self):
+        seen = []
+
+        def capture(base, model, prompt, out_len, timeout=900):
+            seen.append(prompt)
+            return {"source": "stream", "completion_tokens": 8, "stream_chunks": 8,
+                    "decode_tps": 8.0, "ttft_ms": 1.0, "tpot_ms": 1.0, "wall_s": 0.01,
+                    "end_to_end_tps": 8.0, "chunks_match_usage": True, "text_head": ""}
+
+        with mock.patch.object(sweep, "one_stream", capture):
+            sweep.concurrency_point("http://x/v1", "m", 512, 8, 4, True)
+        self.assertEqual(len(set(seen)), 4, "a shared prompt would hand vLLM a prefix-cache hit")
