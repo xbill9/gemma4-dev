@@ -55,6 +55,7 @@ whenever the stream carries a usage block.
 """
 
 import argparse
+import itertools
 import json
 import os
 import statistics
@@ -101,12 +102,19 @@ def gauge(metrics_text: str, name: str) -> float:
     return 0.0
 
 
-def prompt_for(approx_tokens: int) -> str:
+_NONCE = itertools.count(1)
+
+
+def prompt_for(approx_tokens: int, unique: bool = True) -> str:
     # ~1.3 tokens/word for this filler; overshoot then let the server report the
     # real count. The REPORTED prompt_tokens is what goes in the artifact.
     words = max(4, int(approx_tokens / 1.35))
     body = (FILLER * (words // len(FILLER.split()) + 2)).split()[:words]
-    return " ".join(body) + "\n\nSummarize the text above."
+    # A DIFFERENT prompt per request by default, and the leading position matters:
+    # a shared prefix is exactly what a prefix cache keys on, so a nonce appended
+    # at the end would not defeat it.
+    head = f"Record {next(_NONCE):06d}. " if unique else ""
+    return head + " ".join(body) + "\n\nSummarize the text above."
 
 
 def _chat_body(model: str, prompt: str, max_tokens: int, stream: bool) -> dict:
@@ -262,6 +270,16 @@ def main() -> int:
                     help="where the decode figure comes from; see the module docstring")
     ap.add_argument("--rig", default=None,
                     help="rig name for the artifact when /health does not report one")
+    # MEASURED 2026-08-31, and it invalidated a TTFT comparison before anyone
+    # published it. The sweep sent ONE prompt per cell for the warm-up and all
+    # repeats. vLLM ships `enable_prefix_caching=True`, so it answered from cache:
+    # 97,440 hits of 102,898 queries, a 94.7% hit rate, and it genuinely prefilled
+    # only 5.3% of the tokens it was sent. Its TTFT read 0.025 ms/token against
+    # JAX's 1.403 -- a 56x "advantage" that is mostly the harness, since neither
+    # sibling has a prefix cache to hit. `fixed` reproduces that older behaviour.
+    ap.add_argument("--prompt-mode", choices=("unique", "fixed"), default="unique",
+                    help="unique (default) puts a per-request nonce FIRST so a prefix "
+                         "cache cannot hit; fixed reproduces pre-2026-08-31 runs")
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)
@@ -287,15 +305,20 @@ def main() -> int:
     cells = []
     degen_before = gauge(metrics_before, "tpu_jax_degenerate_responses_total")
 
+    unique = args.prompt_mode == "unique"
     for ctx in [int(c) for c in args.contexts.split(",")]:
-        prompt = prompt_for(ctx)
         for out_len in [int(o) for o in args.outputs.split(",")]:
+            prompt = prompt_for(ctx, unique)
             label = f"ctx~{ctx} out={out_len}"
             try:
                 # Warm AT THIS SHAPE, then measure. The warm-up result is
                 # recorded but never averaged in.
-                warm = measure(args.base, args.model, prompt, out_len, source)
-                runs = [measure(args.base, args.model, prompt, out_len, source)
+                warm = measure(args.base, args.model,
+                               prompt_for(ctx, unique) if unique else prompt,
+                               out_len, source)
+                runs = [measure(args.base, args.model,
+                                prompt_for(ctx, unique) if unique else prompt,
+                                out_len, source)
                         for _ in range(args.repeats)]
             except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
                 detail = ""
@@ -314,6 +337,7 @@ def main() -> int:
                 "output_len": out_len,
                 "status": "ok",
                 "decode_source": source,
+        "prompt_mode": args.prompt_mode,
                 "completion_tokens": runs[0]["completion_tokens"],
                 "decode_tps_median": round(decode, 3),
                 "end_to_end_tps_median": round(e2e, 3),

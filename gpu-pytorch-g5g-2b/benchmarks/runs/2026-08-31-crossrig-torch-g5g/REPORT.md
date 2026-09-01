@@ -108,6 +108,63 @@ pre-2026-08-31 number; `stream` matches `vllm bench serve`'s TPOT definition exa
   launched `ami-0b44b90b3d02430ee` directly with boto3, carrying the rig's own tags.
 - All three instances terminated as soon as their artifacts were captured.
 
+## TTFT — and why the obvious reading of it is wrong
+
+The sweep recorded time-to-first-token all along. Written up 2026-08-31, and the write-up
+changed the conclusion, because **the vLLM column does not measure prefill.**
+
+| input tok | out | vLLM | JAX | PyTorch |
+| ---: | ---: | ---: | ---: | ---: |
+| 92 | 32 | 103 ms | 225 ms | 164 ms |
+| 633 | 32 | 114 ms | 767 ms | 335 ms |
+| 1,259 | 32 | 118 ms | 1,615 ms | 657 ms |
+| 2,501 | 32 | 140 ms | 3,373 ms | 1,372 ms |
+| 3,746 | 32 | 178 ms | 5,352 ms | 2,339 ms |
+| 4,630 | 32 | 214 ms | — | — |
+
+| | TTFT slope | growth over the range |
+| --- | ---: | ---: |
+| vLLM | **0.025 ms/token** | 2.1x |
+| JAX | 1.403 ms/token | 23.8x |
+| PyTorch | 0.595 ms/token | 14.3x |
+
+### The vLLM column is a 94.7% cache-hit workload, not a prefill measurement
+
+**0.025 ms/token is physically impossible and that is what gave it away.** Prefill at 4,630
+tokens is ~17 TFLOP against a T4G's realistic ~20-30 TFLOP/s, so a genuine prefill cannot finish
+in 116 ms. It did not: vLLM ships **`enable_prefix_caching=True`**, and its own metrics for this
+run report
+
+```
+vllm:prefix_cache_queries_total  102898
+vllm:prefix_cache_hits_total      97440     -> 94.7% hit rate
+```
+
+**vLLM genuinely prefilled 5.3% of the tokens it was sent.** `sweep.py` used ONE prompt per cell
+for the warm-up and all three repeats, so every repeat after the first was a cache hit. Neither
+sibling has a prefix cache, so both paid full prefill every time. **The 29x "TTFT advantage" is
+mostly the harness.**
+
+Fixed the same day: `sweep.py --prompt-mode` now defaults to `unique`, putting a per-request
+nonce **first** in the prompt — a shared prefix is exactly what the cache keys on, so a trailing
+nonce would not defeat it. `fixed` reproduces this run. **Every TTFT number above was taken under
+`fixed` and must not be quoted as a prefill comparison.**
+
+### What the data does support
+
+**JAX prefills 2.4x slower than PyTorch, and that comparison IS fair** — neither has a prefix
+cache and both saw identical prompts. 1.403 against 0.595 ms/token, consistent across all five
+shared context lengths. That is a real finding about the JAX port's prefill path and it is the
+one prefill result to take from this run.
+
+**Prefix caching is a genuine production advantage**, just not the one measured here. Where
+prompts share a prefix — a system prompt, a document, a chat history — vLLM's TTFT really does
+collapse. The claim it supports is "vLLM caches shared prefixes and the siblings do not", which
+is worth knowing and is *not* "vLLM prefills 29x faster".
+
+**Decode is unaffected.** A prefix cache changes prefill, not per-token generation, so the
+32.53 / 12.69 / 10.24 comparison stands.
+
 ## Boot and revision time — 3 repeats per rig, measured 2026-08-31
 
 **The axis that reverses the performance ranking.** Same `g5g.2xlarge`, `us-east-1a`, nine cold
@@ -157,7 +214,7 @@ binds.
 
 The 264.3 s warm figure for vLLM is a `systemctl restart`, **not a code revision** — it is the
 closest analogue available and it flatters vLLM, because a real change to that rig means rebuilding
-the image. So vLLM wins decode 3.2x and TTFT ~30x, and loses the iteration loop by 3-100x
+the image. So vLLM wins decode 3.2x and loses the iteration loop by 3-100x
 depending on what you are changing.
 
 ### Boot variance is ~12% and belongs to the platform

@@ -190,15 +190,28 @@ sibling hit the identical wall on 2026-08-29 and fixed it with `device_map={"": 
 shard by shard to the GPU: host peak 10.52 GB, zero swap. **vLLM has no equivalent knob here**,
 so on a 16 GiB host this is the floor.
 
-**A larger host was NOT tested and would very plausibly fix it.** All three timed boots were
-`g5g.2xlarge` (16 GiB). On a `g5g.4xlarge` (32 GiB) the 9.54 GiB checkpoint fits page cache
-comfortably, and the superseded text's **129 s on a 32 GiB host** is consistent with exactly
-that. So read "23m 38s" as *the cost on a 16 GiB host*, not as a property of the AMI.
-**Measuring one 32 GiB boot is the cheapest open experiment in this rig.**
+**A larger host does NOT fix it — MEASURED 2026-08-31 on `g5g.4xlarge`** (32 GiB,
+`benchmarks/runs/2026-08-31-boot-32gib-g5g/`). Available RAM went 11.19 → **26.49 GiB**, and:
 
-> An earlier revision of this section asserted "a bigger host will not fix it" — that was
-> unsupported by any measurement here and is retracted (2026-08-31). It was written in the same
-> pass that corrected an unsupported claim, which is the failure mode to watch for.
+| | 16 GiB (n=3) | 32 GiB (n=1) |
+| --- | ---: | ---: |
+| weight loading | 546.45 s | **467.97 s** (−14.4%) |
+| launch → health | 1417.8 s | **1351.0 s** (−4.7%, inside the ±12.6% band) |
+
+**So RAM pressure is not the cause.** 9.54 GiB fits 26.49 GiB with room to spare and the load
+still took nearly eight minutes.
+
+**The real number is 9.54 GiB / 468 s = 20.9 MB/s off local disk**, far below gp3 baseline —
+neither RAM nor disk bandwidth, but the loader. vLLM names the cause in every one of these boot
+logs: *"Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS
+… start vLLM with `--safetensors-load-strategy=prefetch`"*. **That one-line change to
+`/opt/serve.sh` is the next experiment**, and it is untested.
+
+> **Three statements about these 546 seconds have now been wrong**, each written more carefully
+> than the last: "needs no swapfile and buys that time back" (falsified by the 3-boot campaign),
+> "a bigger host will not fix it" (retracted as unsupported), and "a larger host would very
+> plausibly fix it" (falsified by the run above). Do not add a fourth by reasoning about the
+> cause — the box is $0.56/hour and an answer takes 25 minutes.
 
 **For scale: the PyTorch sibling reaches a serving endpoint in 195 s median while installing
 from wheels AND downloading 9.5 GB over the network.** This rig, from an image that downloads
