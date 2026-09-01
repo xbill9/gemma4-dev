@@ -1,0 +1,24 @@
+health: {"status": "ok", "model": "google/gemma-4-E2B-it", "warm": true, "seq": 4096, "build_id": "060a572aeb55", "rig": "gpu-pytorch-g5g-2b", "compute_dtype": "float16", "compute_capability": "7.5", "pre_ampere": true, "weight_bytes": 10208595008}
+decode-source: stream -> stream
+c=1       9.72 tok/s aggregate  TTFT    368.3 ms  TPOT  98.27 ms  per-stream  10.18
+c=2       9.86 tok/s aggregate  TTFT   4447.0 ms  TPOT  97.32 ms  per-stream  10.28
+c=4      10.06 tok/s aggregate  TTFT  12451.6 ms  TPOT  95.50 ms  per-stream  10.47
+c=8      10.05 tok/s aggregate  TTFT  28448.5 ms  TPOT  95.69 ms  per-stream  10.45
+c=16     10.00 tok/s aggregate  TTFT  59952.3 ms  TPOT  95.73 ms  per-stream  10.45
+c=32     10.08 tok/s aggregate  TTFT 124298.2 ms  TPOT  95.36 ms  per-stream  10.49
+
+{
+  "levels": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32
+  ],
+  "peak_output_tokens_per_second": 10.084,
+  "peak_at_concurrency": 32,
+  "scaling_1_to_peak": 1.037
+}
+
+--- stderr ---

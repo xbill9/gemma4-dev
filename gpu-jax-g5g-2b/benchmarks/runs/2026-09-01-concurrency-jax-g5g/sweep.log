@@ -1,0 +1,24 @@
+health: {"status": "ok", "backend": "jax", "device": "cuda:0", "model": "google/gemma-4-E2B-it", "build_id": "53e79b8f40f3", "precision": {"weights": "float16", "activations": "float16", "kv_cache": "float16", "kv_cache_requested": "auto", "quant_mode": "fp16", "ple_bits": 4, "int8_lm_head": true, "pre_ampere": true}}
+decode-source: stream -> stream
+c=1      11.08 tok/s aggregate  TTFT    945.2 ms  TPOT  78.26 ms  per-stream  12.78
+c=2      11.63 tok/s aggregate  TTFT   1894.4 ms  TPOT 147.51 ms  per-stream   6.78
+c=4      11.66 tok/s aggregate  TTFT   3674.9 ms  TPOT 295.11 ms  per-stream   3.39
+c=8      11.56 tok/s aggregate  TTFT   7258.2 ms  TPOT 598.54 ms  per-stream   1.67
+c=16     11.53 tok/s aggregate  TTFT  13977.9 ms  TPOT 1205.27 ms  per-stream   0.83
+c=32     11.50 tok/s aggregate  TTFT  22958.2 ms  TPOT 1714.30 ms  per-stream   0.58
+
+{
+  "levels": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32
+  ],
+  "peak_output_tokens_per_second": 11.659,
+  "peak_at_concurrency": 4,
+  "scaling_1_to_peak": 1.052
+}
+
+--- stderr ---

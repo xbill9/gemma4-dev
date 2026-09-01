@@ -1,0 +1,72 @@
+# HELP tpu_jax_precision_info Dtypes and quantisation resolved on device
+# TYPE tpu_jax_precision_info gauge
+tpu_jax_precision_info{model="google/gemma-4-E2B-it",rig="gpu-jax-g5g-2b",build_id="53e79b8f40f3",compute_dtype="float16",quant_mode="fp16",kv_cache_dtype="float16",kv_cache_requested="auto",ple_bits="4",int8_lm_head="true",pre_ampere="true"} 1
+
+# HELP tpu_jax_requests_total Total HTTP requests processed by JAX TPU server
+# TYPE tpu_jax_requests_total counter
+tpu_jax_requests_total{model="google/gemma-4-E2B-it",status="success"} 56
+tpu_jax_requests_total{model="google/gemma-4-E2B-it",status="failed"} 9
+
+# HELP tpu_jax_degenerate_responses_total Responses that collapsed to a token loop
+# TYPE tpu_jax_degenerate_responses_total counter
+tpu_jax_degenerate_responses_total{model="google/gemma-4-E2B-it"} 0
+
+# HELP tpu_jax_prompt_tokens_total Total prompt tokens processed
+# TYPE tpu_jax_prompt_tokens_total counter
+tpu_jax_prompt_tokens_total{model="google/gemma-4-E2B-it"} 35326
+
+# HELP tpu_jax_completion_tokens_total Total completion tokens generated
+# TYPE tpu_jax_completion_tokens_total counter
+tpu_jax_completion_tokens_total{model="google/gemma-4-E2B-it"} 4349
+
+# HELP tpu_jax_latency_seconds_sum Total generation latency sum
+# TYPE tpu_jax_latency_seconds_sum counter
+tpu_jax_latency_seconds_sum{model="google/gemma-4-E2B-it"} 5960.666
+
+# HELP tpu_jax_decode_tokens_per_second Decode throughput of the last request
+# TYPE tpu_jax_decode_tokens_per_second gauge
+tpu_jax_decode_tokens_per_second{model="google/gemma-4-E2B-it"} 0.5752
+
+# HELP tpu_jax_prefill_milliseconds Prefill (TTFT) of the last request
+# TYPE tpu_jax_prefill_milliseconds gauge
+tpu_jax_prefill_milliseconds{model="google/gemma-4-E2B-it"} 13762.3
+
+# HELP tpu_jax_requests_received_total Requests accepted, before success is known
+# TYPE tpu_jax_requests_received_total counter
+tpu_jax_requests_received_total{model="google/gemma-4-E2B-it"} 65
+
+# HELP tpu_jax_decode_seconds_total Cumulative decode time, excluding prefill and HTTP
+# TYPE tpu_jax_decode_seconds_total counter
+tpu_jax_decode_seconds_total{model="google/gemma-4-E2B-it"} 5366.284
+
+# HELP tpu_jax_prefill_seconds_total Cumulative prefill time
+# TYPE tpu_jax_prefill_seconds_total counter
+tpu_jax_prefill_seconds_total{model="google/gemma-4-E2B-it"} 363.100
+
+# HELP tpu_jax_cold_requests_total Requests whose compiled shape had not been seen before
+# TYPE tpu_jax_cold_requests_total counter
+tpu_jax_cold_requests_total{model="google/gemma-4-E2B-it"} 2
+
+# HELP tpu_jax_last_pad_tokens Bucket padding on the last request
+# TYPE tpu_jax_last_pad_tokens gauge
+tpu_jax_last_pad_tokens{model="google/gemma-4-E2B-it"} 126
+
+# HELP tpu_jax_max_pad_tokens Largest bucket padding seen since start
+# TYPE tpu_jax_max_pad_tokens gauge
+tpu_jax_max_pad_tokens{model="google/gemma-4-E2B-it"} 126
+
+# HELP tpu_jax_last_bucket_size Padded sequence bucket of the last request
+# TYPE tpu_jax_last_bucket_size gauge
+tpu_jax_last_bucket_size{model="google/gemma-4-E2B-it"} 768
+
+# HELP tpu_jax_weight_bytes Parameter footprint resident on device
+# TYPE tpu_jax_weight_bytes gauge
+tpu_jax_weight_bytes{model="google/gemma-4-E2B-it"} 6155450950
+
+# HELP tpu_jax_hbm_used_bytes High Bandwidth Memory used in bytes
+# TYPE tpu_jax_hbm_used_bytes gauge
+tpu_jax_hbm_used_bytes{device="cuda:0"} 6313639680
+
+# HELP tpu_jax_hbm_limit_bytes High Bandwidth Memory total limit in bytes
+# TYPE tpu_jax_hbm_limit_bytes gauge
+tpu_jax_hbm_limit_bytes{device="cuda:0"} 14073987072
