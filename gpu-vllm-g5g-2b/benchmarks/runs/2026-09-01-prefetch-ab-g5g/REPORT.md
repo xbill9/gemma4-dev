@@ -41,7 +41,7 @@ taken so far:
 - more RAM did not help (2026-08-31, 32 GiB host: 468 s) — it is not page cache;
 - the loader's read strategy did not help (this run) — the bytes are not on the volume yet;
 - restarts get progressively faster (76 → 75 → 32) — progressive hydration;
-- 9.54 GiB / 468 s = 20.9 MB/s, far below gp3 steady state but entirely ordinary for
+- 9.54 GiB / 468 s = ~21 MiB/s, far below gp3 steady state but entirely ordinary for
   first-touch snapshot reads.
 
 **This is a hypothesis, not a result.** It is the fourth explanation offered for these seconds

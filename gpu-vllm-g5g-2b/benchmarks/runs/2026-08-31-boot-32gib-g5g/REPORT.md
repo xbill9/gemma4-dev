@@ -39,7 +39,7 @@ the answer took 25 minutes.**
 ## The actual lead
 
 ```
-9.54 GiB / 467.97 s = 20.9 MB/s off LOCAL DISK
+9.54 GiB / 467.97 s = ~21 MiB/s off LOCAL DISK
 ```
 
 That is far below gp3's baseline, so this is neither RAM nor disk bandwidth — it is the

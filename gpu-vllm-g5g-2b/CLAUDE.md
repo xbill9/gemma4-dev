@@ -217,7 +217,7 @@ Same volume, same EXT4, same engine. The only difference is that the blocks had 
 **Leading hypothesis: EBS is lazily hydrating the volume from the AMI snapshot** — first touch
 of each block fetches from S3. It fits everything measured: RAM does not help (not page cache),
 the loader's read strategy does not help (the bytes are not on the volume yet), successive
-restarts get faster (76 → 75 → 32, progressive hydration), and 20.9 MB/s is ordinary for
+restarts get faster (76 → 75 → 32, progressive hydration), and ~21 MiB/s is ordinary for
 first-touch snapshot reads while being absurd for gp3 steady state.
 
 **Untested, and it is the fourth theory about these seconds.** The test: on a fresh instance

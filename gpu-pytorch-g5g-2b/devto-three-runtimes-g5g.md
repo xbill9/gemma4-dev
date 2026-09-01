@@ -47,7 +47,6 @@ own number. Three harnesses computing three statistics is not a comparison.
 | Host CPU | AWS Graviton2, aarch64 |
 | GPU | 1x NVIDIA T4G, Turing, SM 7.5 |
 | GPU memory | 15,360 MiB per `nvidia-smi`; AWS lists 16,384 nominal |
-| Model | `google/gemma-4-E2B-it` |
 
 G5g is the only family AWS ships that puts an NVIDIA GPU behind a Graviton host, which makes
 it the only place to get aarch64 and compute capability 7.5 together.
@@ -87,8 +86,7 @@ check_g5g_quotas
 `g5g.2xlarge` needs 8 vCPUs.
 ```
 
-Sixteen vCPUs of spot is two `g5g.2xlarge` at once, which is what lets two rigs run in
-parallel when capacity allows.
+That is the constraint behind every launch below: two rigs in parallel, and no more.
 
 #### The Sweep Could Not See vLLM
 
@@ -161,11 +159,13 @@ Capacity for the whole G5g family was exhausted across all four availability zon
 times, so the launcher cycles them with a sixty second backoff.
 
 ```
-[12:16:23] round 5 us-east-1c: ❌ AWS InsufficientInstanceCapacity
-[12:17:19] us-east-1a: ✅ Launching `i-0ffdb819663bacc77` (g5g.2xlarge, spot, 1x T4G) in `us-east-1`.
+[12:51:45] round 5 us-east-1c: ❌ AWS InsufficientInstanceCapacity
+[12:52:47] us-east-1a: ✅ Launching `i-02e79988a6cbeecbf` (g5g.2xlarge, spot, 1x T4G) in `us-east-1`.
 ```
 
-All three rigs landed in `us-east-1a` within hours of each other. Note that AWS names the
+The walkthrough from here follows the PyTorch rig on `i-02e79988a6cbeecbf`; the other two run
+the same steps against their own instances. All three landed in `us-east-1a` within hours of
+each other. Note that AWS names the
 other zones as available in every one of those errors — that text describes on-demand capacity
 and says nothing about spot.
 
@@ -186,8 +186,8 @@ status: done
 errors: []
 ```
 
-This is a wheel install, not a build: about 95 seconds, against the hours the vLLM rig needs
-for a from-source build.
+This is a wheel install, not a build. Across the three timed boots the install finishes a
+median 113.55 s after launch, against the hours the vLLM rig needs for a from-source build.
 
 #### Verify the GPU
 
@@ -257,10 +257,10 @@ python3 sweep.py --base http://<ip>:8000/v1 --out benchmarks/runs/<run> \
 
 ```
 decode-source: both -> both
-ctx~512 out=32: in=633 out=32 decode=11.33 tok/s  e2e=10.06 tok/s  stream/usage=0.9616
-ctx~2048 out=128: in=2501 out=89 decode=11.17 tok/s  e2e=9.46 tok/s  stream/usage=0.9540
+ctx~512 out=32: in=633 out=32 decode=10.96 tok/s  e2e=9.83 tok/s (warmup 11.08)  stream/usage=0.9616
+ctx~2048 out=128: in=2501 out=89 decode=10.66 tok/s  e2e=9.16 tok/s (warmup 10.61)  stream/usage=0.9540
 ctx~3800 out=32: FAILED HTTP Error 400 {"detail":"prompt is 4630 tokens and the context
-  bound is 4096, leaving no room to decode."}
+  bound is 4096, leaving no room to decode. Start the server with a larger --seq."}
 ```
 
 Cells that cannot exist on the hardware are recorded as `infeasible` rather than dropped. An
@@ -298,9 +298,9 @@ Time to first token was the result of the run, right up until it was checked.
 | 1,259 | 118 ms | 1,615 ms | 657 ms |
 | 3,746 | 178 ms | 5,352 ms | 2,339 ms |
 
-A 29x advantage, far larger than the 3.2x on decode. It is also impossible. Prefill at 4,630
-tokens is roughly 17 TFLOP against a T4G's realistic 20 to 30 TFLOP/s, so it cannot finish in
-116 ms.
+A 30x advantage, far larger than the 3.2x on decode. It is also impossible. Prefill at 3,746
+tokens is roughly 14 TFLOP against a T4G's realistic 20 to 30 TFLOP/s, which is 460 ms at best.
+vLLM's row says 178 ms.
 
 It did not. vLLM ships `enable_prefix_caching=True`, and its own metrics say so:
 
@@ -346,12 +346,13 @@ Nine cold boots, three per runtime, plus nine warm reloads. The start line is th
 | 🥉 | vLLM | 1417.8 s | 12.6% | 264.3 s | 5.4x |
 
 **vLLM takes 23m 38s to serve, from a prebuilt AMI that downloads nothing.** PyTorch installs
-its runtime from wheels and pulls a 9.5 GB checkpoint over the network, and is still 7.3x
+its runtime from wheels and pulls the 9.54 GiB checkpoint over the network, and is still 7.3x
 faster.
 
 Boot variance is 11.5, 11.8 and 12.6 percent — too consistent across three different runtimes
-to be a property of any of them. That is roughly six times the decode noise floor, which makes
-a single boot measurement nearly worthless.
+to be a property of any of them. This family's decode noise floor is 1.7 percent, measured by
+running an identical build on two hosts, so boot is about seven times noisier and a single boot
+measurement is close to worthless.
 
 #### Is Health 200 the Same as Ready?
 
@@ -402,7 +403,7 @@ What that last run did find is the useful part.
 | warm restart, same box | 32-76 s | 3 |
 
 Same volume, same filesystem, same engine, differing only in whether the blocks had been read
-once. 9.54 GiB in 468 s is 20.9 MB/s, which is absurd for gp3 steady state and ordinary for
+once. 9.54 GiB in 468 s is about 21 MiB/s, which is absurd for gp3 steady state and ordinary for
 first-touch reads against a snapshot-backed volume.
 
 Theory five is EBS lazily hydrating the volume from the AMI snapshot, and it is written down
@@ -463,11 +464,12 @@ terminate_g5g_instance i-02e79988a6cbeecbf
 
 ```bash
 aws ec2 describe-instances --filters "Name=instance-state-name,Values=running" \
-  --query 'Reservations[].Instances[?starts_with(InstanceType,`g5g`)].InstanceId' --output text
+  --query 'Reservations[].Instances[?starts_with(InstanceType,`g5g`)].InstanceId' \
+  --output text | grep . || echo "🟢 none running"
 ```
 
 ```
-🟢 no g5g instances running
+🟢 none running
 ```
 
 #### What This Does Not Cover
