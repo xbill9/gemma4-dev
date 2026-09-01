@@ -495,7 +495,7 @@ every OpenAI-compatible server can produce. The measured results were:
 - The ranking reverses on lifecycle. Cold boot 195.2 s for PyTorch against 1417.8 s for vLLM;
   a code change costs 25 s against a from-source rebuild.
 - JAX prefills 2.4x slower than PyTorch, 1.403 against 0.595 ms/token.
-- A 94.7 percent prefix-cache hit rate turned a 29x TTFT result into a harness artifact.
+- A 94.7 percent prefix-cache hit rate turned a 30x TTFT result into a harness artifact.
 - Calibration offsets are per-rig, 0.9799 and 0.9543, and are not transferable.
 - Boot variance is about 12 percent on this platform regardless of runtime.
 - The whole exercise cost under $3 in total. That is what made discarding a finished campaign

@@ -1,0 +1,15 @@
+Three inference runtimes, one GPU, and under $3 to find out which wins.
+
+vLLM, JAX and PyTorch serving the same Gemma 4 E2B checkpoint on the same AWS G5g GPU, on one harness and one statistic. The decode ranking reverses on boot time. Nineteen instances, four and a half instance-hours, under $3 - which is what let five wrong claims get caught.
+
+What is in it:
+
+- Decode at concurrency one: vLLM 32.53, JAX 12.69, PyTorch 10.24 tok/s — 53, 21 and 17 percent of a 61.4 tok/s bandwidth ceiling, so none is bandwidth-bound.
+- The ranking reverses on lifecycle. Cold boot 195.2 s for PyTorch against 1417.8 s for vLLM; a code change costs 25 s against a from-source rebuild.
+- JAX prefills 2.4x slower than PyTorch, 1.403 against 0.595 ms/token.
+- A 94.7 percent prefix-cache hit rate turned a 30x TTFT result into a harness artifact.
+
+dev.to (Google Developer Experts): https://dev.to/gde/three-gemma-4-deployments-on-one-t4g-for-under-3-what-the-runtime-changes-and-what-it-doesnt-jo3
+dev.to (AWS Community Builders): https://dev.to/aws-builders/three-gemma-4-deployments-on-one-t4g-for-under-3-what-the-runtime-changes-and-what-it-doesnt-2cin
+AWS Builder Center: https://builder.aws.com/content/3IhsZvrENITuAFMs7jNZONDuDn5/three-gemma-4-deployments-on-one-t4g-for-under-dollar3-what-the-runtime-changes-and-what-it-doesnt
+Medium: https://xbill999.medium.com/three-gemma-4-deployments-on-one-t4g-for-under-3-what-the-runtime-changes-and-what-it-doesnt-11769dd902ba
