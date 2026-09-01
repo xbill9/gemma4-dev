@@ -1,0 +1,9 @@
+Three rigs in one monorepo serve the same Gemma 4 E2B checkpoint on the same G5g
+instance, one under vLLM, one under a pure JAX port, one under PyTorch. Only the
+runtime slot moves, so it should be the cleanest A/B available, and for months it
+was not: each rig measured itself with its own harness and quoted its own number.
+
+I rebuilt the harness so all three report one client-side statistic, then ran the
+comparison. vLLM wins decode 3.2x and loses the boot and revision loop badly. The
+whole exercise came to under $3, which is what let five wrong claims get caught
+before they shipped.
