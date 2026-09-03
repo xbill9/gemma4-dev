@@ -9,7 +9,7 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| _none_ | | | | | |
+| `2026-08-31-crossrig-gemma4-e2b-g5g.json` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | ok | — |
 
 ## Run directories in this rig
 
@@ -17,4 +17,7 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 |---|---:|---:|---:|---|
 | `2026-08-12-first-serve-g5g` | 1 | 0 | 0 | yes |
 | `2026-08-14-rust-frontend-g5g` | 1 | 0 | 0 | yes |
-| `2026-08-31-crossrig-vllm-g5g` | 4 | 1 | 0 | yes |
+| `2026-08-31-boot-32gib-g5g` | 3 | 1 | 0 | yes |
+| `2026-08-31-crossrig-vllm-g5g` | 5 | 1 | 0 | yes |
+| `2026-09-01-concurrency-vllm-g5g` | 4 | 1 | 0 | yes |
+| `2026-09-01-prefetch-ab-g5g` | 3 | 1 | 0 | yes |

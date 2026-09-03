@@ -84,8 +84,8 @@ optionally `error`.
 ## What a run directory should contain
 
 The strongest example in this repo is `runs/2026-07-25-vllm-sweep-v6e1/` (complete in
-`tpu-pytorch-v5e1-2b`, `-12b`, and `tpu-pytorch-v6e1-2b`; the copies in `tpu-jax-v5e1-2b` and
-`tpu-pytorch-inf2-2b` are partial stubs). Its shape is the one to copy:
+`tpu-pytorch-v5e1-2b`, `-12b`, and `tpu-pytorch-v6e1-2b`; the copies in `tpu-jax-v5e1-2b`,
+`tpu-jax-v6e1-2b` and `tpu-pytorch-inf2-2b` are partial stubs). Its shape is the one to copy:
 
 ```
 runs/<date>-<what>-<hw-short>/

@@ -20,5 +20,6 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 |---|---:|---:|---:|---|
 | `2026-08-29-first-serve-g5g` | 4 | 1 | 0 | yes |
 | `2026-08-29-profile-and-fixes-g5g` | 7 | 3 | 2 | yes |
-| `2026-08-31-crossrig-torch-g5g` | 5 | 1 | 2 | yes |
+| `2026-08-31-crossrig-torch-g5g` | 12 | 4 | 2 | yes |
 | `2026-08-31-spot-rerun-g5g` | 5 | 1 | 2 | yes |
+| `2026-09-01-concurrency-torch-g5g` | 4 | 1 | 0 | yes |
