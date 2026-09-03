@@ -441,6 +441,16 @@ Three numbers you will be tempted to reuse, and must not:
   different silicon by a wide margin.
 - **43.1 / 44.24 tok/s** — the vLLM sibling on the same T4G silicon, obtained *with reduced
   Triton tiles*.
+  **CORRECTED 2026-08-30 — neither figure is a benchmark, do not compare against either.**
+  `43.1` is one sample from the 2026-08-12 first-serve run, whose own report says "single-run,
+  single-stream, no repeats and no variance figure", taken with a 19-token prompt. `44.24` has
+  **no benchmark artifact anywhere in the tree** — it survives only in `gpu-vllm-g5g-2b/server.py`'s
+  swap comment and `tests/test_server.py`, where it was measured 2026-08-13 to show that
+  `g5g.xlarge` + a 16 GiB swapfile reaches a healthy endpoint at all. The tile-clamp caveat is real
+  but does not distinguish them: it applies to every vLLM-on-T4G number, the good ones included.
+  **Compare against `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`** — `vllm bench
+  serve`, three runs, one `g5g.4xlarge`: c=1 TPOT 31.44 ms (~31.8 tok/s decode), c=4 ~97 tok/s,
+  c=8 168.33 tok/s.
 - **Anything from `~/gemma4-tips`** — that tree duplicated its own artifacts and its directory
   names misattribute both model and chip.
 

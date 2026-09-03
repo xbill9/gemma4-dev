@@ -29,6 +29,12 @@ whether that is the chip or the framework.
 rigs emit `tpu_jax_decode_tokens_per_second`, which times decode alone. An end-to-end tok/s
 carries prefill and HTTP and will not agree with it.
 
+**The two-rig framing above is too narrow, and 2026-08-30 showed why.** There is a THIRD rig on
+this silicon — `gpu-vllm-g5g-2b`, same `google/gemma-4-E2B-it`, same T4G — and it reaches ~3x
+both of them at `B=1`. It was omitted from this rig's reasoning because the only vLLM figure in
+circulation was a single-sample smoke test. **Any "chip or framework?" question asked here must
+consult that rig**, and the answer it gives is *framework*: see the corrected roofline below.
+
 ## The fork shipped a deployment that could not run — five fatal bugs
 
 **FOUND AND FIXED 2026-08-29, on the first launch this rig ever attempted.** The rig was forked
@@ -117,7 +123,7 @@ separately.
 `/metrics` did not exist at all before 2026-08-29, so `get_metrics` and `verify_model_health`
 were both broken against this rig's payload.
 
-## This rig has served — one run, and it answers the question it was built to ask
+## This rig has served — two runs, and the answer is not the one first written down
 
 **`benchmarks/runs/2026-08-29-first-serve-g5g/` — MEASURED, the rig's first token.**
 `g5g.2xlarge` spot in `us-east-1d`, torch 2.12.0+cu132 / Python 3.13, build `4ca8039100d7`.
@@ -133,17 +139,75 @@ moved throughput **+0.0%**, because at `B=1` cuBLAS dispatches a **fp32 `gemvx`*
 path. **This rig is the independent confirmation.** It loads directly as float16, has no
 conversion pass to blame, and is slower anyway.
 
+### The roofline — CORRECTED 2026-08-30, the original was wrong in both terms
+
+This section until 2026-08-30 read:
+
 ```
 10.209 GB / 320 GB/s = 31.9 ms/step -> 31.3 tok/s   (a FLOOR)
 measured                                 10.88 tok/s -> 35% of it
 ```
 
-**Neither framework is within 3x of the bandwidth bound, and the 15% between them is far
-smaller than the 3x each has to the hardware.** The deficit is not a framework artifact: it is
-`B=1` decode being a matrix-*vector* product that no dtype and no runtime turns into a GEMM.
-**The remaining 3x needs batching, which both rigs currently refuse** (`MAX_NUM_SEQS=1`, one
-lock). Do not spend effort here on dtypes, kernels or runtimes — that question is now answered
-twice, from two directions.
+**Both numbers in that division are wrong, and it understated the ceiling by ~2x.**
+
+**Wrong numerator — resident weights are not streamed weights.** E2B is `2B effective / ~5B
+total` (`MODELS.md`, and the `E` prefix is flagged load-bearing there). The bulk of what is
+resident is a **gather, not a matmul**:
+
+| Component | Params | fp16 | Streamed per decode step? |
+| --- | ---: | ---: | --- |
+| Transformer matmuls, 35 layers | 1.854 B | 3.709 GB | yes |
+| LM head / `embed_tokens` (tied) | 0.403 B | 0.805 GB | yes — full-vocab matmul |
+| **PLE table** (262144 x 256 x 35) | **2.349 B** | **4.698 GB** | **no — indexed lookup** |
+
+**Wrong denominator — `HARDWARE.md` says explicitly "Quote 277 GB/s, not 320."** 320.1 is
+theoretical peak; 277.0 is the measured streaming read.
+
+```
+4.514 GB / 277 GB/s = 16.30 ms/step -> 61.4 tok/s   (the real ceiling)
+measured                                 10.88 tok/s -> 18% of it
+```
+
+**Mind `use_double_wide_mlp`.** E2B sets it `true`, which **doubles `intermediate_size` on the
+20 KV-shared layers** (`num_kv_shared_layers=20`; see `tpu-jax/ports/gemma4/jax_e_model.py` and
+tpu-inference's `test_double_wide_mlp`). A first pass at this correction used the plain
+`3 x I x H` MLP for all 35 layers and got 3.382 GB, which is 1.13 GB light.
+
+**PLE being off the streaming path is measured, not argued** —
+`gpu-jax-g5g-2b/benchmarks/runs/2026-08-26-quant-levers-fixed-g5g/` shrank it from 9.257 to
+5.752 GB (−3.505 GB, 38% of resident weights) and decode did **not move**: 12.80 / 12.80 /
+12.80. Arithmetic from the config predicts a 3.523 GB saving — 0.5% from measured. That
+report's own conclusion: *"the table is a gather, never a matmul, so decode never streams it."*
+
+**The arithmetic reconciles against a measurement, which is why it can be trusted.** Text-only
+total comes to 1.854 + 0.403 + 2.349 = 4.606 B params = **9.212 GB**, against the JAX sibling's
+**measured 9.257 GB** of text-only resident weights — **0.49% apart**. As a second bound, taking
+everything resident except PLE as streamed (9.257 − 4.698 = 4.559 GB) gives 60.8 tok/s, within
+1% of the computed 61.4 — the two agree because on E2B almost everything that is not PLE does
+stream.
+
+**So the corrected reading, and it reverses the old conclusion:**
+
+| | B/c=1 decode | % of 61.4 tok/s ceiling |
+| --- | ---: | ---: |
+| vLLM sibling (TPOT 31.44 ms) | ~31.8 | 52% |
+| JAX sibling | 12.80 | 21% |
+| **PyTorch (this rig)** | **10.88** | **18%** |
+
+**The deficit IS a framework artifact, and the old text said the opposite.** vLLM reaches 52%
+of the ceiling on identical silicon with the same checkpoint at the same batch size; these two
+reach 18-21%. There is roughly **3x available to a better runtime at `B=1`, before any
+batching at all**. The previous claim — *"the deficit is not a framework artifact... do not
+spend effort here on dtypes, kernels or runtimes"* — was drawn from the bad roofline and from
+comparing against a single-sample vLLM number. **The dtype half of it still stands** (the
+sibling's f16 experiment moved +0.0%, and this rig's profile already dispatches `__half` GEMV).
+**The runtime half is falsified.**
+
+A third corroboration that none of the three is bandwidth-bound: `ple0+int8head` halves the LM
+head (805 → 403 MB, −11.9% of streamed bytes) and gained **+2.3%** (12.80 → 13.10), not the
+~13% a bandwidth-bound decode would show. Consistent with this rig's own profile finding
+~5,650 kernel launches per step at 1-3 µs on a chip with 5-10 µs launch overhead — **all three
+runtimes are launch-bound at `B=1`, not bandwidth-bound.**
 
 Two corroborations worth keeping:
 
@@ -173,10 +237,27 @@ not throughput.
 confirmation of what the first report could only argue from a roofline: the decode step is
 dominated by costs independent of batch, so extra sequences are nearly free.
 
-**84.16 tok/s at B=8 beats the vLLM sibling's 43-44 and the JAX sibling's 13.10 outright** — but
-it is measured on the ENGINE, not through the server. `MAX_NUM_SEQS=1` and one lock mean the
-served path cannot reach it. **Continuous batching is the highest-value work in this rig, and it
-is now quantified rather than assumed.**
+**84.16 tok/s at B=8 is measured on the ENGINE, not through the server.** `MAX_NUM_SEQS=1` and
+one lock mean the served path cannot reach it. **Continuous batching is the highest-value work
+in this rig, and it is now quantified rather than assumed.**
+
+**CORRECTED 2026-08-30 — this block used to claim 84.16 "beats the vLLM sibling's 43-44 and the
+JAX sibling's 13.10 outright." It does not, and the comparison was malformed in two ways at
+once.** It put this rig's `B=8` engine number against vLLM's *single-stream* figure, and that
+figure was itself a single-sample smoke test (see the reuse list at the end of this file). The
+like-for-like comparison, from `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`
+— `vllm bench serve`, three runs, same `g5g.4xlarge`:
+
+| Concurrency / batch | this rig (engine) | vLLM sibling (served) |
+| ---: | ---: | ---: |
+| 1 | 10.73 | 28.65 / 22.70 / 29.30 end-to-end; TPOT 31.44 ms |
+| 4 | 42.14 | 97.48 / 97.26 / 97.26 |
+| 8 | **84.16** | **168.33 / 169.22 / 169.39** |
+
+**vLLM is roughly 2x this rig at `B=8` and ~3x at `B=1`, and it does it through HTTP while
+84.16 never leaves the engine.** Batching remains the right next step here and 7.84x is real —
+but it closes the gap to vLLM rather than overtaking it. vLLM also saturates at
+`--max-num-seqs 8`; its c=16 and c=32 cells are queueing, not throughput.
 
 ### Where the 93 ms/step goes
 
@@ -189,8 +270,10 @@ is now quantified rather than assumed.**
 - **~5,650 kernel launches per step**, dominated by 1-3 µs elementwise kernels (`copy_` 955/step,
   `mul` 733/step, `pow` 504/step) on a chip whose launch overhead is 5-10 µs. **Launch-bound.**
   `torch.compile(mode="reduce-overhead")` + `StaticCache` is the direct fix and ranks second.
-- **61.3 ms of the 93.2 ms step is not weight streaming** (the floor is 10.209 GB / 320 GB/s =
-  31.9 ms), and none of it scales with B.
+- **76.9 ms of the 93.2 ms step is not weight streaming** (the floor is 4.514 GB / 277 GB/s =
+  16.30 ms — see the corrected roofline above), and none of it scales with B. This bullet read
+  "61.3 ms" against a 31.9 ms floor until 2026-08-30; the correction makes the point *stronger*,
+  since 83% of the step is unaccounted for by bandwidth rather than 66%.
 
 Note this rig's GEMV is templated on `__half`, so PyTorch is **not** uniformly promoting to fp32
 the way the JAX sibling's profile showed. Do not carry that claim across.
@@ -364,7 +447,17 @@ Three numbers you will be tempted to reuse and must not:
 
 - **13.10 tok/s** — `gpu-jax-g5g-2b`, same silicon, different runtime. That is the number this
   rig is *compared against*, not one it inherits.
-- **43.1 / 44.24 tok/s** — the vLLM sibling, obtained with reduced Triton tiles.
+- **43.1 / 44.24 tok/s** — the vLLM sibling. **Neither is a benchmark; do not compare against
+  either.** Corrected 2026-08-30 after both were traced to source. **43.1** is from the
+  2026-08-12 first-serve run, whose own report says "single-run, single-stream, no repeats and
+  no variance figure. One sample per cell," taken with a 19-token prompt. **44.24** has *no
+  benchmark artifact anywhere in the tree* — it survives only in `gpu-vllm-g5g-2b/server.py`'s
+  `_SWAP_BELOW_HOST_RAM_GB` comment and `tests/test_server.py`, where it was measured on
+  2026-08-13 to show that `g5g.xlarge` + a 16 GiB swapfile reaches a healthy endpoint at all.
+  Both did need the Triton tile clamp, but that applies to every vLLM-on-T4G number including
+  the good ones. **The number to compare against is the 2026-08-14 concurrency sweep** —
+  `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`, three runs on one
+  `g5g.4xlarge`: c=1 TPOT 31.44 ms (~31.8 tok/s decode), c=8 168.33 tok/s.
 - **Anything from `~/gemma4-tips`** — that tree duplicated its own artifacts and its directory
   names misattribute both model and chip.
 

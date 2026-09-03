@@ -137,7 +137,7 @@ That list is actively misleading read on its own.
 | **mxfp4** (4-bit) | `layers/jax/quantization/mxfp4.py` | **no — MoE-only**, see below |
 | compressed-tensors int8 w8a8, w4a8 fp8, w4a4 nvfp4 | `layers/vllm/.../schemes/` | no — torch path only |
 | AWQ | `layers/vllm/quantization/awq.py` | no — torch path only |
-| GGUF / q4_0 | absent from `QUANTIZATION_METHODS` in this build | no |
+| GGUF / q4_0 | absent from `QUANTIZATION_METHODS` — **and not a TPU-only gap**, see below | no |
 
 The JAX compressed-tensors dispatcher handles `_is_fp8_w8a8`, then falls off the end:
 
@@ -145,6 +145,14 @@ The JAX compressed-tensors dispatcher handles `_is_fp8_w8a8`, then falls off the
 # TODO: w4a8 / wNa16 schemes need their own JAX methods (not yet ported).
 raise NotImplementedError(...)
 ```
+
+> **The GGUF row is a property of vLLM itself, not of the TPU platform. Verified 2026-09-02** against a
+> stock **vLLM 0.26.0 CUDA** install: `grep -ril gguf` over the entire installed package returns **two**
+> files, both incidental (`lora/layers/utils.py`, `models/qwen2_moe.py`); there is no `gguf.py` under
+> `model_executor/layers/quantization/`; and `QUANTIZATION_METHODS` lists 31 entries with no `gguf` among
+> them. So the original finding — recorded against `tpu_platform.py`'s `supported_quantization` — understated
+> its own scope. **No vLLM rig in this monorepo can load a GGUF, on any platform slot.** Do not "check the
+> CUDA build" expecting a different answer; it has been checked.
 
 `wNa16` is w4a16 — exactly the format of Google's QAT releases
 (`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). A **second, independent** failure hits the QAT exports:
@@ -261,6 +269,82 @@ verified by range-reading the shards: all 256 sampled groups of 32 land exactly 
 expert, attention, MLP, router and embedding tensors alike. **Group size 32 is measured, not assumed**
 — group size 64 fails the same test. So 51.61 GB of BF16 repacks to 15.27 GB losslessly enough to fit
 a 33.55 GB chip.
+
+### `-q4_0-gguf` is the same QAT data, actually packed — and it is the only 4-bit artifact that loads anywhere
+
+**Measured 2026-09-02** by range-reading the file off the Hub; nothing was downloaded whole.
+`google/gemma-4-E2B-it-qat-q4_0-gguf` is ungated and ships two files:
+
+| File | Bytes | sha256 |
+| :--- | ---: | :--- |
+| `gemma-4-E2B_q4_0-it.gguf` | 3,349,516,256 | `fa401b55…` |
+| `gemma-4-E2B-it-mmproj.gguf` | 986,833,664 | `021059cc…` |
+
+GGUF v3, `general.architecture = gemma4`, **541 tensors**, 49 KV pairs, and the full E2B shape is intact —
+`attention.shared_kv_layers=20`, `sliding_window=512`, mixed `key_length=512` / `key_length_swa=256`,
+`embedding_length_per_layer_input=256`. Dtype histogram: **Q4_0 ×275, F32 ×263, Q6_K ×2, F16 ×1**.
+
+**It is the same QAT weights as `-q4_0-unquantized`, proven rather than assumed.** Four F32 norm tensors
+read out of the GGUF are bit-identical to the bf16 tensors in the `-unquantized` repo:
+
+| GGUF | safetensors | first values | mean |
+| :--- | :--- | :--- | ---: |
+| `blk.0.attn_norm.weight` | `layers.0.input_layernorm.weight` | 9.375, 7.9375, 10.6875 | +10.67993 |
+| `output_norm.weight` | `model.norm.weight` | 13.4375, 8.75, 14.375 | +14.20042 |
+| `blk.0.ffn_norm.weight` | `layers.0.pre_feedforward_layernorm.weight` | 21.75, 4.71875, 23.0 | +19.20642 |
+| `blk.0.layer_output_scale.weight` | `layers.0.layer_scalar` | 0.02087402 | +0.02087 |
+
+So the section above — QAT values already on a Q4_0 grid at group size 32, shipped in a bf16 container —
+describes **this file's contents in their native packing**. 51.61 GB → 15.27 GB on the 26B is the same
+relationship, done for you.
+
+**Where the bytes go, and it is the PLE table again.** Summing the tensor table by role:
+
+| Component | fp16 bytes | GGUF bytes | Streamed per decode step? |
+| :--- | ---: | ---: | :--- |
+| Transformer matmuls, 35 layers | 3.709 GB | **1.049 GB** (Q4_0) | yes |
+| LM head / `token_embd` (tied) | 0.805 GB | **0.330 GB** (Q6_K) | yes |
+| `per_layer_model_proj` | — | 0.028 GB (F16) | yes |
+| **PLE table** `per_layer_token_embd` | 4.698 GB | **1.927 GB** (Q6_K) | **no — indexed lookup** |
+| | | **3.334 GB total** (file 3.3495) | |
+
+**Streamed drops 4.514 GB → 1.407 GB, a 3.2x cut.** Do not convert that into a throughput prediction: on
+every GPU rig here decode at `B=1` is launch-bound, not bandwidth-bound, and the two measurements at the top
+of this file (`ple_bits=4` → **0.0%**, `int8_lm_head` → **+2.3%**) are what a bandwidth cut actually buys.
+**The win is residency**, which is what pays for batching.
+
+### Which runtimes can load a GGUF at all
+
+Verified 2026-09-02 against the installed versions named.
+
+| Stack | Loads Google's Gemma 4 GGUF? |
+| :--- | :--- |
+| **vLLM 0.26.0** (CUDA or TPU) | **No.** No `gguf` module at all — see the correction in the route table above |
+| **JAX** | **No.** No GGUF reader exists in the JAX ecosystem |
+| **transformers 5.12.1** | Yes, `from_pretrained(gguf_file=…)` — but see the two defects below |
+| **llama.cpp / Ollama** | Yes, natively — upstream `src/models/gemma4.cpp`, plus the four `mtmd` multimodal variants |
+
+**`ggmlc` does not help.** It compiles PyTorch/JAX graphs *to* GGUF — an exporter, the opposite direction —
+its text coverage stops at Gemma 3, and it writes Q4_0/Q8_0 rather than reading them.
+
+#### transformers loads it, but dequantizes to fp32 and silently drops 35 tensors
+
+Two independent defects, both verified offline:
+
+1. **No memory or bandwidth win.** `modeling_gguf_pytorch_utils.py:791` calls `gguf.dequantize(...)`, which
+   returns **float32**, and only then casts to `torch_dtype` per tensor. The transient is the problem:
+   `per_layer_token_embd` is 8960 × 262144 = 2.349 B params, so that one dequantize allocates **9.395 GB of
+   host fp32**. A 16 GiB box cannot survive it. You arrive at fp16 weights you could have loaded from
+   safetensors.
+2. **35 tensors are dropped without an error.** `model.layers.N.layer_scalar` is a bare `nn.Parameter`, so
+   the generated map key is `blk.N.layer_output_scale` while the file names it
+   `blk.N.layer_output_scale.weight`. Line 806 is `if name not in tensor_key_mapping: continue`. Building the
+   real Gemma4 text model on `meta` and running the real `get_gguf_hf_weights_map` against the file's actual
+   541 names gives **505 mapped, 36 unmapped: all 35 `layer_output_scale` plus `rope_freqs`**. `rope_freqs`
+   is a harmless llama.cpp artifact; the 35 are not — layer 0's true value is 0.02087402, and the model would
+   run on whatever `from_config` initialized.
+
+**So transformers is a converter, not a serving path, for this file.**
 
 ### Two ways to destroy those weights while "just repacking" them
 

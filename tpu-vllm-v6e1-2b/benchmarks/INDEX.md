@@ -21,5 +21,5 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-08-07-kv-quant-v5e1` | 7 | 2 | 0 | **no** |
 | `2026-08-10-article-validation-v6e1` | 6 | 3 | 0 | **no** |
 | `2026-08-10-config-validation-v6e1` | 15 | 4 | 0 | yes |
-| `undated-vllm-grid-a-v6e1` | 7 | 0 | 0 | yes |
+| `undated-vllm-grid-a-v6e1` | 7 | 1 | 0 | yes |
 | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes |

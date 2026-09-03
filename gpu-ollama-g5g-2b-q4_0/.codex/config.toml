@@ -1,0 +1,31 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. Path is relative to the project directory; never an absolute cwd.
+[mcp_servers.gpu-ollama-g5g-2b-q4_0]
+command = "python3"
+args = [".claude/skills/gpu-ollama-g5g-2b-q4_0-management/mcp/server.py"]
+
+[mcp_servers.gpu-ollama-g5g-2b-q4_0.env]
+AWS_REGION = "us-east-1"
+MODEL_NAME = "gemma4:e2b-it-qat"
+INSTANCE_TYPE = "g5g.2xlarge"
+OLLAMA_LLM_LIBRARY = "cuda_v12"
+MCP_SERVER_NAME = "gpu-ollama-g5g-2b-q4_0"
+
+# Launching costs money and a spot instance can be reclaimed under you.
+#
+# Termination is CHEAPER here than on the llama.cpp sibling: that rig loses a
+# compile, this one loses a 1.5 GB download and a 4.3 GB pull. Still gated — it
+# is destructive, and a one-time spot instance cannot be stopped, only terminated.
+[mcp_servers.gpu-ollama-g5g-2b-q4_0.tools.create_g5g_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-ollama-g5g-2b-q4_0.tools.terminate_g5g_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-ollama-g5g-2b-q4_0.tools.stop_g5g_instance]
+approval_mode = "approve"
+
+# A restart DROPS THE LOADED MODEL. With OLLAMA_KEEP_ALIVE=-1 the daemon
+# otherwise holds it forever, so this is not a free operation mid-benchmark.
+[mcp_servers.gpu-ollama-g5g-2b-q4_0.tools.restart_ollama]
+approval_mode = "approve"

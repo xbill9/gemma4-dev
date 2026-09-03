@@ -164,6 +164,14 @@ monorepo's `2026-08-12-first-serve-g5g` run in `gpu-vllm-g5g-2b`.
 | GPU memory in use | 13,501 MiB | 13,573 MiB |
 | Throughput, single stream | **43.1 tok/s** | **12.0 tok/s** |
 
+> **CORRECTION 2026-08-30.** The 43.1 in the row above is a single sample from the vLLM rig's
+> first-serve smoke test, not a benchmark — see that report's own caveat. The comparable
+> measured figures are c=1 TPOT 31.44 ms (~31.8 tok/s decode) and c=8 168.33 tok/s, from
+> `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`. **The 3.5x gap is real and
+> survives the correction** (~31.8 against 12.0 is 2.6x at c=1), but the caveat below
+> understates the case: the tile clamp applies to every vLLM-on-T4G number, so it was never
+> the thing that made this comparison uncontrolled.
+
 **Treat the 3.5x as directional, not as a controlled comparison.** Different instance sizes
 (`g5g.4xlarge` vs `g5g.2xlarge` — irrelevant to decode, which is GPU-bandwidth-bound, but not
 nothing), different context (16,384 vs 8,192), different concurrency ceiling (`max_num_seqs`

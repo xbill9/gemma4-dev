@@ -189,8 +189,23 @@ independent signals** — while delivering a **1.000x** capacity ratio.
 
 So, in order of strength:
 
-1. **Cross-check against an absolute physical bound**, never against another config. Peak HBM ÷ weight
-   bytes gives a decode ceiling; if a measurement beats it, the measurement is wrong.
+1. **Cross-check against an absolute physical bound**, never against another config. A decode ceiling
+   is **measured bandwidth ÷ bytes STREAMED per token**. Get both terms right — this rule was
+   misapplied on 2026-08-29 and produced a confident, wrong conclusion that stood for a day:
+
+   - **Streamed bytes, not resident bytes.** On the `E` sizes most of the checkpoint is a
+     **per-layer-embedding table that decode gathers rather than multiplies**, so it is resident and
+     never streamed. E2B is 10.209 GB resident but **4.514 GB streamed** — a 2.3x error if you use
+     the wrong one. **Reconcile your parameter count against a measured resident figure before
+     trusting it**; E2B's `use_double_wide_mlp` doubles the MLP on 20 of 35 layers and is easy to
+     miss, and only the reconciliation catches it (9.212 GB computed vs 9.257 GB measured). `MODELS.md` §"Resident is not streamed" has the split per size.
+   - **Measured bandwidth, not theoretical peak.** `HARDWARE.md` records both and says which to quote
+     (T4G: 277 GB/s measured, 320.1 peak).
+   - **If a measurement beats the bound, suspect the bound first.** The original wording said the
+     measurement is wrong. That is the less likely case and it is the expensive one to assume: a
+     sibling rig's legitimate 31.8 tok/s was briefly read as physically impossible because the bound
+     had been built from resident bytes over peak bandwidth. **A violated bound is a hypothesis to
+     test, not a verdict** — recompute it before disbelieving the number.
 2. **Read the allocation log**, not the flag. If the line never prints, that is also an answer.
 3. **Profile the kernels.** `is_kernel_using_tensor_core` settles what a kernel name only implies.
 4. **Assert the build id** the server reports equals the payload you shipped. A stale deploy reports

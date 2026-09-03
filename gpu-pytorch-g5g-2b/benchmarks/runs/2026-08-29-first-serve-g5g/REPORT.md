@@ -41,19 +41,54 @@ as cuBLAS dispatching a **fp32 `gemvx`** with no half-precision path at `B=1`.
 **PyTorch is the independent confirmation.** It loads directly as float16, has no bf16 tree and
 no conversion pass to blame, and it is *slower anyway*. Two rigs, two frameworks, one wall:
 
-```
+> **CORRECTION 2026-08-30 — the roofline below is wrong in both terms, and the conclusion
+> drawn from it is falsified.** Kept as written, struck through, because the *reasoning* it
+> models is the thing to avoid. The corrected version follows it. Nothing else in this report
+> is affected: the sweep cells, the flat-decode finding and the memory figures all stand.
+
+~~```
 weights / peak HBM  =  10.209 GB / 320 GB/s  =  31.9 ms/step  ->  31.3 tok/s   (a FLOOR)
 measured                                                          10.88 tok/s  ->  35% of it
+```~~
+
+~~The JAX rig sits at 26% of its own ceiling; this one at 31–35% of its. **Neither framework is
+within 3x of the bandwidth bound...** So the deficit is not a framework artifact — it is `B=1`
+decode being a matrix-*vector* product that no dtype and no runtime turns into a GEMM.~~
+
+### The corrected roofline
+
+**Wrong numerator.** E2B is `2B effective / ~5B total`. Its **PLE table — 4.698 GB of the
+10.209 GB resident — is an indexed gather, not a matmul**, so decode never streams it
+(`vocab_size_per_layer_input=262144` x `hidden_size_per_layer_input=256` x 35 layers). What
+actually streams per step is the transformer matmuls (1.854 B params, 3.709 GB) plus the tied
+LM head (0.403 B, 0.805 GB) = **4.514 GB**. Note `use_double_wide_mlp=true` doubles
+`intermediate_size` on E2B's 20 KV-shared layers; missing that understates the figure by
+1.13 GB. Cross-check: text-only total 9.212 GB against the JAX sibling's measured 9.257 GB
+resident, 0.49% apart.
+
+**Wrong denominator.** `HARDWARE.md` says "Quote 277 GB/s, not 320" — 320.1 is theoretical
+peak, 277.0 the measured streaming read.
+
+```
+streamed / measured BW  =  4.514 GB / 277 GB/s  =  16.30 ms/step  ->  61.4 tok/s  (the ceiling)
+measured                                                             10.88 tok/s  ->  18% of it
 ```
 
-The JAX rig sits at 26% of its own ceiling; this one at 31–35% of its. **Neither framework is
-within 3x of the bandwidth bound, and the gap between them (15%) is far smaller than the gap
-each has to the hardware (3x).** So the deficit is not a framework artifact — it is `B=1` decode
-being a matrix-*vector* product that no dtype and no runtime turns into a GEMM.
+**PLE being off the streaming path is measured, not argued.**
+`gpu-jax-g5g-2b/benchmarks/runs/2026-08-26-quant-levers-fixed-g5g/` cut resident weights from
+9.257 to 5.752 GB (−3.505 GB, 38%) and decode did not move: 12.80 / 12.80 / 12.80. Arithmetic
+from the config predicts −3.523 GB — 0.5% off measured.
 
-**Do not read this as "JAX is the better runtime here" and stop.** The useful reading is that
-the remaining 3x is in neither runtime's gift: it needs batching, which both rigs currently
-refuse (`MAX_NUM_SEQS=1`).
+**The corrected conclusion is the opposite of the original.** A third rig on identical silicon
+with the same checkpoint — `gpu-vllm-g5g-2b`, `2026-08-14-rust-frontend-g5g`, three runs —
+records TPOT 31.44 ms at c=1, i.e. **~31.8 tok/s decode, 52% of the ceiling**, against this
+rig's 18% and JAX's 21%. **The deficit IS a framework artifact.** There is ~3x available to a
+better runtime at `B=1` before any batching. The original text reached the reverse because it
+divided total resident weights by theoretical peak, and because the only vLLM figure in
+circulation at the time (43.1 tok/s) was a single-sample smoke test.
+
+The one part of the original that survives: batching is still worth having, and both of these
+rigs still refuse it (`MAX_NUM_SEQS=1`).
 
 ## Corroborating: decode does not depend on context
 

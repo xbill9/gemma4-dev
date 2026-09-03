@@ -93,6 +93,36 @@ def cheapest_cost(data):
     return min(vals) if vals else None
 
 
+def _status_infeasible(run_path):
+    """Count cells marked infeasible via schema 1.1's per-cell "status" field.
+
+    Returns 0 for schema 1.0 runs, which carry no status fields at all.
+    """
+    best = 0
+    for dirpath, _, filenames in os.walk(run_path):
+        for fn in filenames:
+            if not fn.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(dirpath, fn)) as fh:
+                    doc = json.load(fh)
+            except (OSError, ValueError):
+                continue
+            if not isinstance(doc, dict):
+                continue
+            sweep = (doc.get("throughput") or {}).get("sweep")
+            if not isinstance(sweep, list):
+                continue
+            n = sum(
+                1 for c in sweep
+                if isinstance(c, dict) and c.get("status") == "infeasible"
+            )
+            # One run dir can hold both REPORT.json and the raw sweep it was built from,
+            # describing the same cells. Take the largest single view, never the sum.
+            best = max(best, n)
+    return best
+
+
 def run_dirs():
     """[(rig, run_name, n_files, n_results, n_skip, has_report, has_tables)]"""
     rows = []
@@ -111,6 +141,11 @@ def run_dirs():
                     rel = os.path.relpath(os.path.join(dirpath, fn), path)
                     if rel.startswith("results" + os.sep):
                         n_results += 1
+                    # Rigs that write harness output to the run root rather than into a
+                    # results/ subdirectory were counted as having 0 result files until
+                    # 2026-08-30. REPORT.json is the report, not a result.
+                    elif os.path.dirname(rel) == "" and fn.endswith(".json") and fn != "REPORT.json":
+                        n_results += 1
                     # A .skip marker only means the cell is infeasible if no result exists for
                     # it. A fixup re-run can measure a previously skipped cell and leave the
                     # marker behind; counting markers then overstates infeasibility, which is
@@ -118,6 +153,11 @@ def run_dirs():
                     if fn.endswith(".skip"):
                         if not os.path.exists(os.path.join(dirpath, fn[: -len(".skip")] + ".json")):
                             n_skip += 1
+            # Schema 1.1 records infeasibility as a per-cell "status" field instead of a .skip
+            # marker file, and this counter was never taught to read it -- so every 1.1 run
+            # reported 0 infeasible cells no matter how many it had. Take the max rather than
+            # the sum: a run uses one convention or the other, and max cannot double-count.
+            n_skip = max(n_skip, _status_infeasible(path))
             rows.append(
                 (
                     rig,

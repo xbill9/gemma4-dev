@@ -149,9 +149,23 @@ The serving stack that actually loads the weights.
 | `jax` | JAX-native — Flax, MaxText, or a hand-rolled JAX server |
 | `jaxrust` | JAX-family graph execution driven from **Rust** — the forward pass is defined in Rust and lowered to XLA/StableHLO, not written in Python |
 | `pytorch` | PyTorch, via `torch_xla` on TPU or CUDA on GPU |
+| `llamacpp` | `llama-server` from `ggml-org/llama.cpp`, driven directly — one process, one GGUF file you named |
+| `ollama` | The Ollama daemon, which **links llama.cpp as a library** and adds a registry, a blob store, its own chat-template renderer and model lifecycle management |
 
 `vllm` names the server, not the backend it compiles to — vLLM on TPU is `vllm`, never `pytorch`, even though
 `torch_xla` sits underneath. Pick the layer you'd file a bug against.
+
+**`llamacpp` and `ollama` are the sharpest test of that rule anywhere in this table, because they are the same
+engine.** Ollama ships `libllama.so`, and the Gemma 4 graph both execute is upstream `src/models/gemma4.cpp`.
+They are still two slot values, because the layer you would file a bug against is genuinely different: an
+`ollama` rig's artifact, chat template, CUDA variant and (possibly) engine are all chosen by the daemon, and
+three of those four are things a benchmark can see. Verified 2026-09-02 — see either rig's `CLAUDE.md` for the
+four differences and the byte counts behind them.
+
+**Neither is spelled with its punctuation.** `llama.cpp` and `llama-cpp` both break slot parsing — the hyphen is
+the field separator and the dot is not in the character set — so the value is `llamacpp`, by the same rule that
+makes `jaxrust` one token. **And never `llama` on its own**: slot 2 is a stack, `llama` reads as the Llama model
+family, and `gpu-llama-g5g-2b` invites exactly the misreading the slot exists to prevent.
 
 **`jaxrust` is one slot value, not a compound, and it is never spelled `jax-rust`.** Slot values cannot contain
 a hyphen, because the hyphen is the field separator: `gpu-jax-rust-g5g-2b` parses as a *five*-slot name whose

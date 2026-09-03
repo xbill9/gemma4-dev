@@ -185,6 +185,26 @@ the tensor-parallel size, so at TP=4 you pay **4x the KV memory to store the sam
 A larger topology does not divide E2B's KV cost; it multiplies it. Check the target model's
 `num_key_value_heads` before assuming more chips solves a memory problem.
 
+### RMSNorm has NO `1 + weight` convention — unlike Gemma 1, 2 and 3
+
+**Measured 2026-09-02.** `Gemma4RMSNorm.forward` is `normed_output * self.weight` — a plain scale.
+Gemma 1/2/3 all use `(1 + weight)`, which is why every GGUF converter for those adds 1 when writing and
+every reader subtracts 1 when loading (`Gemma2TensorProcessor` in transformers is exactly that `-1`).
+
+**Gemma 4 does neither, and the artifacts confirm it rather than merely implying it.** The F32 norm
+tensors in `google/gemma-4-E2B-it-qat-q4_0-gguf` are bit-identical to the bf16 tensors in the
+`-qat-q4_0-unquantized` safetensors — `blk.0.attn_norm` and `layers.0.input_layernorm` both start
+9.375, 7.9375, 10.6875 with mean +10.67993. No offset is applied in either direction.
+
+Two consequences:
+
+- **transformers omitting `gemma4` from `TENSOR_PROCESSORS` is correct, not a bug.** It falls back to the
+  identity processor, which is what Gemma 4 wants. Do not "fix" it by pointing `gemma4` at
+  `Gemma2TensorProcessor`; that would subtract 1 from every norm in the model.
+- **Never carry a Gemma 2/3 loader convention into a Gemma 4 port.** The values look plausible either way —
+  a norm weight near 10 is not obviously wrong at 9 — so this fails silently as a quality regression rather
+  than as an error.
+
 ## Family overview
 
 Nothing structural is shared across sizes. Every row below differs from E2B in a way that changes
@@ -541,6 +561,58 @@ accelerator and not.
 **Sparse ≠ small on disk.** The 26B's ~4B *active* parameters set its compute cost, not its memory: all
 26.5B must be resident because any token can route to any expert. It is the largest checkpoint here after
 the 31B, and the "A4B" in the name describes throughput, not footprint.
+
+### Resident is not streamed — the number a decode roofline needs
+
+**A decode ceiling is measured bandwidth ÷ bytes STREAMED per token, and on the `E` and `A` sizes that
+is nowhere near the resident footprint.** Dividing the resident figure by bandwidth understates the
+ceiling, and the error is large enough to invert a conclusion: it did exactly that in
+`gpu-pytorch-g5g-2b` on 2026-08-29, where a 31.3 tok/s "floor" made a rig look near the hardware limit
+when it was at 13% of it, and briefly made a sibling's legitimate measurement look impossible.
+
+**E2B, computed from the config fields above and cross-checked against measurement:**
+
+| Component | Params | fp16 | Streamed per decode step? |
+| :--- | ---: | ---: | :--- |
+| Transformer matmuls, 35 layers | 1.854 B | 3.709 GB | yes |
+| LM head / `embed_tokens` (tied) | 0.403 B | 0.805 GB | yes — full-vocab matmul |
+| **PLE table** (262144 x 256 x 35) | **2.349 B** | **4.698 GB** | **no — indexed gather** |
+| | | **4.514 GB streamed** | of 10.209 GB resident |
+
+**Do not forget `use_double_wide_mlp`.** E2B sets it `true`, which **doubles `intermediate_size`
+on the `num_kv_shared_layers` (20 of 35) layers** — see `tpu-jax/ports/gemma4/jax_e_model.py` and
+tpu-inference's `test_double_wide_mlp`. Using the plain `3 x intermediate_size x hidden_size` MLP
+for all 35 layers understates the streamed figure by 1.13 GB, and was the first error made when
+this section was written.
+
+**The arithmetic reconciles against a measurement.** Text-only total is 1.854 + 0.403 + 2.349 =
+4.606 B params = **9.212 GB**, against the JAX sibling's **measured 9.257 GB** of text-only
+resident weights — **0.49% apart**. That reconciliation is the check that catches a missed
+structural field; without it the double-wide error is invisible.
+
+**Confirmed two ways, from a rig that changed it and measured.**
+`gpu-jax-g5g-2b/benchmarks/runs/2026-08-26-quant-levers-fixed-g5g/` quantised the PLE table and
+recorded `ple0` → `ple4` at **−3.505 GB** of resident weights (9.257 → 5.752); the arithmetic above
+predicts −3.523 GB, 0.5% off. And **decode did not move**: 12.80 / 12.80 / 12.80 across a 38%
+reduction in resident weights. That report's conclusion — *"the table is a gather, never a matmul, so
+decode never streams it"* — is the general rule, not a JAX-port detail.
+
+A third check on the same rig: `int8_lm_head` halves the tied head (805 → 403 MB, −11.9% of streamed
+bytes) for **+2.3%** throughput (12.80 → 13.10), not the ~13% a bandwidth-bound decode would give. On
+T4G none of the three runtimes tested is actually bandwidth-bound at `B=1`.
+
+**Per size — and note what is NOT known:**
+
+| Size | PLE? | Resident vs streamed |
+| :--- | :--- | :--- |
+| **E2B** | yes | **4.514 GB streamed of 10.209 GB resident** — computed and cross-checked above |
+| **E4B** | yes | **Same trap, magnitude UNRECORDED.** `hidden_size_per_layer_input` and `intermediate_size` are dashes in the family table, so this cannot be computed here. Read them off `config.json` before building a roofline. |
+| 12B, 31B | no | resident ≈ streamed; the plain division is correct |
+| **26B A4B** | no | **Same trap, different cause.** ~4B active of 26.5B resident — decode gathers only the 8 selected expert banks per token (see §26B). All 26.5B must be resident; far less streams. |
+
+**The `E` prefix is load-bearing in two directions.** It understates weights when you read `E4B` as
+4B (above) — and it *over*states streamed bytes when you feed the resident figure into a roofline.
+`RIG-ANALYSIS.md` carries the method rule.
 
 E2B's measured on-device figure is **8.97 GiB**, about 6% under the table's 10.2 GB — so treat the
 arithmetic entries as close estimates, not exact allocations. `~/tpu-jax-v5e1-2b/server.py` reserves

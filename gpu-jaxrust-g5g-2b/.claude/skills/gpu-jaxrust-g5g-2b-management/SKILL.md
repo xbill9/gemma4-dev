@@ -25,8 +25,11 @@ on 2026-08-23 read 12.3). Quote the server's own
 which also carries prefill and the HTTP round trip. **Warm up before recording anything** —
 cold decode measures several times slower, and cold prefill far worse again.
 
-Still do not attribute a sibling's numbers to this rig. The vLLM sibling's ~43-44 tok/s is
-the same silicon under a different runtime and is not a baseline this rig inherits.
+Still do not attribute a sibling's numbers to this rig. And note the vLLM sibling's
+"~43-44 tok/s" is **not a benchmark** (corrected 2026-08-30) — 43.1 was a single first-serve
+sample and 44.24 a swapfile smoke test with no artifact. Its measured figures are c=1 TPOT
+31.44 ms (~31.8 tok/s decode) and c=8 168.33 tok/s, in
+`gpu-vllm-g5g-2b/benchmarks/runs/2026-08-14-rust-frontend-g5g/`.
 
 ## Start here, every time
 

@@ -1,7 +1,7 @@
 ---
 title: "Serving Gemma 4 on a Turing GPU with no build at all: pure JAX instead of vLLM"
 published: false
-description: "The same G5g hardware, the same checkpoint, no from-source build, no CUDA toolkit, no Rust, and no kernel patch. jax[cuda12] ships aarch64 wheels that already carry sm_75. It costs 3.5x throughput."
+description: "The same G5g hardware, the same checkpoint, no from-source build, no CUDA toolkit, no Rust, and no kernel patch. jax[cuda12] ships aarch64 wheels that already carry sm_75. It costs 2.6x throughput."
 tags: aws, jax, cuda, machinelearning
 ---
 
@@ -28,7 +28,7 @@ sentence actually costs, measured both ways on the same box.
 I have a rig serving Gemma 4 E2B on AWS G5g under vLLM. Getting there took a from-source build
 with `TORCH_CUDA_ARCH_LIST=7.5`, a CUDA toolkit the image does not ship, a Rust toolchain it
 does not ship either, and a patch to `triton_unified_attention.py` that is not upstream and
-lives on exactly one EBS volume. It serves at 43.1 tok/s.
+lives on exactly one EBS volume. It serves at ~31.8 tok/s.
 
 The obvious question afterwards was whether any of it was necessary. vLLM's problem on this
 hardware is not really vLLM — it is that the fast path through it, for this model, is a
@@ -37,7 +37,7 @@ that does not hand-tile its attention kernel does not have that problem.** JAX l
 XLA, XLA picks its own tiles, and nobody has to know that 64 KiB is a number that matters.
 
 So I built the same rig again on the same instance family with pure JAX — no PyTorch, no
-torch_xla, no vLLM — and ran it. It works. **It is also 3.5x slower, and every failure on the
+torch_xla, no vLLM — and ran it. It works. **It is also 2.6x slower, and every failure on the
 way there was silent.**
 
 ## jaxlib publishes what vLLM does not
@@ -351,12 +351,19 @@ checkpoint, single stream:
 | Weight load | — | 9.26 GB in 158.8 s |
 | Restart (warm compile cache) | — | ~80 s |
 | GPU memory in use | 13,501 MiB | 13,573 MiB |
-| Throughput, single stream | **43.1 tok/s** | **12.0 tok/s** |
+| Throughput, single stream | **~31.8 tok/s** | **12.0 tok/s** |
 
-Roughly 3.5x. Be careful how much weight you put on that ratio: the vLLM figure was obtained
-with reduced Triton tiles on a patched kernel, this JAX engine is a reference implementation
-running one sequence at a time with no continuous batching, and each is a single sample. It is
-directional, not a benchmark result.
+Roughly 2.6x. Be careful how much weight you put on that ratio: this JAX engine is a reference
+implementation running one sequence at a time with no continuous batching, while vLLM was run
+on a patched kernel with reduced Triton tiles. It is directional, not a controlled benchmark.
+
+The vLLM figure is the median time-per-output-token (31.44 ms) from a three-run
+`vllm bench serve` sweep. An earlier draft of this article used **43.1 tok/s**, which was a
+single sample from a first-serve smoke test; it flattered vLLM by about a third. The honest
+number is lower and the conclusion is unchanged. Worth adding, because it is the more
+interesting figure: with continuous batching at 8 concurrent streams vLLM reaches
+**168 tok/s** on this same chip, and that gap — not the single-stream one — is what a
+reference implementation actually gives up.
 
 But the direction is not subtle, and it is not mysterious either. vLLM is a serving engine —
 paged KV, continuous batching, CUDA graphs, kernels written for the job. This is a model
@@ -366,7 +373,7 @@ built.** Skipping the build skips those too.
 
 ## So which one should you run?
 
-Run vLLM if the endpoint is the product. 3.5x is 3.5x, it batches, and the build is a one-time
+Run vLLM if the endpoint is the product. 2.6x single-stream (and ~14x batched) is real, and the build is a one-time
 cost you can bake into an AMI — which is what I did on the other rig, turning a multi-hour
 provision into a four-minute launch.
 
@@ -381,7 +388,7 @@ And there is a case the throughput number hides entirely: JAX is where a fix is 
 The Turing shared-memory ceiling stopped vLLM because the tile sizes are baked into a Triton
 kernel; the fix was to go edit that kernel. In JAX I hit the same ceiling in the W4A16 Pallas
 kernel and could simply not take that path — the dense fp16 route is right there, same code,
-one flag. Being 3.5x slower on a chip you can actually reason about beats being fast on one
+one flag. Being 2.6x slower on a chip you can actually reason about beats being fast on one
 where the next model shape puts you back in someone else's kernel.
 
 ## Troubleshooting quick reference

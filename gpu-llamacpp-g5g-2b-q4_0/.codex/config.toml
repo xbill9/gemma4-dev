@@ -1,0 +1,38 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env. The path is relative to the project directory, as in .mcp.json;
+# never pin an absolute cwd, which is how the inf2 rig ended up pointing at a directory that
+# does not exist.
+#
+# This file was WRONG in the PyTorch sibling it was forked from: it still named
+# gpu-jax-g5g-2b, three renames later. The four registration points (.mcp.json,
+# .claude-plugin/plugin.json, this file, .claude/settings.local.json) drift silently
+# because nothing loads all four.
+[mcp_servers.gpu-llamacpp-g5g-2b-q4_0]
+command = "python3"
+args = [".claude/skills/gpu-llamacpp-g5g-2b-q4_0-management/mcp/server.py"]
+
+[mcp_servers.gpu-llamacpp-g5g-2b-q4_0.env]
+AWS_REGION = "us-east-1"
+MODEL_NAME = "google/gemma-4-E2B-it-qat-q4_0-gguf"
+MODEL_FILE = "gemma-4-E2B_q4_0-it.gguf"
+INSTANCE_TYPE = "g5g.2xlarge"
+MCP_SERVER_NAME = "gpu-llamacpp-g5g-2b-q4_0"
+
+# Launching costs money, and a spot instance can be reclaimed under you. Gate the
+# state-changing tools.
+#
+# Termination is cheap here in the sense the sibling means it — there is no built
+# image to lose. But it is NOT free the way it is on the PyTorch rig: this rig
+# COMPILES llama.cpp on every launch, because no prebuilt aarch64 CUDA binary
+# exists. A terminate throws away that build along with the model cache.
+[mcp_servers.gpu-llamacpp-g5g-2b-q4_0.tools.create_g5g_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-llamacpp-g5g-2b-q4_0.tools.terminate_g5g_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-llamacpp-g5g-2b-q4_0.tools.stop_g5g_instance]
+approval_mode = "approve"
+
+[mcp_servers.gpu-llamacpp-g5g-2b-q4_0.tools.restart_llama_server]
+approval_mode = "approve"

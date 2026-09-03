@@ -391,10 +391,21 @@ physical bound — **300 GB/s of GDDR6 and 23034 MiB is the whole envelope here*
 another config.
 
 **MEASURED 2026-08-30, and it reframes the comparison this rig exists for: decode is NOT
-bandwidth-bound at B=1.** E2B streams **3.382 GB/token** (matmuls 2.576 + tied LM head 0.805);
+bandwidth-bound at B=1.** E2B streams **4.514 GB/token** (matmuls 3.709 + tied LM head 0.805);
 the 4.698 GB PLE table is an indexed **gather**, not a stream — see `@MODELS.md`, *"Resident is
-not streamed"*. At 46.09 tok/s that is 155.9 GB/s of 300, i.e. **52% MBU against an implied
-ceiling of 88.7 tok/s**.
+not streamed"*. At 46.09 tok/s that is 208.0 GB/s of 300, i.e. **69% MBU against an implied
+ceiling of 66.5 tok/s**.
+
+> **NUMBERS CORRECTED 2026-08-30 — the conclusion above needs re-reading.** This paragraph was
+> written against a streamed figure of 3.382 GB/token that was wrong: it used the plain
+> `3 x intermediate_size x hidden_size` MLP for all 35 layers and missed `use_double_wide_mlp`,
+> which doubles `intermediate_size` on E2B's 20 KV-shared layers. The corrected 4.514 GB
+> reconciles to 0.49% against the JAX rig's measured 9.257 GB text-only resident. **MBU moves
+> 52% -> 69% and the ceiling 88.7 -> 66.5 tok/s, so "decode is NOT bandwidth-bound" is a much
+> weaker claim than when it was written** — 46.09 of 66.5 is most of the way to the wall.
+> Left for the author of this rig to re-judge rather than rewritten here. Separately: 300 GB/s
+> looks like the theoretical peak; `HARDWARE.md`'s rule is to quote the *measured* streaming
+> read, which would lower the ceiling further.
 
 So **vLLM (46.09) and JAX (48.3–48.5) both sit at about half the memory roofline**, and the ~5%
 between them is an **overhead / kernel-launch difference, not a memory-system one.** Do not

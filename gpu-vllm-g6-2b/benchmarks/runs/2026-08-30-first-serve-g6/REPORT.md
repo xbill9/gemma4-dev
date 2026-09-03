@@ -60,17 +60,20 @@ compounds under load (42% at concurrency 8), where prefill competes with decode.
 
 **Decode is not bandwidth-bound here, and that reframes the runtime comparison.**
 
-E2B streams **3.382 GB/token** — transformer matmuls 2.576 GB plus the tied LM head 0.805 GB.
+E2B streams **4.514 GB/token** — transformer matmuls 3.709 GB plus the tied LM head 0.805 GB.
+(Corrected 2026-08-30 from 3.382 GB, which missed `use_double_wide_mlp` doubling
+`intermediate_size` on E2B's 20 KV-shared layers. **The heading above was written against the
+old figure and should be re-judged**: 69% MBU is not obviously "not bandwidth-bound".)
 The 4.698 GB PLE table is an **indexed gather, not a stream** (derivation and cross-check in
 the monorepo `MODELS.md`, *"Resident is not streamed"*).
 
 | | value |
 |---|---:|
-| streamed bytes/token | 3.382 GB |
-| demand at 46.09 tok/s | 155.9 GB/s |
+| streamed bytes/token | 4.514 GB |
+| demand at 46.09 tok/s | 208.0 GB/s |
 | L4 bandwidth | 300 GB/s |
-| **memory-bandwidth utilisation** | **52%** |
-| bandwidth-implied ceiling | 88.7 tok/s |
+| **memory-bandwidth utilisation** | **69%** |
+| bandwidth-implied ceiling | 66.5 tok/s |
 
 This run independently confirms that **resident is the wrong denominator**: 46.09 tok/s ×
 9.8 GiB resident would demand **485 GB/s**, which a 300 GB/s bus makes physically impossible.

@@ -20,7 +20,7 @@ wrong before I had a box.*
 | Hardware | `g5g.4xlarge` — Graviton2 + 1x NVIDIA T4G (SM **7.5**, 15,360 MiB) |
 | Base image | Deep Learning ARM64 AMI, PyTorch 2.12 (Ubuntu 24.04) |
 | Software | torch 2.12.0+cu132 · CUDA 13.2 · vLLM v0.27.2rc0 from source (`sm_75`) |
-| Result | **43.1 tok/s** single stream · 329,579-token KV cache · one vLLM patch |
+| Result | **~31.8 tok/s** single stream, **168 tok/s** at 8 streams · 329,579-token KV cache · one vLLM patch |
 
 ---
 
@@ -243,7 +243,8 @@ finish_reason: stop      usage: 19 prompt / 32 completion / 51 total
 
 | Measure | Value |
 |---|---|
-| Throughput, single stream greedy | 42.9 tok/s @ 64, 43.1 @ 256 |
+| Throughput, single stream greedy | 42.9 tok/s @ 64, 43.1 @ 256 — **one sample each; superseded** |
+| Throughput, measured (3-run `vllm bench serve`) | **c=1 TPOT 31.44 ms (~31.8 tok/s); c=4 ~97; c=8 168.33 tok/s** |
 | KV cache | 2.95 GiB, 329,579 tokens |
 | Concurrency at 16k context | 20.12x |
 | GPU memory while serving | 13,501 / 15,360 MiB |

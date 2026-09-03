@@ -25,10 +25,19 @@ direct confirmation of what the first report could only argue: the decode step i
 costs that do not depend on batch — weight streaming and kernel launches — so every extra
 sequence in the batch is very nearly free.
 
-**84.16 tok/s at B=8 beats the vLLM sibling's 43-44 tok/s** and beats the JAX sibling's 13.10
-outright. It is measured on the engine directly, NOT through the server: `MAX_NUM_SEQS=1` and
-one lock mean the *served* path still cannot reach it. **Continuous batching is now the single
-highest-value piece of work in this rig, and it is quantified rather than assumed.**
+**84.16 tok/s at B=8** is measured on the engine directly, NOT through the server:
+`MAX_NUM_SEQS=1` and one lock mean the *served* path still cannot reach it. **Continuous
+batching is now the single highest-value piece of work in this rig, and it is quantified
+rather than assumed.**
+
+> **CORRECTION 2026-08-30.** This paragraph claimed 84.16 "beats the vLLM sibling's 43-44
+> tok/s". It does not. That figure was a single-sample smoke test from the vLLM rig's
+> 2026-08-12 first serve, and comparing this rig's `B=8` against a *single-stream* number is
+> malformed regardless. The like-for-like source is `gpu-vllm-g5g-2b`'s
+> `2026-08-14-rust-frontend-g5g` (`vllm bench serve`, three runs, one `g5g.4xlarge`):
+> **c=1 → 28.65 / 22.70 / 29.30 end-to-end, TPOT 31.44 ms; c=4 → ~97; c=8 → 168.33 / 169.22 /
+> 169.39.** vLLM is ~2x this rig at matched batch and ~3x at `B=1`, and it does it through
+> HTTP. Batching remains the right next step — it closes the gap, it does not overtake.
 
 ## Where the 93 ms/step goes
 
@@ -57,9 +66,13 @@ Four things, and the third is the actionable one:
   launch overhead is 5-10 µs: **launch-bound, not compute-bound.** This is precisely what
   `torch.compile(mode="reduce-overhead")` plus a `StaticCache` collapses into CUDA graphs, and
   it is the second-ranked piece of work.
-- The step's theoretical weight-streaming floor is 10.209 GB / 320 GB/s = **31.9 ms**, so
-  **61.3 ms of the 93.2 ms step is not bandwidth** — and, per the batch table, none of it scales
-  with B.
+- The step's weight-streaming floor is **4.514 GB / 277 GB/s = 16.30 ms**, so **76.9 ms of the
+  93.2 ms step is not bandwidth** — and, per the batch table, none of it scales with B.
+  **CORRECTED 2026-08-30**: this read "10.209 GB / 320 GB/s = 31.9 ms, so 61.3 ms". Only
+  4.514 GB streams per step (E2B's 4.698 GB PLE table is a gather, not a matmul) and the
+  measured bandwidth is 277 GB/s, not the 320 theoretical peak. The correction *strengthens*
+  this bullet — 83% of the step is unexplained by bandwidth, not 66% — and it is consistent
+  with the launch-bound finding immediately above.
 
 ## Two fixes, measured
 

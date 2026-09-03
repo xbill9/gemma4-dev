@@ -20,8 +20,16 @@ finish_reason: stop      usage: 19 prompt / 32 completion / 51 total
 | KV cache | **2.95 GiB → 329,579 tokens**, max concurrency 20.12x at 16,384 ctx |
 | Engine init | 76.4 s (compilation 2.9 s), CUDA graph capture 17 s / 0.15 GiB |
 
-Single-run, single-stream, no repeats and no variance figure. One sample per cell. For
-scale only: the Inferentia port records ~44 tok/s for E2B on one NeuronCore, so this is the
+Single-run, single-stream, no repeats and no variance figure. One sample per cell.
+
+> **FORWARD POINTER, added 2026-08-30.** The 43.1 figure above was, despite this caveat,
+> reused across ~28 files in the tree as though it were this rig's benchmark, and on
+> 2026-08-29 it led `gpu-pytorch-g5g-2b` to record that its `B=8` engine number "beats the
+> vLLM sibling." **Quote `2026-08-14-rust-frontend-g5g/` instead** — `vllm bench serve`, three
+> runs, one `g5g.4xlarge`: c=1 TPOT 31.44 ms (~31.8 tok/s decode), c=4 ~97, c=8 168.33 tok/s.
+> The measurement below is not wrong; it is a smoke test being read as a benchmark.
+
+For scale only: the Inferentia port records ~44 tok/s for E2B on one NeuronCore, so this is the
 same order — but that is a different harness on different silicon and is not a controlled
 comparison.
 

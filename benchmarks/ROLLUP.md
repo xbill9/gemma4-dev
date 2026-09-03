@@ -20,9 +20,12 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-08-25-context-sweep-g5g` | google/gemma-4-E2B-it | nvidia-t4g×1 | spot / aws | pure-jax jax 0.11.1 on Pyt… | 2-D (6ctx × 1conc) | 13 | — | 1.1 | ok | gpu-jax-g5g-2b |
 | `2026-08-25-gemma4-e2b-v6e1` | google/gemma-4-E2B-it | tpu-v6e×1 | on-demand / gcp | vllm 0.26.1rc1.dev994+gd62… | 2-D (6ctx × 7conc) | 2,134 | 0.42 | 1.1 | ok | gke-vllm-v6e1-2b |
 | `2026-08-29-first-serve-g4dn` | google/gemma-4-E2B-it | nvidia-t4×1 | — | jax 0.11.1 | 2-D (3ctx × 2conc)<br>1 infeasible | 13 | — | 1.1 | ok | gpu-jax-g4dn-2b |
-| `2026-08-29-first-serve-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (4ctx × 1conc) | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
+| `2026-08-29-gemma4-e2b-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (4ctx × 1conc) | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
 | `2026-08-29-gemma4-e2b-g6` | google/gemma-4-E2B-it | NVIDIA L4×1 | — | pytorch-transformers torch… | 2-D (4ctx × 1conc) | — | — | 1.1 | ok | gpu-pytorch-g6-2b |
-| `2026-08-29-profile-and-fixes-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (6ctx × 1conc)<br>2 infeasible | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
+| `2026-08-29-profile-fixes-gemma4-e2b-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (6ctx × 1conc)<br>2 infeasible | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
+| `2026-08-30-gemma4-e2b-g6` | google/gemma-4-E2B-it | NVIDIA L4 (Ada, SM 8.9)×1 | spot / aws | vllm 0.28.0 | 2-D (2ctx × 4conc) | 360 | 0.73 | 1.1 | ok | gpu-vllm-g6-2b |
+| `2026-08-31-crossrig-gemma4-e2b-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (6ctx × 1conc)<br>2 infeasible | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
+| `2026-08-31-spot-rerun-gemma4-e2b-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (6ctx × 1conc)<br>2 infeasible | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
 
 ## Sweep run directories
 
@@ -31,30 +34,37 @@ to a complete run if you only read the directory name, so completeness is counte
 
 | Rig | Run | Files | Result files | Infeasible cells (unshadowed) | REPORT.md | tables.md |
 |---|---|---:|---:|---:|---|---|
+| gce-pytorch-v6e1-2b | `2026-08-29-torchxla-sweep-v6e1` | 3 | 1 | 0 | **no** | **no** |
 | gce-vllm-v6e1-2b | `2026-08-10-gce-flex-v6e1` | 8 | 3 | 0 | yes | **no** |
 | gce-vllm-v6e8-31b | `2026-08-25-tp4-v6e4-31b-validation` | 3 | 0 | 0 | yes | **no** |
 | gce-vllm-v6e8-31b | `2026-08-26-xprof-tp4-v0260` | 5 | 0 | 0 | **no** | **no** |
 | gke-vllm-v6e1-2b | `2026-08-25-gke-first-provision-v6e1` | 1 | 0 | 0 | **no** | **no** |
-| gpu-jax-g4dn-2b | `2026-08-29-first-serve-g4dn` | 12 | 0 | 0 | **no** | **no** |
+| gpu-jax-g4dn-2b | `2026-08-29-first-serve-g4dn` | 12 | 5 | 0 | **no** | **no** |
 | gpu-jax-g5g-2b | `2026-08-19-first-serve-g5g` | 1 | 0 | 0 | yes | **no** |
 | gpu-jax-g5g-2b | `2026-08-21-cuda13-py314-g5g` | 1 | 0 | 0 | yes | **no** |
-| gpu-jax-g5g-2b | `2026-08-25-context-sweep-g5g` | 10 | 0 | 0 | yes | **no** |
-| gpu-jax-g5g-2b | `2026-08-26-config-sweep-g5g` | 11 | 0 | 0 | yes | **no** |
-| gpu-jax-g5g-2b | `2026-08-26-quant-levers-fixed-g5g` | 15 | 0 | 0 | yes | **no** |
-| gpu-jax-g5g-2b | `2026-08-27-baseline-g5g` | 7 | 0 | 0 | **no** | **no** |
-| gpu-jax-g5g-2b | `2026-08-27-baseline-xprof-g5g` | 11 | 0 | 0 | **no** | **no** |
+| gpu-jax-g5g-2b | `2026-08-25-context-sweep-g5g` | 10 | 1 | 0 | yes | **no** |
+| gpu-jax-g5g-2b | `2026-08-26-config-sweep-g5g` | 11 | 3 | 0 | yes | **no** |
+| gpu-jax-g5g-2b | `2026-08-26-quant-levers-fixed-g5g` | 15 | 6 | 0 | yes | **no** |
+| gpu-jax-g5g-2b | `2026-08-27-baseline-g5g` | 7 | 2 | 0 | **no** | **no** |
+| gpu-jax-g5g-2b | `2026-08-27-baseline-xprof-g5g` | 11 | 5 | 0 | **no** | **no** |
 | gpu-jax-g5g-2b | `2026-08-27-f16-weights-g5g` | 0 | 0 | 0 | **no** | **no** |
 | gpu-jax-g5g-2b | `2026-08-27-ubuntu2604-base-g5g` | 9 | 0 | 0 | yes | **no** |
 | gpu-jax-g5g-2b | `2026-08-28-f16-loader-only-g5g` | 0 | 0 | 0 | **no** | **no** |
-| gpu-jax-g5g-2b | `2026-08-28-f16-weights-g5g` | 12 | 0 | 0 | **no** | **no** |
+| gpu-jax-g5g-2b | `2026-08-28-f16-weights-g5g` | 12 | 5 | 0 | **no** | **no** |
 | gpu-jax-g5g-2b | `2026-08-28-f16-weights-released-g5g` | 0 | 0 | 0 | **no** | **no** |
-| gpu-jax-g5g-2b | `2026-08-28-full-run-cached-g5g` | 119 | 0 | 0 | yes | **no** |
-| gpu-jax-g6-2b | `2026-08-28-first-serve-g6` | 13 | 0 | 0 | yes | **no** |
-| gpu-pytorch-g5g-2b | `2026-08-29-first-serve-g5g` | 4 | 0 | 0 | yes | **no** |
-| gpu-pytorch-g5g-2b | `2026-08-29-profile-and-fixes-g5g` | 7 | 0 | 0 | yes | **no** |
-| gpu-pytorch-g6-2b | `2026-08-29-first-serve-g6` | 5 | 0 | 0 | yes | **no** |
+| gpu-jax-g5g-2b | `2026-08-28-full-run-cached-g5g` | 119 | 5 | 0 | yes | **no** |
+| gpu-jax-g5g-2b | `2026-08-31-crossrig-jax-g5g` | 4 | 1 | 0 | yes | **no** |
+| gpu-jax-g6-2b | `2026-08-28-first-serve-g6` | 13 | 5 | 0 | yes | **no** |
+| gpu-pytorch-g5g-2b | `2026-08-29-first-serve-g5g` | 4 | 1 | 0 | yes | **no** |
+| gpu-pytorch-g5g-2b | `2026-08-29-profile-and-fixes-g5g` | 7 | 3 | 2 | yes | **no** |
+| gpu-pytorch-g5g-2b | `2026-08-31-crossrig-torch-g5g` | 5 | 1 | 2 | yes | **no** |
+| gpu-pytorch-g5g-2b | `2026-08-31-spot-rerun-g5g` | 5 | 1 | 2 | yes | **no** |
+| gpu-pytorch-g6-2b | `2026-08-29-first-serve-g6` | 5 | 1 | 0 | yes | **no** |
+| gpu-vllm-g4dn-2b | `2026-08-30-first-serve-g4dn` | 4 | 2 | 0 | **no** | **no** |
 | gpu-vllm-g5g-2b | `2026-08-12-first-serve-g5g` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-08-14-rust-frontend-g5g` | 1 | 0 | 0 | yes | **no** |
+| gpu-vllm-g5g-2b | `2026-08-31-crossrig-vllm-g5g` | 4 | 1 | 0 | yes | **no** |
+| gpu-vllm-g6-2b | `2026-08-30-first-serve-g6` | 10 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-09-vllm-grid-cloudrun-l4` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-15-vllm-grid-ec2-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-15-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
@@ -66,15 +76,15 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-31b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-4b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 13 | 1 | 0 | yes | yes |
-| tpu-jax-v5e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 0 | 0 | yes | **no** |
+| tpu-jax-v5e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 5 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-29-kv-quant-v6e1` | 44 | 0 | 0 | yes | **no** |
-| tpu-jax-v5e1-2b | `2026-07-29-real-http-v6e1` | 5 | 0 | 0 | yes | **no** |
-| tpu-jax-v6e1-12b-w4a16 | `2026-07-31-gemma4-12b-v6e1` | 2 | 0 | 0 | yes | **no** |
+| tpu-jax-v5e1-2b | `2026-07-29-real-http-v6e1` | 5 | 3 | 0 | yes | **no** |
+| tpu-jax-v6e1-12b-w4a16 | `2026-07-31-gemma4-12b-v6e1` | 2 | 1 | 0 | yes | **no** |
 | tpu-jax-v6e1-26b-q4_0 | `2026-07-31-gemma4-26b-v6e1` | 1 | 0 | 0 | yes | **no** |
 | tpu-jax-v6e1-2b | `2026-07-25-vllm-sweep-v6e1` | 13 | 1 | 0 | yes | yes |
-| tpu-jax-v6e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 0 | 0 | yes | **no** |
+| tpu-jax-v6e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 5 | 0 | yes | **no** |
 | tpu-jax-v6e1-2b | `2026-07-29-kv-quant-v6e1` | 44 | 0 | 0 | yes | **no** |
-| tpu-jax-v6e1-2b | `2026-07-29-real-http-v6e1` | 5 | 0 | 0 | yes | **no** |
+| tpu-jax-v6e1-2b | `2026-07-29-real-http-v6e1` | 5 | 3 | 0 | yes | **no** |
 | tpu-jax-v6e1-31b-w4a16 | `2026-07-31-gemma4-31b-v6e1` | 67 | 20 | 0 | yes | **no** |
 | tpu-pytorch-inf2-2b | `2026-07-25-torchtpu-e2b-v6e1` | 18 | 0 | 0 | yes | **no** |
 | tpu-pytorch-inf2-2b | `2026-07-25-vllm-sweep-v6e1` | 7 | 0 | 0 | **no** | **no** |
@@ -94,10 +104,10 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-08-06-vllm-sweep-v5e1` | 28 | 13 | 0 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-08-07-gpu-mem-util-v5e1` | 3 | 0 | 0 | yes | **no** |
-| tpu-vllm-v5e1-2b | `2026-08-07-kv-quant-v5e1` | 15 | 6 | 0 | yes | **no** |
+| tpu-vllm-v5e1-2b | `2026-08-07-kv-quant-v5e1` | 15 | 7 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-07-qwix-int8-v5e1` | 4 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-09-serving-params-v5e1` | 6 | 2 | 0 | yes | **no** |
-| tpu-vllm-v5e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 0 | 0 | yes | **no** |
+| tpu-vllm-v5e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 1 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
@@ -105,7 +115,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v6e1-2b | `2026-08-07-kv-quant-v5e1` | 7 | 2 | 0 | **no** | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-10-article-validation-v6e1` | 6 | 3 | 0 | **no** | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-10-config-validation-v6e1` | 15 | 4 | 0 | yes | **no** |
-| tpu-vllm-v6e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 0 | 0 | yes | **no** |
+| tpu-vllm-v6e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 1 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e8-2b | `2026-07-25-vllm-sweep-v6e1` | 552 | 539 | 28 | yes | yes |
 
@@ -114,7 +124,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | Rig | Reports | Runs |
 |---|---:|---:|
 | gce-jaxrust-v6e1-2b | 0 | 0 |
-| gce-pytorch-v6e1-2b | 0 | 0 |
+| gce-pytorch-v6e1-2b | 0 | 1 |
 | gce-vllm-v5e1-2b | 0 | 0 |
 | gce-vllm-v5p1-2b | 0 | 0 |
 | gce-vllm-v6e1-2b | 0 | 1 |
@@ -122,15 +132,15 @@ to a complete run if you only read the directory name, so completeness is counte
 | gce-vllm-v6e8-31b | 0 | 2 |
 | gke-vllm-v6e1-2b | 1 | 1 |
 | gpu-jax-g4dn-2b | 1 | 1 |
-| gpu-jax-g5g-2b | 3 | 13 |
+| gpu-jax-g5g-2b | 3 | 14 |
 | gpu-jax-g6-2b | 0 | 1 |
 | gpu-jaxrust-g5g-2b | 0 | 0 |
 | gpu-pytorch-g4dn-2b | 0 | 0 |
-| gpu-pytorch-g5g-2b | 2 | 2 |
+| gpu-pytorch-g5g-2b | 4 | 4 |
 | gpu-pytorch-g6-2b | 1 | 1 |
-| gpu-vllm-g4dn-2b | 0 | 0 |
-| gpu-vllm-g5g-2b | 0 | 2 |
-| gpu-vllm-g6-2b | 0 | 0 |
+| gpu-vllm-g4dn-2b | 0 | 1 |
+| gpu-vllm-g5g-2b | 0 | 3 |
+| gpu-vllm-g6-2b | 1 | 1 |
 | gpu-vllm-l4-12b-w4a16 | 0 | 4 |
 | gpu-vllm-l4-26b-w4a16 | 0 | 2 |
 | gpu-vllm-l4-2b-w4a16 | 0 | 1 |

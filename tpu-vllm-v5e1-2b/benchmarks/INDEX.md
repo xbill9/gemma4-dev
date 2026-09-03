@@ -19,8 +19,8 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes |
 | `2026-08-06-vllm-sweep-v5e1` | 28 | 13 | 0 | yes |
 | `2026-08-07-gpu-mem-util-v5e1` | 3 | 0 | 0 | yes |
-| `2026-08-07-kv-quant-v5e1` | 15 | 6 | 0 | yes |
+| `2026-08-07-kv-quant-v5e1` | 15 | 7 | 0 | yes |
 | `2026-08-07-qwix-int8-v5e1` | 4 | 0 | 0 | yes |
 | `2026-08-09-serving-params-v5e1` | 6 | 2 | 0 | yes |
-| `undated-vllm-grid-a-v6e1` | 7 | 0 | 0 | yes |
+| `undated-vllm-grid-a-v6e1` | 7 | 1 | 0 | yes |
 | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes |
