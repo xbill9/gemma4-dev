@@ -1,0 +1,300 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-03-first-light-1650ti",
+    "date": "2026-09-03",
+    "source": "local-llamacpp-1650ti-2b-q4_0",
+    "notes": "First light for the rig and for the `local` platform slot. Two tools: llama-bench for the single-stream configuration sweep (concurrency 1 by construction), and llama-batched-bench for the concurrency sweep. A FORCE_MMQ rebuild was also tested and rejected."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+    "chips": 1,
+    "hbm_gb_per_chip": 4.294,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "TU117, compute capability 7.5, NO tensor cores. 12 CPU cores. Driver 610.57.04, CUDA 13.3. Not comparable to the T4-based g4dn/g5g rigs despite the matching compute capability: the T4 is TU104 and has tensor cores."
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+    "family": "gemma-4",
+    "parameters_b": 4.63,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 8192,
+    "architecture_notes": "llama.cpp reports 4.63 B params / 3.10 GiB. Slot-5 `q4_0` is what MODEL_NAME calls the export; by bytes the file is 67.7% Q6_K and 31.4% Q4_0. per_layer_token_embd (1.927 GB, 58% of the file) is TENSOR_READ_LAZY and never becomes resident."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b1-95ef7fc",
+    "backend": "CUDA",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-ngl",
+      "99",
+      "-c",
+      "8192",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "4"
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 3.638,
+    "weights_gib": 1.311,
+    "kv_cache_gib": 0.141,
+    "workspace_gib": 0.127,
+    "kv_bytes_per_token": 18432,
+    "notes": "MEASURED 1618 MiB total via nvidia-smi --query-compute-apps, against 1616 MiB predicted. usable_hbm_gib is the 3725 MiB llama.cpp reports, not the 4096 MiB nameplate. weights_gib EXCLUDES per_layer_token_embd (1.927 GB) because TENSOR_READ_LAZY keeps it host-side in the mmap; sizing from the 3.35 GB file would predict a model that cannot load on this card, and it loads with 2.1 GiB spare. A second configuration was measured for the batched case: -c 16384 --parallel 16 occupies 1818 MiB, leaving 1903 MiB free."
+  },
+  "throughput": {
+    "workload": {
+      "tool": "llama-bench",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 3,
+      "notes": "llama-bench reports prefill (pp512) and decode (tg128) as separate tests. output_tok_per_s below is tg128; the pp512 figure for the same configuration is in each point's raw block."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 70.39,
+        "per_stream_tok_per_s": 70.39,
+        "raw": {
+          "config": "-fa 0 -ctk f16 -ctv f16 -t 6",
+          "pp512_tok_per_s": 338.74,
+          "pp512_stddev": 1.11,
+          "tg128_stddev": 0.13
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 73.74,
+        "per_stream_tok_per_s": 73.74,
+        "raw": {
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 6  [BEST]",
+          "pp512_tok_per_s": 340.39,
+          "pp512_stddev": 0.66,
+          "tg128_stddev": 0.08
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 73.75,
+        "per_stream_tok_per_s": 73.75,
+        "raw": {
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4",
+          "pp512_tok_per_s": 340.33,
+          "pp512_stddev": 0.87,
+          "tg128_stddev": 0.06
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 72.97,
+        "per_stream_tok_per_s": 72.97,
+        "raw": {
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 8",
+          "pp512_tok_per_s": 338.49,
+          "pp512_stddev": 0.6,
+          "tg128_stddev": 0.03
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 65.55,
+        "per_stream_tok_per_s": 65.55,
+        "raw": {
+          "config": "-fa 1 -ctk f16 -ctv q8_0 -t 4",
+          "pp512_tok_per_s": 202.66,
+          "pp512_stddev": 0.53,
+          "tg128_stddev": 0.02
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 64.91,
+        "per_stream_tok_per_s": 64.91,
+        "raw": {
+          "config": "-fa 1 -ctk q8_0 -ctv f16 -t 4",
+          "pp512_tok_per_s": 239.09,
+          "pp512_stddev": 0.52,
+          "tg128_stddev": 0.03
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 73.33,
+        "total_tok_per_s": 119.8,
+        "per_stream_tok_per_s": 73.33,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 327.2
+        }
+      },
+      {
+        "concurrency": 2,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 121.31,
+        "total_tok_per_s": 179.62,
+        "per_stream_tok_per_s": 60.66,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 345.85
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 168.37,
+        "total_tok_per_s": 227.93,
+        "per_stream_tok_per_s": 42.09,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 352.68
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 223.75,
+        "total_tok_per_s": 274.3,
+        "per_stream_tok_per_s": 27.97,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 354.38
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 238.41,
+        "total_tok_per_s": 284.84,
+        "per_stream_tok_per_s": 14.9,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 353.71
+        }
+      },
+      {
+        "concurrency": 24,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 244.16,
+        "total_tok_per_s": 289.48,
+        "per_stream_tok_per_s": 10.17,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 355.47
+        }
+      },
+      {
+        "concurrency": 32,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 258.28,
+        "total_tok_per_s": 299.02,
+        "per_stream_tok_per_s": 8.07,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 355.03
+        }
+      },
+      {
+        "concurrency": 48,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 271.19,
+        "total_tok_per_s": 307.49,
+        "per_stream_tok_per_s": 5.65,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 355.0
+        }
+      },
+      {
+        "concurrency": 64,
+        "input_len": 128,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 277.61,
+        "total_tok_per_s": 312.91,
+        "per_stream_tok_per_s": 4.34,
+        "raw": {
+          "tool": "llama-batched-bench",
+          "config": "-fa 1 -ctk f16 -ctv f16 -t 4 -c 16384",
+          "prefill_tok_per_s": 358.5
+        }
+      }
+    ]
+  },
+  "issues": [
+    {
+      "summary": "llama.cpp warns at init that this device lacks tensor cores and suggests CMAKE_CUDA_ARCHITECTURES=61-virtual;80-virtual plus GGML_CUDA_FORCE_MMQ. TESTED: a FORCE_MMQ build at arch=75 measured pp512 337.61 / tg128 73.04 against the stock build's 340.33 / 73.75 \u2014 a wash, marginally worse. The 61-virtual;80-virtual half of the suggestion was not tested; decode is not matmul-bound here, so it is unlikely to pay.",
+      "status": "wontfix"
+    },
+    {
+      "summary": "The -ctk/-ctv q8_0 sweep was cut short by a 2-minute command timeout: the q8_0/q8_0 combination and the t=6/t=8 rows of the q8_0 configurations were not run. Not pursued because both single-sided q8_0 configurations were already clear regressions.",
+      "status": "wontfix"
+    },
+    {
+      "summary": "Max-Q thermal variance is real and large enough to invert a curve. A first concurrency sweep measured B=32 at 184.09 tok/s, BELOW B=16's 238.41; a re-run of the same command measured 258.28 and restored monotonicity. Do not read a single batched-bench row as a result.",
+      "status": "open"
+    }
+  ],
+  "notes": [
+    "Nothing here is a serving benchmark: llama-bench drives the model directly, with no HTTP path and no concurrency. Every sweep point is concurrency 1 by construction, not by measurement.",
+    "The rig's llama-server was verified healthy separately, and is what the 1618 MiB memory figure was measured against \u2014 not llama-bench.",
+    "KV cache quantization is a LOSS on this card: q8_0 on either K or V costs ~12% of decode and 20-40% of prefill. There are no tensor cores and the KV is only ~144 MiB, so the dequant work buys memory that is not scarce.",
+    "Thread count is irrelevant (73.75 / 73.08 / 72.97 at t=4/6/8) \u2014 decode is GPU-bound.",
+    "Do not compare these numbers against the T4-based g4dn/g5g rigs on the strength of a shared compute capability 7.5: the T4 is TU104 and has tensor cores, TU117 has none.",
+    "Batching is the largest lever on this card by far: aggregate decode goes 73.33 (B=1) -> 223.75 (B=8) -> 277.61 (B=64), a 3.8x. Per-stream falls correspondingly (73.33 -> 4.3), so pick the point from whether the workload is one interactive session or many.",
+    "Prefill is flat at ~355 t/s across every concurrency from 1 to 64, so the prefill path is already saturated at B=1 and batching buys nothing there.",
+    "Gemma 4 reasons. llama.cpp routes the thinking block to `reasoning_content` and leaves `content` empty until it closes: at max_tokens=64 the reply is finish_reason 'length' with EMPTY content; at 400 it is 'TPU v1, TPU v2, TPU v5' after 1274 chars of reasoning. Every -n 128 figure in this report therefore measures the thinking phase, which is fine for tok/s and misleading as a task."
+  ]
+}

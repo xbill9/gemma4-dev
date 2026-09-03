@@ -58,8 +58,9 @@ not which cloud it sits in.
 | `gke` | A GKE node pool carrying the accelerator, with the model served from a Pod rather than a VM | `gcloud container clusters create` / `node-pools create --machine-type=ct6e-…`, then `kubectl` |
 | `gpu` | A general-purpose GPU attached to a VM, any cloud | varies (GCE, EC2) |
 | `cloudrun` | A general-purpose GPU attached to cloudrun |  Cloud Run |
+| `local` | A machine you physically own and are sitting at — no API to call, nothing to create, nothing to release | nothing; the hardware is already there |
 
-These five are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
+These six are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
 slot or recorded in the rig's `tpu.env`. Add a platform value only for a genuinely different execution target.
 
 **`tpu`, `gce` and `gke` can name the same silicon, and that is the point.** `tpu-vllm-v6e1-2b`,
@@ -139,6 +140,34 @@ node pool. A manifest applied to a cluster someone else owns is not what it name
 hardest here, because the underlying VM is identical: a rig that ends up shelling to `instances create` is a
 `gce` rig with a stale name, whatever Kubernetes is doing on top of it.
 
+### `local` is the absence of a control plane
+
+Added 2026-09-03 for the llama.cpp workstation deployment.
+
+The other five values name an API you call to get hardware. `local` names the case where there is no such
+call: the accelerator is in the machine under the desk, it is there whether or not any code runs, and
+nothing in the rig provisions, waits for, or releases it. That passes this section's own test for a new
+value — a genuinely different execution target — and it passes it in the direction that matters, because
+**the entire provisioning half of a rig is absent** rather than merely spelled differently.
+
+Four things follow, and together they are why this is a slot value rather than a line in a README:
+
+- **There is no capacity to find.** Every other rig here carries machinery for a resource that might not
+  exist yet — zone scanning, queued-resource state, the `~/.cache/<rig>/tpu_zones_status.md` skip list.
+  A `local` rig has none of it, and a `local` rig that grows some has the wrong name.
+- **Capacity is a hard ceiling, not a quota conversation.** A cloud rig that doesn't fit asks for a bigger
+  machine type. A `local` rig that doesn't fit does not run. The card is the budget, and slot 3 is
+  therefore load-bearing in a way it is nowhere else.
+- **The endpoint is not discovered.** It is `127.0.0.1:<port>`, known before the process starts. This is the
+  one place the "never hardcode an endpoint" rule in `CLAUDE.md` does not apply, because there is no
+  QR → node → external IP chain to walk.
+- **Nothing is billed and nothing needs tearing down**, so the care the other rigs take not to strand
+  capacity is dead weight here.
+
+`local` is a claim about who owns the machine, not about where you are typing. SSH into a cloud VM you
+provisioned and it keeps that VM's platform value; a workstation is `local` whether or not you are sitting
+in front of it.
+
 ## Slot 2 — runtime
 
 The serving stack that actually loads the weights.
@@ -200,8 +229,17 @@ load-bearing rather than cosmetic:
 
 - **On EC2 — the instance family.** `g5g`, `g4dn`, `g6`, `g6f`. This was a `g5g`-only carve-out
   until 2026-08-28; it is now the rule for every EC2 GPU rig. See below.
-- **Everywhere else — the GPU SKU.** `l4`, `a100`: lowercase, no punctuation. This is what the
-  five `gpu-vllm-l4-*` artifact rigs use and they are unaffected.
+- **Everywhere else, `local` included — the GPU SKU.** `l4`, `a100`, `1650ti`: lowercase, no
+  punctuation, consumer parts keeping their series digits and their suffix. This is what the five
+  `gpu-vllm-l4-*` artifact rigs use and they are unaffected.
+
+**Never the architecture or the compute capability.** `turing75` was weighed for the GTX 1650 Ti on
+2026-09-03 and rejected. Compute capability 7.5 spans a 4 GB 1650 Ti and a 16 GB T4, so it drops the one
+number that decides whether a checkpoint fits at all — and it is not even a single silicon capability: the
+T4 is TU104 and has tensor cores, while the GTX 16-series is TU116/TU117 and has none. Naming this card
+`turing75` would assert equivalence with the T4-based `g4dn` and `g5g` rigs in exactly the respect where it
+differs. The architecture is a real fact; it belongs in `@HARDWARE.md`, which owns which numeric formats a
+part natively supports. The name slot carries the part.
 
 For `gce` use `cpu`.
 
@@ -405,6 +443,7 @@ Three things that trip people up:
 | `~/gemma4-dev/gpu-pytorch-g5g-2b` | **EC2 G5g** (Graviton2 host) | PyTorch / `transformers` | g5g (Graviton2 + NVIDIA T4G, Turing) | `gemma-4-E2B-it` | — — added 2026-08-28, forked from `gpu-jax-g5g-2b`. Same `g5g` carve-out as its siblings; **slot 2 is the only slot that differs from the JAX rig**, which is exactly what NAMING.md says an A/B pair looks like |
 | `~/gemma4-dev/gpu-pytorch-g4dn-2b` | **EC2 G4dn** (x86_64 host) | PyTorch / `transformers` | g4dn (Intel + NVIDIA T4, Turing) | `gemma-4-E2B-it` | — — added 2026-08-29, forked from `gpu-pytorch-g5g-2b` into a directory that was a stale copy of `gpu-jax-g4dn-2b`. **The fourth corner of the {jax, pytorch} x {g5g, g4dn} square**, so it differs from `gpu-pytorch-g5g-2b` in slot 3 only and from `gpu-jax-g4dn-2b` in slot 2 only. The latter pair is the point: identical hardware, so it is the cleanest runtime A/B in the tree — cleaner than the G5g pair, whose vLLM side used hand-reduced Triton tiles. The EC2-family rule earns its keep again here, since a `t4`-something slot would make this name collide with `gpu-pytorch-g5g-2b`'s silicon while hiding the host, and the host is what the two AMI lines differ on |
 | `~/gemma4-dev/tpu-jax-inf2-2b` | Inferentia (slot `tpu`) | pure JAX (`jax-neuronx`) | inf2 | `gemma-4-E2B-it` | — — added 2026-08-28. Slot 3 is unaffected by the EC2 rule: `inf2` is both the part name and the instance family, so both readings agree |
+| `~/gemma4-dev/local-llamacpp-1650ti-2b-q4_0` | **Local workstation** — no control plane, nothing provisioned | `llama-server`, driven directly | 1650ti (TU117, sm_75, 4096 MiB) | `gemma-4-E2B-it-qat-q4_0-gguf` | `q4_0` — added 2026-09-03, **the first `local` rig**, and the slot-1 value was added for it. Not a fork of anything. **Slot 3 is `1650ti` and deliberately not `turing75`**: sm_75 is shared with the T4-based `g4dn`/`g5g` rigs, but the T4 is TU104 and has tensor cores while TU116/TU117 has none, so the architecture would assert an equivalence that does not hold — and it would drop the 4096 MiB figure, which is the binding constraint on a `local` rig where capacity is a ceiling rather than a quota conversation. **Slot 5 is the weakest claim in this table**: the artifact is 67.7% Q6_K and only 31.4% Q4_0, so `q4_0` is what `MODEL_NAME` calls the export, not a description of the tensors. **Slots 1 and 3 are the only slots that differ from `gpu-llamacpp-g5g-2b-q4_0`**, which serves the same artifact through the same runtime — so the pair is a local-vs-cloud A/B on identical weights, and the two rigs currently *disagree* on whether `per_layer_token_embd` occupies VRAM — **settled 2026-09-03 in this rig's favour by measurement**, and the sibling corrected. **First light 2026-09-03**, and a full sweep the same day: 73.75 tok/s single-stream decode, 1618 MiB of 4096, and end-to-end serving throughput capped at ~45-48 tok/s because prefill does not batch |
 | `~/gemma4-dev/gpu-vllm-l4-2b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-4b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
 | `~/gemma4-dev/gpu-vllm-l4-12b-w4a16` | NVIDIA L4 | vLLM | l4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, see below |
@@ -600,7 +639,7 @@ project's README and env file, not its directory name.
 
 1. Name the directory from the four mandatory slots. For slot 1, pick the **control plane you will actually
    provision through** — `tpu` for the Cloud TPU API, `gce` for a Compute Engine TPU machine type, `gke` for
-   a GKE node pool. This is a claim about the code in `server.py`, and a rig that switches paths needs the
+   a GKE node pool, `local` for hardware you already own and provision nothing for. This is a claim about the code in `server.py`, and a rig that switches paths needs the
    rename. Three of these can name one chip, so slot 1 is the only thing telling them apart.
 2. Add slot 5 if the weights aren't the reference build — one lowercase token naming the **encoding**
    (`w4a16`, `q4_0`, `int4`), read off `MODEL_NAME`. Not `qat`, not the container, not a runtime flag.

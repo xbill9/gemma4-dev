@@ -1,0 +1,446 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-03-full-sweep-1650ti",
+    "date": "2026-09-03",
+    "source": "local-llamacpp-1650ti-2b-q4_0",
+    "notes": "Full sweep: concurrency at a fixed 512/128 shape, plus a context x output-length sweep at concurrency 1. Prompt cache defeated via cache_prompt:false -- a FIRST attempt was discarded because llama-server's prefix cache answered 656 of 661 prompt tokens despite the harness's leading nonce; that artifact is kept beside this one as concurrency.DISCARDED-prompt-cache.json."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+    "chips": 1,
+    "hbm_gb_per_chip": 4.294,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "TU117, compute capability 7.5, NO tensor cores. Max-Q: thermally throttled, and it inverted a curve once."
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+    "family": "gemma-4",
+    "parameters_b": 4.63,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 8192,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes. At 32 and 128 output tokens every cell here is measuring the thinking phase."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b1-95ef7fc",
+    "backend": "CUDA",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-ngl",
+      "99",
+      "-c",
+      "32768",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "4",
+      "--parallel",
+      "32"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (copy of gpu-pytorch-g5g-2b, three bugs fixed)",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 3,
+      "notes": "decode-source auto -> stream; llama-server emits no usage.decode_tokens_per_second."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 32.742,
+        "per_stream_tok_per_s": 69.89,
+        "ttft_ms": {
+          "median": 2134.61,
+          "p99": 2134.61
+        },
+        "tpot_ms": {
+          "median": 14.308
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.2,
+          "min": 32.715,
+          "max": 32.779
+        }
+      },
+      {
+        "concurrency": 2,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 40.592,
+        "per_stream_tok_per_s": 55.265,
+        "ttft_ms": {
+          "median": 4061.82,
+          "p99": 4061.45
+        },
+        "tpot_ms": {
+          "median": 18.095
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.3,
+          "min": 40.55,
+          "max": 40.671
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 45.119,
+        "per_stream_tok_per_s": 36.858,
+        "ttft_ms": {
+          "median": 7981.65,
+          "p99": 7981.92
+        },
+        "tpot_ms": {
+          "median": 27.131
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.2,
+          "min": 45.092,
+          "max": 45.164
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 44.793,
+        "per_stream_tok_per_s": 18.743,
+        "ttft_ms": {
+          "median": 16211.54,
+          "p99": 16240.04
+        },
+        "tpot_ms": {
+          "median": 53.354
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 7.7,
+          "min": 44.721,
+          "max": 48.161
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 45.887,
+        "per_stream_tok_per_s": 10.313,
+        "ttft_ms": {
+          "median": 32551.29,
+          "p99": 32742.22
+        },
+        "tpot_ms": {
+          "median": 96.967
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.5,
+          "min": 45.756,
+          "max": 45.999
+        }
+      },
+      {
+        "concurrency": 32,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 48.187,
+        "per_stream_tok_per_s": 5.424,
+        "ttft_ms": {
+          "median": 61825.46,
+          "p99": 66241.74
+        },
+        "tpot_ms": {
+          "median": 184.359
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.1,
+          "min": 48.175,
+          "max": 48.224
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 108,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 40.869,
+        "per_stream_tok_per_s": 71.155,
+        "ttft_ms": {
+          "median": 389.392
+        },
+        "tpot_ms": {
+          "median": 14.0538
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 71.155,
+          "implied_prefill_tok_per_s": 324.1,
+          "content_chunks": 0,
+          "reasoning_chunks": 29,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 108,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 59.723,
+        "per_stream_tok_per_s": 70.841,
+        "ttft_ms": {
+          "median": 391.708
+        },
+        "tpot_ms": {
+          "median": 14.109
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 70.841,
+          "implied_prefill_tok_per_s": 321.3,
+          "content_chunks": 0,
+          "reasoning_chunks": 125,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 661,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 12.525,
+        "per_stream_tok_per_s": 69.498,
+        "ttft_ms": {
+          "median": 2151.907
+        },
+        "tpot_ms": {
+          "median": 14.4136
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 69.498,
+          "implied_prefill_tok_per_s": 315.6,
+          "content_chunks": 0,
+          "reasoning_chunks": 29,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 661,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 32.386,
+        "per_stream_tok_per_s": 69.107,
+        "ttft_ms": {
+          "median": 2158.344
+        },
+        "tpot_ms": {
+          "median": 14.4742
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 69.107,
+          "implied_prefill_tok_per_s": 314.8,
+          "content_chunks": 0,
+          "reasoning_chunks": 125,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1279,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 7.017,
+        "per_stream_tok_per_s": 68.51,
+        "ttft_ms": {
+          "median": 4153.031
+        },
+        "tpot_ms": {
+          "median": 14.6708
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 68.51,
+          "implied_prefill_tok_per_s": 312.5,
+          "content_chunks": 0,
+          "reasoning_chunks": 29,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1279,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 21.496,
+        "per_stream_tok_per_s": 68.611,
+        "ttft_ms": {
+          "median": 4147.196
+        },
+        "tpot_ms": {
+          "median": 14.575
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 68.611,
+          "implied_prefill_tok_per_s": 312.8,
+          "content_chunks": 0,
+          "reasoning_chunks": 125,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2527,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 3.582,
+        "per_stream_tok_per_s": 67.226,
+        "ttft_ms": {
+          "median": 8519.743
+        },
+        "tpot_ms": {
+          "median": 14.8751
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 67.226,
+          "implied_prefill_tok_per_s": 298.8,
+          "content_chunks": 0,
+          "reasoning_chunks": 29,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2527,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 12.344,
+        "per_stream_tok_per_s": 67.022,
+        "ttft_ms": {
+          "median": 8519.364
+        },
+        "tpot_ms": {
+          "median": 14.9205
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 67.022,
+          "implied_prefill_tok_per_s": 298.7,
+          "content_chunks": 0,
+          "reasoning_chunks": 125,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 5027,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 1.756,
+        "per_stream_tok_per_s": 65.3,
+        "ttft_ms": {
+          "median": 17795.955
+        },
+        "tpot_ms": {
+          "median": 15.3088
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 65.3,
+          "implied_prefill_tok_per_s": 283.4,
+          "content_chunks": 0,
+          "reasoning_chunks": 29,
+          "chunks_match_usage": false
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 5027,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 6.498,
+        "per_stream_tok_per_s": 65.232,
+        "ttft_ms": {
+          "median": 17792.924
+        },
+        "tpot_ms": {
+          "median": 15.3299
+        },
+        "raw": {
+          "phase": "context-sweep",
+          "decode_tok_per_s": 65.232,
+          "implied_prefill_tok_per_s": 283.4,
+          "content_chunks": 0,
+          "reasoning_chunks": 125,
+          "chunks_match_usage": false
+        }
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 3.638,
+    "weights_gib": 1.311,
+    "kv_bytes_per_token": 18432,
+    "notes": "-c 32768 --parallel 32 measured 2106 MiB; -c 8192 --parallel 1 measured 1598 MiB."
+  },
+  "issues": [
+    {
+      "summary": "FIRST CONCURRENCY RUN DISCARDED. llama-server's prefix cache answered 656 of 661 prompt tokens despite sweep.py's leading nonce -- it reuses cached KV either side of a small mismatch rather than requiring an exact common prefix. Prefill read as 38 ms instead of 2080 ms, unevenly across cells, producing an incoherent rather than obviously-wrong curve. Fixed with cache_prompt:false; the discarded artifact is kept as concurrency.DISCARDED-prompt-cache.json.",
+      "status": "fixed"
+    },
+    {
+      "summary": "sweep.py counted only delta.content off the SSE stream, so Gemma 4's reasoning tokens were invisible and every cell stamped zero tokens. Fixed to stamp either field. All three sibling copies carried the same bug and were fixed 2026-09-03.",
+      "status": "fixed"
+    },
+    {
+      "summary": "sweep.py's concurrency failure path did None[:200], raising TypeError and killing the whole run instead of recording one failed cell. Fixed.",
+      "status": "fixed"
+    },
+    {
+      "summary": "--repeats was silently ignored in concurrency mode: every concurrency number this family has published is a single sample. Fixed to take a median and record the spread.",
+      "status": "fixed"
+    },
+    {
+      "summary": "Every cell measures the REASONING phase. content_chunks is 0 and reasoning_chunks is ~29-125 in every context cell at 32 and 128 output tokens -- the model had not finished thinking. The tok/s is real; no cell completed a task.",
+      "status": "open"
+    },
+    {
+      "summary": "stream_chunks (29) does not match usage.completion_tokens (32) -- the harness's one-delta-per-chunk assumption does not hold exactly for llama-server. Recorded per cell as chunks_match_usage:false. Decode rate is computed from inter-token gaps so it is unaffected, but a token COUNT taken from chunks would be ~9% low.",
+      "status": "open"
+    }
+  ],
+  "notes": [
+    "PREFILL DOES NOT BATCH. TTFT doubles exactly with each doubling of concurrency (2135/4062/7982/16212/32551/61825 ms), so aggregate output saturates at 45-48 tok/s and only 1.47x from c=1. Adding clients past c=4 buys latency and nothing else.",
+    "Decode DOES batch -- llama-batched-bench measured 73->278 tok/s from B=1 to B=64 -- but that is the decode phase in isolation. At 512 in / 128 out prefill is 4x the token volume of decode, so the phase that scales is the minority of the work. Never quote the decode figure without naming the phase.",
+    "Decode is remarkably flat in context: 71.15 tok/s at 108 input tokens to 65.23 at 5027, i.e. -8.3% across a 46x context increase. End-to-end collapses over the same range (40.87 -> 1.76 at 32 output tokens) entirely from prefill cost.",
+    "Implied prefill rate is ~284-324 t/s and degrades mildly with context.",
+    "Two servers were needed: llama.cpp splits --ctx-size across --parallel slots, so the concurrency sweep ran on -c 32768 --parallel 32 (1024 tok/slot) and the context sweep on -c 8192 --parallel 1.",
+    "Do not compare against the T4-based g4dn/g5g rigs on a shared compute capability 7.5: the T4 is TU104 with tensor cores, this is TU117 with none."
+  ]
+}
