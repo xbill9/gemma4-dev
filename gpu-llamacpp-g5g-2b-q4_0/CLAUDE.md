@@ -62,7 +62,7 @@ Derived from the file's own tensor table, against the PyTorch sibling's **measur
 | | fp16 (measured) | Q4_0 (derived) |
 | --- | ---: | ---: |
 | Streamed per decode step | 4.514 GB | **1.407 GB** |
-| Resident | 10.209 GB | **3.35 GB** |
+| Resident | 10.209 GB | **~1.4 GB** (was 3.35 GB — corrected 2026-09-03, see below) |
 | Bandwidth ceiling @ 277 GB/s | 61.4 tok/s | 197 tok/s |
 | Measured decode | 10.88 tok/s (18% of ceiling) | — |
 
@@ -72,7 +72,22 @@ overhead. The two controlled experiments in `QUANTIZATION.md` are what a bandwid
 buys here: `ple_bits=4` removed **3.505 GB** for **0.0%**, and `int8_lm_head` removed 11.9% of
 streamed bytes for **+2.3%**.
 
-**The win is residency.** Freeing ~6.9 GB of a 14.07 GB budget is what pays for batching, and
+**CORRECTION 2026-09-03 — the residency win is BIGGER than this section said, because 58% of the
+GGUF never reaches the GPU.** `per_layer_token_embd` (1.927 GB of the 3.334 GB) is created with
+`TENSOR_READ_LAZY` in upstream `src/models/gemma4.cpp` and served by `GGML_OP_GET_ROWS` out of the
+mmap, so it stays on the host. MEASURED on `local-llamacpp-1650ti-2b-q4_0` (GTX 1650 Ti, 4096 MiB):
+`llama-server -ngl 99 -c 8192` occupies **1618 MiB**, not ~3.5 GB. Filed in `MODELS.md`.
+
+The `Resident 3.35 GB` above was the whole file, which was the wrong figure for a VRAM budget — the
+*Streamed per decode step* row, 1.407 GB, is the same set of tensors under the right label and was
+correct all along. Nothing here was mismeasured; this rig has served nothing and both columns were
+derived.
+
+**Free budget on a T4G is therefore ~8.8 GB of 14.07, not ~6.9 GB.** That is more room for
+batching, not less, so the experiment below is if anything better motivated — but re-derive the
+slot count from ~1.4 GB rather than from 3.35 GB before setting `PARALLEL_SLOTS`.
+
+**The win is residency.** Freeing ~8.8 GB of a 14.07 GB budget is what pays for batching, and
 the PyTorch sibling measured batching at **7.84x** (B=8, 84.16 tok/s) for 0.258 GB. That is the
 experiment this rig exists to make cheap — but run it deliberately, with `PARALLEL_SLOTS` raised
 in a run whose REPORT.md says so. Changing the default silently invalidates every comparison.

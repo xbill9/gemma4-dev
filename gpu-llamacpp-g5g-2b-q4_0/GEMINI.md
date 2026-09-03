@@ -66,7 +66,7 @@ Derived from the file's own tensor table, against the PyTorch sibling's **measur
 | | fp16 (measured) | Q4_0 (derived) |
 | --- | ---: | ---: |
 | Streamed per decode step | 4.514 GB | **1.407 GB** |
-| Resident | 10.209 GB | **3.35 GB** |
+| Resident | 10.209 GB | **~1.4 GB** (was 3.35 GB — corrected 2026-09-03: `per_layer_token_embd`, 58% of the GGUF, is `TENSOR_READ_LAZY` and stays on the host. MEASURED 1618 MiB on `local-llamacpp-1650ti-2b-q4_0`; filed in `MODELS.md`. Free budget is ~8.8 GB of 14.07, not ~6.9 GB) |
 | Bandwidth ceiling @ 277 GB/s | 61.4 tok/s | 197 tok/s |
 | Measured decode | 10.88 tok/s (18% of ceiling) | — |
 
@@ -76,7 +76,7 @@ overhead. The two controlled experiments in `QUANTIZATION.md` are what a bandwid
 buys here: `ple_bits=4` removed **3.505 GB** for **0.0%**, and `int8_lm_head` removed 11.9% of
 streamed bytes for **+2.3%**.
 
-**The win is residency.** Freeing ~6.9 GB of a 14.07 GB budget is what pays for batching, and
+**The win is residency.** Freeing ~8.8 GB of a 14.07 GB budget is what pays for batching, and
 the PyTorch sibling measured batching at **7.84x** (B=8, 84.16 tok/s) for 0.258 GB. That is the
 experiment this rig exists to make cheap — but run it deliberately, with `PARALLEL_SLOTS` raised
 in a run whose REPORT.md says so. Changing the default silently invalidates every comparison.

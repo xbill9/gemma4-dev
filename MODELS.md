@@ -554,6 +554,48 @@ measured 8.97 GiB on a v5e-1 and 9.257 GB on a T4G against 10.2 GB here). **For 
 treat the bf16 column as a ceiling and the int4 column as a floor** — the error runs in opposite
 directions, so a plan that survives both is safe and one that needs the int4 figure to be exact is not.
 
+### On llama.cpp, 58% of the E2B GGUF never reaches the accelerator
+
+**MEASURED 2026-09-03 on `local-llamacpp-1650ti-2b-q4_0`** (GTX 1650 Ti, 4096 MiB). This is a
+property of how llama.cpp loads E2B, so it holds wherever llama.cpp serves this checkpoint.
+
+`google/gemma-4-E2B-it-qat-q4_0-gguf` is 3.334 GB of tensor data across 541 tensors, and
+`per_layer_token_embd.weight` alone is **1.927 GB of it — 58%**. That tensor is
+`[8960, 262144]`: `hidden_size_per_layer_input=256` x 35 layers = 8960, against
+`vocab_size_per_layer_input=262144`. It is the per-layer-embedding table this file describes
+above, and it is most of the gap between E2B's ~5B total and 2B effective params.
+
+**llama.cpp does not make it resident.** `src/models/gemma4.cpp` creates it with
+`TENSOR_READ_LAZY` — "read rows on demand instead of loading whole tensor; requires mmap for now"
+(`src/llama-model-loader.h`) — and it is a `GGML_OP_GET_ROWS` lookup rather than a matmul
+(`src/llama-arch.cpp`), so rows are pulled from the mapped file on the host as tokens need them.
+
+Measured, `-ngl 99 -c 8192 -ctk f16 -ctv f16`:
+
+```
+1342 MiB  resident weights (3.334 GB total - 1.927 GB lazy PLE)
++ 144 MiB  KV, 8192 tokens x 18 KiB/token
++ ~130 MiB  CUDA context + compute buffers
+= 1616 MiB predicted        1618 MiB measured (nvidia-smi, per-process)
+```
+
+**Two consequences, and both have already caught a rig:**
+
+- **Never size a llama.cpp E2B deployment from the file size on disk.** 3.35 GB against a 4 GiB
+  card reads as "will not fit"; the real requirement is ~1.6 GiB and it fits with 2.3 GiB spare.
+  A rig that lowers `--n-gpu-layers` on the strength of the disk figure is slower for no reason.
+- **`--no-mmap` inverts the result.** `TENSOR_READ_LAZY` requires mmap, so disabling it forces the
+  1.93 GB tensor to be materialised and turns a comfortable fit into an OOM.
+
+**This corrects a derived figure in `gpu-llamacpp-g5g-2b-q4_0`**, whose table gives
+*Resident: 3.35 GB* for this artifact and computes "freeing ~6.9 GB of a 14.07 GB budget" from it.
+Resident is ~1.4 GB and the freeing is ~8.8 GB. Note that rig's *other* row is right and agrees
+exactly: 1.407 GB "streamed per decode step" is the same set of tensors under the correct label.
+
+**Do not extrapolate the 58% to other sizes.** It is a property of the `E` checkpoints — 12B, 26B
+and 31B have `hidden_size_per_layer_input=0` and no such tensor at all (see the family table
+above), so their GGUF footprint is resident in full.
+
 **The `E` prefix is load-bearing.** E4B is *not* a 4B dense model — 4.5B effective, 8.0B total. Reading
 `E4B` as "4B" understates its weights by roughly 2x, which is the difference between fitting a 16 GB
 accelerator and not.
