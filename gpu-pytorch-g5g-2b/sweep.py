@@ -118,6 +118,28 @@ def prompt_for(approx_tokens: int, unique: bool = True) -> str:
     return head + " ".join(body) + "\n\nSummarize the text above."
 
 
+# Send `cache_prompt: false` on every request, to stop the engine's prefix cache
+# from answering the question the sweep is asking.
+#
+# OFF HERE: the server is a hand-rolled transformers loop with no prefix cache
+# to defeat, so the flag would be an unknown field for no benefit. If that
+# server ever gains prompt caching, this must be revisited.
+#
+# WHY THIS EXISTS AT ALL: prompt_for() puts a unique nonce at the FRONT of every
+# prompt, and its comment explains that a trailing nonce would not defeat a
+# prefix cache. That is right for vLLM and WRONG for llama.cpp, which reuses the
+# cached KV either side of a small mismatch instead of requiring an exact common
+# prefix. MEASURED 2026-09-03 on `local-llamacpp-1650ti-2b-q4_0`: a 661-token
+# prompt with a fresh leading nonce came back `cached=656`, "prefilled" in 38 ms.
+# With cache_prompt false: `cached=0`, 2080 ms, 318 t/s. A whole concurrency
+# sweep was discarded over it, and its curve was not obviously wrong -- it was
+# merely incoherent, which is worse.
+#
+# A rig whose engine REJECTS unknown fields must not simply set this False and
+# move on: that measures the cache. Defeat it another way (restart between
+# cells, or vary the prompt beyond any reuse window) and say so in the report.
+DEFEAT_PROMPT_CACHE = False
+
 def _chat_body(model: str, prompt: str, max_tokens: int, stream: bool) -> dict:
     body = {
         "model": model,
@@ -125,6 +147,8 @@ def _chat_body(model: str, prompt: str, max_tokens: int, stream: bool) -> dict:
         "max_tokens": max_tokens,
         "temperature": 0.0,
     }
+    if DEFEAT_PROMPT_CACHE:
+        body["cache_prompt"] = False
     if stream:
         body["stream"] = True
         # vLLM only emits a usage block on a stream when asked; our servers send
@@ -168,6 +192,7 @@ def one_stream(base: str, model: str, prompt: str, max_tokens: int,
     )
     stamps: list[float] = []
     pieces: list[str] = []
+    reasoning_chunks = 0
     usage: dict = {}
     t0 = time.perf_counter()
     with urllib.request.urlopen(req, timeout=timeout) as fh:
@@ -185,11 +210,31 @@ def one_stream(base: str, model: str, prompt: str, max_tokens: int,
             if chunk.get("usage"):
                 usage = chunk["usage"]
             for choice in chunk.get("choices", []) or []:
-                delta = (choice.get("delta") or {}).get("content")
-                if delta:
+                d = choice.get("delta") or {}
+                # REASONING TOKENS ARE TOKENS. Gemma 4 emits a thinking block, and
+                # an OpenAI-compatible server that splits it out streams it as
+                # `reasoning_content` with `content` empty until the block closes.
+                # Counting only `content` then stamps ZERO tokens for the whole
+                # run. Decode rate is a property of the token loop and does not
+                # care which field the text lands in, so stamp either; the split
+                # is reported separately so a cell that thought until it ran out
+                # of budget is visible rather than looking like a fast empty answer.
+                #
+                # UNVERIFIED for this rig: its server is a hand-rolled transformers loop that
+                # may leave the thinking block inline in `content`. The change is purely
+                # additive -- if `reasoning_content` never appears, behaviour is identical.
+                #
+                # MEASURED 2026-09-03 on `local-llamacpp-1650ti-2b-q4_0`, where
+                # this made every cell fail outright.
+                delta = d.get("content")
+                reasoning = d.get("reasoning_content")
+                if delta or reasoning:
                     # Stamp on arrival, before any parsing of later chunks.
                     stamps.append(time.perf_counter())
-                    pieces.append(delta)
+                    if delta:
+                        pieces.append(delta)
+                    else:
+                        reasoning_chunks += 1
     wall = time.perf_counter() - t0
 
     n = len(stamps)
@@ -209,6 +254,11 @@ def one_stream(base: str, model: str, prompt: str, max_tokens: int,
         "prompt_tokens": usage.get("prompt_tokens", 0),
         "completion_tokens": completion,
         "stream_chunks": n,
+        # Split of the above. A cell where content_chunks is 0 and
+        # reasoning_chunks is large did not answer -- it thought until it ran
+        # out of max_tokens. The tok/s is real; the task was not completed.
+        "content_chunks": n - reasoning_chunks,
+        "reasoning_chunks": reasoning_chunks,
         # One delta per chunk is an assumption; this is how you find out it broke.
         "chunks_match_usage": (usage.get("completion_tokens") in (None, n)),
         "decode_tps": round(1.0 / tpot_mean_s, 4) if tpot_mean_s else 0.0,
@@ -248,8 +298,13 @@ def concurrency_point(base: str, model: str, ctx: int, out_len: int,
     wall = time.perf_counter() - t0
     ok = [r for r in runs if "error" not in r and r.get("stream_chunks")]
     if not ok:
-        return {"concurrency": c, "status": "failed",
-                "error": (runs[0].get("error") if runs else "no responses")[:200]}
+        # `.get("error")` is None for a request that returned 200 and produced no
+        # countable tokens, so `None[:200]` raised TypeError and took the WHOLE
+        # run down instead of recording one failed cell. Hit for real on
+        # `local-llamacpp-1650ti-2b-q4_0` 2026-09-03, via the reasoning_content
+        # bug above -- two failures compounding, the second hiding the first.
+        first = (runs[0].get("error") if runs else None) or "no countable tokens in any response"
+        return {"concurrency": c, "status": "failed", "error": str(first)[:200]}
     tokens = sum(r["completion_tokens"] for r in ok)
     return {
         "concurrency": c,
@@ -372,8 +427,29 @@ def main() -> int:
         concurrency_point(args.base, args.model, args.conc_input,
                           args.conc_output, 1, unique)
         for c in levels:
-            pt = concurrency_point(args.base, args.model, args.conc_input,
-                                   args.conc_output, c, unique)
+            # --repeats WAS SILENTLY IGNORED HERE until 2026-09-03. The context
+            # sweep honoured it; this loop fired each level exactly once, so
+            # EVERY concurrency number this family has published is a single
+            # sample. That is not survivable on a thermally-throttled part: a
+            # pass on `local-llamacpp-1650ti-2b-q4_0` measured B=32 BELOW B=16,
+            # and an identical re-run did not reproduce it.
+            # Median of `repeats`, with the spread recorded so a wide one is
+            # visible rather than averaged away.
+            trials = [concurrency_point(args.base, args.model, args.conc_input,
+                                        args.conc_output, c, unique)
+                      for _ in range(max(1, args.repeats))]
+            good = [t for t in trials if t["status"] == "ok"]
+            if not good:
+                pt = trials[0]
+            else:
+                rates = sorted(t["output_tokens_per_second"] for t in good)
+                pt = dict(min(good, key=lambda t: abs(t["output_tokens_per_second"]
+                                                      - statistics.median(rates))))
+                pt["repeats"] = len(good)
+                pt["output_tps_min"] = rates[0]
+                pt["output_tps_max"] = rates[-1]
+                pt["output_tps_spread_pct"] = (round(100 * (rates[-1] - rates[0]) / rates[0], 1)
+                                               if rates[0] else 0.0)
             points.append(pt)
             if pt["status"] == "ok":
                 print(f"c={c:<3d} {pt['output_tokens_per_second']:8.2f} tok/s aggregate  "

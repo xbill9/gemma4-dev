@@ -132,6 +132,28 @@ def prompt_for(approx_tokens: int, unique: bool = True) -> str:
     return head + " ".join(body) + "\n\nSummarize the text above."
 
 
+# Send `cache_prompt: false` on every request, to stop the engine's prefix cache
+# from answering the question the sweep is asking.
+#
+# ON HERE, and verified: this is `llama-server`, the same engine and the same
+# GGUF on which the effect was measured. `cache_prompt` is a real llama-server
+# request field.
+#
+# WHY THIS EXISTS AT ALL: prompt_for() puts a unique nonce at the FRONT of every
+# prompt, and its comment explains that a trailing nonce would not defeat a
+# prefix cache. That is right for vLLM and WRONG for llama.cpp, which reuses the
+# cached KV either side of a small mismatch instead of requiring an exact common
+# prefix. MEASURED 2026-09-03 on `local-llamacpp-1650ti-2b-q4_0`: a 661-token
+# prompt with a fresh leading nonce came back `cached=656`, "prefilled" in 38 ms.
+# With cache_prompt false: `cached=0`, 2080 ms, 318 t/s. A whole concurrency
+# sweep was discarded over it, and its curve was not obviously wrong -- it was
+# merely incoherent, which is worse.
+#
+# A rig whose engine REJECTS unknown fields must not simply set this False and
+# move on: that measures the cache. Defeat it another way (restart between
+# cells, or vary the prompt beyond any reuse window) and say so in the report.
+DEFEAT_PROMPT_CACHE = True
+
 def _chat_body(model: str, prompt: str, max_tokens: int, stream: bool) -> dict:
     body = {
         "model": model,
@@ -139,6 +161,8 @@ def _chat_body(model: str, prompt: str, max_tokens: int, stream: bool) -> dict:
         "max_tokens": max_tokens,
         "temperature": 0.0,
     }
+    if DEFEAT_PROMPT_CACHE:
+        body["cache_prompt"] = False
     if stream:
         body["stream"] = True
         # vLLM only emits a usage block on a stream when asked; our servers send
@@ -182,6 +206,7 @@ def one_stream(base: str, model: str, prompt: str, max_tokens: int,
     )
     stamps: list[float] = []
     pieces: list[str] = []
+    reasoning_chunks = 0
     usage: dict = {}
     t0 = time.perf_counter()
     with urllib.request.urlopen(req, timeout=timeout) as fh:
@@ -199,11 +224,30 @@ def one_stream(base: str, model: str, prompt: str, max_tokens: int,
             if chunk.get("usage"):
                 usage = chunk["usage"]
             for choice in chunk.get("choices", []) or []:
-                delta = (choice.get("delta") or {}).get("content")
-                if delta:
+                d = choice.get("delta") or {}
+                # REASONING TOKENS ARE TOKENS. Gemma 4 emits a thinking block, and
+                # an OpenAI-compatible server that splits it out streams it as
+                # `reasoning_content` with `content` empty until the block closes.
+                # Counting only `content` then stamps ZERO tokens for the whole
+                # run. Decode rate is a property of the token loop and does not
+                # care which field the text lands in, so stamp either; the split
+                # is reported separately so a cell that thought until it ran out
+                # of budget is visible rather than looking like a fast empty answer.
+                #
+                # THIS RIG IS THE SAME ENGINE AND THE SAME ARTIFACT as the rig that hit it,
+                # so this is a certainty here, not a precaution.
+                #
+                # MEASURED 2026-09-03 on `local-llamacpp-1650ti-2b-q4_0`, where
+                # this made every cell fail outright.
+                delta = d.get("content")
+                reasoning = d.get("reasoning_content")
+                if delta or reasoning:
                     # Stamp on arrival, before any parsing of later chunks.
                     stamps.append(time.perf_counter())
-                    pieces.append(delta)
+                    if delta:
+                        pieces.append(delta)
+                    else:
+                        reasoning_chunks += 1
     wall = time.perf_counter() - t0
 
     n = len(stamps)
@@ -223,6 +267,11 @@ def one_stream(base: str, model: str, prompt: str, max_tokens: int,
         "prompt_tokens": usage.get("prompt_tokens", 0),
         "completion_tokens": completion,
         "stream_chunks": n,
+        # Split of the above. A cell where content_chunks is 0 and
+        # reasoning_chunks is large did not answer -- it thought until it ran
+        # out of max_tokens. The tok/s is real; the task was not completed.
+        "content_chunks": n - reasoning_chunks,
+        "reasoning_chunks": reasoning_chunks,
         # One delta per chunk is an assumption; this is how you find out it broke.
         "chunks_match_usage": (usage.get("completion_tokens") in (None, n)),
         "decode_tps": round(1.0 / tpot_mean_s, 4) if tpot_mean_s else 0.0,
