@@ -30,6 +30,8 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-08-31-spot-rerun-gemma4-e2b-g5g` | google/gemma-4-E2B-it | NVIDIA T4G×1 | — | pytorch-transformers torch… | 2-D (6ctx × 1conc)<br>2 infeasible | — | — | 1.1 | ok | gpu-pytorch-g5g-2b |
 | `2026-09-03-first-light-1650ti` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b1-95ef7fc | 2-D (2ctx × 9conc) | 278 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
 | `2026-09-03-full-sweep-1650ti` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b1-95ef7fc | 2-D (6ctx × 6conc) | 60 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
+| `2026-09-04-first-light-ollama-1650ti` | gemma4:e2b-it-qat | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ollama 0.33.2 | 2-D (6ctx × 6conc)<br>6 failed | 59 | — | 1.1 | ok | local-ollama-1650ti-2b-q4_0 |
+| `2026-09-04-text-only-ollama-1650ti` | gemma4:e2b-it-qat-text | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ollama 0.33.2 | 2-D (1ctx × 6conc) | 46 | — | 1.1 | ok | local-ollama-1650ti-2b-q4_0 |
 
 ## Sweep run directories
 
@@ -83,6 +85,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-4b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
+| local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
+| local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 13 | 1 | 0 | yes | yes |
 | tpu-jax-v5e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 5 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-29-kv-quant-v6e1` | 44 | 0 | 0 | yes | **no** |
@@ -158,6 +162,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-4b-w4a16 | 0 | 1 |
 | local-jax-cpu-2b | 0 | 0 |
 | local-llamacpp-1650ti-2b-q4_0 | 2 | 2 |
+| local-ollama-1650ti-2b-q4_0 | 2 | 2 |
 | local-pytorch-cpu-2b | 0 | 0 |
 | local-vllm-cpu-2b | 0 | 0 |
 | tpu-jax-inf2-2b | 0 | 0 |
