@@ -1,0 +1,197 @@
+{
+ "schema_version": "1.1",
+ "run": {
+  "id": "2026-09-04-text-only-ollama-1650ti",
+  "date": "2026-09-04",
+  "source": "local-ollama-1650ti-2b-q4_0",
+  "notes": "Concurrency sweep on gemma4:e2b-it-qat-text, the projector-free variant. THIS IS THE LIKE-FOR-LIKE RUN against local-llamacpp-1650ti-2b-q4_0's 2026-09-03-full-sweep-1650ti: both servers are llama-server at -c 32768 with 32 slots of 1024 tokens, all KV in VRAM, 36/36 layers offloaded. The earlier 2026-09-04-first-light-ollama-1650ti run could not reach that geometry because the stock tag's projector forced 2048 tokens/slot and the result did not fit the card."
+ },
+ "hardware": {
+  "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+  "chips": 1,
+  "hbm_gb_per_chip": 4.294,
+  "machine_type": "local workstation",
+  "host": {
+   "notes": "TU117, compute capability 7.5, NO tensor cores. Max-Q: thermally throttled."
+  }
+ },
+ "model": {
+  "id": "gemma4:e2b-it-qat-text",
+  "family": "gemma-4",
+  "parameters_b": 4.63,
+  "quantization": "q4_0",
+  "kv_cache_dtype": "f16",
+  "max_model_len": 32768,
+  "architecture_notes": "`ollama show --modelfile gemma4:e2b-it-qat` with the second FROM removed and nothing else changed: same model blob by digest, same RENDERER/PARSER gemma4, same three sampling parameters, projector layer dropped. Capabilities go from 'completion vision audio tools thinking' to 'completion tools thinking'. Reasoning model: every cell measures the thinking phase at 128 output tokens."
+ },
+ "software": {
+  "engine": "ollama",
+  "version": "0.33.2",
+  "backend": "CUDA (cuda_v12, pinned via OLLAMA_LLM_LIBRARY)",
+  "tensor_parallel_size": 1,
+  "serve_args": [
+   "OLLAMA_LLM_LIBRARY=cuda_v12",
+   "OLLAMA_KEEP_ALIVE=-1",
+   "OLLAMA_CONTEXT_LENGTH=1024",
+   "OLLAMA_NUM_PARALLEL=32"
+  ],
+  "notes": "Child process: llama-server -c 32768 -np 32 --flash-attn auto -b 512 -ub 512 --context-shift --keep 4 --no-jinja --chat-template chatml. The sibling ran llama-server -c 32768 --parallel 32 with llama.cpp's DEFAULT batch sizes (-b 2048 -ub 512), which is the one server-flag difference remaining between the two runs and the leading candidate for the TTFT/TPOT trade at c=16 and c=32."
+ },
+ "memory": {
+  "weights_gb": 1.407,
+  "notes": "2106 MiB of 4096 at 32 slots, 36/36 layers on GPU, all KV in VRAM (192 MiB non-SWA + 384 MiB SWA). At 1 slot / 8192 context the same model is 1612 MiB, against 2762 for the stock tag and 1618 for the llama.cpp sibling. `ollama ps` never counts the projector, so it under-reports by ~1150 MiB on the stock tag and by 181-291 MiB (CUDA context + compute buffers, scaling with slots) here."
+ },
+ "throughput": {
+  "workload": {
+   "tool": "sweep.py (copy of the llama.cpp sibling's, three bugs fixed)",
+   "input_len": 512,
+   "output_len": 128,
+   "runs_per_point": 3,
+   "notes": "decode-source auto -> stream. Prompt cache defeated by --prompt-mode shuffled; the sibling used cache_prompt:false, which Ollama drops in translation. Both verified to cached=0."
+  },
+  "sweep": [
+   {
+    "concurrency": 1,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 32.551,
+    "per_stream_tok_per_s": 64.382,
+    "ttft_ms": {
+     "median": 2114.4,
+     "p99": 2114.4
+    },
+    "tpot_ms": {
+     "median": 15.532
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 0.5,
+     "min": 32.415,
+     "max": 32.584
+    }
+   },
+   {
+    "concurrency": 2,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 39.717,
+    "per_stream_tok_per_s": 51.704,
+    "ttft_ms": {
+     "median": 4164.14,
+     "p99": 4154.57
+    },
+    "tpot_ms": {
+     "median": 19.344
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 0.1,
+     "min": 39.699,
+     "max": 39.751
+    }
+   },
+   {
+    "concurrency": 4,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 43.355,
+    "per_stream_tok_per_s": 34.423,
+    "ttft_ms": {
+     "median": 8392.7,
+     "p99": 8407.48
+    },
+    "tpot_ms": {
+     "median": 29.05
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 1.0,
+     "min": 43.156,
+     "max": 43.599
+    }
+   },
+   {
+    "concurrency": 8,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 46.177,
+    "per_stream_tok_per_s": 19.631,
+    "ttft_ms": {
+     "median": 15977.73,
+     "p99": 16949.0
+    },
+    "tpot_ms": {
+     "median": 51.728
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 6.9,
+     "min": 43.273,
+     "max": 46.241
+    }
+   },
+   {
+    "concurrency": 16,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 45.442,
+    "per_stream_tok_per_s": 6.918,
+    "ttft_ms": {
+     "median": 27685.98,
+     "p99": 35151.85
+    },
+    "tpot_ms": {
+     "median": 144.817
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 4.3,
+     "min": 43.909,
+     "max": 45.805
+    }
+   },
+   {
+    "concurrency": 32,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 45.573,
+    "per_stream_tok_per_s": 2.654,
+    "ttft_ms": {
+     "median": 45384.65,
+     "p99": 72971.24
+    },
+    "tpot_ms": {
+     "median": 376.899
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 0.1,
+     "min": 45.54,
+     "max": 45.607
+    }
+   }
+  ]
+ },
+ "issues": [
+  {
+   "summary": "Ollama applies a MINIMUM PER-SLOT CONTEXT OF 2048 to projector-carrying models and none to text-only ones. MEASURED across four settings: the stock tag took 1024->2048 and 1536->2048 (and honoured 8192), while the text-only variant honoured 1024, 1536 and 8192 exactly. This is what made the stock tag unable to hold 32 slots on a 4 GiB card.",
+   "status": "workaround"
+  },
+  {
+   "summary": "TTFT grows sub-linearly on this runtime past c=8 (ratios 1.73 and 1.64 per doubling against the sibling's 2.01 and 1.90) while TPOT roughly doubles relative to it (144.82/376.90 against 96.97/184.36). Aggregate throughput is unchanged, so it is a scheduling redistribution rather than a throughput difference. NOT isolated -- Ollama forces -b 512 where llama.cpp defaults to 2048.",
+   "status": "open"
+  }
+ ],
+ "notes": [
+  "LIKE-FOR-LIKE against 2026-09-03-full-sweep-1650ti at identical server geometry. c=1 through c=8 agree within 4%: 32.55/32.74, 39.72/40.59, 43.35/45.12, 46.18/44.79 tok/s aggregate. Peak is 46.18 here against 48.19 there, both saturating near 45-48.",
+  "TTFT doubles with c through c=8 on BOTH runtimes -- 2114/4164/8393/15978 here, 2135/4062/7982/16212 there -- so prefill runs one request at a time and concurrency past c=4-8 buys latency and nothing else. That is the load-bearing result and it is the same on both.",
+  "The c=8 cells are the noisy ones on both sides: 6.9% spread here, 7.7% there. This part is Max-Q and throttles; never read a single row.",
+  "Not comparable to the T4-based g4dn/g5g rigs at equal compute capability 7.5: TU117 has no tensor cores, TU104 does."
+ ]
+}

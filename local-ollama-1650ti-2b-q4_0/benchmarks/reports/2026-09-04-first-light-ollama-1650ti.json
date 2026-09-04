@@ -1,0 +1,490 @@
+{
+ "schema_version": "1.1",
+ "run": {
+  "id": "2026-09-04-first-light-ollama-1650ti",
+  "date": "2026-09-04",
+  "source": "local-ollama-1650ti-2b-q4_0",
+  "notes": "First light and full sweep. Context x output-length at concurrency 1, plus TWO concurrency sweeps at a fixed 512/128 shape. Prompt cache defeated by --prompt-mode shuffled: Ollama drops cache_prompt in its OpenAI translation, so the sibling's method does not work here. A FIRST context run was discarded because Ollama spells the reasoning delta `reasoning` rather than llama.cpp's `reasoning_content`, so the harness stamped zero tokens in all ten cells; kept beside this one as sweep.DISCARDED-zero-decode.json. The concurrency sweep was run twice because the first configuration did not fit -- see the two workload notes."
+ },
+ "hardware": {
+  "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+  "chips": 1,
+  "hbm_gb_per_chip": 4.294,
+  "machine_type": "local workstation",
+  "host": {
+   "notes": "TU117, compute capability 7.5, NO tensor cores -- not comparable to the T4-based g4dn/g5g rigs at equal compute capability. Max-Q: thermally throttled. Driver 610.57.04, reported to Ollama as CUDA 13.3."
+  }
+ },
+ "model": {
+  "id": "gemma4:e2b-it-qat",
+  "family": "gemma-4",
+  "parameters_b": 4.63,
+  "quantization": "q4_0",
+  "kv_cache_dtype": "f16",
+  "max_model_len": 8192,
+  "architecture_notes": "An OLLAMA TAG, not a Hub id: Google's QAT Q4_0 GGUF re-containered with the embedded chat template stripped (model blob 3,349,514,112 B vs Google's 3,349,516,256; digests differ). Reasoning model -- content_chunks is 0 and reasoning_chunks is the whole stream in every cell here, so at 32 and 128 output tokens every cell measures the thinking phase and no cell completed a task. The tag also bundles a 986 MB vision+audio projector that the daemon loads unconditionally."
+ },
+ "software": {
+  "engine": "ollama",
+  "version": "0.33.2",
+  "backend": "CUDA (cuda_v12, pinned via OLLAMA_LLM_LIBRARY)",
+  "tensor_parallel_size": 1,
+  "serve_args": [
+   "OLLAMA_LLM_LIBRARY=cuda_v12",
+   "OLLAMA_KEEP_ALIVE=-1",
+   "OLLAMA_CONTEXT_LENGTH=8192",
+   "OLLAMA_NUM_PARALLEL=1"
+  ],
+  "notes": "Ollama links llama.cpp and starts a llama-server child; the child's own flags are the daemon's choices, not ours: --mmproj (unconditional), --no-jinja --chat-template chatml (the GGUF template is replaced by Ollama's Go renderer, renderer=gemma4 parser=gemma4), --flash-attn auto, -b 512 -ub 512, --context-shift --keep 4."
+ },
+ "memory": {
+  "weights_gb": 1.407,
+  "notes": "MEASURED 2762 MiB of 4096 at 8192 context, against local-llamacpp-1650ti-2b-q4_0's 1618 MiB for the same weights. Breakdown from the daemon log: 1341.78 model buffer + 48.00 KV non-SWA (8192 cells x 3 layers) + 12.00 KV SWA (1024 cells x 12 layers) + 122.52 compute buffer + 1154.07 mmproj + ~84 CUDA context. `ollama ps` reports 1.7 GB -- it does not count the projector, so it must not be used to size this rig. NOTE the SWA cache is capped at its 1024-cell window regardless of n_ctx, so KV is 60 MiB where MODELS.md's 18 KiB/token predicts 144."
+ },
+ "throughput": {
+  "workload": {
+   "tool": "sweep.py (copy of local-llamacpp-1650ti-2b-q4_0's, three further bugs fixed)",
+   "input_len": 512,
+   "output_len": 128,
+   "runs_per_point": 3,
+   "notes": "decode-source auto -> stream; Ollama emits no usage.decode_tokens_per_second and no Prometheus endpoint, so metrics.prom is empty. The sweep array holds three groups: concurrency 1 points whose input_len varies are the CONTEXT sweep (OLLAMA_CONTEXT_LENGTH=8192 NUM_PARALLEL=1); the 512/128 points are the CONCURRENCY sweep at NUM_PARALLEL=8, which is the configuration that FITS this card; the concurrency points marked degraded were run at NUM_PARALLEL=32 and did not fit."
+  },
+  "sweep": [
+   {
+    "concurrency": 1,
+    "input_len": 99,
+    "output_len": 32,
+    "status": "ok",
+    "output_tok_per_s": 41.533,
+    "per_stream_tok_per_s": 76.516,
+    "ttft_ms": {
+     "median": 364.49
+    },
+    "tpot_ms": {
+     "median": 15.582
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 99,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 58.934,
+    "per_stream_tok_per_s": 70.373,
+    "ttft_ms": {
+     "median": 366.44
+    },
+    "tpot_ms": {
+     "median": 16.254
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 652,
+    "output_len": 32,
+    "status": "ok",
+    "output_tok_per_s": 12.604,
+    "per_stream_tok_per_s": 74.873,
+    "ttft_ms": {
+     "median": 2124.6
+    },
+    "tpot_ms": {
+     "median": 15.925
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 652,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 32.209,
+    "per_stream_tok_per_s": 69.266,
+    "ttft_ms": {
+     "median": 2140.32
+    },
+    "tpot_ms": {
+     "median": 15.408
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 1270,
+    "output_len": 32,
+    "status": "ok",
+    "output_tok_per_s": 7.085,
+    "per_stream_tok_per_s": 72.991,
+    "ttft_ms": {
+     "median": 4091.11
+    },
+    "tpot_ms": {
+     "median": 16.335
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 1270,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 21.496,
+    "per_stream_tok_per_s": 68.201,
+    "ttft_ms": {
+     "median": 4090.8
+    },
+    "tpot_ms": {
+     "median": 16.129
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 2518,
+    "output_len": 32,
+    "status": "ok",
+    "output_tok_per_s": 3.592,
+    "per_stream_tok_per_s": 72.3,
+    "ttft_ms": {
+     "median": 8454.68
+    },
+    "tpot_ms": {
+     "median": 16.491
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 2518,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 12.34,
+    "per_stream_tok_per_s": 66.48,
+    "ttft_ms": {
+     "median": 8459.79
+    },
+    "tpot_ms": {
+     "median": 16.189
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 5018,
+    "output_len": 32,
+    "status": "ok",
+    "output_tok_per_s": 1.764,
+    "per_stream_tok_per_s": 70.704,
+    "ttft_ms": {
+     "median": 17699.4
+    },
+    "tpot_ms": {
+     "median": 16.863
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 5018,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 6.497,
+    "per_stream_tok_per_s": 64.952,
+    "ttft_ms": {
+     "median": 17706.37
+    },
+    "tpot_ms": {
+     "median": 16.672
+    },
+    "raw": {
+     "repeats": 3,
+     "note": "per_stream_tok_per_s is DECODE CORRECTED FOR CHUNK BATCHING: completion_tokens over the measured inter-token span. The harness's own decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell (1.067-1.185 tokens per chunk), which understates it by 8-15%."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 32.158,
+    "per_stream_tok_per_s": 63.091,
+    "ttft_ms": {
+     "median": 2141.14,
+     "p99": 2141.14
+    },
+    "tpot_ms": {
+     "median": 15.85
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 0.3,
+     "min": 32.087,
+     "max": 32.189,
+     "note": "NUM_PARALLEL=8, llama-server -c 16384 -np 8 (2048/slot). 36/36 layers on GPU, all KV in VRAM, 2900 MiB of 4096. This is the configuration to compare against the sibling."
+    }
+   },
+   {
+    "concurrency": 2,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 32.126,
+    "per_stream_tok_per_s": 30.932,
+    "ttft_ms": {
+     "median": 4192.81,
+     "p99": 4177.5
+    },
+    "tpot_ms": {
+     "median": 32.336
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 23.7,
+     "min": 31.81,
+     "max": 39.342,
+     "note": "NUM_PARALLEL=8, llama-server -c 16384 -np 8 (2048/slot). 36/36 layers on GPU, all KV in VRAM, 2900 MiB of 4096. This is the configuration to compare against the sibling."
+    }
+   },
+   {
+    "concurrency": 4,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 35.174,
+    "per_stream_tok_per_s": 19.26,
+    "ttft_ms": {
+     "median": 8416.37,
+     "p99": 8442.14
+    },
+    "tpot_ms": {
+     "median": 51.922
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 0.4,
+     "min": 35.028,
+     "max": 35.185,
+     "note": "NUM_PARALLEL=8, llama-server -c 16384 -np 8 (2048/slot). 36/36 layers on GPU, all KV in VRAM, 2900 MiB of 4096. This is the configuration to compare against the sibling."
+    }
+   },
+   {
+    "concurrency": 8,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "ok",
+    "output_tok_per_s": 45.977,
+    "per_stream_tok_per_s": 19.493,
+    "ttft_ms": {
+     "median": 16052.74,
+     "p99": 17023.75
+    },
+    "tpot_ms": {
+     "median": 52.359
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 0.3,
+     "min": 45.912,
+     "max": 46.041,
+     "note": "NUM_PARALLEL=8, llama-server -c 16384 -np 8 (2048/slot). 36/36 layers on GPU, all KV in VRAM, 2900 MiB of 4096. This is the configuration to compare against the sibling."
+    }
+   },
+   {
+    "concurrency": 1,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "failed",
+    "output_tok_per_s": 22.879,
+    "per_stream_tok_per_s": 34.737,
+    "ttft_ms": {
+     "median": 2312.38,
+     "p99": 2312.38
+    },
+    "tpot_ms": {
+     "median": 28.788
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 1.4,
+     "min": 22.718,
+     "max": 23.036,
+     "note": "DEGRADED -- NUM_PARALLEL=32, llama-server -c 65536 -np 32. Ollama raised the requested 1024 tokens/slot to 2048, and the result did not fit: only 26/36 layers were offloaded and 512 MiB of 768 MiB of KV went to host RAM. Recorded because it is what this daemon DOES when asked for the sibling's concurrency shape on a 4 GiB card, not because it measures the runtime."
+    }
+   },
+   {
+    "concurrency": 2,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "failed",
+    "output_tok_per_s": 28.539,
+    "per_stream_tok_per_s": 26.674,
+    "ttft_ms": {
+     "median": 4549.61,
+     "p99": 4532.15
+    },
+    "tpot_ms": {
+     "median": 37.496
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 1.7,
+     "min": 28.13,
+     "max": 28.607,
+     "note": "DEGRADED -- NUM_PARALLEL=32, llama-server -c 65536 -np 32. Ollama raised the requested 1024 tokens/slot to 2048, and the result did not fit: only 26/36 layers were offloaded and 512 MiB of 768 MiB of KV went to host RAM. Recorded because it is what this daemon DOES when asked for the sibling's concurrency shape on a 4 GiB card, not because it measures the runtime."
+    }
+   },
+   {
+    "concurrency": 4,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "failed",
+    "output_tok_per_s": 29.92,
+    "per_stream_tok_per_s": 15.177,
+    "ttft_ms": {
+     "median": 9228.15,
+     "p99": 9257.88
+    },
+    "tpot_ms": {
+     "median": 65.888
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 1.6,
+     "min": 29.881,
+     "max": 30.356,
+     "note": "DEGRADED -- NUM_PARALLEL=32, llama-server -c 65536 -np 32. Ollama raised the requested 1024 tokens/slot to 2048, and the result did not fit: only 26/36 layers were offloaded and 512 MiB of 768 MiB of KV went to host RAM. Recorded because it is what this daemon DOES when asked for the sibling's concurrency shape on a 4 GiB card, not because it measures the runtime."
+    }
+   },
+   {
+    "concurrency": 8,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "failed",
+    "output_tok_per_s": 31.319,
+    "per_stream_tok_per_s": 7.985,
+    "ttft_ms": {
+     "median": 17694.93,
+     "p99": 18934.58
+    },
+    "tpot_ms": {
+     "median": 125.542
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 13.8,
+     "min": 27.968,
+     "max": 31.818,
+     "note": "DEGRADED -- NUM_PARALLEL=32, llama-server -c 65536 -np 32. Ollama raised the requested 1024 tokens/slot to 2048, and the result did not fit: only 26/36 layers were offloaded and 512 MiB of 768 MiB of KV went to host RAM. Recorded because it is what this daemon DOES when asked for the sibling's concurrency shape on a 4 GiB card, not because it measures the runtime."
+    }
+   },
+   {
+    "concurrency": 16,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "failed",
+    "output_tok_per_s": 30.601,
+    "per_stream_tok_per_s": 3.33,
+    "ttft_ms": {
+     "median": 31315.76,
+     "p99": 40870.04
+    },
+    "tpot_ms": {
+     "median": 300.538
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 5.3,
+     "min": 29.567,
+     "max": 31.125,
+     "note": "DEGRADED -- NUM_PARALLEL=32, llama-server -c 65536 -np 32. Ollama raised the requested 1024 tokens/slot to 2048, and the result did not fit: only 26/36 layers were offloaded and 512 MiB of 768 MiB of KV went to host RAM. Recorded because it is what this daemon DOES when asked for the sibling's concurrency shape on a 4 GiB card, not because it measures the runtime."
+    }
+   },
+   {
+    "concurrency": 32,
+    "input_len": 512,
+    "output_len": 128,
+    "status": "failed",
+    "output_tok_per_s": 32.057,
+    "per_stream_tok_per_s": 1.615,
+    "ttft_ms": {
+     "median": 52073.12,
+     "p99": 86485.64
+    },
+    "tpot_ms": {
+     "median": 619.572
+    },
+    "raw": {
+     "repeats": 3,
+     "spread_pct": 0.4,
+     "min": 32.055,
+     "max": 32.169,
+     "note": "DEGRADED -- NUM_PARALLEL=32, llama-server -c 65536 -np 32. Ollama raised the requested 1024 tokens/slot to 2048, and the result did not fit: only 26/36 layers were offloaded and 512 MiB of 768 MiB of KV went to host RAM. Recorded because it is what this daemon DOES when asked for the sibling's concurrency shape on a 4 GiB card, not because it measures the runtime."
+    }
+   }
+  ]
+ },
+ "issues": [
+  {
+   "summary": "Ollama's OpenAI stream spells the reasoning delta `reasoning`, not llama.cpp's `reasoning_content`, and pairs it with an empty-string `content`. A harness reading only the llama.cpp field name records zero tokens in every cell.",
+   "status": "fixed"
+  },
+  {
+   "summary": "cache_prompt:false does not survive Ollama's OpenAI-to-native translation, so the prefix cache cannot be defeated the way the sibling defeats it. Measured: an 8-token request carrying the flag still logged cached n_tokens = 660 of 661.",
+   "status": "workaround"
+  },
+  {
+   "summary": "Ollama's prompt cache outlives the client, so a deterministically seeded prompt generator makes a second process hit the first one's cache -- 0.15 s against 2.17 s cold on a 652-token prompt.",
+   "status": "fixed"
+  },
+  {
+   "summary": "OLLAMA_CONTEXT_LENGTH is multiplied by OLLAMA_NUM_PARALLEL (llama.cpp DIVIDES its -c across slots), and a MULTIMODAL model additionally gets a 2048-token minimum per slot. MEASURED across four settings: the stock tag took 1024->2048 and 1536->2048 while the projector-free variant honoured 1024, 1536 and 8192 exactly. That floor is why this run could not reach the sibling's geometry; 2026-09-04-text-only-ollama-1650ti does.",
+   "status": "workaround"
+  },
+  {
+   "summary": "Partial offload is silent. At NUM_PARALLEL=32 the daemon offloaded 26/36 layers and put 512 MiB of KV on the host; nothing raised an error and `ollama ps` said 60%/40% CPU/GPU only if you looked. No configuration knob prevents it -- dropping the projector does.",
+   "status": "workaround"
+  },
+  {
+   "summary": "At num_predict=128 on /api/generate, both `response` and `thinking` come back EMPTY with done_reason 'length' -- 128 tokens generated, zero characters returned.",
+   "status": "workaround"
+  }
+ ],
+ "notes": [
+  "Paired with local-llamacpp-1650ti-2b-q4_0's 2026-09-03-full-sweep-1650ti: same card, same weights, same engine, different daemon. End-to-end ties within 1% in all ten context cells; corrected decode is ~3% behind; VRAM is +1144 MiB for a projector this workload never touches.",
+  "TTFT tracks the sibling within 5% at every concurrency level and doubles exactly with each doubling of c on both rigs -- prefill does not batch on either runtime, and aggregate output saturates near 46 tok/s here against 45-48 there.",
+  "The concurrency c=2 cell is NOT a result: 23.7% spread across three repeats, against <=0.5% in every other cell. This part is Max-Q and throttles; never read a single row.",
+  "The c=4 gap (35.17 vs the sibling's 45.12) is real at 0.4% spread and is NOT isolated: the two servers do not have the same slot geometry (2048 tokens/slot here, 1024 there, because this daemon will not accept 1024), so scheduler behaviour and slot size are confounded.",
+  "Ollama serves no Prometheus endpoint -- GET /metrics returns 404 -- so metrics.prom is empty in both runs. llama-server has one. This is not a harness failure.",
+  "The two rigs defeated the prompt cache by DIFFERENT means, both verified to cached=0: the sibling by cache_prompt:false, this rig by --prompt-mode shuffled.",
+  "Not comparable to the T4-based g4dn/g5g rigs at equal compute capability 7.5: TU117 has no tensor cores, TU104 does."
+ ]
+}

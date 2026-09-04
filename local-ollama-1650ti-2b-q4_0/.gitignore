@@ -1,0 +1,33 @@
+# Models and large files. The blobs live in ~/.ollama/models, outside this tree,
+# but these patterns stay as a guard against a stray copy being committed.
+gemma-4-*/
+gemma-*/
+*.gguf
+*.safetensors
+*.bin
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Local MCP registration (generated)
+.mcp.json
+
+# Local env config
+.env
+
+# Runtime state: daemon pid/log written by `make serve`
+run/
+
+# NOTE: tpu.env is NOT ignored. It is the rig's source of truth and is committed
+# on purpose — never add *.env here.

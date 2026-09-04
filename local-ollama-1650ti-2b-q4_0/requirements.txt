@@ -1,0 +1,17 @@
+# local-ollama-1650ti-2b-q4_0
+#
+# Install into the system python3: `pip install -r requirements.txt`.
+# Never create a virtualenv — see CLAUDE.md.
+#
+# Ollama itself is NOT a dependency here: it is an installed binary located
+# through tpu.env (OLLAMA_BIN), not a pip package. There is no build on this rig
+# at all, which is the asymmetry against local-llamacpp-1650ti-2b-q4_0.
+
+# PINNED BELOW 2. `mcp` 2.x renamed FastMCP to MCPServer
+# (`from mcp.server.mcpserver import MCPServer`), so `from mcp.server.fastmcp
+# import FastMCP` in server.py raises ModuleNotFoundError against it. Discovered
+# 2026-09-03 by installing `mcp` unpinned, which broke the import in four rigs
+# at once.
+mcp>=1.2.0,<2
+httpx>=0.27.0
+python-dotenv>=1.0.0

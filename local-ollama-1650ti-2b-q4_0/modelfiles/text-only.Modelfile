@@ -1,0 +1,28 @@
+# gemma4:e2b-it-qat-text — the same Ollama artifact with the projector layer dropped.
+#
+# WHY: the stock tag declares `vision` and `audio`, so the daemon passes --mmproj
+# unconditionally and a vision+audio encoder is resident for a pure-text workload.
+# MEASURED 2026-09-04 on the GTX 1650 Ti: 1154.07 MiB of a 4096 MiB card, 28% of
+# the budget, and `ollama ps` does not count it.
+#
+# WHAT IS AND IS NOT CHANGED. This is `ollama show --modelfile gemma4:e2b-it-qat`
+# with the second FROM removed and nothing else touched:
+#
+#   - The model blob is Ollama's OWN re-containered artifact, by digest. It is NOT
+#     Google's Hub file. Slot 5 of the rig name and the provenance argument in
+#     CLAUDE.md are therefore unaffected -- this is still what the daemon
+#     packaged, minus a layer.
+#   - RENDERER gemma4 / PARSER gemma4 are carried over verbatim, so the Go chat
+#     renderer and the thinking parser are the same ones the stock tag uses.
+#   - The three sampling parameters are carried over verbatim. Ollama's defaults
+#     differ from llama-server's, and changing them would confound the A/B.
+#
+# The LICENSE block is dropped because it is not load-bearing; the license is
+# unchanged and is on the original tag.
+FROM /home/xbill/.ollama/models/blobs/sha256-3646b4c147cd235a44d91df1546d3b7d8e29b547dbe4e1f80856419aa455e6fd
+TEMPLATE {{ .Prompt }}
+RENDERER gemma4
+PARSER gemma4
+PARAMETER temperature 1
+PARAMETER top_k 64
+PARAMETER top_p 0.95
