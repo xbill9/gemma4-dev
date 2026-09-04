@@ -19,8 +19,10 @@ service-account*.json
 # Generated MCP registration — embeds the GCP project id, regenerate with project-setup.sh
 .mcp.json
 
-# Machine-specific Claude Code settings (.claude/settings.json IS committed and shared)
-.claude/settings.local.json
+# Machine-specific Claude Code settings (.claude/settings.json IS committed and shared).
+# Leading **/ because a pattern containing a slash is anchored to this directory:
+# the bare form matched only the root's own file, never a rig's.
+**/.claude/settings.local.json
 
 # Private, not-for-publication docs
 tpu.md
