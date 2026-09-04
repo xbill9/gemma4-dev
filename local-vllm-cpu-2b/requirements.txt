@@ -1,10 +1,17 @@
-# Control-plane dependencies: what the MCP server itself needs to run locally.
+# local-vllm-cpu-2b
 #
-# Deliberately does NOT include jax. The serving stack runs on the G4dn
-# instance, not here, and its CUDA dependencies would be wrong (and enormous) on
-# a control-plane host. Those live in requirements-serving.txt and are installed
-# by cloud-init; tests/test_server.py asserts the two agree. The profiler is a
-# third list again -- requirements-profiling.txt, also instance-side.
-mcp
-httpx
-boto3
+# Install into the system python3: `pip install -r requirements.txt`.
+# Never create a virtualenv — see CLAUDE.md.
+#
+# vLLM IS NOT LISTED HERE ON PURPOSE. The PyPI `vllm` wheel is the CUDA build
+# and there is no published CPU wheel (wheels.vllm.ai/cpu -> 404), so `pip
+# install vllm` would produce something that imports and cannot serve on this
+# host. A CPU vLLM is a source build with VLLM_TARGET_DEVICE=cpu, and on an
+# AVX2-only CPU also VLLM_CPU_DISABLE_AVX512=1. Run `make capacity` before
+# spending that hour.
+
+# PINNED BELOW 2. `mcp` 2.x renamed FastMCP to MCPServer, so the import in
+# server.py raises ModuleNotFoundError against it.
+mcp>=1.2.0,<2
+httpx>=0.27.0
+python-dotenv>=1.0.0

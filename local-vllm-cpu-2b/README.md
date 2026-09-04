@@ -1,86 +1,91 @@
-# gpu-jax-g4dn-2b
+# local-vllm-cpu-2b
 
-Serve **`google/gemma-4-E2B-it`** with **pure JAX** on **AWS EC2 G4dn** — an x86_64 Intel host
-paired with an **NVIDIA T4** (Turing, SM 7.5).
+Serve **`google/gemma-4-E2B-it`** with **vLLM on the local CPU** — no accelerator,
+no cloud, no control plane.
 
-> **Status: this rig has served nothing.** Forked from
-> [`gpu-jax-g5g-2b`](../gpu-jax-g5g-2b/) on 2026-08-28. The engine, the server and the MCP
-> devops agent are inherited unchanged; what moved is the **host architecture**, from Graviton2
-> `aarch64` to `x86_64`. 137 tests pass offline. No instance has been launched, no weights
-> loaded, no token generated, and `benchmarks/` is deliberately empty.
+> **STATUS 2026-09-04: scaffolded, nothing served, and the budget is CLOSE
+> rather than closed.** `make capacity` has the live arithmetic. On the
+> quantized checkpoint it is short by ~1.2 GB of a 16.42 GB machine — a
+> close-a-browser problem, not a wall. `benchmarks/runs/` is empty on purpose.
 
-## Why this exists
+## Why it exists
 
-**It is the A/B control that separates Turing from Graviton2.**
+**It is the runtime control for `local-jax-cpu-2b`** — same host, same
+checkpoint, no chip — and the only place a vLLM number could be attributed
+entirely to the engine rather than to silicon.
 
-`gpu-jax-g5g-2b` measured **13.10 tok/s**, with **54.0% of decode in dtype conversion** and
-**0.0% TensorCore utilisation**. Nothing in that run can tell you how much of it is the T4G and
-how much is the Graviton2 host, because both changed at once relative to every other rig.
+It is also the **only vLLM rig this machine could ever run**. The GTX 1650 Ti has
+4096 MiB; E2B under vLLM needs **8.15 GB** of w4a16 weights before KV, because vLLM
+holds the 2.349 B-parameter per-layer embedding table resident, where llama.cpp
+gathers it lazily out of an mmap and never puts it on the device at all. That one
+structural difference is why `local-llamacpp-1650ti-2b-q4_0` fits in 1.6 GB and
+vLLM does not fit in 4.
 
-This rig changes exactly one variable. Same engine, same model, same dtype policy, same Turing
-SM 7.5 — different host CPU and different instruction set. If the numbers land on top of the
-G5g's, the host is irrelevant and the finding is purely Turing. If they diverge, the divergence
-is the Graviton2 contribution, isolated.
-
-| | `gpu-jax-g5g-2b` | **this rig** |
-| --- | --- | --- |
-| host | AWS Graviton2, `aarch64` | **Intel/AMD, `x86_64`** |
-| GPU | NVIDIA T4G | **NVIDIA T4** |
-| architecture | Turing, SM 7.5 | Turing, SM 7.5 — *same* |
-| VRAM reported | 15,360 MiB | **16,384 MiB** (`describe_instance_types`) |
-| default size | `g5g.2xlarge` | **`g4dn.xlarge`** |
-| compute dtype | `float16` (device-selected) | `float16` (device-selected) |
-
-**The T4 reports a full 16,384 MiB where the T4G reports 15,360.** That is a real 1 GiB
-difference on the same nominal 16 GB, and it is the kind of thing that decides whether a
-configuration fits.
-
-## What is cheaper here, and what is not
-
-`g4dn.xlarge` is **$0.5260/hr on-demand, $0.3678 spot average** (us-east-1, 7-day history,
-2026-08-28) against `g5g.2xlarge`'s $0.5560 / $0.3996. So the control is also the cheaper box.
-
-What it does **not** buy is any escape from Turing. No bf16, no fp8, the same 64 KiB
-shared-memory ceiling, and the fused W4A16 Pallas kernel is refused at startup for the same
-arithmetic. If you want out of those constraints, that is [`gpu-jax-g6-2b`](../gpu-jax-g6-2b/),
-not this rig.
-
-## What changed in the fork
-
-- **AMI resolution** — the SSM parameter moved from `/arm64/` to `/x86_64/`, and the name
-  fallback is narrower: `Deep Learning Base OSS Nvidia Driver GPU*Ubuntu*`. The parent's pattern
-  also accepted the frozen PyTorch line; there is no reason to inherit that.
-- **Instance shapes** — read from `describe_instance_types` on 2026-08-28, not a product page.
-  Note the ladder is not monotonic: `g4dn.12xlarge` has **four** T4s and `g4dn.16xlarge` has
-  **one**.
-- **Tool names** follow the rig's hardware slot: `create_g4dn_instance`, `check_g4dn_quotas`, …
-- **The swap threshold is inherited, not re-measured.** 16 GiB inclusive, from the parent's
-  2026-08-26 OOM-kill run. `g4dn.xlarge` has exactly 16 GiB, so it is the boundary case.
-
-## Quickstart
+## Quick start
 
 ```bash
-pip install -r requirements.txt
-python3 -m unittest discover -s tests -v   # 137 tests, fully offline
+make capacity     # run this FIRST — live budget, and it names the quantized route
+make install      # deps for the MCP server only; does NOT install vLLM
+make verify       # is the installed vLLM actually a CPU build?
+make serve        # refuses while capacity refuses
 ```
 
-Then through the MCP tools (`mcp__gpu-jax-g4dn-2b__…`):
+## The budget, and the three corrections behind it
+
+MEASURED 2026-09-04. **Everything in this section was wrong in the first version
+of this rig, and wrong in the direction that made it look impossible.**
+
+| checkpoint | weights | + KV + overhead | vs 9.25 GB available now |
+| :--- | ---: | ---: | :--- |
+| `gemma-4-E2B-it` (bf16) | 10.25 GB | 12.39 GB | short 3.15 GB |
+| **`gemma-4-E2B-it-qat-w4a16-ct`** | **8.32 GB** | **10.46 GB** | **short 1.22 GB** |
+
+The machine has **16.42 GB total**, so both fit it — the shortfall is against
+what is free on a live desktop right now, and the remedy is to close something.
+
+**Correction 1 — there is no fp32 upcast.** vLLM's `CpuPlatform.supported_dtypes`
+returns `[bfloat16, float16, float32]` for x86 unconditionally; its own comment
+reads *"x86/aarch64 CPU has supported both bf16 and fp16 natively"*. AVX512-BF16
+governs how fast a bf16 datapath is, not how many bytes the weights occupy. The
+first version doubled the weights to 20.49 GB on this assumption and reported a
+13.16 GB shortfall.
+
+**Correction 2 — AVX2 is a first-class build target.**
+`cmake/cpu_extension.cmake` carries `CXX_COMPILE_FLAGS_AVX2` beside the AVX512
+set and dispatches between them. The only hard x86 requirement is
+`gcc/g++ >= 12.3`; this host has 14.2. The build is from source only because no
+CPU wheel is published (`wheels.vllm.ai/cpu` → 404; the PyPI `vllm` wheel is the
+CUDA build).
+
+**Correction 3 — w4a16 saves 19%, not 75%.** The checkpoint's own `ignore` list
+keeps the vision tower and the embeddings at bf16, so only the linears are
+packed. `@MODELS.md` records the resident figure as 8.15 GB and it is right. A
+`weights ÷ 4` estimate under-predicts by ~3×, which is where this rig's earlier
+"~2.9 GB" claim came from.
+
+**What survives all three: this still cannot fit the 1650 Ti's 4096 MiB**, and by
+a wider margin than first stated — 8.15 GB of w4a16 weights, not 2.9. vLLM holds
+the 2.349 B-parameter per-layer embedding table resident where llama.cpp gathers
+it lazily from an mmap.
+
+## The reachable CPU baseline is the JAX sibling
+
+`local-jax-cpu-2b` fits this host and `jax 0.11.1` is already installed with a
+`CpuDevice`. Its `PLE_BITS=4` lever takes the weights from 9.257 GB to **5.752
+GB** by quantizing the per-layer embedding table — a gather, never a matmul, so
+it costs **0.0% decode**. Plus ~1.6 GB of prefill transient, that is 7.35 GB
+against 9.48 available.
+
+**vLLM exposes no equivalent.** The PLE is the whole story on this machine, on
+both the GPU and the CPU.
+
+## Layout
 
 ```
-create_g4dn_instance → get_install_progress → verify_gpu_arch → deploy_jax_server
-                   → get_jax_logs → verify_model_health → query_model → get_metrics
+server.py    MCP server — capacity, lifecycle, inference. No provisioning tools.
+tpu.env      source of truth, committed
+tests/       offline unittest suite — python3 -m unittest discover -s tests -v
+benchmarks/  empty; the synced root schema and README only
 ```
 
-**Always `make skill` before `deploy_jax_server`** — the deploy ships the skill snapshot, not
-the working tree.
-
-## Inherited findings — read them against the parent, not this rig
-
-The engine-level documentation lives in [`gpu-jax-g5g-2b/docs/`](../gpu-jax-g5g-2b/docs/) and
-every number in it was measured on G5g. `docs/turing-aarch64-gap.md` is **half** applicable here:
-the Turing shared-memory analysis carries, the aarch64 packaging half does not — x86_64 + CUDA is
-the well-trodden axis, which is precisely why this rig should be cheaper to stand up.
-
-## License
-
-Apache-2.0 — see [`../LICENSE`](../LICENSE).
+Read `CLAUDE.md` before changing anything.

@@ -1,102 +1,84 @@
-# gpu-jax-g4dn-2b — EC2 G5g (Graviton2 + NVIDIA T4G) pure-JAX rig.
+# local-vllm-cpu-2b — vLLM on the local CPU. No accelerator, no control plane.
 #
-# The skill name carries the rig directory: rigs all shipping a skill called
-# "tpu-management" meant `make skill-install` rm -rf'd one shared destination, so
-# whichever rig ran last silently replaced the rest. Same rule as the plugin and
-# MCP server names (NAMING.md).
-SKILL_NAME ?= $(notdir $(CURDIR))-management
-SKILL_DIR  := .claude/skills/$(SKILL_NAME)
-PLUGIN_DIR := skills/$(SKILL_NAME)
-DIST_DIR   := dist
+# There are no provisioning targets and none is owed. `make serve` is the whole
+# of what `make deploy` means elsewhere, and teardown is Ctrl-C.
+#
+# START WITH `make capacity`. As of 2026-09-04 it refuses on this host, and
+# `make serve` refuses with it — the weights do not fit RAM. Building vLLM
+# before that arithmetic passes spends an hour on something that cannot serve.
+include tpu.env
+export
 
-.PHONY: all help clean test lint install deploy init skill skill-install skill-package medium
+.PHONY: all help capacity install verify serve stop status query test lint clean bench-validate
 
 all: help
 
 help:
 	@echo "========================================================="
-	@echo " gpu-jax-g4dn-2b — EC2 G5g / NVIDIA T4G pure-JAX rig"
+	@echo " local-vllm-cpu-2b — vLLM on CPU, Gemma 4 E2B, no chip"
 	@echo "========================================================="
-	@echo "  make install       - pip install -r requirements.txt"
-	@echo "  make test          - offline unittest suite"
-	@echo "  make lint          - ruff + bash -n on shell scripts"
-	@echo "  make clean         - remove caches"
-	@echo "  make skill         - refresh $(SKILL_NAME) snapshots"
-	@echo "  make skill-install - refresh + copy to ~/.claude/skills"
-	@echo "  make skill-package - refresh + build dist/$(SKILL_NAME)-skill.zip"
-	@echo "  make medium        - render medium-*.md to paste-ready HTML"
-	@echo "  make init TARGET=/path/to/project [ARGS='--region us-east-1']"
+	@echo "  make capacity  - CAN this host hold the weights? run this first"
+	@echo "  make verify    - is the installed vLLM actually a CPU build?"
+	@echo "  make install   - deps for the MCP server only (NOT vLLM itself)"
+	@echo "  make serve     - start the OpenAI server (refuses if over budget)"
+	@echo "  make status    - is it up, and what has happened to free RAM"
+	@echo "  make query     - one chat completion"
+	@echo "  make test      - offline unittest suite"
+	@echo "  make lint      - ruff on the module list below"
 	@echo "========================================================="
-	@echo "Serving here is a pip install, not a build: jax[cuda12] publishes"
-	@echo "aarch64 wheels whose arch tables carry sm_75. See docs/turing-aarch64-gap.md."
+	@echo "Blocker 1, RAM: 10.25 GB of weights against ~9.5 GB available."
+	@echo "Blocker 2, ISA: this CPU is AVX2-only, so vLLM needs a source build"
+	@echo "  and its backend upcasts bf16 to fp32, doubling the weights."
+	@echo "Exceeding host RAM does not raise - it swaps, and a thrashing serve"
+	@echo "looks exactly like a loading one. That is why serve refuses."
 
+capacity:
+	@python3 -c "import asyncio, server; print(asyncio.run(server.check_host_capacity()))"
+
+# THIS DOES NOT INSTALL vLLM. There is no published CPU wheel
+# (wheels.vllm.ai/cpu -> 404) and the PyPI `vllm` wheel is the CUDA build, so a
+# CPU vLLM is a source build:
+#
+#   git clone https://github.com/vllm-project/vllm && cd vllm
+#   VLLM_TARGET_DEVICE=cpu VLLM_CPU_DISABLE_AVX512=1 pip install -e .
+#
+# Deliberately not a target: it takes ~an hour, it replaces the system torch,
+# and on this host `make capacity` says the result could not serve.
 install:
 	python3 -m pip install -r requirements.txt
+
+verify:
+	@python3 -c "import asyncio, server; print(asyncio.run(server.verify_cpu_backend()))"
+
+serve:
+	@python3 -c "import asyncio, server; print(asyncio.run(server.start_vllm_server()))"
+
+stop:
+	@python3 -c "import asyncio, server; print(asyncio.run(server.stop_vllm_server()))"
+
+status:
+	@python3 -c "import asyncio, server; print(asyncio.run(server.server_status()))"
+
+# /v1/chat/completions, NOT /v1/completions: raw completions return an empty
+# string on -it checkpoints.
+query:
+	@curl -fsS $(ENDPOINT)/v1/chat/completions \
+	  -H 'Content-Type: application/json' \
+	  -d '{"model":"$(MODEL_NAME)","messages":[{"role":"user","content":"In one sentence, what is a TPU?"}],"max_tokens":1024}' \
+	  | python3 -m json.tool
 
 test:
 	python3 -m unittest discover -s tests -v
 
-# Lint the rig sources. Snapshots under .claude/skills and skills/ are generated
-# copies — lint the sources, not the copies.
-#
-# ports/ is deliberately excluded. It is a vendored clean-room model port shared
-# with tpu-jax-v5e1-2b, and ruff's UP006/UP045 would rewrite its `Dict`/`Optional`
-# annotations to `dict`/`X | None` — which the monorepo CLAUDE.md explicitly says
-# not to do ("Existing code uses Optional[str], not X | None"). Linting it would
-# either fail forever or drift it away from the sibling copy.
-#
-# NOTE: a new top-level module is silently unlinted until it is added below.
+# A NEW TOP-LEVEL MODULE IS SILENTLY UNLINTED UNTIL IT IS ADDED HERE.
 lint:
 	@command -v ruff >/dev/null || { echo "ruff not found; install with: pip install ruff"; exit 1; }
-	ruff check server.py refresh_skill.py jax_engine.py jax_openai_server.py profile_decode.py profile_prefill.py tune_loop.py tests
-	@for s in project-setup.sh init.sh set_env.sh save-aws-creds.sh; do bash -n $$s || exit 1; done
+	ruff check server.py tests
 	@echo "lint OK"
+
+bench-validate:
+	python3 ../benchmarks/validate.py benchmarks/runs
 
 clean:
 	rm -rf __pycache__ .ruff_cache .mypy_cache
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-
-# Medium strips markdown tables and reflows monospace, so tables and ASCII
-# diagrams are rendered to PNG and inlined as data: URIs. Open the -embed.html
-# in a browser, Select All, Copy, paste into the Medium editor.
-medium:
-	@rm -rf medium
-	@for f in medium-*.md; do python3 make-medium.py "$$f" medium; done
-	@echo "---------------------------------------------------------"
-	@echo "Open in a browser, Ctrl-A, Ctrl-C, paste into Medium:"
-	@ls -1 medium/*-embed.html 2>/dev/null | sed 's/^/  /'
-
-init: skill
-	@if [ -z "$(TARGET)" ] && ! echo "$(ARGS)" | grep -q -- --global; then \
-		echo "usage: make init TARGET=/path/to/project [ARGS='--region us-east-1 ...']"; \
-		echo "   or: make init ARGS='--global ...'"; \
-		exit 1; \
-	fi
-	./project-setup.sh $(TARGET) $(ARGS)
-
-skill:
-	SKILL_NAME=$(SKILL_NAME) python3 refresh_skill.py
-	rm -rf $(PLUGIN_DIR)
-	mkdir -p $(dir $(PLUGIN_DIR))
-	cp -r $(SKILL_DIR) $(PLUGIN_DIR)
-	@echo "Synced plugin copy -> $(PLUGIN_DIR)"
-
-skill-install: skill
-	mkdir -p $(HOME)/.claude/skills
-	rm -rf $(HOME)/.claude/skills/$(SKILL_NAME)
-	cp -r $(SKILL_DIR) $(HOME)/.claude/skills/$(SKILL_NAME)
-	@echo "Installed to $(HOME)/.claude/skills/$(SKILL_NAME)"
-
-skill-package: skill
-	mkdir -p $(DIST_DIR)
-	rm -f $(DIST_DIR)/$(SKILL_NAME)-skill.zip
-	cd $(dir $(SKILL_DIR)) && zip -qr $(CURDIR)/$(DIST_DIR)/$(SKILL_NAME)-skill.zip $(notdir $(SKILL_DIR))
-	@echo "Packaged $(DIST_DIR)/$(SKILL_NAME)-skill.zip"
-
-# No `deploy` target on purpose. Provisioning goes through the MCP server's
-# create_g4dn_instance, which resolves an arm64 AMI at launch time — a Makefile
-# recipe would have to hardcode one, and a hardcoded x86_64 AMI id is exactly
-# the bug inherited from the legacy tips-tree rigs.
-deploy:
-	@echo "Use the MCP tool create_g4dn_instance (or get_deployment_config for the CLI form)."
-	@echo "Run verify_gpu_arch first — see docs/turing-aarch64-gap.md."
