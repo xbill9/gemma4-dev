@@ -147,6 +147,45 @@ produced the 15 KiB/token error above. Size KV from the config geometry and chec
 with a single KV head is still an extraordinarily cheap configuration. Any model without KV sharing, or
 with real KV heads, costs multiples of this per token.
 
+### 18 KiB/token is the GEOMETRY. Whether you pay it depends on the engine's SWA policy
+
+**MEASURED 2026-09-04 on llama.cpp and Ollama** (`local-ollama-1650ti-2b-q4_0`, whose daemon log prints
+the allocation directly), at `n_ctx = 8192`:
+
+```
+llama_kv_cache_iswa: creating non-SWA KV cache, size = 8192 cells
+llama_kv_cache: size = 48.00 MiB ( 8192 cells,  3 layers)   K (f16) 24.00  V (f16) 24.00
+llama_kv_cache_iswa: creating     SWA KV cache, size = 1024 cells
+llama_kv_cache: size = 12.00 MiB ( 1024 cells, 12 layers)   K (f16)  6.00  V (f16)  6.00
+```
+
+**The per-layer geometry above is confirmed to the byte** — 24 MiB ÷ 3 ÷ 8192 = 1024 B of K per cell for
+a full-attention layer (1 head × 512 × 2), and 6 MiB ÷ 12 ÷ 1024 = 512 B for a sliding one (1 head × 256
+× 2). Nothing in the derivation is wrong.
+
+**What differs is the allocation.** `llama_kv_cache_iswa` sizes the sliding cache at the **window**, not
+at `n_ctx` — 1024 cells whatever the context is. So on that engine the cost is **6 KiB/token plus a flat
+12 MiB**, and the 18 KiB/token figure over-predicts:
+
+| `n_ctx` | 18 KiB/token predicts | llama.cpp allocates | over by |
+| ---: | ---: | ---: | ---: |
+| 8,192 | 144 MiB | 60 MiB | 2.4x |
+| 32,768 | 576 MiB | 204 MiB | 2.8x |
+| ∞ | 18 KiB/token | → 6 KiB/token | → 3.0x |
+
+**So the number to use depends on which question you are asking.** 18 KiB/token is what the checkpoint
+*needs* if every cached layer holds the full context, which is what the TPU path does and what the two
+v5e/v6e cross-checks above confirm. 6 KiB/token + 12 MiB is what llama.cpp and Ollama *allocate*. Both
+are correct; neither is a correction of the other.
+
+**This confirms the mechanism the open discrepancy below proposes, and does not close it.** vLLM's
+9,622 B/token on an L4 is a 1.92x gap; a pure window cap predicts **3.0x** at large context. The policy
+is real and is now measured on one engine — but the magnitude still does not match vLLM's, so that block
+stays open.
+
+**Practical rule: this error is always a floor error, so it never OOMs — it silently wastes budget you
+thought you had spent.** Read the engine's own allocation log before sizing context from this section.
+
 > **OPEN DISCREPANCY — the vLLM CUDA path reports about half this, 2026-08-30.** Serving E2B under
 > stock vLLM 0.28.0 on an NVIDIA L4 (`gpu-vllm-g6-2b`, `benchmarks/runs/2026-08-30-first-serve-g6/`),
 > the engine allocated a **9.65 GiB KV pool** and reported **1,076,849 tokens** of capacity —

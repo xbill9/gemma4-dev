@@ -90,6 +90,29 @@ nvidia-smi --query-compute-apps=pid,process_name,used_memory
 = 1616 MiB                                        measured 1618
 ```
 
+> **CORRECTED 2026-09-04: the total is right and BOTH of the last two terms are wrong.**
+> `local-ollama-1650ti-2b-q4_0` runs the same engine on the same card and its daemon prints the
+> allocation, so the split can be read rather than derived:
+>
+> ```
+> 1341.78 MiB  CUDA0 model buffer          <- the weights term is exact
+>    48.00 MiB  KV non-SWA, 8192 cells x 3 layers
+>    12.00 MiB  KV SWA,     1024 cells x 12 layers   <- capped at the WINDOW, not n_ctx
+>   122.52 MiB  CUDA0 compute buffer
+>    ~94 MiB    CUDA context + slack
+> = 1618 MiB
+> ```
+>
+> KV is **60 MiB, not 144** — `llama_kv_cache_iswa` sizes the twelve sliding layers at the 1024-cell
+> window whatever `n_ctx` is, so `@MODELS.md`'s 18 KiB/token (correct geometry, and correct on the TPU
+> path) over-predicts by 2.4x here. Compute buffer plus CUDA context is **~216 MiB, not ~130**.
+>
+> **Two offsetting errors landing 2 MiB from the measurement is the most dangerous shape an arithmetic
+> can have**, because agreeing with the hardware reads as confirmation of every term. The lesson is the
+> one `@MODELS.md` now carries: read the engine's allocation log, do not derive KV and then check only
+> the total. The qualifier is filed in `@MODELS.md` because it describes the checkpoint's KV geometry
+> meeting an engine's policy, not this card.
+
 If `per_layer_token_embd` were resident the figure would be ~3.5 GB, which **does not fit in
 4096 MiB at all** — the model would have failed to load rather than served at 73 tok/s. The
 `TENSOR_READ_LAZY` reading is correct.
@@ -252,6 +275,23 @@ present in all three sibling copies**:
 The mercy in (1) is that it failed loudly rather than reporting a plausible wrong number. Had the
 model emitted a little content and a lot of reasoning, it would have silently measured the wrong
 thing — which is the failure mode `benchmarks/README.md` exists to prevent.
+
+> **TWO MORE FIXES LANDED IN `local-ollama-1650ti-2b-q4_0`'s COPY ON 2026-09-04 AND ARE NOT IN THIS
+> ONE.** Neither changes a number measured here, but both are latent: (1) Ollama spells the reasoning
+> delta `reasoning`, not `reasoning_content`, so the field list needs both — the same bug class as (1)
+> above, one field name over; (2) the shuffled-prompt RNG must be seeded from entropy, because a fixed
+> seed makes a second process regenerate the first one's prompts and hit a cache that outlives the
+> client. Port them if this copy is ever pointed at another engine.
+
+> **AND THE DECODE COLUMN IN THIS RIG'S OWN TABLES IS UNDERSTATED.** `decode_tps` counts inter-CHUNK
+> gaps, and `chunks_match_usage` is `false` in every cell here: `completion_tokens / stream_chunks` is
+> **1.103** at output 32 and **1.024** at output 128. Recomputed from this rig's own `sweep.json` as
+> tokens over the measured inter-token span, the context-sweep decode column reads 78.78 / 76.94 /
+> 75.85 / 74.43 / 72.30 at output 32 and 72.55 / 70.78 / 70.27 / 68.64 / 66.81 at output 128, against
+> the 71.15 / 69.50 / 68.51 / 67.23 / 65.30 printed above. **`end_to_end_tps` is unaffected** — it is
+> tokens over wall time and never touches the chunk count. Do not difference a `decode_tps` against
+> another rig's without checking both ratios; the Ollama sibling batches at 1.185, so as-run the two
+> rigs appeared 11% apart when the real gap is ~3%.
 
 **`--decode-source auto` correctly resolves to `stream` here**, as the llamacpp sibling documents:
 `llama-server` does not emit `usage.decode_tokens_per_second`, which is an invention of our own JAX
