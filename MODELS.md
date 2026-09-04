@@ -576,6 +576,32 @@ _BF16_WEIGHTS_GB = {"E2B": 10.2, "E4B": 16.0, "12B": 24.0, "26B": 52.0, "31B": 6
 int8/int4 columns are arithmetic halving/quartering **except** the 26B, whose 15.27 GB is the measured
 resident size after load-time Q4_0→W4A16 repacking of the `-q4_0-unquantized` export.
 
+### The E2B W4A16 QAT export does NOT quantize the PLE, and that is 56.5% of it
+
+**MEASURED 2026-09-04** by range-reading the safetensors header of
+`google/gemma-4-E2B-it-qat-w4a16-ct` (2,504 tensors, 8.316 GB; nothing downloaded whole):
+
+| group | GB | % | note |
+| :--- | ---: | ---: | :--- |
+| **`embed_tokens_per_layer.weight`** | **4.698** | **56.5%** | **one BF16 tensor, NOT quantized** |
+| `embed_tokens` / `lm_head` | 1.611 | 19.4% | BF16, not quantized |
+| transformer body | 1.040 | 12.5% | this is the part that is actually 4-bit |
+| audio tower | 0.610 | 7.3% | BF16 |
+| vision tower | 0.335 | 4.0% | BF16 |
+
+**So "w4a16" describes 12.5% of the file.** The `quantization_config.ignore` list and the dtypes agree:
+`pack-quantized`, 4-bit int, group 32, applied to the linears only. This is why the export is 8.32 GB
+against the bf16 build's 10.25 — **a 19% cut, not 75%** — and why `weights / 4` under-predicts this
+family by ~3x. It is the same fact this file already records as the reason the int4 column
+under-predicts, now confirmed per-tensor on the artifact rather than inferred.
+
+**The practical consequence is that the single biggest tensor is also the cheapest one to move off
+the device.** `embed_tokens_per_layer` is an indexed gather, never a matmul — the "Resident is not
+streamed" section below says so, and llama.cpp acts on it: `TENSOR_READ_LAZY` keeps the same tensor
+out of VRAM entirely and still reaches 73 tok/s on a 4 GiB card
+(`local-llamacpp-1650ti-2b-q4_0`). Any engine that can leave that one tensor in host memory changes
+its own residency by 4.7 GB, and the access pattern is already proven to survive it.
+
 **The int4 column UNDER-predicts by ~19%, and the reason generalises to every size.** MEASURED
 2026-08-23 on a T4G (`gpu-jax-g5g-2b/docs/larger-models-on-t4g.md`): E2B at `ple_bits=4` came to
 **3.054 GB against the 2.4 GiB (= 2.58 GB) this table predicts**. Mind the units — the int8/int4
