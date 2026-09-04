@@ -165,6 +165,72 @@ raise NotImplementedError(...)
 > them. So the original finding — recorded against `tpu_platform.py`'s `supported_quantization` — understated
 > its own scope. **No vLLM rig in this monorepo can load a GGUF, on any platform slot.** Do not "check the
 > CUDA build" expecting a different answer; it has been checked.
+>
+> **RE-VERIFIED 2026-09-04 on vLLM 0.28.0**, a live install rather than a survey — two releases later
+> and the answer is unchanged: no `gguf.py` under `layers/quantization/`, `QUANTIZATION_METHODS` has
+> **30** entries and none is `gguf`, and `LoadFormats` offers no gguf option. Three incidental
+> mentions remain in the package, and **one of them is the strongest evidence yet**:
+>
+> ```
+> models/exaone_moe.py:225   if quant_config is not None and quant_config.get_name() == "gguf":
+> models/qwen2_moe.py:497    # GGUF: make sure that shared_expert_gate is a 2D tensor.
+> lora/layers/utils.py:69    # MoE GPTQ/AWQ/GGUF
+> ```
+>
+> That first line is a live branch guarded on a name **no quant config in this build can return**.
+> This is not a feature that was never added — it is one that was removed, leaving a dangling check.
+> So the right expectation is that it stays gone, not that a later release restores it.
+>
+> **And GGUF would not have rescued the 4 GiB card anyway, though it was the best remaining shot.**
+> The `VocabParallelEmbedding` that OOMs at construction takes a `quant_config`, so a GGUF config
+> that quantized embeddings would have allocated the PLE at Q6_K — 1.93 GB in llama.cpp's file
+> against the 4.38 GiB fp16 the w4a16 path asked for. That is the one mechanism that could have
+> shrunk the tensor *at construction*, which is where the failure is. It does not exist here.
+
+### vLLM CANNOT offload Gemma 4's PLE, and that closes the 4 GiB GPU route
+
+**MEASURED 2026-09-04**, vLLM 0.28.0 + torch 2.13.0+cu130 on a GTX 1650 Ti (4096 MiB), serving
+`google/gemma-4-E2B-it-qat-w4a16-ct` with the Turing Triton clamp applied:
+
+```
+--cpu-offload-gb 6 --cpu-offload-params embed_tokens_per_layer vision_tower audio_tower
+-> torch.OutOfMemoryError: Tried to allocate 4.38 GiB.
+   GPU 0 has a total capacity of 3.64 GiB of which 1.87 GiB is free.
+```
+
+**4.38 GiB is the PLE exactly**: 262,144 vocab x (256 x 35 layers = 8,960) x 2 B = 4,697,620,480 B.
+The flag was accepted and did nothing, and the traceback says why — the allocation happens at
+**construction**, not at weight loading:
+
+```
+gemma4.py:979                   self.embed_tokens_per_layer = VocabParallelEmbedding(...)
+vocab_parallel_embedding.py:325 __init__
+vocab_parallel_embedding.py:50  create_weights
+```
+
+`cpu_offload_gb` / `cpu_offload_params` act during weight *loading*. `Gemma4Model.__init__` has
+already put the tensor on the device by then, so **no offload flag can reach it.** This is a
+construction-order property of the implementation, not a budget more offload would fix.
+
+**Consequence: vLLM cannot serve E2B on a 4 GiB card at all, and quantization does not change it**,
+because the QAT w4a16 export leaves the PLE at bf16 — one tensor, 56.5% of that checkpoint (see
+`@MODELS.md`). The contrast is the whole point: llama.cpp creates the same tensor with
+`TENSOR_READ_LAZY` and gathers rows out of the mmap so it never reaches VRAM, and
+`local-llamacpp-1650ti-2b-q4_0` serves the same weights on the same card in **1612 MiB**.
+
+**Two things this run settled in vLLM's favour**, both against what this repo assumed:
+
+- **bf16 on SM 7.5 is a warning and an automatic cast, not a hard failure.** Logged verbatim: "Your
+  device ... doesn't support torch.bfloat16. Falling back to torch.float16 for compatibility."
+  `@HARDWARE.md`'s T4G section calls `--dtype bfloat16` "a hard failure, not a slow path"; on the
+  CUDA path it downgrades itself instead.
+- **The Turing shared-memory clamp works against a stock PyPI wheel.**
+  `gpu-vllm-g4dn-2b/patch_triton_turing.py` applied cleanly to vLLM 0.28.0's site-packages copy
+  (inserting after the last tile assignment, before all three reads), `TRITON_ATTN` was forced, and
+  the run reached model construction without an `OutOfResources`. No from-source build on x86_64.
+
+**Cost of learning this: an 8.32 GB download and a torch downgrade** — vLLM 0.28.0 pins
+`torch==2.13.0` exactly, so it and a torch nightly are mutually exclusive.
 
 `wNa16` is w4a16 — exactly the format of Google's QAT releases
 (`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). A **second, independent** failure hits the QAT exports:
