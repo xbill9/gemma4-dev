@@ -489,6 +489,41 @@ are unavailable one generation earlier. `--dtype bfloat16` on T4G is a hard fail
 
 FlashAttention also requires SM 8.0+, so the Turing-capable vLLM attention backend is `XFORMERS`.
 
+### TU117 is Turing without tensor cores, and fp16 there is a 4x PENALTY
+
+**MEASURED 2026-09-04 on the GTX 1650 Ti (Max-Q) in `local-llamacpp-1650ti-2b-q4_0`'s host**, torch
+2.15.0.dev20260904+cu130, square matmul, 10 warm-up iterations then best of 3:
+
+| N | fp32 | fp16 | bf16 | fp16 / fp32 |
+| ---: | ---: | ---: | ---: | ---: |
+| 1024 | 1.41 | **0.41** | 1.87 | **0.29x** |
+| 2048 | 1.72 | **0.41** | 1.61 | **0.24x** |
+| 4096 | 1.68 | **0.41** | 1.59 | **0.25x** |
+
+TFLOP/s. **fp16 is pinned at 0.41 across a 64x range in FLOP count**, and that flatness is the
+diagnostic: it is a fixed-rate path, not a cache or occupancy effect. bf16 tracks fp32 (0.93–1.33x).
+
+**The table above is right for the T4 and wrong for the GTX 16-series, and the difference is tensor
+cores.** T4/T4G is TU104 and has them; TU116/TU117 does not — Nvidia cut both the RT and the tensor
+cores from that die. Same compute capability 7.5, different silicon. So:
+
+- **`float16` is the recommended Turing compute dtype in `@QUANTIZATION.md`'s table, and that
+  recommendation does not transfer to TU116/TU117.** It is correct where fp16 reaches tensor cores
+  and a 4x regression where it does not.
+- **`bf16` is not a "hard failure" on this part.** The T4G paragraph above says `--dtype bfloat16`
+  fails rather than running slowly; under torch on TU117 it runs at parity with fp32. That paragraph
+  is about vLLM's dtype validation refusing the flag, not about the silicon being unable — worth
+  keeping distinct, because the remedies differ.
+- **This is a torch/cuBLAS matmul measurement, not a serving measurement.** It says what the part
+  delivers for a dense GEMM; it does not by itself predict a decode loop, which on this card is
+  bandwidth- and launch-bound rather than matmul-bound (`local-llamacpp-1650ti-2b-q4_0` measured
+  `GGML_CUDA_FORCE_MMQ` — llama.cpp's own suggestion for a tensor-core-less device — moving decode
+  by −1%).
+
+**Practical rule: never pick a compute dtype for a `7.5` device without asking which die it is.**
+The compute capability is shared; the tensor cores are not, and the penalty for guessing wrong here
+is 4x on the format the shared capability number recommends.
+
 ### The packaging gap: aarch64 and SM 7.5 are not published together
 
 **This is the property that makes T4G unlike every other GPU here, and it is a fact about the

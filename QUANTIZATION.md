@@ -60,7 +60,19 @@ signature before choosing a remedy, or you will spend three attempts on the wron
 | v5e / v6e / v7 | `bfloat16` | — |
 | L4 (SM 8.9) | `bfloat16` | — |
 | **T4G (SM 7.5)** | **`float16`** | bf16 emulates silently; fp8 absent |
+| **1650 Ti (SM 7.5, TU117)** | **`float32` or `bfloat16` — NOT fp16** | see below |
 | inf2 | see `HARDWARE.md` | — |
+
+> **THE TWO SM 7.5 ROWS DISAGREE, AND THAT IS THE POINT.** Compute capability 7.5 spans TU104
+> (T4/T4G, **has** tensor cores) and TU116/TU117 (GTX 16-series, **has none** — Nvidia cut them from
+> that die). MEASURED 2026-09-04 on a GTX 1650 Ti under torch 2.15.0.dev: fp16 matmul is pinned at
+> **0.41 TFLOP/s against fp32's 1.68**, flat across N=1024/2048/4096 — a **4x penalty** on the very
+> dtype this table recommends for "Turing". bf16 runs at parity with fp32 there. Full table and the
+> caveats in `@HARDWARE.md`, "TU117 is Turing without tensor cores".
+>
+> **So do not resolve this table by compute capability alone.** Read the die, or read the device from
+> the live driver as `ports/gemma4/jax_e_model.py` does — and note that reading `get_device_capability`
+> is exactly what would get this wrong, because both parts answer `(7, 5)`.
 
 **Check this before evaluating any quantization scheme**, and check it from the device rather than from
 config: `ports/gemma4/jax_e_model.py` reads the live compute capability and picks, which is the pattern
