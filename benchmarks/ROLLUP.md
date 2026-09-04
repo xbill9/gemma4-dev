@@ -87,6 +87,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
+| local-pytorch-cpu-2b | `2026-09-04-first-light-pytorch-cpu` | 2 | 1 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 13 | 1 | 0 | yes | yes |
 | tpu-jax-v5e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 5 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-29-kv-quant-v6e1` | 44 | 0 | 0 | yes | **no** |
@@ -163,7 +164,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-jax-cpu-2b | 0 | 0 |
 | local-llamacpp-1650ti-2b-q4_0 | 2 | 2 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
-| local-pytorch-cpu-2b | 0 | 0 |
+| local-pytorch-cpu-2b | 0 | 1 |
 | local-vllm-cpu-2b | 0 | 0 |
 | tpu-jax-inf2-2b | 0 | 0 |
 | tpu-jax-v5e1-2b | 1 | 4 |
