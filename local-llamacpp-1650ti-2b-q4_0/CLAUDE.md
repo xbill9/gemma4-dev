@@ -252,9 +252,61 @@ a bare "277 tok/s" for this rig is wrong for any real serving workload.
 Two consequences for anyone planning work here:
 
 - **A long-prompt workload will not benefit from concurrency on this card.** Short-prompt,
-  long-generation is the shape that would — untested, and the obvious next sweep.
+  long-generation is the shape that would — MEASURED 2026-09-08 and confirmed (2.6x vs 1.47x), but
+  the mid-range levels turned out not to reproduce. See the next section before quoting any of it.
 - **The `-npp 128` in the early `llama-batched-bench` run flattered it.** 128-token prompts make
   prefill only 1x the decode volume; 512-token prompts make it 4x, and the conclusion inverts.
+
+## Decode batching is intermittent below c=16, and it is NOT thermal
+
+**MEASURED 2026-09-08**, 128 in / 512 out, card cooled to 52 °C before every level.
+Run `benchmarks/runs/2026-09-08-conc-shortprompt-1650ti/`.
+
+This is the short-prompt/long-generation sweep the previous section called the obvious next one.
+The headline confirms the prediction — **63.8 → 164.1 tok/s, 2.6x from c=1**, against 1.47x for the
+512/128 shape, because prefill is the minority of the work here. **But only c=1 and c=16 reproduce.**
+
+| c | median tok/s | modes | spread | TPOT ms (3 trials) |
+| ---: | ---: | :--- | ---: | :--- |
+| 1 | 63.77 | 62.9 / 63.8 / 63.8 | 1.5% | 14.43 / 14.48 / 14.49 |
+| 2 | 62.58 | **62.3, 62.6 / 97.6** | **56.7%** | **17.93** / 29.63 / 29.72 |
+| 4 | 128.19 | **94.5 / 128.2, 129.0** | **36.6%** | **26.58** / 37.91 / **26.91** |
+| 8 | 109.91 | **109.6, 109.9 / 127.8** | **16.6%** | 63.74 / **53.86** / 64.14 |
+| 16 | 164.07 | 164.0 / 164.1 / 164.4 | 0.2% | 79.97 / 80.10 / 80.05 |
+
+**TTFT is constant within every level and TPOT is not.** At c=2 the slow mode decodes at
+29.6 ms/token, exactly 2x the c=1 figure of 14.4 — two streams taking turns instead of sharing a
+batch. The variance is llama.cpp intermittently failing to co-schedule decode across slots, and
+prefill has nothing to do with it.
+
+**The thermal reading is wrong, and it is the reading everyone will reach for** — this is a Max-Q
+part, the section above already says it throttles, and the card really is power-capped (≈39 W of
+40 W, 1530–1770 MHz against a 2100 MHz max). Three things rule it out:
+
+- **c=16 is the hottest, fastest AND most stable level.** Thermal decay cannot peak in the middle.
+- **Fast and slow trials happen at equal temperature and clock** — c=4 trial 2 is slow at 1680 MHz,
+  trial 3 fast at 1740 MHz and 1 °C hotter.
+- **The minima reproduce to 0.2% across independent passes** (c=4: 95.26 then 95.10). Throttling is
+  continuous; this is two discrete states.
+
+**Consequences:**
+
+- **Do not quote a mid-range concurrency number from this rig at any shape.** c=16 is the only
+  multi-stream figure that has ever reproduced here. c=8 measured 160.5, 159.8, ~128 and ~110 in
+  one session with no configuration change.
+- **`--repeats 3` cannot characterise a bimodal cell.** The 2026-09-03 repeats fix assumed noise
+  around one value; a median over two modes reports whichever won two tosses. It is why this run's
+  curve appears to FALL from c=1 to c=2 — an artifact of median selection, not a result.
+- **Every generation hit the 512-token cap**, so this shape measures the thinking phase throughout.
+  Throughput real, task fictional.
+- Whether the same bimodality is present at 512/128 and hidden by that shape's prefill dominance is
+  **open**. The 2026-09-03 run's one wide cell (c=8, 7.7%) is the candidate.
+
+**The prompt cache was verified defeated, not assumed:** `llamacpp:prompt_tokens_cached_total 0`
+against `prompt_tokens_total 17689`. `/metrics` was enabled here on 2026-09-08 (`METRICS=1` in
+`tpu.env`); the 2026-09-03 run had to discard an artifact after finding the prefix cache had
+answered 656 of 661 prompt tokens. Use `/metrics` for that class of check — **not** for the
+benchmark decode column, which `--decode-source auto` must keep taking from the stream.
 
 ## `sweep.py` came from a sibling and needed two fixes to measure this model at all
 

@@ -1,0 +1,251 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-08-conc-shortprompt-1650ti",
+    "date": "2026-09-08",
+    "source": "local-llamacpp-1650ti-2b-q4_0",
+    "notes": "Short-prompt/long-generation concurrency (128 in / 512 out), the shape CLAUDE.md flagged as untested after the 2026-09-03 512/128 sweep. Primary numbers are from a thermally-controlled pass (card cooled to 52C before every level, cooled.json); the uncontrolled ascending pass is concurrency.json. ONLY c=1 AND c=16 REPRODUCE. c=2/4/8 are bimodal, the variance is entirely in TPOT with TTFT constant, and the thermal explanation was tested and rejected (c=16 is hottest, fastest and most stable; fast and slow trials occur at equal temperature and clock; minima reproduce to 0.2% across passes). Every generation hit the 512-token cap, so this measures the reasoning phase: throughput real, task fictional."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+    "chips": 1,
+    "hbm_gb_per_chip": 4.294,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "TU117, compute capability 7.5, NO tensor cores. Max-Q: thermally throttled, and it inverted a curve once."
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+    "family": "gemma-4",
+    "parameters_b": 4.63,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 16384,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes. Every cell here ran to the 512-token cap with finish_reason length."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b1-95ef7fc",
+    "backend": "CUDA",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-ngl",
+      "99",
+      "-c",
+      "16384",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "4",
+      "--parallel",
+      "16",
+      "--metrics"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (copy of gpu-pytorch-g5g-2b, three bugs fixed)",
+      "input_len": 128,
+      "output_len": 512,
+      "runs_per_point": 3,
+      "notes": "decode-source auto -> stream; llama-server emits no usage.decode_tokens_per_second. Prompt cache VERIFIED defeated: llamacpp:prompt_tokens_cached_total 0 against prompt_tokens_total 17689."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 63.767,
+        "per_stream_tok_per_s": 63.77,
+        "ttft_ms": {
+          "median": 663.23,
+          "p99": 663.23
+        },
+        "tpot_ms": {
+          "median": 14.264
+        },
+        "raw": {
+          "cooled_start_temp_c": 52,
+          "trials_tok_per_s": [
+            62.888,
+            63.813,
+            63.767
+          ],
+          "trials_tpot_ms": [
+            14.432,
+            14.479,
+            14.487
+          ],
+          "spread_pct": 1.5,
+          "reproducible": true,
+          "as_run_ascending_tok_per_s": 64.73,
+          "note": "stable across all passes"
+        }
+      },
+      {
+        "concurrency": 2,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 62.576,
+        "per_stream_tok_per_s": 31.29,
+        "ttft_ms": {
+          "median": 1255.4,
+          "p99": 1254.97
+        },
+        "tpot_ms": {
+          "median": 17.858
+        },
+        "raw": {
+          "cooled_start_temp_c": 52,
+          "trials_tok_per_s": [
+            97.636,
+            62.576,
+            62.309
+          ],
+          "trials_tpot_ms": [
+            17.931,
+            29.63,
+            29.717
+          ],
+          "spread_pct": 56.7,
+          "reproducible": false,
+          "as_run_ascending_tok_per_s": 99.23,
+          "note": "BIMODAL - median is whichever mode won 2 of 3; do not quote"
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 128.189,
+        "per_stream_tok_per_s": 32.05,
+        "ttft_ms": {
+          "median": 2288.27,
+          "p99": 2288.86
+        },
+        "tpot_ms": {
+          "median": 26.651
+        },
+        "raw": {
+          "cooled_start_temp_c": 52,
+          "trials_tok_per_s": [
+            129.042,
+            94.462,
+            128.189
+          ],
+          "trials_tpot_ms": [
+            26.583,
+            37.915,
+            26.907
+          ],
+          "spread_pct": 36.6,
+          "reproducible": false,
+          "as_run_ascending_tok_per_s": 129.49,
+          "note": "BIMODAL - median is whichever mode won 2 of 3; do not quote"
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 109.914,
+        "per_stream_tok_per_s": 13.74,
+        "ttft_ms": {
+          "median": 4469.49,
+          "p99": 4471.89
+        },
+        "tpot_ms": {
+          "median": 41.437
+        },
+        "raw": {
+          "cooled_start_temp_c": 52,
+          "trials_tok_per_s": [
+            109.914,
+            127.783,
+            109.634
+          ],
+          "trials_tpot_ms": [
+            63.742,
+            53.858,
+            64.138
+          ],
+          "spread_pct": 16.6,
+          "reproducible": false,
+          "as_run_ascending_tok_per_s": 160.478,
+          "note": "BIMODAL - median is whichever mode won 2 of 3; do not quote"
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 164.075,
+        "per_stream_tok_per_s": 10.25,
+        "ttft_ms": {
+          "median": 9207.38,
+          "p99": 9288.07
+        },
+        "tpot_ms": {
+          "median": 80.642
+        },
+        "raw": {
+          "cooled_start_temp_c": 52,
+          "trials_tok_per_s": [
+            164.366,
+            163.973,
+            164.075
+          ],
+          "trials_tpot_ms": [
+            79.969,
+            80.099,
+            80.046
+          ],
+          "spread_pct": 0.2,
+          "reproducible": true,
+          "as_run_ascending_tok_per_s": 163.158,
+          "note": "stable across all passes"
+        }
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 3.638,
+    "weights_gib": 1.311,
+    "kv_bytes_per_token": 18432,
+    "notes": "-c 16384 --parallel 16 measured 1818 MiB of 4096, matching CLAUDE.md."
+  },
+  "issues": [
+    {
+      "summary": "Decode batching is intermittent below c=16: at c=2 the slow mode's TPOT is 29.6 ms/token, exactly 2x the c=1 figure of 14.4, i.e. streams taking turns rather than batching. Cause unknown; arrival timing against llama.cpp batch formation is the untested suspect.",
+      "status": "open"
+    },
+    {
+      "summary": "--repeats 3 cannot characterise a bimodal cell. The 2026-09-03 repeats fix assumed noise around a single value; a median of two modes is worse than reporting both.",
+      "status": "open"
+    },
+    {
+      "summary": "c=8 measured 160.5 and 159.8 early in the session and ~110-128 later, with no configuration change. Not reproducible.",
+      "status": "open"
+    },
+    {
+      "summary": "NOT A DEFECT - closed investigation. Thermal throttling investigated as the cause of the spreads and REJECTED on three independent grounds. Heat is real (clocks fall ~10% within a level, power capped at ~39W of 40W) but is not what these spreads are.",
+      "status": "wontfix"
+    }
+  ],
+  "notes": [
+    "SHORT-PROMPT / LONG-GENERATION DOES SCALE, unlike the long-prompt shape: 63.8 -> 164.1 tok/s, 2.6x from c=1, against 1.47x for 512/128 on 2026-09-03. Prefill does not batch and is the minority of the work at this shape, which is exactly why it pays here.",
+    "c=16 is the only multi-stream level that reproduced across every pass (0.2% spread, 164.0/164.1/164.4). It is the only high-concurrency number from this rig worth quoting.",
+    "The curve appears to FALL from c=1 to c=2 (63.77 -> 62.58). That is an artifact of median selection over two modes, not a result.",
+    "Per-stream throughput at c=16 is 10.3 tok/s. Peak aggregate and usable interactive latency remain far apart on this card."
+  ]
+}
