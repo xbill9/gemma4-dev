@@ -56,6 +56,7 @@ ENDPOINT = os.environ.get("ENDPOINT", f"http://{HOST}:{PORT}")
 N_GPU_LAYERS = os.environ.get("N_GPU_LAYERS", "99")
 CONTEXT_SIZE = os.environ.get("CONTEXT_SIZE", "8192")
 KV_CACHE_TYPE = os.environ.get("KV_CACHE_TYPE", "f16")
+METRICS = os.environ.get("METRICS", "0")
 
 RUN_DIR = RIG_DIR / "run"
 PID_FILE = RUN_DIR / "llama-server.pid"
@@ -80,8 +81,8 @@ async def run_command(cmd: list[str], timeout: int = 120) -> tuple[int, str, str
         return 127, "", f"not found: {cmd[0]}"
 
 
-def _read_pid() -> Optional[int]:
-    """The running llama-server's pid, or None if it is not up.
+def _pidfile_pid() -> Optional[int]:
+    """The pid this server recorded when it started llama-server, if still alive.
 
     Checked against /proc rather than trusted, because a stale pid file outlives
     a Ctrl-C and there is no control plane here to ask for the truth.
@@ -93,6 +94,79 @@ def _read_pid() -> Optional[int]:
     except (ValueError, OSError):
         return None
     return pid if Path(f"/proc/{pid}").exists() else None
+
+
+def _listening_inodes(port: int) -> set[str]:
+    """Socket inodes in TCP_LISTEN on `port`, from /proc/net/tcp and tcp6."""
+    inodes: set[str] = set()
+    for table in ("tcp", "tcp6"):
+        try:
+            rows = Path(f"/proc/net/{table}").read_text().splitlines()[1:]
+        except OSError:
+            continue
+        for row in rows:
+            fields = row.split()
+            if len(fields) < 10 or fields[3] != "0A":  # 0A == TCP_LISTEN
+                continue
+            try:
+                if int(fields[1].rsplit(":", 1)[1], 16) != port:
+                    continue
+            except (IndexError, ValueError):
+                continue
+            inodes.add(fields[9])
+    return inodes
+
+
+def _pid_owning_port(port: int) -> Optional[int]:
+    """The pid holding the listening socket on `port`, or None.
+
+    Read out of /proc rather than shelling out to `ss`/`lsof`: no subprocess, no
+    dependency, and it answers the exact question both callers have — who owns
+    ENDPOINT — rather than "is there a process whose cmdline looks like ours".
+    That distinction is not academic here. `tpu.env` documents a second build at
+    ~/llama.cpp/build-mmq, so matching on LLAMA_SERVER_BIN would miss a server
+    started from it and go back to reporting a live endpoint as down.
+    """
+    targets = {f"socket:[{inode}]" for inode in _listening_inodes(port)}
+    if not targets:
+        return None
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            for fd in (entry / "fd").iterdir():
+                try:
+                    if os.readlink(fd) in targets:
+                        return int(entry.name)
+                except OSError:  # fd closed under us, or not ours to read
+                    continue
+        except OSError:  # process exited between iterdir and open
+            continue
+    return None
+
+
+def _read_pid() -> Optional[int]:
+    """The running llama-server's pid, or None if nothing is serving.
+
+    Two sources, in order: the pid file `start_model_server` writes, then the
+    process actually holding the listening socket on PORT.
+
+    THE PID FILE ALONE IS NOT ENOUGH, AND IT FAILS IN BOTH DIRECTIONS. It goes
+    stale when a server dies (handled above, since 2026-09-03), and it is simply
+    ABSENT whenever the server was started any other way — which is the normal
+    case here, not an edge one: `make serve` is foreground by design and writes
+    no pid file at all. Before 2026-09-08 that absence was read as "not running",
+    so against a healthy server `model_server_status` returned ❌ and, worse,
+    `stop_model_server` returned "✅ Not running." while the process kept the
+    card. `make status` curls /health directly and disagreed with both.
+    """
+    pid = _pidfile_pid()
+    if pid is not None:
+        return pid
+    try:
+        return _pid_owning_port(int(PORT))
+    except ValueError:  # PORT unparseable; nothing to discover against
+        return None
 
 
 @mcp.tool()
@@ -169,6 +243,11 @@ async def start_model_server(context_size: Optional[str] = None) -> str:
         "-ctk", KV_CACHE_TYPE,
         "-ctv", KV_CACHE_TYPE,
     ]
+    # llama.cpp serves /metrics only when asked; without this it answers 501.
+    # Operational visibility only — see tpu.env, METRICS, for why it must not
+    # become the benchmark decode source.
+    if METRICS == "1":
+        cmd.append("--metrics")
     # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
     # disabling it forces the 1.93 GB per-layer embedding tensor to be
     # materialised and turns a comfortable fit into an OOM.
@@ -192,28 +271,46 @@ async def stop_model_server() -> str:
     if pid is None:
         PID_FILE.unlink(missing_ok=True)
         return "✅ Not running."
+    # `_read_pid` now also finds a server this process did not start, so this
+    # stops a `make serve` too. It used to return "✅ Not running." at a live
+    # process holding the card — a success message for a teardown that did not
+    # happen, which is the worse half of the 2026-09-08 pid-file bug.
+    discovered = _pidfile_pid() is None
     try:
         os.kill(pid, signal.SIGTERM)
     except OSError as exc:
         return f"❌ Could not signal pid {pid}: {exc}"
     PID_FILE.unlink(missing_ok=True)
-    return f"✅ Sent SIGTERM to llama-server (pid {pid}). VRAM is released on exit."
+    origin = f" — found on port {PORT}, not started through this server" if discovered else ""
+    return f"✅ Sent SIGTERM to llama-server (pid {pid}){origin}. VRAM is released on exit."
 
 
 @mcp.tool()
 async def model_server_status() -> str:
     """Check whether llama-server is up and serving at the known local endpoint."""
+    # /health DECIDES, the pid annotates. The endpoint is a known literal here
+    # rather than the end of a QR -> node -> external IP chain, so probing it
+    # costs nothing and it is the actual claim this tool makes. Gating on the pid
+    # first is what made this return ❌ against a healthy server on 2026-09-08.
     pid = _read_pid()
     if pid is None:
-        return f"❌ llama-server is not running. Endpoint would be {ENDPOINT}."
+        who = "pid unknown"
+    elif _pidfile_pid() == pid:
+        who = f"pid {pid}"
+    else:
+        who = f"pid {pid}, found on port {PORT} — not started through this server, so `{LOG_FILE}` may not be its log"
+
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(f"{ENDPOINT}/health")
-        if resp.status_code == 200:
-            return f"✅ Serving at {ENDPOINT} (pid {pid}). `/health` → 200."
-        return f"📡 Process is up (pid {pid}) but `/health` → {resp.status_code}. Still loading?"
     except httpx.HTTPError as exc:
-        return f"📡 Process is up (pid {pid}) but {ENDPOINT} is not answering yet ({exc}). Still loading?"
+        if pid is None:
+            return f"❌ llama-server is not running. Endpoint would be {ENDPOINT}."
+        return f"📡 Process is up ({who}) but {ENDPOINT} is not answering yet ({exc}). Still loading?"
+
+    if resp.status_code == 200:
+        return f"✅ Serving at {ENDPOINT} ({who}). `/health` → 200."
+    return f"📡 Reachable at {ENDPOINT} ({who}) but `/health` → {resp.status_code}. Still loading?"
 
 
 @mcp.tool()
