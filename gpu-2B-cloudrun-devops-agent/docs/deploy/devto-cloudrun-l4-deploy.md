@@ -3,7 +3,7 @@ title: "2B Gemma 4 Deployment with Cloud Run, NVIDIA L4, MCP SDK 2.x, and Claude
 published: false
 description: "Step by step deployment of Gemma 4 E2B to a Cloud Run NVIDIA L4 GPU with vLLM, managed by a Python MCP server migrated to the MCP SDK 2.x."
 tags: mcp, gemma, googlecloud, claudecode
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/devto-cover.a4522d79.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/devto-cover.24212670.jpg
 ---
 
 This article provides a step by step deployment guide for Gemma 4 E2B to a Cloud Run hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM hosted deployment with Claude Code.
