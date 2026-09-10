@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>2B Gemma 4 Deployment with Cloud Run, NVIDIA L4, MCP SDK 2.x, and Claude Code</title>
+  <meta name="description" content="Step by step deployment of Gemma 4 E2B to a Cloud Run NVIDIA L4 GPU with vLLM, managed by a Python MCP server migrated to the MCP SDK 2.x." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/medium/img/devto-cover.24212670.jpg" alt="2B Gemma 4 Deployment with Cloud Run, NVIDIA L4, MCP SDK 2.x, and Claude Code" /></figure>
+<p>This article provides a step by step deployment guide for Gemma 4 E2B
+to a Cloud Run hosted GPU enabled system. A suite of Python MCP tools is
+built to simplify management of the vLLM hosted deployment with Claude
+Code.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent">https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent</a></p>
+<hr />
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
+<p>This project is a DevOps/SRE assistant for a Gemma 4 model served by
+vLLM on Cloud Run with an NVIDIA L4 GPU. A single-file Python MCP server
+provides tools to stage the weights, deploy the service, check its
+health, benchmark it, and tear it down.</p>
+<p>Cloud Run is the serverless option. There is no VM to provision and
+no driver to install: the service scales to zero when idle, and one
+<code>gcloud</code> command attaches the GPU.</p>
+<p>Along the way the MCP server itself had to move to the MCP Python SDK
+2.x, because a fresh <code>pip install</code> stopped it from starting.
+That migration is covered where it happened — in the MCP server section,
+before the deploy.</p>
+<hr />
+<h4 id="where-do-i-start">Where do I start?</h4>
+<p>The strategy for starting MCP development for model management is a
+incremental step by step approach.</p>
+<p>First, the basic development environment is setup with the required
+system variables and a working Claude Code configuration.</p>
+<p>Then, the Python MCP server is brought up over stdio and validated
+with Claude Code in the local environment. That server then stages the
+model, deploys it to Cloud Run, and drives validation and a benchmark
+sweep against the live endpoint.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>Python 3.10 or newer — mcp 2.x declares
+<code>Requires-Python &gt;=3.10</code></li>
+<li>Claude Code installed and working</li>
+<li>The Google Cloud SDK, logged in, with application default
+credentials</li>
+<li>A Google Cloud project with Cloud Run GPU access in your region
+(this one runs in <code>us-east4</code>)</li>
+<li>A GCS bucket named <code>&lt;project&gt;-bucket</code> for the model
+weights</li>
+</ul>
+<hr />
+<h4 id="setup-the-basic-environment">Setup the Basic Environment</h4>
+<p>Clone the repository and switch to the Cloud Run directory:</p>
+<pre class="shell"><code>cd ~
+git clone https://github.com/xbill9/gemma4-dev
+cd gemma4-dev/gpu-2B-cloudrun-devops-agent</code></pre>
+<p>Then run <strong>init.sh</strong> once. It checks your
+<code>gcloud</code> login and application default credentials, asks for
+a project ID, installs the Python requirements, enables the Cloud Run,
+Secret Manager and related APIs, and grants the default compute service
+account its roles. It pauses on errors and waits for input, so run it in
+a terminal:</p>
+<pre class="shell"><code>source init.sh</code></pre>
+<p>If your session times out or you need to reset your variables, run
+<strong>set_env.sh</strong>:</p>
+<pre class="shell"><code>source set_env.sh
+Current Environment:
+  GOOGLE_CLOUD_PROJECT=aisprint-491218
+  GOOGLE_CLOUD_LOCATION=us-east4
+  SERVICE_NAME=gpu-2b-l4-devops-agent
+  MODEL_NAME=/mnt/models/gemma-4-E2B-it
+  VLLM_BASE_URL=&lt;unset — discovered via gcloud&gt;
+ 
+Cloud Run here is --no-allow-unauthenticated. If calls fail, run: source ./set_adc.sh</code></pre>
+<p><code>VLLM_BASE_URL</code> can stay unset: the MCP server finds the
+service URL through <code>gcloud</code> when a tool first needs it.</p>
+<hr />
+<h4 id="model-management-tool-with-mcp-stdio-transport">Model Management
+Tool with MCP Stdio Transport</h4>
+<p>One of the key features that the MCP libraries provide is abstracting
+various transport methods. The tool implementation is the same no matter
+which transport the MCP client uses to connect.</p>
+<p>The simplest transport is stdio — the client launches the server as a
+local process and talks to it over stdin and stdout. Both must run in
+the same environment. In this project Claude Code is the MCP client.</p>
+<p>The server is created in one line:</p>
+<pre class="python"><code># Initialize MCP server (mcp 2.x; FastMCP was renamed MCPServer)
+mcp = MCPServer(&quot;Self-Hosted vLLM DevOps Agent&quot;)</code></pre>
+<p>That line used to say <code>FastMCP</code>. The next section is why
+it changed.</p>
+<hr />
+<h4 id="wait--why-mcpserver-and-not-fastmcp">Wait — Why MCPServer and
+not FastMCP?</h4>
+<p>Nothing in the repository changed. A fresh install did.
+<code>requirements.txt</code> listed <code>mcp</code> with no version
+bound, so the next <code>pip install</code> resolved the 2.x line, and
+the server stopped importing:</p>
+<pre class="shell"><code>python3 -c &quot;from mcp.server.fastmcp import FastMCP&quot;
+    raise ModuleNotFoundError(_MESSAGE, name=__name__)
+ModuleNotFoundError: No module named &#39;mcp.server.fastmcp&#39;. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin &#39;mcp&lt;2&#39; to keep running v1 code.</code></pre>
+<p>In Claude Code it showed up less helpfully, as a server listed with
+<code>Connection closed</code>: it died on the import before the
+handshake.</p>
+<p>The error names two fixes. Pinning <code>mcp&lt;2</code> is
+legitimate — the v1 line still gets critical fixes — but these projects
+install into one system Python with no virtualenvs, so a pin here is a
+downgrade for every other project on the machine. Migrating keeps the
+change inside the repository.</p>
+<p>The whole code change is the import and the constructor:</p>
+<pre class="diff"><code>-from mcp.server.fastmcp import FastMCP
++from mcp.server.mcpserver import MCPServer
+ ...
+-mcp = FastMCP(&quot;Self-Hosted vLLM DevOps Agent&quot;)
++mcp = MCPServer(&quot;Self-Hosted vLLM DevOps Agent&quot;)</code></pre>
+<p><code>@mcp.tool()</code>, <code>@mcp.resource()</code>,
+<code>mcp.run()</code> and every tool body stay as they are. Before
+editing, check the rest of the migration guide's list against your own
+server:</p>
+<pre class="shell"><code>grep -c &quot;^@mcp\.\(tool\|resource\)&quot; server.py
+grep -A1 &quot;^@mcp\.&quot; server.py | grep -c &quot;^def&quot;
+grep -n &quot;get_running_loop\|asyncio.run(&quot; server.py || echo &quot;(no matches)&quot;
+grep -n &quot;^import httpx&quot; server.py; grep -n &quot;^httpx&quot; requirements.txt
+28
+12
+(no matches)
+13:import httpx
+14:httpx</code></pre>
+<p>Three things to know from that output:</p>
+<ul>
+<li><strong><code>mcp</code> 2.x no longer installs
+<code>httpx</code>.</strong> It depends on <code>httpx2</code> instead.
+This server imports <code>httpx</code> and was safe only because
+<code>requirements.txt</code> already declared it.</li>
+<li><strong>The 12 sync handlers now run on a worker thread.</strong>
+Only code that expects the event loop's thread breaks, and there is none
+here.</li>
+<li><strong>The server's version is now blank</strong> unless you pass
+<code>version=</code> to <code>MCPServer(...)</code>. Nothing breaks; it
+shows in the handshake below.</li>
+</ul>
+<p>The requirement then says what the code needs —
+<code>mcp&gt;=2</code> in place of the bare <code>mcp</code> line.</p>
+<hr />
+<h4 id="mag_right-tip-change-the-usage-before-the-import">🔎 Tip: Change
+the Usage Before the Import</h4>
+<p>This project has a Claude Code hook that runs
+<code>ruff check --fix</code> after every edit. Change the import line
+first and, for a moment, <code>MCPServer</code> is imported but unused —
+so the hook deletes it:</p>
+<pre class="plaintext"><code>--- server.py
++++ server.py
+@@ -1,3 +1,2 @@
+-from mcp.server.mcpserver import MCPServer
+ 
+ mcp = FastMCP(&quot;demo&quot;)
+ 
+Would fix 1 error.</code></pre>
+<p>Make both changes in one edit, or change the usage first. Any editor
+that runs <code>ruff check --fix</code> on save does the same thing.</p>
+<hr />
+<h4 id="running-the-python-code">Running the Python Code</h4>
+<p>The project can be linted:</p>
+<pre class="shell"><code>make lint
+ruff check .
+All checks passed!
+ruff format --check .
+14 files already formatted
+mypy .
+Success: no issues found in 6 source files</code></pre>
+<p>and tested:</p>
+<pre class="shell"><code>make test
+----------------------------------------------------------------------
+Ran 28 tests in 1.151s
+ 
+OK</code></pre>
+<p>The suite compares the registered tool set against a hard-coded list,
+so a tool that silently failed to register after the rename would fail
+here. ✅</p>
+<hr />
+<h4 id="test-the-protocol-by-hand">Test the Protocol by Hand</h4>
+<p>Unit tests call Python. A client speaks JSON-RPC over stdio, so test
+that too. <strong>Hold stdin open with <code>sleep</code></strong> —
+with a bare <code>printf</code> pipe the server sees end-of-input and
+exits after answering only <code>initialize</code>:</p>
+<pre class="shell"><code>{ printf &#39;%s\n&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2025-06-18&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;probe&quot;,&quot;version&quot;:&quot;0&quot;}}}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/initialized&quot;}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/list&quot;,&quot;params&quot;:{}}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:3,&quot;method&quot;:&quot;resources/list&quot;,&quot;params&quot;:{}}&#39;; sleep 5; } \
+  | python3 server.py 2&gt;/dev/null</code></pre>
+<p>Summarised:</p>
+<pre class="plaintext"><code>initialize OK: name=&#39;Self-Hosted vLLM DevOps Agent&#39; version=&#39;&#39; proto 2025-06-18
+tools/list OK: 27 tools -&gt; cloudrun_analyze_cloud_logging, cloudrun_analyze_gpu_logs, cloudrun_check_gpu_quotas, cloudrun_deploy, ...
+resources/list OK: [&#39;config://vllm-deployment-template&#39;]</code></pre>
+<p>🟢 27 tools and the resource. Keep this snippet — it is the fastest
+way to tell "my server is broken" from "my client config is broken."</p>
+<hr />
+<h4 id="claude-code-mcpjson">Claude Code .mcp.json</h4>
+<p>Claude Code reads <code>.mcp.json</code> in the project directory. It
+launches <code>server.py</code> with the system
+<code>python3</code>:</p>
+<pre class="json"><code>{
+  &quot;mcpServers&quot;: {
+    &quot;cloudrun-devops&quot;: {
+      &quot;command&quot;: &quot;python3&quot;,
+      &quot;args&quot;: [&quot;/home/xbill/gemma4-dev/gpu-2B-cloudrun-devops-agent/server.py&quot;],
+      &quot;env&quot;: {
+        &quot;GOOGLE_CLOUD_PROJECT&quot;: &quot;aisprint-491218&quot;,
+        &quot;GOOGLE_CLOUD_LOCATION&quot;: &quot;us-east4&quot;,
+        &quot;VLLM_BASE_URL&quot;: &quot;https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app&quot;,
+        &quot;MODEL_NAME&quot;: &quot;/mnt/models/gemma-4-E2B-it&quot;
+      }
+    }
+  }
+}</code></pre>
+<hr />
+<h4 id="validation-with-claude-code">Validation with Claude Code</h4>
+<p>Check the connection from Claude Code to the local server:</p>
+<pre class="shell"><code>claude mcp get cloudrun-devops
+cloudrun-devops:
+  Scope: Project config (shared via .mcp.json)
+  Status: ✔ Connected</code></pre>
+<p>If the server failed at startup earlier in the session, reconnect it
+from <code>/mcp</code> or start a new session to pick up the fixed
+code.</p>
+<hr />
+<h4 id="model-lifecycle-management-via-mcp">Model Lifecycle Management
+via MCP</h4>
+<p>The MCP tools cover the whole lifecycle of the Cloud Run deployment.
+Every tool is prefixed <code>cloudrun_</code>. Abridged output of
+<code>cloudrun_get_help</code>:</p>
+<pre class="markdown"><code>The server is running in CLOUD RUN mode targeting NVIDIA L4 GPU in region us-east4.
+ 
+🐳 Infrastructure &amp; Deployment
+  cloudrun_deploy, cloudrun_destroy, cloudrun_status, cloudrun_update_scaling,
+  cloudrun_get_deployment_config, cloudrun_get_gpu_deployment_config, cloudrun_check_gpu_quotas
+📊 Model Management
+  cloudrun_list_vertex_models, cloudrun_list_bucket_models, cloudrun_save_hf_token,
+  cloudrun_get_vertex_ai_model_copy_instructions, cloudrun_get_huggingface_model_copy_instructions,
+  cloudrun_get_huggingfacehub_download_path
+📊 Monitoring &amp; Status
+  cloudrun_get_metrics, cloudrun_get_system_status, cloudrun_get_endpoint,
+  cloudrun_get_endpoint_url, cloudrun_get_model_details, cloudrun_verify_model_health
+📈 Performance &amp; Benchmarking
+  cloudrun_run_benchmark
+💬 Interaction &amp; Diagnostics
+  cloudrun_query_gemma4, cloudrun_query_gemma4_with_stats, cloudrun_query,
+  cloudrun_analyze_cloud_logging, cloudrun_analyze_gpu_logs, cloudrun_suggest_sre_remediation</code></pre>
+<hr />
+<h4 id="stage-the-model-weights">Stage the Model Weights</h4>
+<p>Cloud Run mounts the bucket read-only at <code>/mnt/models</code>
+through GCS FUSE, so the weights go to GCS once. Download to a real disk
+rather than <code>/tmp</code>, which on this host is a RAM-backed tmpfs
+smaller than the model:</p>
+<pre class="shell"><code>hf download google/gemma-4-E2B-it --local-dir ~/hf-downloads/gemma-4-E2B-it
+gcloud storage rsync ~/hf-downloads/gemma-4-E2B-it gs://aisprint-491218-bucket/gemma-4-E2B-it \
+  --recursive --exclude=&#39;^\.cache/&#39;
+gcloud storage ls -l gs://aisprint-491218-bucket/gemma-4-E2B-it/
+Average throughput: 41.4MiB/s
+      4954  2026-09-10T14:51:14Z  gs://aisprint-491218-bucket/gemma-4-E2B-it/config.json
+10246621918  2026-09-10T14:55:13Z  gs://aisprint-491218-bucket/gemma-4-E2B-it/model.safetensors
+  32169626  2026-09-10T14:51:34Z  gs://aisprint-491218-bucket/gemma-4-E2B-it/tokenizer.json
+TOTAL: 9 objects, 10278849571 bytes (9.57GiB)</code></pre>
+<p>The bucket is shared with other models, and
+<code>cloudrun_list_bucket_models</code> shows the trap:</p>
+<pre class="plaintext"><code>&gt; cloudrun_list_bucket_models
+ 
+### Contents of GCS Bucket: aisprint-491218-bucket
+- gemma-2b-it/config.json (0.00 MB)
+- gemma-2b-it/model-00001-of-00002.safetensors (4716.15 MB)
+...
+- gemma-4-12B-it-qat-w4a16-ct/model.safetensors (9788.73 MB)
+...</code></pre>
+<p><strong>Check the architecture, not the folder name.</strong>
+<code>gemma-2b-it/</code> looks like the answer and is the original
+Gemma, which the <code>gemma4</code> parsers cannot serve.
+<code>config.json</code> settles it:</p>
+<pre class="shell"><code>gcloud storage cat gs://aisprint-491218-bucket/gemma-4-E2B-it/config.json \
+  | python3 -c &#39;import json,sys; c=json.load(sys.stdin); t=c[&quot;text_config&quot;]; print(c[&quot;model_type&quot;], c[&quot;architectures&quot;], &quot;hidden&quot;, t[&quot;hidden_size&quot;], &quot;layers&quot;, t[&quot;num_hidden_layers&quot;])&#39;
+gemma4 [&#39;Gemma4ForConditionalGeneration&#39;] hidden 1536 layers 35</code></pre>
+<hr />
+<h4 id="deploy-to-cloud-run">Deploy to Cloud Run</h4>
+<p>The <code>deploy-vllm</code> target in the <code>Makefile</code> is
+the single source of truth for the vLLM and Cloud Run flags. The ones
+that matter most:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/medium/img/devto-cloudrun-l4-deploy-table-1.png"
+alt="Table: Flag, Value, Why" /></p>
+<p>The service is also <code>--no-allow-unauthenticated</code>, so every
+caller needs an identity token.</p>
+<pre class="shell"><code>make deploy
+Deploying container to Cloud Run service [gpu-2b-l4-devops-agent] in project [aisprint-491218] region [us-east4]
+Deploying new service...
+Routing traffic.....done
+Done.
+Service [gpu-2b-l4-devops-agent] revision [gpu-2b-l4-devops-agent-00001-ssq] has been deployed and is serving 100 percent of traffic.
+Service URL: https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app</code></pre>
+<p><code>gcloud run deploy</code> returns only once the startup probe
+passes, and the probe waits <code>initialDelaySeconds=180</code> before
+its first check. Expect several minutes.</p>
+<hr />
+<h4 id="demo-mode-fixed-instances">Demo Mode: Fixed Instances</h4>
+<p>The default autoscales between zero and one instance, which means a
+cold GPU start after the service goes idle. A demo cannot wait for that.
+The <code>Makefile</code> takes a <code>SCALING</code> variable:</p>
+<pre class="make"><code>SCALING ?= auto
+ifeq ($(SCALING),auto)
+SCALING_FLAGS = --scaling=auto --max-instances=1 --min-instances=0
+else
+SCALING_FLAGS = --scaling=$(SCALING)
+endif
+make deploy SCALING=1
+gcloud run services describe gpu-2b-l4-devops-agent --region us-east4 --format=&#39;yaml(metadata.annotations)&#39;
+    run.googleapis.com/manualInstanceCount: &#39;1&#39;
+    run.googleapis.com/scalingMode: manual</code></pre>
+<p>One L4 now runs until you change it. Plain <code>make deploy</code>,
+and the <code>cloudrun_deploy</code> and
+<code>cloudrun_update_scaling</code> tools, all pass
+<code>--scaling=auto</code> on purpose — a service stuck in manual
+scaling at zero returns 503 to every request. So any of them quietly
+takes a demo back to scale-to-zero.</p>
+<hr />
+<h4 id="checking-system-status">Checking System Status</h4>
+<p>The status can be checked with an MCP tool:</p>
+<pre class="plaintext"><code>&gt; cloudrun_get_system_status
+ 
+### 🌀 GPU Cloud Run System Status (gpu-2b-l4-devops-agent)
+- vLLM Health: 🟢 Online (https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app)
+- Cloud Run Service Status: 🟢 Ready
+👉 Next Step: Use cloudrun_query_gemma4 to interact with the model.</code></pre>
+<hr />
+<h4 id="cross-check-the-deployed-model">Cross Check The Deployed
+Model</h4>
+<p>Ask vLLM what it loaded:</p>
+<pre class="shell"><code>curl -s -H &quot;Authorization: Bearer $(gcloud auth print-identity-token)&quot; \
+  https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app/v1/models | python3 -m json.tool
+{
+    &quot;object&quot;: &quot;list&quot;,
+    &quot;data&quot;: [
+        {
+            &quot;id&quot;: &quot;/mnt/models/gemma-4-E2B-it&quot;,
+            &quot;object&quot;: &quot;model&quot;,
+            &quot;owned_by&quot;: &quot;vllm&quot;,
+            &quot;max_model_len&quot;: 16384
+        }
+    ]
+}</code></pre>
+<p>The model id is the mount path, not the Hugging Face repo id. The
+container is started with <code>--model=/mnt/models/&lt;path&gt;</code>,
+so that path is the name the OpenAI API expects.</p>
+<p>Then the MCP health check:</p>
+<pre class="plaintext"><code>&gt; cloudrun_verify_model_health
+ 
+✅ Model health check PASSED.
+Model: /mnt/models/gemma-4-E2B-it
+Response: &#39;Hello! Yes, I am working. I am Gemma 4, a Large La...&#39;
+Latency: 0.87 seconds.</code></pre>
+<p>Right after the first deploy the same check took 2.48 seconds. That
+answer came through the whole stack: Claude Code called the tool over
+MCP, and the tool called vLLM on Cloud Run. 🟢</p>
+<hr />
+<h4 id="benchmark-the-model">Benchmark the Model</h4>
+<p>Ask the agent for <code>cloudrun_run_benchmark</code> with its
+defaults: one warmup request, then 20 requests at each concurrency level
+of 1, 2, 4 and 8, up to 128 output tokens each, one fixed prompt at
+temperature 0.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/medium/img/devto-cloudrun-l4-deploy-table-2.png"
+alt="Table: Concurrency, Req/s, Tokens/s, Avg latency, P95 latency" /></p>
+<p>Every request at every level succeeded. Three readings:</p>
+<p><strong>From 1 to 4, throughput scales almost linearly.</strong>
+188.46 tokens/s is 3.8x the single-stream 49.63 (arithmetic), while
+average latency moves from 2.58 s to 2.71 s. The L4 is nowhere near full
+at 4.</p>
+<p><strong>From 4 to 8, it stops.</strong> Throughput rises 0.6%
+(arithmetic) while average latency goes from 2.71 s to 4.86 s. Half the
+requests are waiting.</p>
+<p><strong>The ceiling is a Cloud Run setting, not the GPU.</strong> One
+instance accepts <code>--concurrency=4</code> requests at a time, and
+vLLM would batch up to <code>--max-num-seqs=8</code>. The next section
+checks that against the same chip with nothing in front of it.</p>
+<hr />
+<h4 id="compare-to-other-deployments">Compare to Other Deployments</h4>
+<p>The same checkpoint was served on the same chip — one NVIDIA L4 in an
+AWS EC2 <code>g6.2xlarge</code> — with vLLM and
+<code>--max-num-seqs 8</code>, and swept with
+<code>vllm bench serve</code> at the same concurrency levels and 128
+output tokens:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/medium/img/devto-cloudrun-l4-deploy-table-3.png"
+alt="Table: Concurrency, Cloud Run L4 tok/s, EC2 g6 L4 tok/s" /></p>
+<p><strong>Up to 4, the two are the same chip doing the same
+work</strong> — within 8% of each other at every level, with Cloud Run
+slightly ahead.</p>
+<p><strong>At 8, the g6 keeps going.</strong> It reaches 360.17
+tokens/s, 1.9x Cloud Run's 189.53 (arithmetic), because nothing in front
+of vLLM caps admissions at 4. That is the direct evidence that Cloud
+Run's plateau is <code>--concurrency=4</code>, not the L4.</p>
+<p>Read the rows as a shape, not a leaderboard. The runs differ in
+engine version, KV-cache dtype, prompt and client location; the scope
+paragraph at the end lists each.</p>
+<hr />
+<h4 id="and-priceperformance">And Price/Performance?</h4>
+<p>Cloud Run bills a GPU service by the second for the whole instance
+while it runs — GPU, CPU and memory — because the L4 requires
+<code>--no-cpu-throttling</code>. List prices in <code>us-east4</code>
+from the Cloud Billing catalog:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/medium/img/devto-cloudrun-l4-deploy-table-4.png"
+alt="Table: Component, Price, Per hour" /></p>
+<p>That is $34.10 a day in demo mode with one fixed instance
+(arithmetic). In the default mode an idle service scales to zero
+instances.</p>
+<p>Per million output tokens, from the benchmark (arithmetic):</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/medium/img/devto-cloudrun-l4-deploy-table-5.png"
+alt="Table: Deployment, Tokens/s, $ / hour, $ / M tokens" /></p>
+<p>The winner is the VM, on two counts: a lower hourly rate, and twice
+the throughput with no admission cap. Cloud Run's price is list and
+on-demand; the g6 price is a spot price and can be reclaimed. What Cloud
+Run buys is no VM to manage and zero cost while idle — for intermittent
+SRE work that is the number that matters.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<pre class="shell"><code>make destroy</code></pre>
+<p>Not run for this article — the demo service is still up. It deletes
+the Cloud Run service; the weights stay in the bucket for the next
+deploy.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to deploy Gemma 4 E2B to a Cloud Run
+NVIDIA L4 GPU with vLLM, and to manage the whole lifecycle from Claude
+Code through a Python MCP server. The key to the solution was bringing
+the MCP server up and validating it locally before the deploy — which is
+where the move to the MCP SDK 2.x surfaced, and where it cost one import
+and one class name. The deployment results were:</p>
+<ul>
+<li>🟢 The migrated MCP server registered all 27 tools and the resource
+unchanged, and drove staging, deploy, validation and benchmarking</li>
+<li>🟢 Gemma 4 E2B deployed to Cloud Run with one
+<code>make deploy</code> and passed the MCP health check in 0.87
+seconds</li>
+<li>🟢 Throughput scaled 3.8x from concurrency 1 to 4 with flat latency,
+peaking at 189.53 tokens/s</li>
+<li>❌ Past 4, Cloud Run's <code>--concurrency=4</code> is the ceiling —
+the same L4 on EC2 reached 360.17 tokens/s at 8</li>
+<li>⚠️ One fixed Cloud Run L4 instance lists at $1.4209 an hour, $2.08
+per million output tokens at peak</li>
+</ul>
+<p>Scope: one Cloud Run instance with one NVIDIA L4 in
+<code>us-east4</code>, vLLM <code>v0.26.0-cu129</code>, Gemma 4 E2B with
+bf16 weights and fp8 KV cache, manual scaling at one fixed instance
+during the sweep. One sweep of 20 requests per level, a single fixed
+prompt, 128 max output tokens, driven over the internet from a laptop.
+The EC2 comparison is a separate run: vLLM 0.28.0, bf16 KV cache,
+1,024-token random prompts, 8 to 32 requests per level, driven on the
+instance itself, spot-priced in <code>us-east-1</code>. Costs are
+arithmetic on list prices, not a bill. MCP server on mcp 2.2.0 and
+Python 3.14.7.</p>
+<p>The strategy for using MCP for Gemma 4 GPU deployment to Cloud Run
+with Claude Code was validated with an incremental step by step
+approach.</p>
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent">gpu-2B-cloudrun-devops-agent
+| GitHub</a></li>
+<li><a
+href="https://py.sdk.modelcontextprotocol.io/v2/migration/">Migration
+Guide: v1 to v2 | MCP Python SDK</a></li>
+<li><a href="https://github.com/modelcontextprotocol/python-sdk">GitHub
+- modelcontextprotocol/python-sdk</a></li>
+</ul>
+</body>
+</html>
