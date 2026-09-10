@@ -1,0 +1,50 @@
+# captured 2026-09-10 on yoga9i: MCP tool calls from Claude Code to the local-llamacpp-1650ti-2b-q4_0
+# server (mcp 2.2.0, stdio), against the llama-server started by start_model_server (pid 83619).
+# Tool results verbatim; the JSON {"result": ...} wrapper is removed.
+
+$ gpu_status
+📡 **GPU** — `local-llamacpp-1650ti-2b-q4_0`
+
+```
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 7.5, 4096 MiB, 1606 MiB, 2127 MiB, 615.71.09
+```
+
+⚠️  GTX 16-series (TU116/TU117): compute capability 7.5 but **no tensor cores**. Do not compare throughput against the T4-based `g4dn`/`g5g` rigs on the strength of a matching compute capability.
+
+$ model_info
+📡 **Model** — `local-llamacpp-1650ti-2b-q4_0`
+
+- **Name:** `google/gemma-4-E2B-it-qat-q4_0-gguf`
+- **Path:** `/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf`
+- **On disk:** 3.35 GB
+- **Quantization slot:** `q4_0` — but the dominant tensor type is **Q6_K**. Both embedding tensors are Q6_K (2.257 GB of 3.334 GB); only the ~1.08 GB transformer body is actually Q4_0.
+- **Resident on GPU:** ~1.31 GiB. `per_layer_token_embd` (1.93 GB, 58% of the file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out of the mmap.
+
+Run `inspect_gguf.py` to re-derive the split from the artifact rather than trusting these numbers.
+
+$ model_server_status
+✅ Serving at http://127.0.0.1:8080 (pid 83619). `/health` → 200.
+
+$ query_model prompt="In one sentence, what is a TPU?"
+✅ **Reply**
+
+A TPU is a specialized hardware accelerator designed by Google specifically to speed up the computationally intensive operations required for training and running machine learning models and deep learning tasks.
+
+---
+_(plus 1167 chars of reasoning, suppressed)_
+prompt 25 tok · completion 308 tok · 70.5 tok/s
+
+$ query_model prompt="Name three TPU generations." max_tokens=64
+📡 **Reasoning only — no answer yet.** `finish_reason: length` after 64 tokens, all of them thinking.
+
+This is Gemma 4 reasoning, not a broken server. Re-run with a larger `max_tokens` (currently 64).
+
+<details>
+
+*   **Analyze the Request:** The user wants the names of three generations of TPU (Tensor Processing Unit).
+
+*   **Identify Key TPU Generations:** TPUs are developed by Google and evolve with new architectures and capabilities.
+    *   TPU v1 (The original architecture)
+    *
+
+</details>
