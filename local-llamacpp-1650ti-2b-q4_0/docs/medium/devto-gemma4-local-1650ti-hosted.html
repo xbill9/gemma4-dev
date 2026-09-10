@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>Gemma 4 on a 4 GiB Laptop GPU: 58% of the Model Never Leaves the Host</title>
-  <meta name="description" content="Step-by-step: serving Gemma 4 E2B from a GTX 1650 Ti Max-Q with no tensor cores — why the memory arithmetic everyone reaches for is wrong, which tuning levers are traps, and moving its MCP server to the Python SDK 2.x." />
+  <title>Gemma 4 on an Old 4 GB Laptop GPU: QAT Takes It From 9.5 GiB to 1.6</title>
+  <meta name="description" content="Step-by-step: running Google&#x27;s quantization-aware-trained Gemma 4 E2B on a 10th-gen Core i7 laptop with a 4 GB GTX 1650 Ti — why bf16 and int8 cannot fit, why the QAT GGUF does with room to spare, and managing it with an MCP server." />
   <style>
     html {
       color: #1a1a1a;
@@ -183,41 +183,29 @@
   </style>
 </head>
 <body>
-<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-cover.1f9664d0.jpg" alt="Gemma 4 on a 4 GiB Laptop GPU: 58% of the Model Never Leaves the Host" /></figure>
-<p>This article provides a step by step deployment guide for Gemma 4 E2B
-to a local, laptop hosted GPU enabled system — a GTX 1650 Ti Max-Q with
-4 GiB of memory and no tensor cores. A suite of Python MCP tools is
-built to simplify management of the llama.cpp hosted deployment.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-cover.225eaada.jpg" alt="Gemma 4 on an Old 4 GB Laptop GPU: QAT Takes It From 9.5 GiB to 1.6" /></figure>
+<p>This article provides a step by step deployment guide for Gemma 4
+E2B's quantization-aware-trained (QAT) checkpoint to a local, laptop
+hosted GPU enabled system — a much older Lenovo Yoga 9 with a 4 GB GTX
+1650 Ti. A suite of Python MCP tools is built to simplify management of
+the llama.cpp hosted deployment.</p>
 <p><a
 href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0</a></p>
-<p>The checkpoint is 3.35 GB and the card has 4 GiB, and the obvious
-conclusion — that it barely fits — is wrong. <strong>58% of the file is
-a lookup table that llama.cpp never copies to the GPU</strong>, so full
-offload takes 1618 MiB and leaves more than half the card free. The rest
-of this card's surprises run the same way: two tuning levers that win
-elsewhere lose here, and the concurrency that scales decode does nothing
-for prefill.</p>
+<p>Gemma 4 E2B in bfloat16 is 9.5 GiB of weights. This laptop's GPU has
+4 GiB. Even a plain int8 conversion would not fit. <strong>The QAT
+release closes that gap: the same model, trained knowing it would be
+stored at 4 bits, in a 3.35 GB file of which only 1.31 GiB ever has to
+be on the GPU.</strong> It loaded in 1618 MiB, left more than half the
+card free, and decodes at 73.75 tok/s.</p>
 <h4 id="what-is-this-project-trying-to-do">What is this project trying
 to Do?</h4>
 <p>Every other rig in this repository serves Gemma 4 from rented
-hardware: Cloud TPU, Compute Engine, EC2, Cloud Run. Those rigs spend
-most of their code on a control plane — finding a zone with capacity,
-waiting on a queued resource, discovering an endpoint, tearing it all
-down so nothing stays billed.</p>
-<p>This one has no control plane at all. The GPU is in the laptop, and
-four cloud habits are actively wrong here:</p>
-<ul>
-<li><strong>There is no capacity to find.</strong> No zone scan, no
-quota request, no flex-start wait.</li>
-<li><strong>The endpoint is not discovered.</strong> It is
-<code>127.0.0.1:8080</code>, known before the process starts.</li>
-<li><strong>Memory is a hard ceiling.</strong> 4096 MiB. There is no
-bigger machine type to ask for.</li>
-<li><strong>Nothing is billed.</strong> Ctrl-C is a complete
-teardown.</li>
-</ul>
-<p>What is left is the half that is the same everywhere: start the model
-server, check it, ask it something, and measure it.</p>
+hardware: Cloud TPU, Compute Engine, EC2, Cloud Run. I wanted to know
+whether the same model would run on the laptop I already had — a
+10th-generation Core i7 with a GTX 16-series GPU, no tensor cores and a
+4 GB ceiling that no quota request can raise.</p>
+<p>It does, and QAT is the reason. The rest of this article is how, and
+what the old hardware changes about running it.</p>
 <h4 id="at-this-point-you-should-have">At This Point You Should
 Have…</h4>
 <ul>
@@ -231,39 +219,57 @@ Design, driver 615.71.09</li>
 directory</li>
 <li>Claude Code, or any MCP client that speaks stdio</li>
 </ul>
-<h4 id="the-mcp-server">The MCP Server</h4>
-<p><code>server.py</code> is a single-file MCP server exposing seven
-tools:</p>
+<h4 id="the-laptop">The Laptop</h4>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-1.png"
-alt="Table: Tool, What it does" /></p>
-<p>There is no <code>find_*</code> tool, no queued resource and no zone
-skip list. The server registers under its directory name, so every tool
-arrives in Claude Code as
-<code>mcp__local-llamacpp-1650ti-2b-q4_0__gpu_status</code> and cannot
-be confused with a cloud rig's.</p>
-<h4 id="what-is-the-hardware">What Is the Hardware?</h4>
-<p>Ask the agent rather than the spec sheet:</p>
+alt="Table: Machine, CPU, RAM, GPU" /></p>
+<p>The MCP server reports the GPU the same way:</p>
 <pre class="plaintext"><code>gpu_status
 📡 **GPU** — `local-llamacpp-1650ti-2b-q4_0`
  
 NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 7.5, 4096 MiB, 1606 MiB, 2127 MiB, 615.71.09
  
 ⚠️  GTX 16-series (TU116/TU117): compute capability 7.5 but **no tensor cores**. Do not compare throughput against the T4-based `g4dn`/`g5g` rigs on the strength of a matching compute capability.</code></pre>
-<p>(That snapshot was taken with the model loaded. Idle, the card
-reports 3724 MiB free.)</p>
-<p><strong>Compute capability 7.5 is a trap.</strong> The T4 is also
-7.5, and a T4 has tensor cores. The T4 is Turing's TU104 die; the GTX
-16-series is TU116/TU117, and Nvidia cut the tensor cores from that
-silicon. llama.cpp notices on its own, at init:</p>
+<p><strong>Compute capability 7.5 is a trap.</strong> A T4 is also 7.5
+and has tensor cores; the GTX 16-series is a cut-down Turing die with
+the tensor cores removed. llama.cpp notices on its own at init:</p>
 <pre class="plaintext"><code>The following devices will have suboptimal performance due to a lack of tensor cores:
   Device 0: NVIDIA GeForce GTX 1650 Ti with Max-Q Design</code></pre>
-<p>So a throughput number from this card is not comparable to a T4
-number, in either direction. It is also a Max-Q part, power-capped at 40
-W, and it throttles.</p>
-<h4 id="which-checkpoint">Which Checkpoint?</h4>
-<p><code>google/gemma-4-E2B-it-qat-q4_0-gguf</code> — Google's
-quantization-aware-trained Gemma 4 E2B, published as a GGUF that
-llama.cpp opens directly.</p>
+<h4 id="why-cant-the-normal-model-fit">Why Can't the Normal Model
+Fit?</h4>
+<p>The sizes, from this repository's model reference:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-2.png"
+alt="Table: Gemma 4 E2B as, Weights, Fits 4096 MiB?" /></p>
+<p>The bf16 checkpoint is more than twice the card. Halving it to int8
+is still larger than the card. Only a 4-bit model is in range, and that
+is where QAT comes in.</p>
+<h4 id="what-is-qat-and-why-does-it-matter-here">What Is QAT, and Why
+Does It Matter Here?</h4>
+<p>Quantization-aware training simulates quantization <em>during</em>
+training rather than compressing a finished model afterwards. The 4-bit
+weights are not a post-hoc approximation of a bf16 model: the model was
+trained knowing it would be stored this way. Google's model card puts
+the goal plainly:</p>
+<blockquote>
+<p>This model card is for the new versions of the Gemma 4 family
+optimized with Quantization-Aware Training (QAT), which allows
+preserving similar quality to bfloat16 while dramatically reducing the
+memory requirements to load the model.</p>
+</blockquote>
+<p>That is the difference that matters on a 4 GB card. <strong>Rounding
+the bf16 model down to 4 bits after the fact would fit too, but nothing
+in its training would have prepared it for that.</strong> QAT is the
+version of "fits" that was designed to keep the model's quality close to
+bf16 on the way there.</p>
+<p>Google ships the QAT weights four ways:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-3.png"
+alt="Table: Artifact, What it is, For" /></p>
+<p>The GGUF is not a lesser copy. This repository checked it: four norm
+tensors read out of the GGUF are bit-identical to the ones in the
+<code>-unquantized</code> release, so it is the same QAT model in its
+native packing.</p>
+<h4 id="which-qat-checkpoint">Which QAT Checkpoint?</h4>
+<p><code>google/gemma-4-E2B-it-qat-q4_0-gguf</code>, which llama.cpp
+opens directly. The agent reads it off disk:</p>
 <pre class="plaintext"><code>model_info
 📡 **Model** — `local-llamacpp-1650ti-2b-q4_0`
  
@@ -274,15 +280,13 @@ llama.cpp opens directly.</p>
 - **Resident on GPU:** ~1.31 GiB. `per_layer_token_embd` (1.93 GB, 58% of the file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out of the mmap.
  
 Run `inspect_gguf.py` to re-derive the split from the artifact rather than trusting these numbers.</code></pre>
-<p>The tool's last line is the point. Those figures are not remembered;
-they come from reading the file.</p>
-<h4 id="will-it-fit-the-obvious-arithmetic-is-wrong">Will It Fit? The
-Obvious Arithmetic Is Wrong</h4>
-<p>A 3.35 GB file against 3724 MiB free. Read those side by side and the
-conclusion is that full GPU offload barely fits — so lower
-<code>-ngl</code> and cap the context "to be safe."</p>
-<p><strong>That conclusion is wrong.</strong> <code>make info</code>
-reads tensor metadata out of the GGUF:</p>
+<p>Two lines in that output explain why a 3.35 GB file fits in far less
+than 3.35 GB.</p>
+<h4 id="why-only-131-gib-has-to-be-on-the-gpu">Why Only 1.31 GiB Has to
+Be on the GPU</h4>
+<p>A 3.35 GB file against 3724 MiB free reads as "barely fits." It is
+better than that. <code>make info</code> reads the tensor table out of
+the GGUF:</p>
 <pre class="shell"><code>make info
 gemma-4-E2B_q4_0-it.gguf
   tensors:  541
@@ -302,33 +306,27 @@ gemma-4-E2B_q4_0-it.gguf
     Q4_0      1.048 GB  (31.4%)
     F16       0.028 GB  ( 0.8%)</code></pre>
 <p><strong>One tensor is 58% of the file, and none of it has to be on
-the GPU.</strong></p>
-<h4 id="the-lazy-tensor-is-the-e-in-e2b">The Lazy Tensor Is the E in
-E2B</h4>
-<p><code>per_layer_token_embd</code> is Gemma 4's per-layer embedding
-table. Its leading dimension is 8960, which is 256 per-layer input
-dimensions × 35 layers, over a 262,144-token vocabulary. It is why E2B
-has about 5B parameters in total but only 2B "effective" ones.</p>
-<p>llama.cpp creates it with <code>TENSOR_READ_LAZY</code> in
-<code>src/models/gemma4.cpp</code>, documented in
-<code>src/llama-model-loader.h</code> as <em>"read rows on demand
-instead of loading whole tensor; requires mmap for now."</em> It is used
-as a row lookup (<code>GET_ROWS</code>), not a matmul, so the rows a
-token needs are read out of the memory-mapped file on the host.</p>
-<p>Two rules fall out of it:</p>
+the GPU.</strong> <code>per_layer_token_embd</code> is Gemma 4's
+per-layer embedding table — the "E" in E2B, and why the model has about
+5B parameters in total but 2B effective. llama.cpp creates it with
+<code>TENSOR_READ_LAZY</code> and uses it as a row lookup, not a matmul,
+so the rows a token needs are read out of the memory-mapped file on the
+host.</p>
+<p>QAT and the lazy table stack. QAT puts the 35 transformer blocks at
+Q4_0, 1.05 GB where half precision would be 3.7 GB; the lazy table keeps
+the biggest remaining tensor off the card entirely. <strong>What decode
+actually streams per token drops from 4.514 GB at half precision to
+1.407 GB, a 3.2x cut.</strong></p>
+<p>Two rules follow, and both are the opposite of what a memory-anxious
+setup would do:</p>
 <ul>
 <li><strong>Do not lower <code>-ngl</code> to save memory.</strong> Full
 offload leaves over 2 GiB free. Lowering it moves real matmul weights to
 the CPU and saves nothing that was scarce.</li>
 <li><strong>Never pass <code>--no-mmap</code>.</strong> Lazy reading
-<em>requires</em> mmap. Turn it off and the 1.93 GB tensor has to be
-materialised, and a comfortable fit becomes a failure to load.</li>
+requires mmap. Turn it off and the 1.93 GB table has to be materialised,
+and a comfortable fit becomes a failure to load.</li>
 </ul>
-<p>The type breakdown carries a second lesson. <strong>"q4_0" is only
-31% Q4_0</strong>: both embedding tables are Q6_K. Further quantization
-would take its savings from the embeddings first, on a card with no
-memory problem to solve, and a benchmark from this rig is not a clean
-q4_0 datapoint without that split beside it.</p>
 <h4 id="step-1--build-llamacpp-for-sm_75">Step 1 — Build llama.cpp for
 sm_75</h4>
 <p>A standard CUDA build, pinned to this card's architecture:</p>
@@ -338,16 +336,11 @@ CMAKE_BUILD_TYPE:STRING=Release
 CMAKE_CUDA_ARCHITECTURES:UNINITIALIZED=75
 GGML_CUDA:BOOL=ON
 version: 0.3.0-dev (build 1, commit 95ef7fc)</code></pre>
-<p>llama.cpp's init message suggests a different build for
-tensor-core-less Turing, <code>GGML_CUDA_FORCE_MMQ</code>. That was
-built into a separate directory and measured; it is in the tuning
-section below, and it does not pay.</p>
 <h4 id="step-2--configure-tpuenv">Step 2 — Configure
 <code>tpu.env</code></h4>
-<p>One committed env file is the source of truth for the
-<code>Makefile</code> and the MCP server alike. It is called
-<code>tpu.env</code> for consistency with its siblings; there is no TPU
-here.</p>
+<p>One committed env file drives both the <code>Makefile</code> and the
+MCP server. It is called <code>tpu.env</code> for consistency with its
+siblings; there is no TPU here.</p>
 <pre class="shell"><code>grep -E &quot;^(MODEL_PATH|ENDPOINT|N_GPU_LAYERS|CONTEXT_SIZE|KV_CACHE_TYPE|FLASH_ATTENTION|THREADS|PARALLEL_SLOTS|METRICS)=&quot; tpu.env
 MODEL_PATH=/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf
 ENDPOINT=http://127.0.0.1:8080
@@ -358,143 +351,42 @@ FLASH_ATTENTION=1
 METRICS=1
 THREADS=4
 PARALLEL_SLOTS=1</code></pre>
-<p>Every value was measured on this card rather than copied from a
-sibling. <code>f16</code> KV and <code>-fa 1</code> in particular are
-the opposite of what a cloud-rig habit would pick.</p>
-<h4 id="step-3--serve-and-measure-the-memory">Step 3 — Serve and Measure
-the Memory</h4>
+<p><code>N_GPU_LAYERS=99</code> is full offload. Every value was
+measured on this card rather than copied from a cloud rig.</p>
+<h4 id="step-3--serve-it-and-measure-the-memory">Step 3 — Serve It and
+Measure the Memory</h4>
 <pre class="shell"><code>make serve</code></pre>
-<p><code>make serve</code> runs <code>llama-server</code> in the
-foreground on purpose: Ctrl-C costs nothing, so the backgrounding a
-cloud rig needs would be ceremony. From another shell:</p>
+<p><code>make serve</code> runs in the foreground on purpose: this is a
+laptop, nothing is billed, and Ctrl-C is a complete teardown. From
+another shell:</p>
 <pre class="shell"><code>nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
 37073, /home/xbill/llama.cpp/build/bin/llama-server, 1618 MiB</code></pre>
-<p><strong>1618 MiB of 4096.</strong> Had the lazy tensor been resident,
-the requirement would have been about 3.5 GB and the model would have
-failed to load. It served instead.</p>
-<p>The agent sees it too, and it does not need to have started the
-server to say so:</p>
+<p><strong>1618 MiB of 4096.</strong> Weights, an 8192-token context and
+CUDA's own overhead, with more than half the card to spare. Had the lazy
+table been resident the requirement would have been about 3.5 GB, and
+the model would have failed to load.</p>
+<p>The agent confirms it is serving:</p>
 <pre class="plaintext"><code>model_server_status
 ✅ Serving at http://127.0.0.1:8080 (pid 83619). `/health` → 200.</code></pre>
-<p><code>make serve</code> writes no pid file, and an early version of
-this tool read that absence as "not running" — reporting ❌ against a
-healthy server while <code>stop_model_server</code> answered "✅ Not
-running." at a process holding the card. Both now look up which process
-owns the listening socket on port 8080, and <code>/health</code> makes
-the final call.</p>
-<h4 id="a-matching-total-does-not-confirm-the-terms">A Matching Total
-Does Not Confirm the Terms</h4>
-<p>The derivation written down <em>before</em> that run predicted 1616
-MiB — two MiB off:</p>
-<pre class="plaintext"><code>1342 MiB  resident weights
-+ 144 MiB  KV, 8192 tokens x 18 KiB/token f16
-+ ~130 MiB  CUDA context + compute buffers
-= 1616 MiB</code></pre>
-<p>A day later a sibling rig ran the same engine on the same card
-through Ollama, whose daemon prints its allocations:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-2.png"
+<p>The endpoint is a fixed local address, so there is nothing to
+discover. An early version of this tool read a missing pid file as "not
+running" and reported ❌ against a healthy server; it now checks which
+process owns port 8080, and <code>/health</code> makes the final
+call.</p>
+<h4 id="where-the-1618-mib-goes">Where the 1618 MiB Goes</h4>
+<p>The allocation, as printed by the engine when a sibling rig loaded
+the same file on this same card through Ollama:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-4.png"
 alt="Table: term, MiB" /></p>
-<p><strong>The weights term was exact, and both of the others were
-wrong.</strong> llama.cpp caps the sliding-window layers' KV at the
-1024-token window whatever the context size, so KV is 60 MiB, not 144.
-Compute plus context is ~216 MiB (arithmetic), not ~130. Two errors of
-opposite sign landed two MiB from the measurement.</p>
-<p><strong>Agreeing with the hardware reads as confirmation of every
-term, and it is not.</strong> Read the engine's allocation log rather
-than deriving the terms and checking only the total.</p>
-<h4 id="what-broke-mcp-sdk-2x">What Broke: MCP SDK 2.x</h4>
-<p>Nothing in this rig changed. The shared Python did.</p>
-<p>Another project on the same machine needed the MCP Python SDK 2.x,
-and these projects deliberately install into one system
-<code>python3</code> with no virtualenvs — the deployment images use
-system site-packages, so a venv would diverge dev from what runs. When
-<code>mcp</code> 2.2.0 landed, this rig's server stopped loading:</p>
-<pre class="shell"><code>python3 -c &quot;from mcp.server.fastmcp import FastMCP&quot;
-    raise ModuleNotFoundError(_MESSAGE, name=__name__)
-ModuleNotFoundError: No module named &#39;mcp.server.fastmcp&#39;. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin &#39;mcp&lt;2&#39; to keep running v1 code.</code></pre>
-<p>The process dies on the import, before the stdio handshake, so an MCP
-client sees only a server that failed to connect.</p>
-<p><strong>Pinning back was not available.</strong> This rig's
-<code>requirements.txt</code> already said
-<code>mcp&gt;=1.2.0,&lt;2</code>. With one shared interpreter a pin in
-one project is a downgrade for every project on it, and the project that
-pulled 2.x in requires <code>mcp&gt;=2</code>. So: migrate.</p>
-<h4 id="step-4--the-migration">Step 4 — The Migration</h4>
-<p>Measure the exposure first. The migration guide's change list,
-checked against this server:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-3.png"
-alt="Table: 2.x change, This server" /></p>
-<p>The code change is two lines, and the requirement flips its
-bound:</p>
-<pre class="diff"><code>-from mcp.server.fastmcp import FastMCP
-+from mcp.server.mcpserver import MCPServer
- ...
--mcp = FastMCP(MCP_SERVER_NAME)
-+mcp = MCPServer(MCP_SERVER_NAME)
- 
--mcp&gt;=1.2.0,&lt;2
-+mcp&gt;=2</code></pre>
-<p>One change the guide cannot tell you about: <strong>the tests mock
-the module path.</strong> They replace <code>mcp</code> in
-<code>sys.modules</code> before importing <code>server</code>, so the
-fake has to move with the import:</p>
-<pre class="diff"><code>-sys.modules[&quot;mcp.server.fastmcp&quot;] = _fastmcp_module
-+sys.modules[&quot;mcp.server.mcpserver&quot;] = _mcpserver_module</code></pre>
-<p>Miss that and the suite cannot import <code>server</code> at all,
-which reads as the migration failing when it is the fake that is
-wrong.</p>
-<h4 id="the-drift-the-migration-exposed">The Drift the Migration
-Exposed</h4>
-<p>Touching <code>start_model_server</code> for the rename surfaced
-something older. The <code>Makefile</code> passed the measured flags;
-the MCP tool did not. It launched <code>llama-server</code> without
-<code>-fa</code>, <code>-t</code> or <code>--parallel</code>, so a
-server started through MCP came up with llama.cpp's defaults — <strong>4
-slots and 6 threads</strong> — instead of the configuration every
-benchmark was measured on.</p>
-<p>The slots matter more than they look. <strong>llama.cpp splits
-<code>--ctx-size</code> across <code>--parallel</code> slots</strong>,
-so four default slots quietly quarter the context each request can
-use.</p>
-<p>The fix pulls the argv into one function,
-<code>_server_command()</code>, and a test holds it to the
-<code>Makefile</code>:</p>
-<pre class="python"><code>def test_same_flag_set(self):
-    with patch.object(server, &quot;METRICS&quot;, &quot;1&quot;):
-        cmd = server._server_command()
-    self.assertEqual({t for t in cmd if t.startswith(&quot;-&quot;)}, self._makefile_flags())</code></pre>
-<p>The server running while this article was written was started through
-<code>start_model_server</code>. Its real command line:</p>
-<pre class="shell"><code>tr &#39;\0&#39; &#39; &#39; &lt; /proc/$(pidof llama-server)/cmdline
-/home/xbill/llama.cpp/build/bin/llama-server -m /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf --host 127.0.0.1 --port 8080 -ngl 99 -c 8192 -ctk f16 -ctv f16 -fa 1 -t 4 --parallel 1 --metrics</code></pre>
-<h4 id="step-5--lint-test-and-test-the-protocol-by-hand">Step 5 — Lint,
-Test, and Test the Protocol by Hand</h4>
-<pre class="shell"><code>make lint
-make test
-All checks passed!
-lint OK
-----------------------------------------------------------------------
-Ran 30 tests in 0.035s
- 
-OK</code></pre>
-<p>The suite is offline: it mocks <code>mcp</code>, the subprocess
-boundary and HTTP, and never touches the GPU. Unit tests call Python,
-though, and a client speaks JSON-RPC over stdio. Test that too, holding
-stdin open with <code>sleep</code> so the server does not see
-end-of-input and exit after <code>initialize</code>:</p>
-<pre class="shell"><code>{ printf &#39;%s\n&#39; \
-  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2025-06-18&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;probe&quot;,&quot;version&quot;:&quot;0&quot;}}}&#39; \
-  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/initialized&quot;}&#39; \
-  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/list&quot;,&quot;params&quot;:{}}&#39;; sleep 4; } \
-  | python3 server.py 2&gt;/dev/null</code></pre>
-<p>The responses are JSON; summarised:</p>
-<pre class="plaintext"><code>initialize OK: name=&#39;local-llamacpp-1650ti-2b-q4_0&#39; version=&#39;&#39; proto 2025-06-18
-tools/list OK: 7 tools -&gt; get_help, gpu_status, model_info, model_server_status, query_model, start_model_server, stop_model_server</code></pre>
-<p>Seven tools on <code>mcp</code> 2.2.0. <code>version=''</code> is the
-2.x change from the table: an unversioned server no longer borrows the
-SDK's version number.</p>
-<h4 id="step-6--validate-ask-the-model">Step 6 — Validate: Ask the
-Model</h4>
+<p>The weights are the QAT body plus the resident embeddings. The KV
+cache is only 60 MiB, because llama.cpp caps Gemma 4's sliding-window
+layers at the 1024-token window regardless of context size.</p>
+<p>My own derivation before the run predicted 1616 MiB — two MiB off —
+with 144 MiB of KV and ~130 of overhead. <strong>Both of those terms
+were wrong, in opposite directions, and the total still
+matched.</strong> A total that agrees with the hardware does not confirm
+the terms; read the engine's allocation log.</p>
+<h4 id="step-4--ask-the-model">Step 4 — Ask the Model</h4>
 <pre class="plaintext"><code>query_model &quot;In one sentence, what is a TPU?&quot;
 ✅ **Reply**
  
@@ -503,196 +395,162 @@ A TPU is a specialized hardware accelerator designed by Google specifically to s
 ---
 _(plus 1167 chars of reasoning, suppressed)_
 prompt 25 tok · completion 308 tok · 70.5 tok/s</code></pre>
-<p>That answer came through the migrated server: Claude Code called the
-tool over MCP, and the tool called llama.cpp. <strong>A one-sentence
-answer cost 308 completion tokens</strong>, and most of them were
-thinking.</p>
+<p>A 4-bit Gemma 4 answering on a laptop GPU with no tensor cores,
+through Claude Code, over MCP. <strong>A one-sentence answer cost 308
+completion tokens</strong>, and most of them were thinking.</p>
 <h4 id="the-second-way-to-get-an-empty-reply">The Second Way to Get an
 Empty Reply</h4>
-<p>The usual warning about <code>-it</code> checkpoints is that raw
-<code>/v1/completions</code> returns nothing, so use
-<code>/v1/chat/completions</code>. On Gemma 4 there is a second,
-unrelated empty-reply path, and it hits the endpoint you were told to
-use instead.</p>
 <p>Gemma 4 emits a thinking block. llama.cpp routes it to
 <code>reasoning_content</code> and leaves <code>content</code> empty
 until the block closes, so a caller that reads only <code>content</code>
 with a modest budget gets <code>""</code> and concludes the server is
 broken. <code>query_model</code> defaults to
-<code>max_tokens=1024</code>, a test holds it at 512 or more, and an
-empty <code>content</code> with a non-empty
-<code>reasoning_content</code> is reported as what it is:</p>
+<code>max_tokens=1024</code>, and reports the empty case as what it
+is:</p>
 <pre class="plaintext"><code>query_model &quot;Name three TPU generations.&quot; max_tokens=64
 📡 **Reasoning only — no answer yet.** `finish_reason: length` after 64 tokens, all of them thinking.
  
 This is Gemma 4 reasoning, not a broken server. Re-run with a larger `max_tokens` (currently 64).</code></pre>
 <p>The same applies to benchmarks: <strong>a 128-token generation limit
-on this model measures the thinking phase and nothing else.</strong> The
-tok/s is real; the task is fictional.</p>
+on this model measures the thinking phase and nothing else.</strong></p>
 <h4 id="tuning-what-moved-decode">Tuning: What Moved Decode?</h4>
-<p><code>llama-bench -p 512 -n 128 -r 3</code>, all 35 layers on the
+<p><code>llama-bench -p 512 -n 128 -r 3</code>, all layers on the
 GPU:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-4.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-5.png"
 alt="Table: config, prefill t/s, decode t/s" /></p>
-<p>Four findings, and two of them are traps:</p>
 <ul>
 <li><strong>Flash attention is a free +4.8% on decode</strong> (70.39 →
-73.74) and does nothing to prefill. Adopted.</li>
-<li><strong>Thread count does not matter.</strong> Decode is GPU-bound;
-<code>-t 4</code> leaves cores free.</li>
-<li><strong>KV quantization is a loss, and a large one.</strong>
-<code>q8_0</code> on either K or V costs 11–12% of decode and 30–40% of
-prefill. It is a win on the TPU rigs in this repo. Here there are no
-tensor cores to hide the dequantization, and E2B's KV is tiny — it buys
-memory that was never scarce.</li>
+73.74). Adopted.</li>
+<li><strong>Thread count does not matter.</strong> Decode is
+GPU-bound.</li>
+<li><strong>Quantizing the KV cache is a loss.</strong>
+<code>q8_0</code> costs 11–12% of decode and 30–40% of prefill. With no
+tensor cores to hide the dequantization, and a KV cache of 60 MiB, it
+buys memory that was never scarce. <strong>QAT already did the
+quantizing that matters.</strong></li>
 <li><strong><code>GGML_CUDA_FORCE_MMQ</code> does not pay</strong>, even
-though llama.cpp suggests it for this card. Stock build 340.33 / 73.75;
-forced-MMQ build 337.61 / 73.04. Decode at batch 1 is bandwidth- and
-launch-bound, not matmul-bound.</li>
+though llama.cpp suggests it for this card: 337.61 / 73.04 against the
+stock build's 340.33 / 73.75.</li>
 </ul>
-<p><strong>Both traps would be adopted by anyone tuning from another
-rig's results instead of measuring on this one.</strong></p>
-<h4 id="benchmark-sweep-does-concurrency-help">Benchmark Sweep: Does
-Concurrency Help?</h4>
-<p><code>llama-batched-bench</code> says yes, emphatically: aggregate
-decode goes from 73.33 to 277.61 tok/s between one and 64 parallel
-sequences, 3.8x. But that tool reports the decode phase <em>in
-isolation</em>. A real serving sweep through the HTTP endpoint —
-512-token prompts, 128-token outputs, three repeats per level, prompt
-cache defeated — tells a different story:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-5.png"
-alt="Table: clients, aggregate tok/s, TTFT ms, per stream" /></p>
-<p><strong>Time to first token doubles exactly with every doubling of
-clients.</strong> That is prefill running strictly one request at a
-time. Aggregate output saturates near 45–48 tok/s, 1.47x from one
-client, and past four clients more concurrency buys only latency.</p>
-<p>The two results do not conflict. Decode really does batch, but at 512
-in and 128 out prefill is four times the token volume of decode, so the
-phase that scales is the minority of the work. <strong>Never quote this
-card's "277 tok/s" without naming the phase.</strong></p>
-<h4 id="short-prompts-long-answers-it-batches-sometimes">Short Prompts,
-Long Answers: It Batches, Sometimes</h4>
-<p>The next shape is the one where decode dominates: 128 in, 512 out,
-card cooled to 52 °C before every level.</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-6.png"
-alt="Table: clients, median tok/s, trials, TPOT ms" /></p>
-<p>The prediction held: <strong>2.6x from one client to
-sixteen</strong>, against 1.47x at the prefill-heavy shape. But only 1
-and 16 reproduce. <strong>Everything between is bimodal.</strong></p>
-<p>At two clients the slow mode decodes at 29.6 ms per token — exactly
-twice the single-stream 14.4. Two streams taking turns instead of
-sharing a batch. Time to first token is constant within every level;
-only the decode rate jumps.</p>
-<p><strong>It is not thermal</strong>, although that is the reading
-everyone reaches for on a power-capped Max-Q part (≈39 W of 40 W, clocks
-1530–1770 MHz against 2100). Three things rule it out:</p>
-<ul>
-<li><strong>16 clients is the hottest level, and the fastest and most
-stable.</strong> Thermal decay cannot peak in the middle.</li>
-<li><strong>Fast and slow trials occur at the same temperature and
-clock.</strong></li>
-<li><strong>The slow mode reproduces to 0.2% across independent
-passes.</strong> Throttling is continuous; this is two discrete
-states.</li>
-</ul>
-<p>So this rig quotes no mid-range concurrency number at any shape, and
-a median of three samples is the wrong statistic for a bimodal cell — it
-reports whichever mode won two tosses.</p>
-<h4 id="and-context-length">And Context Length?</h4>
-<p>One client, output capped at 128 tokens, input stepped up 46x
-(arithmetic):</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-7.png"
-alt="Table: input tokens, TTFT ms, decode tok/s, end-to-end tok/s" /></p>
-<p><strong>Decode barely notices context: −7.9% (arithmetic) across the
-whole range.</strong> End-to-end falls 9x (arithmetic), entirely from
-prefill. On this card the prompt length is the lever for responsiveness;
-the generation length is not.</p>
-<p>Decode here is recomputed from the run's JSON as tokens over the
-inter-token span; the harness counted stream chunks, which llama-server
-does not send one per token, and read 2.3–2.4% low.</p>
-<h4 id="what-did-not-transfer-from-the-cloud-rigs">What Did Not Transfer
-From the Cloud Rigs?</h4>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/medium/img/devto-gemma4-local-1650ti-table-8.png"
-alt="Table: habit, on the cloud rigs, on this card" /></p>
-<p><strong>Same model, same repository; the hardware changed the answer
-in most rows.</strong></p>
+<h4 id="does-concurrency-help">Does Concurrency Help?</h4>
+<p>For decode, yes: <code>llama-batched-bench</code> goes from 73.33 to
+277.61 tok/s between one and 64 parallel sequences. But that is the
+decode phase in isolation. Through the HTTP endpoint with 512-token
+prompts, prefill runs one request at a time — time to first token
+doubles exactly with every doubling of clients — and aggregate output
+tops out near 48 tok/s, 1.47x from one client. With short prompts and
+long answers it reaches 2.6x at 16 clients, but every level between 1
+and 16 flips between two speeds from trial to trial.</p>
+<p><strong>For one person on one laptop, concurrency one is the right
+setting</strong>, and that is what <code>PARALLEL_SLOTS=1</code>
+carries.</p>
+<h4 id="managing-it-with-mcp">Managing It with MCP</h4>
+<p><code>server.py</code> is a single-file MCP server with seven tools:
+<code>gpu_status</code>, <code>model_info</code>,
+<code>start_model_server</code>, <code>stop_model_server</code>,
+<code>model_server_status</code>, <code>query_model</code> and
+<code>get_help</code>. There is no provisioning tool, because there is
+nothing to provision. It registers under its directory name, so every
+tool reaches Claude Code as
+<code>mcp__local-llamacpp-1650ti-2b-q4_0__&lt;tool&gt;</code>.</p>
+<p>A stdio check confirms the handshake independently of any client:</p>
+<pre class="shell"><code>{ printf &#39;%s\n&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2025-06-18&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;probe&quot;,&quot;version&quot;:&quot;0&quot;}}}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/initialized&quot;}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/list&quot;,&quot;params&quot;:{}}&#39;; sleep 4; } \
+  | python3 server.py 2&gt;/dev/null
+initialize OK: name=&#39;local-llamacpp-1650ti-2b-q4_0&#39; version=&#39;&#39; proto 2025-06-18
+tools/list OK: 7 tools -&gt; get_help, gpu_status, model_info, model_server_status, query_model, start_model_server, stop_model_server</code></pre>
+<h4 id="one-thing-broke-mcp-sdk-2x">One Thing Broke: MCP SDK 2.x</h4>
+<p>Midway through, the server stopped loading. Another project on the
+machine needed the MCP Python SDK 2.x, all of these projects share one
+system Python, and 2.x renamed the class this server imports:</p>
+<pre class="shell"><code>python3 -c &quot;from mcp.server.fastmcp import FastMCP&quot;
+    raise ModuleNotFoundError(_MESSAGE, name=__name__)
+ModuleNotFoundError: No module named &#39;mcp.server.fastmcp&#39;. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin &#39;mcp&lt;2&#39; to keep running v1 code.</code></pre>
+<p>Pinning back was not an option with a shared interpreter. The fix was
+two lines, the requirement bound, and the test mock's module path:</p>
+<pre class="diff"><code>-from mcp.server.fastmcp import FastMCP
++from mcp.server.mcpserver import MCPServer
+-mcp = FastMCP(MCP_SERVER_NAME)
++mcp = MCPServer(MCP_SERVER_NAME)
+ 
+-mcp&gt;=1.2.0,&lt;2
++mcp&gt;=2
+ 
+-sys.modules[&quot;mcp.server.fastmcp&quot;] = _fastmcp_module
++sys.modules[&quot;mcp.server.mcpserver&quot;] = _mcpserver_module</code></pre>
+<p>Touching <code>start_model_server</code> for the rename surfaced an
+older bug: the tool launched <code>llama-server</code> without
+<code>-fa</code>, <code>-t</code> or <code>--parallel</code>, so an
+MCP-started server came up with <strong>4 slots and 6 threads</strong>
+instead of the measured configuration — and llama.cpp splits the context
+across slots. The argv now lives in one function, a test holds it to the
+<code>Makefile</code>, and the running server's real command line
+matches:</p>
+<pre class="shell"><code>tr &#39;\0&#39; &#39; &#39; &lt; /proc/$(pidof llama-server)/cmdline
+/home/xbill/llama.cpp/build/bin/llama-server -m /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf --host 127.0.0.1 --port 8080 -ngl 99 -c 8192 -ctk f16 -ctv f16 -fa 1 -t 4 --parallel 1 --metrics
+make lint
+make test
+All checks passed!
+lint OK
+----------------------------------------------------------------------
+Ran 30 tests in 0.035s
+ 
+OK</code></pre>
 <h4 id="and-priceperformance">And Price/Performance?</h4>
-<p>There is no price. Nothing is billed, nothing is reserved, and there
-is no idle cost to optimise. The honest comparison is what the card
-cannot do: it will not batch prefill, it throttles, and it tops out at 4
-GiB forever.</p>
-<p>For one interactive session — the normal use of a laptop — 73.75
-tok/s single-stream decode in 1618 MiB is plenty.</p>
+<p>There is no price. The laptop was already on the desk: nothing is
+billed, nothing is reserved, and there is no idle cost to optimise.</p>
+<p>What QAT bought is capability, not a discount. Without it this GPU
+cannot hold Gemma 4 E2B at all. With it, the model takes 1618 MiB and a
+single conversation decodes at 73.75 tok/s.</p>
 <h4 id="teardown">Teardown</h4>
 <pre class="shell"><code># make serve is in the foreground:
 Ctrl-C</code></pre>
 <p>Or ask the agent for <code>stop_model_server</code>, which sends
-SIGTERM to whichever process owns port 8080 — including one started by
-<code>make serve</code> — and VRAM is released on exit. Not run for this
-article; the server is still up. There is no queued resource to delete
-and nothing to forget.</p>
+SIGTERM to whichever process owns port 8080, including one started by
+<code>make serve</code>. Not run for this article; the server is still
+up.</p>
 <h4 id="what-this-does-not-cover">What This Does Not Cover</h4>
-<p><strong>No task was completed in any benchmark.</strong> Every sweep
+<p><strong>Output quality was not measured here.</strong> The claim that
+QAT holds quality close to bfloat16 is Google's, from the model card;
+this article measured memory and speed, not accuracy, and never compared
+the QAT model's answers against a bf16 run.</p>
+<p><strong>No benchmark completed a task.</strong> Every sweep
 generation hit its token cap inside Gemma 4's thinking block, so the
-sweeps measure throughput, not answers, and no output-quality axis was
-measured.</p>
-<p><strong>The mid-range concurrency result is unexplained.</strong>
-Arrival timing against llama.cpp's batch formation is the obvious
-suspect and is untested, and whether the same bimodality hides inside
-the prefill-heavy shape is open.</p>
+throughput figures are real and the tasks are not.</p>
 <p><strong>Nothing here transfers to a T4.</strong> Same compute
-capability, different silicon, and every tensor-core-dependent
-conclusion runs in both directions.</p>
-<h4 id="cheat-sheet">Cheat Sheet</h4>
-<pre class="shell"><code># what has to be resident (not the file size)
-make info
- 
-# serve with the measured flags, in the foreground
-make serve
-nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
- 
-# mcp 2.x migration, in ONE edit
-#   from mcp.server.fastmcp import FastMCP  -&gt;  from mcp.server.mcpserver import MCPServer
-#   FastMCP(name)                           -&gt;  MCPServer(name)
-#   requirements.txt: mcp&gt;=2   tests: sys.modules[&quot;mcp.server.mcpserver&quot;]
-make lint &amp;&amp; make test
- 
-# a reply, with enough budget to get past the thinking block
-make query
- 
-# never: --no-mmap, a lower -ngl &quot;to be safe&quot;, q8_0 KV</code></pre>
+capability, different silicon.</p>
 <h4 id="summary">Summary</h4>
-<p>The goal of this article was to serve Gemma 4 from a 4 GiB laptop GPU
-with no tensor cores, and to manage it with the same kind of MCP agent
-the cloud rigs use. The key to the solution was reading the artifact and
-the engine instead of the file size and the spec sheet. The measured
-results were:</p>
+<p>The goal of this article was to run Gemma 4 on a much older laptop
+whose GPU has 4 GB of memory. The key to the solution was Google's
+quantization-aware-trained checkpoint, packed as a GGUF, plus llama.cpp
+leaving its largest tensor in host memory. The measured results
+were:</p>
 <ul>
-<li><strong>Full offload fits in 1618 MiB of 4096</strong>, because the
-1.93 GB per-layer embedding table — 58% of the file — stays in the mmap
-and is never copied to the GPU.</li>
-<li><strong>73.75 tok/s single-stream decode</strong> with
-<code>-fa 1</code> and f16 KV; flash attention alone is worth 4.8%.</li>
-<li><strong>Two levers that win elsewhere lose here:</strong>
-<code>q8_0</code> KV costs 11–12% of decode and 30–40% of prefill, and
-<code>FORCE_MMQ</code> gains nothing.</li>
-<li><strong>Concurrency scales decode, not prefill:</strong> 1.47x at
-512 in / 128 out, 2.6x at 128 in / 512 out, and bimodal at every level
-between 1 and 16 clients.</li>
-<li><strong>The MCP server moved to SDK 2.x with a two-line
-change</strong>, forced by a shared interpreter, and the move exposed an
-MCP-started server running 4 slots and 6 threads that no benchmark had
-measured.</li>
+<li><strong>bf16 needs 9.5 GiB and int8 ~4.8 GiB; the QAT GGUF needs
+1.31 GiB on the GPU.</strong> Only the 4-bit QAT model fits this card,
+and it fits with room to spare.</li>
+<li><strong>Full offload in 1618 MiB of 4096</strong>, with an
+8192-token context and a KV cache of just 60 MiB.</li>
+<li><strong>73.75 tok/s single-stream decode</strong> on a GPU with no
+tensor cores; flash attention is worth 4.8%.</li>
+<li><strong>Quantizing further is a loss:</strong> a <code>q8_0</code>
+KV cache costs 11–12% of decode, because QAT already took the memory
+pressure away.</li>
+<li><strong>An MCP server manages the whole lifecycle</strong>, and
+moving it to SDK 2.x took a two-line change that also exposed an
+MCP-started server running the wrong configuration.</li>
 </ul>
-<p>Scope: one GTX 1650 Ti with Max-Q Design (TU117, compute capability
-7.5, 4096 MiB, 40 W cap) in one laptop, llama.cpp <code>95ef7fc</code>
+<p>Scope: one Lenovo Yoga 9 15IMH5 (Core i7-10750H, 15 GiB RAM, GTX 1650
+Ti Max-Q with 4096 MiB and a 40 W cap), llama.cpp <code>95ef7fc</code>
 built for sm_75 with CUDA 13.3,
 <code>google/gemma-4-E2B-it-qat-q4_0-gguf</code>, and the MCP server on
 mcp 2.2.0 under Python 3.14.7. <code>llama-bench</code> rows are three
 repeats; serving sweeps are three repeats per level with the prompt
-cache defeated and verified so via <code>/metrics</code>. The memory
-split comes from a sibling rig running the same engine through Ollama on
-the same card.</p>
+cache defeated. The memory split comes from a sibling rig running the
+same engine through Ollama on the same card. Model quality was not
+measured.</p>
 <p>The strategy for using MCP for a local GPU deployment was validated
 with an incremental step by step approach.</p>
 <h4 id="references">References</h4>
@@ -701,13 +559,16 @@ with an incremental step by step approach.</p>
 href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0">local-llamacpp-1650ti-2b-q4_0
 | GitHub</a></li>
 <li><a
-href="https://py.sdk.modelcontextprotocol.io/v2/migration/">Migration
-Guide: v1 to v2 | MCP Python SDK</a></li>
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf">google/gemma-4-E2B-it-qat-q4_0-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://blog.google/innovation-and-ai/technology/developers-tools/quantization-aware-training-gemma-4/">Quantization-Aware
+Training for Gemma 4 | Google</a></li>
 <li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp |
 GitHub</a></li>
 <li><a
-href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf">google/gemma-4-E2B-it-qat-q4_0-gguf
-| Hugging Face</a></li>
+href="https://py.sdk.modelcontextprotocol.io/v2/migration/">Migration
+Guide: v1 to v2 | MCP Python SDK</a></li>
 </ul>
 </body>
 </html>

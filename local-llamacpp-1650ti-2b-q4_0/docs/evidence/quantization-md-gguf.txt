@@ -1,0 +1,43 @@
+# excerpt of QUANTIZATION.md (repo root), lines 351-392, copied 2026-09-10T14:31:39-04:00
+### `-q4_0-gguf` is the same QAT data, actually packed — and it is the only 4-bit artifact that loads anywhere
+
+**Measured 2026-09-02** by range-reading the file off the Hub; nothing was downloaded whole.
+`google/gemma-4-E2B-it-qat-q4_0-gguf` is ungated and ships two files:
+
+| File | Bytes | sha256 |
+| :--- | ---: | :--- |
+| `gemma-4-E2B_q4_0-it.gguf` | 3,349,516,256 | `fa401b55…` |
+| `gemma-4-E2B-it-mmproj.gguf` | 986,833,664 | `021059cc…` |
+
+GGUF v3, `general.architecture = gemma4`, **541 tensors**, 49 KV pairs, and the full E2B shape is intact —
+`attention.shared_kv_layers=20`, `sliding_window=512`, mixed `key_length=512` / `key_length_swa=256`,
+`embedding_length_per_layer_input=256`. Dtype histogram: **Q4_0 ×275, F32 ×263, Q6_K ×2, F16 ×1**.
+
+**It is the same QAT weights as `-q4_0-unquantized`, proven rather than assumed.** Four F32 norm tensors
+read out of the GGUF are bit-identical to the bf16 tensors in the `-unquantized` repo:
+
+| GGUF | safetensors | first values | mean |
+| :--- | :--- | :--- | ---: |
+| `blk.0.attn_norm.weight` | `layers.0.input_layernorm.weight` | 9.375, 7.9375, 10.6875 | +10.67993 |
+| `output_norm.weight` | `model.norm.weight` | 13.4375, 8.75, 14.375 | +14.20042 |
+| `blk.0.ffn_norm.weight` | `layers.0.pre_feedforward_layernorm.weight` | 21.75, 4.71875, 23.0 | +19.20642 |
+| `blk.0.layer_output_scale.weight` | `layers.0.layer_scalar` | 0.02087402 | +0.02087 |
+
+So the section above — QAT values already on a Q4_0 grid at group size 32, shipped in a bf16 container —
+describes **this file's contents in their native packing**. 51.61 GB → 15.27 GB on the 26B is the same
+relationship, done for you.
+
+**Where the bytes go, and it is the PLE table again.** Summing the tensor table by role:
+
+| Component | fp16 bytes | GGUF bytes | Streamed per decode step? |
+| :--- | ---: | ---: | :--- |
+| Transformer matmuls, 35 layers | 3.709 GB | **1.049 GB** (Q4_0) | yes |
+| LM head / `token_embd` (tied) | 0.805 GB | **0.330 GB** (Q6_K) | yes |
+| `per_layer_model_proj` | — | 0.028 GB (F16) | yes |
+| **PLE table** `per_layer_token_embd` | 4.698 GB | **1.927 GB** (Q6_K) | **no — indexed lookup** |
+| | | **3.334 GB total** (file 3.3495) | |
+
+**Streamed drops 4.514 GB → 1.407 GB, a 3.2x cut.** Do not convert that into a throughput prediction: on
+every GPU rig here decode at `B=1` is launch-bound, not bandwidth-bound, and the two measurements at the top
+of this file (`ple_bits=4` → **0.0%**, `int8_lm_head` → **+2.3%**) are what a bandwidth cut actually buys.
+**The win is residency**, which is what pays for batching.
