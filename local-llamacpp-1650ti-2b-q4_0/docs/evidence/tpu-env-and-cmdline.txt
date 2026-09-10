@@ -1,0 +1,18 @@
+# captured 2026-09-10T14:10:31-04:00
+$ grep -E "^(MODEL_PATH|ENDPOINT|N_GPU_LAYERS|CONTEXT_SIZE|KV_CACHE_TYPE|FLASH_ATTENTION|THREADS|PARALLEL_SLOTS|METRICS)=" tpu.env
+MODEL_PATH=/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf
+ENDPOINT=http://127.0.0.1:8080
+N_GPU_LAYERS=99
+CONTEXT_SIZE=8192
+KV_CACHE_TYPE=f16
+FLASH_ATTENTION=1
+METRICS=1
+THREADS=4
+PARALLEL_SLOTS=1
+$ tr '\0' ' ' < /proc/$(pgrep -f build/bin/llama-server)/cmdline
+83619
+108832
+/home/xbill/llama.cpp/build/bin/llama-server -m /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf --host 127.0.0.1 --port 8080 -ngl 99 -c 8192 -ctk f16 -ctv f16 -fa 1 -t 4 --parallel 1 --metrics 
+# captured 2026-09-10T14:10:46-04:00
+$ tr '\0' ' ' < /proc/$(pidof llama-server)/cmdline
+/home/xbill/llama.cpp/build/bin/llama-server -m /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf --host 127.0.0.1 --port 8080 -ngl 99 -c 8192 -ctk f16 -ctv f16 -fa 1 -t 4 --parallel 1 --metrics 

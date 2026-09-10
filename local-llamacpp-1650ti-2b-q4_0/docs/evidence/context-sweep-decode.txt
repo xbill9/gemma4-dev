@@ -1,0 +1,14 @@
+# computed 2026-09-10T14:06:52-04:00 from benchmarks/runs/2026-09-03-full-sweep-1650ti/sweep.json
+# decode recomputed as (completion_tokens - 1) / (wall_s - ttft_s): tokens over the measured inter-token span,
+# because decode_tps counts inter-CHUNK gaps and chunks_match_usage is false in every cell. median of 3 runs.
+ input  out  decode_tps(as-run)  decode(recomputed)  e2e_tps  ttft_ms tok/chunk
+   108   32               71.16               78.76    40.87      389 1.103
+   108  128               70.84               72.55    59.72      393 1.024
+   661   32               69.50               76.91    12.53     2152 1.103
+   661  128               69.11               70.77    32.39     2158 1.024
+  1279   32               68.51               75.82     7.02     4151 1.103
+  1279  128               68.61               70.27    21.50     4147 1.024
+  2527   32               67.23               74.42     3.58     8518 1.103
+  2527  128               67.02               68.64    12.34     8519 1.024
+  5027   32               65.30               72.26     1.76    17796 1.103
+  5027  128               65.23               66.80     6.50    17798 1.024

@@ -1,0 +1,20 @@
+# captured 2026-09-10T14:07:51-04:00
+$ llama-server --help | grep -E -A2 -- "--threads N|--parallel N"
+-t,    --threads N                      number of CPU threads to use during generation (default: -1)
+                                        (env: LLAMA_ARG_THREADS)
+-tb,   --threads-batch N                number of threads to use during batch and prompt processing (default:
+--
+-np,   --parallel N                     number of server slots (default: -1, -1 = auto)
+                                        (env: LLAMA_ARG_N_PARALLEL)
+-cb,   --cont-batching, -nocb, --no-cont-batching
+$ nproc
+12
+# parity test docstring, tests/test_server.py:252-259
+class TestServerCommandMatchesMakefile(unittest.TestCase):
+    """`make serve` and `start_model_server` must launch the same server.
+
+    They drifted once: 2026-09-10 the MCP tool started llama-server without -fa,
+    -t or --parallel, so it came up with 4 slots and 6 threads while `make serve`
+    carried the measured config. A benchmark against the MCP-started server
+    would have measured a configuration no tpu.env line describes.
+    """
