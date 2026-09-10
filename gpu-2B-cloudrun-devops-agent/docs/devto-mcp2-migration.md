@@ -3,12 +3,12 @@ title: "FastMCP Is Now MCPServer: Migrating a Python MCP Server to the MCP SDK 2
 published: false
 description: "Step-by-step: moving a FastMCP server to the MCP Python SDK 2.x — what broke, what changed, what did not, and a redeploy of its Gemma 4 vLLM backend to a Cloud Run L4 GPU."
 tags: mcp, python, googlecloud, vllm
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-queens/main/gpu-2B-cloudrun-devops-agent/docs/devto-cover.5bbae7c1.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/devto-cover.5bbae7c1.jpg
 ---
 
 This article provides a step by step migration guide for a Python MCP server from the MCP Python SDK 1.x (`FastMCP`) to 2.x (`MCPServer`), followed by a step by step deployment of Gemma 4 E2B to a Cloud Run hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM hosted deployment.
 
-https://github.com/xbill9/gemma4-queens/tree/main/gpu-2B-cloudrun-devops-agent
+https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent
 
 ---
 
@@ -258,7 +258,7 @@ Claude Code reads `.mcp.json`. Nothing in it changes for the migration — it la
   "mcpServers": {
     "cloudrun-devops": {
       "command": "python3",
-      "args": ["/home/xbill/gemma4-queens/gpu-2B-cloudrun-devops-agent/server.py"],
+      "args": ["/home/xbill/gemma4-dev/gpu-2B-cloudrun-devops-agent/server.py"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "aisprint-491218",
         "GOOGLE_CLOUD_LOCATION": "us-east4",
@@ -481,7 +481,7 @@ The strategy for using MCP for migrating a Python MCP server to the MCP SDK 2.x 
 #### References
 
 * [Migration Guide: v1 to v2 | MCP Python SDK](https://py.sdk.modelcontextprotocol.io/v2/migration/)
-* [gpu-2B-cloudrun-devops-agent | GitHub](https://github.com/xbill9/gemma4-queens/tree/main/gpu-2B-cloudrun-devops-agent)
+* [gpu-2B-cloudrun-devops-agent | GitHub](https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent)
 
 ---
 

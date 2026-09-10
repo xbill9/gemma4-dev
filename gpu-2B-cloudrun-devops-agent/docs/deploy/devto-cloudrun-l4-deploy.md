@@ -3,12 +3,12 @@ title: "2B Gemma 4 Deployment with Cloud Run, NVIDIA L4, MCP SDK 2.x, and Claude
 published: false
 description: "Step by step deployment of Gemma 4 E2B to a Cloud Run NVIDIA L4 GPU with vLLM, managed by a Python MCP server migrated to the MCP SDK 2.x."
 tags: mcp, gemma, googlecloud, claudecode
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-queens/main/gpu-2B-cloudrun-devops-agent/docs/deploy/devto-cover.a4522d79.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/deploy/devto-cover.a4522d79.jpg
 ---
 
 This article provides a step by step deployment guide for Gemma 4 E2B to a Cloud Run hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM hosted deployment with Claude Code.
 
-https://github.com/xbill9/gemma4-queens/tree/main/gpu-2B-cloudrun-devops-agent
+https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent
 
 ---
 
@@ -48,8 +48,8 @@ Clone the repository and switch to the Cloud Run directory:
 
 ```shell
 cd ~
-git clone https://github.com/xbill9/gemma4-queens
-cd gemma4-queens/gpu-2B-cloudrun-devops-agent
+git clone https://github.com/xbill9/gemma4-dev
+cd gemma4-dev/gpu-2B-cloudrun-devops-agent
 ```
 
 Then run **init.sh** once. It checks your `gcloud` login and application default credentials, asks for a project ID, installs the Python requirements, enables the Cloud Run, Secret Manager and related APIs, and grants the default compute service account its roles. It pauses on errors and waits for input, so run it in a terminal:
@@ -237,7 +237,7 @@ Claude Code reads `.mcp.json` in the project directory. It launches `server.py` 
   "mcpServers": {
     "cloudrun-devops": {
       "command": "python3",
-      "args": ["/home/xbill/gemma4-queens/gpu-2B-cloudrun-devops-agent/server.py"],
+      "args": ["/home/xbill/gemma4-dev/gpu-2B-cloudrun-devops-agent/server.py"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "aisprint-491218",
         "GOOGLE_CLOUD_LOCATION": "us-east4",
@@ -545,6 +545,6 @@ The strategy for using MCP for Gemma 4 GPU deployment to Cloud Run with Claude C
 
 #### References
 
-* [gpu-2B-cloudrun-devops-agent | GitHub](https://github.com/xbill9/gemma4-queens/tree/main/gpu-2B-cloudrun-devops-agent)
+* [gpu-2B-cloudrun-devops-agent | GitHub](https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent)
 * [Migration Guide: v1 to v2 | MCP Python SDK](https://py.sdk.modelcontextprotocol.io/v2/migration/)
 * [GitHub - modelcontextprotocol/python-sdk](https://github.com/modelcontextprotocol/python-sdk)
