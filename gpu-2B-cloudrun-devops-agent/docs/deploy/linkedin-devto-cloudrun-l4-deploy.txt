@@ -1,0 +1,17 @@
+More Claude Code adventures.
+What does a serverless GPU actually buy you for Gemma 4?
+
+I deployed Gemma 4 E2B to Cloud Run on an NVIDIA L4 GPU, and drove the whole lifecycle from Claude Code through a Python MCP server: stage the weights, deploy, health-check, benchmark.
+
+The MCP server broke before the model did. The MCP Python SDK 2.x renamed FastMCP to MCPServer, and a fresh pip install stopped it from starting. The fix was one import and one class name.
+
+Throughput scaled 3.8x from 1 to 4 concurrent requests, then went flat at 189.53 tokens/s. The ceiling is Cloud Run's --concurrency=4, not the GPU: the same L4 on EC2 kept going to 360.17.
+
+One fixed L4 instance lists at $1.42 an hour. In the default mode it scales to zero when idle.
+
+Write ups are here:
+
+dev.to (Google Developer Experts): https://dev.to/gde/2b-gemma-4-deployment-with-cloud-run-nvidia-l4-mcp-sdk-2x-and-claude-code-4ml3
+Medium: https://xbill999.medium.com/2b-gemma-4-deployment-with-cloud-run-nvidia-l4-mcp-sdk-2-x-and-claude-code-d3c9a547734a
+
+#gemma #googlecloud #mcp #claudecode
