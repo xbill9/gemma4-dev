@@ -6,7 +6,7 @@ tags: gemma, llamacpp, mcp, cuda
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/devto-cover.225eaada.jpg
 ---
 
-This article provides a step by step deployment guide for Gemma 4 E2B's quantization-aware-trained (QAT) checkpoint to a local, laptop hosted GPU enabled system — a much older Lenovo Yoga 9 with a 4 GB GTX 1650 Ti. A suite of Python MCP tools is built to simplify management of the llama.cpp hosted deployment.
+This article provides a step by step deployment guide for Gemma 4 E2B's quantization-aware-trained (QAT) checkpoint to a local, laptop hosted GPU enabled system — a much older Lenovo Yoga 9, on sale since January 2021, with a 4 GB GTX 1650 Ti. A suite of Python MCP tools is built to simplify management of the llama.cpp hosted deployment.
 
 https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0
 
@@ -31,6 +31,7 @@ It does, and QAT is the reason. The rest of this article is how, and what the ol
 | | |
 | :--- | :--- |
 | Machine | Lenovo Yoga 9 15IMH5 |
+| On sale | since January 2021, when Windows Central reviewed it |
 | CPU | Intel Core i7-10750H, 10th generation (Comet Lake), 12 threads |
 | RAM | 15 GiB, as `free` reports it |
 | GPU | GeForce GTX 1650 Ti with Max-Q Design, 4096 MiB |
@@ -402,6 +403,7 @@ The strategy for using MCP for a local GPU deployment was validated with an incr
 
 * [local-llamacpp-1650ti-2b-q4_0 | GitHub](https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0)
 * [google/gemma-4-E2B-it-qat-q4_0-gguf | Hugging Face](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf)
+* [Lenovo Yoga 9i 15 review, January 2021 | Windows Central](https://www.windowscentral.com/lenovo-yoga-9i-15)
 * [Quantization-Aware Training for Gemma 4 | Google](https://blog.google/innovation-and-ai/technology/developers-tools/quantization-aware-training-gemma-4/)
 * [llama.cpp | GitHub](https://github.com/ggml-org/llama.cpp)
 * [Migration Guide: v1 to v2 | MCP Python SDK](https://py.sdk.modelcontextprotocol.io/v2/migration/)
