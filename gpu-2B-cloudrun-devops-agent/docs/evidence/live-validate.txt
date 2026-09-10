@@ -1,0 +1,43 @@
+# MCP tool output — captured 2026-09-10 ~14:40 EDT via Claude Code (mcp__cloudrun-devops__*), service gpu-2b-l4-devops-agent, manual scaling, 1 instance
+
+> cloudrun_get_system_status
+### 🌀 GPU Cloud Run System Status (`gpu-2b-l4-devops-agent`)
+- **vLLM Health:** 🟢 Online (https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app)
+- **Cloud Run Service Status:** 🟢 Ready
+**👉 Next Step:** Use `cloudrun_query_gemma4` to interact with the model.
+
+> cloudrun_get_model_details
+### 🧩 Model Details (https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app)
+**Model Information (`/v1/models`):**
+[
+  {
+    "id": "/mnt/models/gemma-4-E2B-it",
+    "object": "model",
+    "owned_by": "vllm"
+  }
+]
+**Health Status (`/health`):**
+- Status: `Healthy` ✅
+
+> cloudrun_verify_model_health
+✅ Model health check PASSED.
+Model: /mnt/models/gemma-4-E2B-it
+Response: 'Hello! Yes, I am working. I am Gemma 4, a Large La...'
+Latency: 0.87 seconds.
+
+> cloudrun_get_help  (Active Mode Summary + tool groups, abridged)
+The server is running in **CLOUD RUN** mode targeting NVIDIA L4 GPU in region `us-east4`.
+🐳 Infrastructure & Deployment: cloudrun_deploy, cloudrun_destroy, cloudrun_status, cloudrun_update_scaling, cloudrun_get_deployment_config, cloudrun_get_gpu_deployment_config, cloudrun_check_gpu_quotas
+📊 Model Management: cloudrun_list_vertex_models, cloudrun_list_bucket_models, cloudrun_save_hf_token, cloudrun_get_vertex_ai_model_copy_instructions, cloudrun_get_huggingface_model_copy_instructions, cloudrun_get_huggingfacehub_download_path
+📊 Monitoring & Status: cloudrun_get_metrics, cloudrun_get_system_status, cloudrun_get_endpoint, cloudrun_get_endpoint_url, cloudrun_get_model_details, cloudrun_verify_model_health
+📈 Performance & Benchmarking: cloudrun_run_benchmark
+💬 Interaction & Diagnostics: cloudrun_query_gemma4, cloudrun_query_gemma4_with_stats, cloudrun_query, cloudrun_analyze_cloud_logging, cloudrun_analyze_gpu_logs, cloudrun_suggest_sre_remediation
+
+# comparison control used in the article: gpu-vllm-g6-2b/benchmarks/reports/2026-08-30-gemma4-e2b-g6.json
+# EC2 g6.2xlarge, 1x NVIDIA L4, us-east-1d spot $0.9412/chip-hr, vLLM 0.28.0, bf16 KV, --max-num-seqs 8,
+# vllm bench serve ON the instance, 1024-token random input, 128 output. output_tok_per_s by concurrency:
+# c=1 46.09   c=2 92.6   c=4 175.83   c=8 360.17
+# arithmetic: 360.17 / 189.53 = 1.90 -> "1.9x"
+# arithmetic: c=1 Cloud Run 49.63 / g6 46.09 = 1.077 -> within 8%
+# arithmetic: c=2 Cloud Run 95.36 / g6 92.6 = 1.030 -> within 8%
+# arithmetic: c=4 Cloud Run 188.46 / g6 175.83 = 1.072 -> within 8%

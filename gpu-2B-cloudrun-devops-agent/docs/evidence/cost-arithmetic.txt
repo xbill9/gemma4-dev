@@ -1,0 +1,15 @@
+# cost arithmetic — ARITHMETIC, not a bill. Prices from cloudrun-pricing.txt (list, us-east4, instance-based billing, no free tier / CUD).
+GPU  L4 no zonal redundancy  0.0001867 $/s x 3600            = 0.6721 $/hr
+CPU  8 vCPU x 1.8e-05 $/vCPU-s x 3600                     = 0.5184 $/hr
+MEM  32 GiB x 2e-06 $/GiB-s x 3600                       = 0.2304 $/hr
+TOTAL one instance                                        = 1.4209 $/hr ; x24 = 34.10 $/day
+Cloud Run c=1: 49.63 tok/s -> 178,668 tok/hr -> 7.95 $/M output tokens
+Cloud Run c=2: 95.36 tok/s -> 343,296 tok/hr -> 4.14 $/M output tokens
+Cloud Run c=4: 188.46 tok/s -> 678,456 tok/hr -> 2.09 $/M output tokens
+Cloud Run c=8: 189.53 tok/s -> 682,308 tok/hr -> 2.08 $/M output tokens
+EC2 g6 spot c=4: 175.83 tok/s @ 0.9412 $/hr -> 1.49 $/M output tokens
+EC2 g6 spot c=8: 360.17 tok/s @ 0.9412 $/hr -> 0.73 $/M output tokens
+ratio g6 c=8 / Cloud Run c=8 = 1.90x
+# decimal forms of the SKU prices above, as written in the article:
+# CPU  Services CPU (Instance-based billing) in us-east4  1.8e-05 $/vCPU-s = $0.000018 / vCPU-s
+# MEM  Services Memory (Instance-based billing) in us-east4  2e-06 $/GiB-s = $0.000002 / GiB-s
