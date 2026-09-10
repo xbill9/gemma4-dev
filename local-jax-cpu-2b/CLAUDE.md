@@ -27,6 +27,47 @@ memory bugs, and the observability machinery. Those are marked as inherited wher
 **Facts measured on THIS host on 2026-08-29** are the swap incident, the host inventory, the
 anonymous-checkpoint verification, and the XLA:CPU trace lane names. Each says so.
 
+## MEASURED 2026-09-04 — first light, and it is slow
+
+`benchmarks/runs/2026-09-04-first-light-jax-cpu/`. jax/jaxlib 0.11.2.dev20260904 (nightly);
+124 tests pass against it.
+
+| | |
+| :--- | ---: |
+| load | 59 s, 5.75 GB placed, 0.95 GB of towers skipped |
+| cold query, 128 tok | 0.43 tok/s (compiled during the request) |
+| warm | **0.47 / 0.46 tok/s** |
+| engine decode gauge | 0.50 tok/s |
+
+**Compilation was only ~8% of the cold request.** This rig is slow, not slow to start.
+
+**Against `local-pytorch-cpu-2b` on the same host and checkpoint: 4.85 tok/s vs 0.47 — ~10x
+in stock transformers' favour. Do not publish that ratio.** This run paged and the PyTorch
+run did not: `SwapFree` fell 15.94 → 7.04 GB, and the engine reports RSS 4.72 GB against
+5.75 GB of placed weights, so about a gigabyte of the weight set is on disk while decode
+streams weights every token. Free the host and re-measure before differencing them.
+
+Two further confounds, both structural rather than incidental: **XLA:CPU has no bf16
+datapath** and upconverts to fp32 in front of every use (`verify_cpu_backend` says so at
+startup, and bf16 is unavoidable here because fp32 storage needs 18.51 GB against 16.42 GB
+of RAM); and **`ple_bits=4` costs a dequant on every gather**, which measured 0.0% on the TPU
+parent but has never been measured on a CPU.
+
+## `check_host_capacity` under-predicts the PEAK, and first light proved it
+
+The tool cleared this load with "**Fits in available RAM with 4.01 GB to spare. No swap
+needed**" — 5.75 GB weights + 1.61 GB prefill transient = 7.37 GB against 11.37 GB available.
+Then `MemAvailable` fell to **0.87 GB** during `convert_params`, ~5.5 GB went to swap, and a
+further ~3.4 GB followed during the first query.
+
+**Its model is `weights + prefill transient`. The dtype-conversion transient is not in it**,
+and neither is whatever the first XLA compilation holds. It is right about the steady state
+and wrong about the peak, and the peak decides whether you swap.
+
+That is precisely the failure this file says the tool exists to prevent. Until it accounts
+for `convert_params`, treat a "fits with N GB to spare" verdict as a claim about the resident
+set only, and watch `SwapFree` across the load rather than trusting it.
+
 ## Why this rig exists
 
 **It is the zero point.** Every other rig here measures an accelerator, and none of them can

@@ -6,13 +6,14 @@
 # llama.cpp itself is NOT a dependency here: it is built from source at
 # $LLAMA_CPP_DIR and located through tpu.env, not pip-installed.
 
-# PINNED BELOW 2. `mcp` 2.x renamed FastMCP to MCPServer
-# (`from mcp.server.mcpserver import MCPServer`), so `from mcp.server.fastmcp
-# import FastMCP` in server.py raises ModuleNotFoundError against it. Discovered
-# 2026-09-03 by installing `mcp` unpinned, which broke the import in this rig and
-# in three siblings at once. Every other rig's requirements.txt still says
-# `mcp>=1.2.0` or bare `mcp`, both of which now resolve to 2.x.
-mcp>=1.2.0,<2
+# mcp 2.x, NOT 1.x. 2.x renamed FastMCP to MCPServer (`from mcp.server.mcpserver
+# import MCPServer`); `tool()`, `list_tools()` and `run()` are unchanged. This was
+# pinned `<2` until 2026-09-10, when mcp 2.2.0 landed in the shared python3 (no
+# virtualenvs, so every rig shares one install) and this rig's MCP server stopped
+# loading. Pinning back was not an option: gpu-2B- and gpu-4B-cloudrun-devops-agent
+# require `mcp>=2`. Sibling rigs still importing mcp.server.fastmcp are broken the
+# same way and need the same two-line change.
+mcp>=2
 httpx>=0.27.0
 python-dotenv>=1.0.0
 

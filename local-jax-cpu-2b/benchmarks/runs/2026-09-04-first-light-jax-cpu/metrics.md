@@ -1,0 +1,17 @@
+| `tpu_jax_cold_requests_total` | 1 |
+| `tpu_jax_completion_tokens_total` | 384 |
+| `tpu_jax_decode_seconds_total` | 829.98 |
+| `tpu_jax_decode_tokens_per_second` | 0.50 |
+| `tpu_jax_degenerate_responses_total` | 0 |
+| `tpu_jax_host_rss_bytes` | 4723011584 |
+| `tpu_jax_last_bucket_size` | 32 |
+| `tpu_jax_last_pad_tokens` | 18 |
+| `tpu_jax_latency_seconds_sum` | 845.07 |
+| `tpu_jax_max_pad_tokens` | 18 |
+| `tpu_jax_prefill_milliseconds` | 2951.30 |
+| `tpu_jax_prefill_seconds_total` | 14.39 |
+| `tpu_jax_prompt_tokens_total` | 42 |
+| `tpu_jax_requests_received_total` | 3 |
+| `tpu_jax_requests_total{status="failed"}` | 0 |
+| `tpu_jax_requests_total{status="success"}` | 3 |
+| `tpu_jax_weight_bytes` | 5752273478 |

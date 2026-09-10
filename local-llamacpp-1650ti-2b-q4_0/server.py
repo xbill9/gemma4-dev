@@ -34,7 +34,7 @@ from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 RIG_DIR = Path(__file__).resolve().parent
 load_dotenv(RIG_DIR / "tpu.env")
@@ -56,13 +56,16 @@ ENDPOINT = os.environ.get("ENDPOINT", f"http://{HOST}:{PORT}")
 N_GPU_LAYERS = os.environ.get("N_GPU_LAYERS", "99")
 CONTEXT_SIZE = os.environ.get("CONTEXT_SIZE", "8192")
 KV_CACHE_TYPE = os.environ.get("KV_CACHE_TYPE", "f16")
+FLASH_ATTENTION = os.environ.get("FLASH_ATTENTION", "1")
+THREADS = os.environ.get("THREADS", "4")
+PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
 METRICS = os.environ.get("METRICS", "0")
 
 RUN_DIR = RIG_DIR / "run"
 PID_FILE = RUN_DIR / "llama-server.pid"
 LOG_FILE = RUN_DIR / "llama-server.log"
 
-mcp = FastMCP(MCP_SERVER_NAME)
+mcp = MCPServer(MCP_SERVER_NAME)
 
 
 async def run_command(cmd: list[str], timeout: int = 120) -> tuple[int, str, str]:
@@ -220,6 +223,37 @@ async def model_info() -> str:
     )
 
 
+def _server_command(context_size: Optional[str] = None) -> list[str]:
+    """The llama-server argv. Must carry the same flags as `make serve`.
+
+    A test enforces that parity: on 2026-09-10 this list lacked -fa, -t and
+    --parallel and the MCP-started server came up with 4 slots and 6 threads.
+    """
+    cmd = [
+        LLAMA_SERVER_BIN,
+        "-m", MODEL_PATH,
+        "--host", HOST,
+        "--port", str(PORT),
+        "-ngl", str(N_GPU_LAYERS),
+        "-c", str(context_size or CONTEXT_SIZE),
+        "-ctk", KV_CACHE_TYPE,
+        "-ctv", KV_CACHE_TYPE,
+        "-fa", FLASH_ATTENTION,
+        "-t", THREADS,
+        # llama.cpp splits -c across slots, and its default is more than one.
+        "--parallel", PARALLEL_SLOTS,
+    ]
+    # llama.cpp serves /metrics only when asked; without this it answers 501.
+    # Operational visibility only — see tpu.env, METRICS, for why it must not
+    # become the benchmark decode source.
+    if METRICS == "1":
+        cmd.append("--metrics")
+    # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
+    # disabling it forces the 1.93 GB per-layer embedding tensor to be
+    # materialised and turns a comfortable fit into an OOM.
+    return cmd
+
+
 @mcp.tool()
 async def start_model_server(context_size: Optional[str] = None) -> str:
     """Start llama-server on the local GPU. No-op if it is already running."""
@@ -233,24 +267,7 @@ async def start_model_server(context_size: Optional[str] = None) -> str:
         return f"✅ Already running (pid {existing}) at {ENDPOINT}. Use `stop_model_server` first to restart."
 
     RUN_DIR.mkdir(exist_ok=True)
-    cmd = [
-        LLAMA_SERVER_BIN,
-        "-m", MODEL_PATH,
-        "--host", HOST,
-        "--port", str(PORT),
-        "-ngl", str(N_GPU_LAYERS),
-        "-c", str(context_size or CONTEXT_SIZE),
-        "-ctk", KV_CACHE_TYPE,
-        "-ctv", KV_CACHE_TYPE,
-    ]
-    # llama.cpp serves /metrics only when asked; without this it answers 501.
-    # Operational visibility only — see tpu.env, METRICS, for why it must not
-    # become the benchmark decode source.
-    if METRICS == "1":
-        cmd.append("--metrics")
-    # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
-    # disabling it forces the 1.93 GB per-layer embedding tensor to be
-    # materialised and turns a comfortable fit into an OOM.
+    cmd = _server_command(context_size)
 
     with open(LOG_FILE, "ab") as log:
         proc = await asyncio.create_subprocess_exec(

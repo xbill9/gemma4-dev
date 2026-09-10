@@ -1,0 +1,27 @@
+# make deploy (2026-09-10, first deploy of this service) — captured 2026-09-10T11:53:47-04:00 on yoga9i, cwd gpu-2B-cloudrun-devops-agent
+	--no-cpu-throttling \
+	--concurrency=4 \
+	--timeout=3600 \
+	--startup-probe=timeoutSeconds=60,periodSeconds=60,failureThreshold=10,initialDelaySeconds=180,httpGet.port=8000,httpGet.path=/health \
+	--scaling=auto \
+	--max-instances=1 \
+	--min-instances=0 \
+	--port=8000 \
+	--memory=32Gi \
+	--cpu=8 \
+	--execution-environment=gen2 \
+	--add-volume=name=model-volume,type=cloud-storage,bucket=aisprint-491218-bucket,readonly=true \
+	--add-volume-mount=volume=model-volume,mount-path=/mnt/models \
+	--args=--model=/mnt/models/gemma-4-E2B-it,--dtype=bfloat16,--max-model-len=16384,--disable-chunked-mm-input,--gpu-memory-utilization=0.95,--kv-cache-dtype=fp8,--tensor-parallel-size=1,--max-num-seqs=8,--enable-chunked-prefill,--max-num-batched-tokens=4096,--enable-auto-tool-choice,--tool-call-parser=gemma4,--reasoning-parser=gemma4,--async-scheduling,--limit-mm-per-prompt={},--host=0.0.0.0,--port=8000 \
+	--no-allow-unauthenticated \
+	--region=us-east4 \
+	--set-env-vars=VLLM_ENABLE_CUDA_COMPATIBILITY=0
+Deploying container to Cloud Run service [gpu-2b-l4-devops-agent] in project [aisprint-491218] region [us-east4]
+Deploying new service...
+Routing traffic.....done
+Done.
+Service [gpu-2b-l4-devops-agent] revision [gpu-2b-l4-devops-agent-00001-ssq] has been deployed and is serving 100 percent of traffic.
+Service URL: https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app
+Proxy locally with: gcloud run services proxy gpu-2b-l4-devops-agent --region us-east4 --project aisprint-491218
+
+[exited with code 0]

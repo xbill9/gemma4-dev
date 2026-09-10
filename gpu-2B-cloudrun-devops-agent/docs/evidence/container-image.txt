@@ -1,0 +1,5 @@
+# live revision container image — captured 2026-09-10T12:02:44-04:00 on yoga9i
+$ gcloud run services describe gpu-2b-l4-devops-agent --region us-east4 --format="value(spec.template.spec.containers[0].image,status.latestReadyRevisionName)"
+vllm/vllm-openai:v0.26.0-cu129	gpu-2b-l4-devops-agent-00002-t5v
+$ grep -n "image=" Makefile
+43:		--image=vllm/vllm-openai:v0.26.0-cu129 \

@@ -1,0 +1,18 @@
+# server.py cloudrun_run_benchmark defaults
+@mcp.tool()
+async def cloudrun_run_benchmark(
+    model: Optional[str] = None,
+    num_prompts: int = 20,
+    random_output_len: int = 128,
+    max_concurrency: int = 8,
+) -> str:
+    """
+    Runs a performance/concurrency benchmark sweep against the Cloud Run vLLM GPU endpoint.
+
+    Args:
+        model: Model name to request (defaults to the active model from /v1/models).
+        num_prompts: Number of requests to send per concurrency level.
+        random_output_len: Max tokens to generate per request.
+        max_concurrency: Maximum concurrency level to sweep up to (powers of 2, e.g. 1, 2, 4, 8).
+    """
+1165:            "temperature": 0.0,

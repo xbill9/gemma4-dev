@@ -22,7 +22,7 @@ sys.path.insert(0, str(RIG_DIR))
 # So `tool()` is a pass-through decorator and the real functions survive.
 
 
-class _FakeFastMCP:
+class _FakeMCPServer:
     def __init__(self, name):
         self.name = name
 
@@ -38,11 +38,11 @@ class _FakeFastMCP:
         raise AssertionError("mcp.run() must never be called from a test")
 
 
-_fastmcp_module = MagicMock()
-_fastmcp_module.FastMCP = _FakeFastMCP
+_mcpserver_module = MagicMock()
+_mcpserver_module.MCPServer = _FakeMCPServer
 sys.modules["mcp"] = MagicMock()
 sys.modules["mcp.server"] = MagicMock()
-sys.modules["mcp.server.fastmcp"] = _fastmcp_module
+sys.modules["mcp.server.mcpserver"] = _mcpserver_module
 
 import server  # noqa: E402
 
@@ -241,10 +241,49 @@ class TestMetricsFlag(unittest.TestCase):
     """/metrics is llama.cpp's endpoint and is 501 unless --metrics is passed."""
 
     def test_flag_is_passed_when_enabled(self):
-        import inspect
-        src = inspect.getsource(server.start_model_server)
-        self.assertIn("--metrics", src)
-        self.assertIn('METRICS == "1"', src)
+        with patch.object(server, "METRICS", "1"):
+            self.assertIn("--metrics", server._server_command())
+
+    def test_flag_is_absent_when_disabled(self):
+        with patch.object(server, "METRICS", "0"):
+            self.assertNotIn("--metrics", server._server_command())
+
+
+class TestServerCommandMatchesMakefile(unittest.TestCase):
+    """`make serve` and `start_model_server` must launch the same server.
+
+    They drifted once: 2026-09-10 the MCP tool started llama-server without -fa,
+    -t or --parallel, so it came up with 4 slots and 6 threads while `make serve`
+    carried the measured config. A benchmark against the MCP-started server
+    would have measured a configuration no tpu.env line describes.
+    """
+
+    @staticmethod
+    def _makefile_flags() -> set:
+        import re
+        text = (RIG_DIR / "Makefile").read_text()
+        recipe = text.split("\nserve:\n", 1)[1].split("\n\n", 1)[0]
+        return set(re.findall(r"(?<![\w-])(--?[a-z][\w-]*)", recipe))
+
+    def test_same_flag_set(self):
+        with patch.object(server, "METRICS", "1"):
+            cmd = server._server_command()
+        self.assertEqual({t for t in cmd if t.startswith("-")}, self._makefile_flags())
+
+    def test_measured_levers_come_from_tpu_env(self):
+        with patch.object(server, "FLASH_ATTENTION", "1"), \
+             patch.object(server, "THREADS", "4"), \
+             patch.object(server, "PARALLEL_SLOTS", "1"):
+            cmd = server._server_command()
+        for flag, value in (("-fa", "1"), ("-t", "4"), ("--parallel", "1")):
+            self.assertEqual(cmd[cmd.index(flag) + 1], value, flag)
+
+    def test_context_size_override(self):
+        cmd = server._server_command("16384")
+        self.assertEqual(cmd[cmd.index("-c") + 1], "16384")
+
+    def test_never_disables_mmap(self):
+        self.assertNotIn("--no-mmap", server._server_command())
 
 
 class TestRunCommand(unittest.IsolatedAsyncioTestCase):

@@ -1,0 +1,16 @@
+# handler audit — captured 2026-09-10T11:55:54-04:00 on yoga9i, cwd gpu-2B-cloudrun-devops-agent
+$ grep -c "^@mcp\.\(tool\|resource\)" server.py
+28
+$ grep -A1 "^@mcp\." server.py | grep -c "^async def"
+16
+$ grep -A1 "^@mcp\." server.py | grep -c "^def"
+12
+$ grep -n "get_running_loop\|asyncio.run(" server.py
+(no matches)
+$ grep -n "MCP_\|dotenv" server.py
+(no matches)
+$ grep -n "^import httpx" server.py; grep -n "^httpx" requirements.txt
+13:import httpx
+14:httpx
+$ grep -n "MCPServer(" server.py
+27:mcp = MCPServer("Self-Hosted vLLM DevOps Agent")
