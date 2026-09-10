@@ -26,7 +26,7 @@ Gemma 4 vLLM service on Cloud Run GPU (NVIDIA L4). Nearly every tool either shel
 
 ## Working in this directory
 
-This directory is one of several sibling agent projects under `gemma4-queens/` (other TPU, GPU, and EC2
+This directory is one of several sibling agent projects under `gemma4-dev/` (other TPU, GPU, and EC2
 variants). They are independent — do not edit siblings unless asked. The git root is the parent, so
 `git status` shows their changes too; never stage them.
 
