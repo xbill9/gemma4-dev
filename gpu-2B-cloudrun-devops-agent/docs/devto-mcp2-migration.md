@@ -202,7 +202,7 @@ make lint
 ruff check .
 All checks passed!
 ruff format --check .
-12 files already formatted
+14 files already formatted
 mypy .
 Success: no issues found in 6 source files
 ```
@@ -476,7 +476,7 @@ The goal of this article was to move a Python MCP server off FastMCP and onto th
 
 Scope: mcp 2.2.0 on Python 3.14.7, with the 1.30.0 wheel as the v1 reference. One Cloud Run instance with one NVIDIA L4 in `us-east4`, vLLM `v0.26.0-cu129`, Gemma 4 E2B, in manual scaling at one fixed instance during the sweep. One sweep of 20 requests per level, a single fixed prompt, 128 max output tokens. It measures the serving stack, not the SDK.
 
-The strategy for using MCP for migrating a Python MCP server to the MCP SDK 2.x was validated with an incremental step by step approach.
+Each step validated a different layer of the migrated server: the unit tests, the raw MCP protocol over stdio, and a live Cloud Run deployment.
 
 #### References
 
