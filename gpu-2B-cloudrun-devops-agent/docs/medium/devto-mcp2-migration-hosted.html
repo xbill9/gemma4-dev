@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>FastMCP Is Now MCPServer: Migrating a Python MCP Server to the MCP SDK 2.x</title>
+  <meta name="description" content="Step-by-step: moving a FastMCP server to the MCP Python SDK 2.x — what broke, what changed, what did not, and a redeploy of its Gemma 4 vLLM backend to a Cloud Run L4 GPU." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/medium/img/devto-cover.5bbae7c1.jpg" alt="FastMCP Is Now MCPServer: Migrating a Python MCP Server to the MCP SDK 2.x" /></figure>
+<p>This article provides a step by step migration guide for a Python MCP
+server from the MCP Python SDK 1.x (<code>FastMCP</code>) to 2.x
+(<code>MCPServer</code>), followed by a step by step deployment of Gemma
+4 E2B to a Cloud Run hosted GPU enabled system. A suite of Python MCP
+tools is built to simplify management of the vLLM hosted deployment.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent">https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent</a></p>
+<hr />
+<h4 id="what-broke">What Broke?</h4>
+<p>Nothing in the repository changed. A fresh install did.</p>
+<p>The project's <code>requirements.txt</code> listed <code>mcp</code>
+with no version bound, so the next <code>pip install</code> resolved the
+2.x line. The server stopped importing:</p>
+<pre class="shell"><code>python3 -c &quot;from mcp.server.fastmcp import FastMCP&quot;
+    raise ModuleNotFoundError(_MESSAGE, name=__name__)
+ModuleNotFoundError: No module named &#39;mcp.server.fastmcp&#39;. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin &#39;mcp&lt;2&#39; to keep running v1 code.</code></pre>
+<p>It showed up in Claude Code first, and less helpfully. The MCP server
+was listed as failed with <code>Connection closed</code>: Claude Code
+launched it with <code>python3</code>, it died on the import, and stdio
+closed before the handshake.</p>
+<p>That error message deserves credit. The 2.x package still ships a
+<code>mcp/server/fastmcp.py</code>, and its only job is to raise it. A
+bare <code>No module named</code> would have sent everyone hunting for a
+broken install. ✅</p>
+<hr />
+<h4 id="pin-or-migrate">Pin or Migrate?</h4>
+<p>Two fixes, and the error message names both.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/medium/img/devto-mcp2-migration-table-1.png"
+alt="Table: Pin mcp&lt;2, Migrate to MCPServer" /></p>
+<p>The migration guide says the v1.x line keeps receiving critical bug
+fixes and security patches, so pinning is legitimate. This rig rules it
+out for a different reason: <strong>these projects install into one
+system Python, with no virtualenvs</strong>, so a pin in one project is
+a downgrade for every other project on the machine. Migrating keeps the
+change inside the repository.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>Python 3.10 or newer — mcp 2.x declares
+<code>Requires-Python &gt;=3.10</code></li>
+<li>The Google Cloud SDK, logged in, with application default
+credentials</li>
+<li>A Google Cloud project with Cloud Run GPU access in your region
+(this one runs in <code>us-east4</code>)</li>
+<li>A GCS bucket named <code>&lt;project&gt;-bucket</code> for the model
+weights</li>
+<li>The repository cloned, and the directory above as your working
+directory</li>
+</ul>
+<hr />
+<h4 id="what-changed-in-2x">What Changed in 2.x?</h4>
+<p>The official migration guide opens with a table of the changes almost
+every project hits. Here they are against this server — stdio transport,
+<code>@mcp.tool()</code> tools, one <code>@mcp.resource()</code>, and no
+client code:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/medium/img/devto-mcp2-migration-table-2.png"
+alt="Table: Change, First symptom, This server" /></p>
+<p>Three rows deserve more than a table cell.</p>
+<p><strong><code>mcp</code> no longer installs
+<code>httpx</code>.</strong> v2 depends on <code>httpx2</code>, a fork
+of httpx, instead. <code>server.py</code> does <code>import httpx</code>
+for its HTTP probes and its benchmark, and the guide warns what happens
+next: a <code>ModuleNotFoundError</code> whose traceback never mentions
+mcp. This server escaped only because <code>requirements.txt</code>
+already listed <code>httpx</code> on its own line. If your server
+imports httpx and never declared it, declare it now.</p>
+<p><strong>Sync handlers changed threads.</strong> In v1 a plain
+<code>def</code> tool ran inline on the event loop, so a blocking call
+stalled every other request on the server. v2 runs sync handlers on a
+worker thread. The only thing that breaks is code that expects the
+loop's thread — <code>asyncio.get_running_loop()</code> in a
+<code>def</code> handler now raises. This server has none, so its sync
+tools gain concurrency for free. The move covers <code>def</code>
+handlers only: an <code>async def</code> tool that makes a blocking call
+still blocks the loop, in v1 and v2 alike.</p>
+<p><strong>The server's version went blank.</strong> In v1 an
+unversioned server reported the installed <code>mcp</code> version as
+its own. In v2 it reports an empty string. Nothing breaks, but it shows
+up in the handshake in Step 5.</p>
+<hr />
+<h4 id="what-did-not-change">What Did Not Change</h4>
+<p>The guide lists the everyday surface that carries over, and it is
+most of a typical FastMCP server:</p>
+<ul>
+<li><code>@mcp.tool()</code>, <code>@mcp.resource()</code> and
+<code>@mcp.prompt()</code> take the same arguments and handler
+signatures</li>
+<li>Tool return handling: strings, dicts, models and content blocks are
+wrapped by the same rules</li>
+<li><code>list_tools()</code> and <code>list_resources()</code> return
+the same lists</li>
+<li><code>lifespan=</code> works as before</li>
+</ul>
+<p>For this server that means no tool function changed. Every tool body
+is exactly what it was.</p>
+<hr />
+<h4 id="step-1--find-your-exposure">Step 1 — Find Your Exposure</h4>
+<p>Measure before editing. Five greps cover everything in the table
+above:</p>
+<pre class="shell"><code>grep -c &quot;^@mcp\.\(tool\|resource\)&quot; server.py
+grep -A1 &quot;^@mcp\.&quot; server.py | grep -c &quot;^def&quot;
+grep -n &quot;get_running_loop\|asyncio.run(&quot; server.py || echo &quot;(no matches)&quot;
+grep -n &quot;MCP_\|dotenv&quot; server.py || echo &quot;(no matches)&quot;
+grep -n &quot;^import httpx&quot; server.py; grep -n &quot;^httpx&quot; requirements.txt
+28
+12
+(no matches)
+(no matches)
+13:import httpx
+14:httpx</code></pre>
+<p>28 handlers, 12 of them sync, none touching the event loop, and
+<code>httpx</code> declared.</p>
+<p>The <code>MCP_</code> grep checks one more change. v2 no longer reads
+<code>MCP_*</code> environment variables or a <code>.env</code> file
+into server settings. The guide points out that constructor arguments
+always took precedence, so those variables rarely did anything anyway.
+This server reads its own configuration from
+<code>GOOGLE_CLOUD_PROJECT</code>, <code>VLLM_BASE_URL</code> and
+friends, so nothing changes.</p>
+<p>One check a grep cannot do: <strong>v2 inserted <code>title</code>
+and <code>description</code> into the constructor's positional
+parameters.</strong> A v1 call like
+<code>FastMCP("Demo", "You answer questions…")</code> still runs on v2,
+but the second string silently becomes the title and stops reaching the
+model as instructions. Keep the name positional and pass everything else
+by keyword. This server passes only the name.</p>
+<hr />
+<h4 id="step-2--the-rename">Step 2 — The Rename</h4>
+<p>The whole code change:</p>
+<pre class="diff"><code>-from mcp.server.fastmcp import FastMCP
++from mcp.server.mcpserver import MCPServer
+ from openai import AsyncOpenAI
+ ...
+-# Initialize FastMCP server
+-mcp = FastMCP(&quot;Self-Hosted vLLM DevOps Agent&quot;)
++# Initialize MCP server (mcp 2.x; FastMCP was renamed MCPServer)
++mcp = MCPServer(&quot;Self-Hosted vLLM DevOps Agent&quot;)</code></pre>
+<p><code>@mcp.tool()</code>, <code>@mcp.resource()</code>,
+<code>mcp.run()</code> and every tool body stay as they are. Other
+submodules moved the same way — <code>mcp.server.fastmcp.*</code> is now
+<code>mcp.server.mcpserver.*</code>, and <code>ctx.fastmcp</code> is now
+<code>ctx.mcp_server</code> — but this server uses neither.</p>
+<hr />
+<h4 id="mag_right-tip-change-the-usage-before-the-import">🔎 Tip: Change
+the Usage Before the Import</h4>
+<p>This one cost a test run. The project has a Claude Code hook that
+runs <code>ruff format</code> and <code>ruff check --fix</code> after
+every edit. Change the import line first and, for a moment,
+<code>MCPServer</code> is imported but unused. The hook deletes it:</p>
+<pre class="shell"><code>cat server.py
+ruff check --fix --diff server.py
+from mcp.server.mcpserver import MCPServer
+ 
+mcp = FastMCP(&quot;demo&quot;)
+ 
+--- server.py
++++ server.py
+@@ -1,3 +1,2 @@
+-from mcp.server.mcpserver import MCPServer
+ 
+ mcp = FastMCP(&quot;demo&quot;)
+ 
+Would fix 1 error.</code></pre>
+<p>The next edit renames the class, and the file now has no import at
+all:</p>
+<pre class="plaintext"><code>    mcp = MCPServer(&quot;Self-Hosted vLLM DevOps Agent&quot;)
+          ^^^^^^^^^
+NameError: name &#39;MCPServer&#39; is not defined</code></pre>
+<p>Make both changes in one edit, or change the usage first. Any editor
+that runs <code>ruff check --fix</code> on save will do the same
+thing.</p>
+<hr />
+<h4 id="step-3--pin-the-floor">Step 3 — Pin the Floor</h4>
+<p>Code that imports <code>mcp.server.mcpserver</code> cannot run on
+1.x, so the requirement should say so:</p>
+<pre class="diff"><code>-mcp
++mcp&gt;=2</code></pre>
+<p>The guide's own example also caps the major version,
+<code>mcp&gt;=2,&lt;3</code>. That is the safer line if you would rather
+meet 3.x on purpose than by <code>pip install</code>. Keep
+<code>httpx</code> on its own line in the same file, for the reason
+above.</p>
+<hr />
+<h4 id="step-4--lint-and-test">Step 4 — Lint and Test</h4>
+<pre class="shell"><code>make lint
+ruff check .
+All checks passed!
+ruff format --check .
+14 files already formatted
+mypy .
+Success: no issues found in 6 source files
+make test
+----------------------------------------------------------------------
+Ran 28 tests in 1.058s
+ 
+OK</code></pre>
+<p>The suite compares the registered tool set against a hard-coded list
+through <code>mcp.list_tools()</code>. That call is on the guide's
+unchanged list, and it is the test that would catch a tool silently
+failing to register after the rename. ✅</p>
+<hr />
+<h4 id="step-5--test-the-protocol-by-hand">Step 5 — Test the Protocol by
+Hand</h4>
+<p>Unit tests call Python. A client speaks JSON-RPC over stdio, so test
+that too. <strong>Hold stdin open with <code>sleep</code></strong>: with
+a bare <code>printf</code> pipe the server saw end-of-input and exited
+after answering only <code>initialize</code>.</p>
+<pre class="shell"><code>{ printf &#39;%s\n&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2025-06-18&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;probe&quot;,&quot;version&quot;:&quot;0&quot;}}}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/initialized&quot;}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/list&quot;,&quot;params&quot;:{}}&#39; \
+  &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:3,&quot;method&quot;:&quot;resources/list&quot;,&quot;params&quot;:{}}&#39;; sleep 5; } \
+  | python3 server.py 2&gt;/dev/null</code></pre>
+<p>The responses are JSON; summarised:</p>
+<pre class="plaintext"><code>initialize OK: name=&#39;Self-Hosted vLLM DevOps Agent&#39; version=&#39;&#39; proto 2025-06-18
+tools/list OK: 27 tools -&gt; cloudrun_analyze_cloud_logging, cloudrun_analyze_gpu_logs, cloudrun_check_gpu_quotas, cloudrun_deploy, ...
+resources/list OK: [&#39;config://vllm-deployment-template&#39;]</code></pre>
+<p>🟢 27 tools and the resource, matching the suite's expected list.
+Note <code>version=''</code> — the unversioned-server change from the
+table. Pass <code>version="..."</code> to <code>MCPServer(...)</code> if
+a client or dashboard displays it.</p>
+<p>Keep this snippet. It is the fastest way to tell "my server is
+broken" from "my client config is broken."</p>
+<hr />
+<h4 id="step-6--register-it">Step 6 — Register It</h4>
+<p>Claude Code reads <code>.mcp.json</code>. Nothing in it changes for
+the migration — it launches <code>server.py</code> with the system
+<code>python3</code>:</p>
+<pre class="json"><code>{
+  &quot;mcpServers&quot;: {
+    &quot;cloudrun-devops&quot;: {
+      &quot;command&quot;: &quot;python3&quot;,
+      &quot;args&quot;: [&quot;/home/xbill/gemma4-dev/gpu-2B-cloudrun-devops-agent/server.py&quot;],
+      &quot;env&quot;: {
+        &quot;GOOGLE_CLOUD_PROJECT&quot;: &quot;aisprint-491218&quot;,
+        &quot;GOOGLE_CLOUD_LOCATION&quot;: &quot;us-east4&quot;,
+        &quot;VLLM_BASE_URL&quot;: &quot;https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app&quot;,
+        &quot;MODEL_NAME&quot;: &quot;/mnt/models/gemma-4-E2B-it&quot;
+      }
+    }
+  }
+}</code></pre>
+<p>If the server failed at startup earlier in the session, reconnect it
+from <code>/mcp</code> or start a new session to pick up the fixed
+code.</p>
+<hr />
+<h4 id="step-7--stage-the-model-weights">Step 7 — Stage the Model
+Weights</h4>
+<p>Cloud Run mounts the bucket read-only at <code>/mnt/models</code>
+through GCS FUSE, so the weights go to GCS once. Download to a real disk
+rather than <code>/tmp</code>, which on this host is a RAM-backed tmpfs
+smaller than the model:</p>
+<pre class="shell"><code>hf download google/gemma-4-E2B-it --local-dir ~/hf-downloads/gemma-4-E2B-it
+gcloud storage rsync ~/hf-downloads/gemma-4-E2B-it gs://aisprint-491218-bucket/gemma-4-E2B-it \
+  --recursive --exclude=&#39;^\.cache/&#39;
+gcloud storage ls -l gs://aisprint-491218-bucket/gemma-4-E2B-it/
+Average throughput: 41.4MiB/s
+      4954  2026-09-10T14:51:14Z  gs://aisprint-491218-bucket/gemma-4-E2B-it/config.json
+10246621918  2026-09-10T14:55:13Z  gs://aisprint-491218-bucket/gemma-4-E2B-it/model.safetensors
+  32169626  2026-09-10T14:51:34Z  gs://aisprint-491218-bucket/gemma-4-E2B-it/tokenizer.json
+TOTAL: 9 objects, 10278849571 bytes (9.57GiB)</code></pre>
+<p><strong>Check the architecture, not the folder name.</strong> The
+same bucket already held a <code>gemma-2b-it/</code> folder that looked
+like the answer and was the original Gemma, which the
+<code>gemma4</code> parsers cannot serve. <code>config.json</code>
+settles it:</p>
+<pre class="shell"><code>gcloud storage cat gs://aisprint-491218-bucket/gemma-4-E2B-it/config.json \
+  | python3 -c &#39;import json,sys; c=json.load(sys.stdin); t=c[&quot;text_config&quot;]; print(c[&quot;model_type&quot;], c[&quot;architectures&quot;], &quot;hidden&quot;, t[&quot;hidden_size&quot;], &quot;layers&quot;, t[&quot;num_hidden_layers&quot;])&#39;
+gemma4 [&#39;Gemma4ForConditionalGeneration&#39;] hidden 1536 layers 35</code></pre>
+<hr />
+<h4 id="step-8--deploy-to-cloud-run">Step 8 — Deploy to Cloud Run</h4>
+<p>The <code>deploy-vllm</code> target in the <code>Makefile</code> is
+the single source of truth for the vLLM and Cloud Run flags:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/medium/img/devto-mcp2-migration-table-3.png"
+alt="Table: Flag, Value, Why" /></p>
+<pre class="shell"><code>make deploy
+Deploying container to Cloud Run service [gpu-2b-l4-devops-agent] in project [aisprint-491218] region [us-east4]
+Deploying new service...
+Creating Revision....................done
+Routing traffic.....done
+Done.
+Service [gpu-2b-l4-devops-agent] revision [gpu-2b-l4-devops-agent-00001-ssq] has been deployed and is serving 100 percent of traffic.
+Service URL: https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app</code></pre>
+<p><code>gcloud run deploy</code> returns only once the startup probe
+passes, and the probe waits <code>initialDelaySeconds=180</code> before
+its first check. Expect several minutes.</p>
+<hr />
+<h4 id="demo-mode-fixed-instances">Demo Mode: Fixed Instances</h4>
+<p>The default autoscales between zero and one instance, which means a
+cold GPU start after the service goes idle. A demo cannot wait for that.
+The <code>Makefile</code> takes a <code>SCALING</code> variable:</p>
+<pre class="make"><code>SCALING ?= auto
+ifeq ($(SCALING),auto)
+SCALING_FLAGS = --scaling=auto --max-instances=1 --min-instances=0
+else
+SCALING_FLAGS = --scaling=$(SCALING)
+endif
+make deploy SCALING=1
+gcloud run services describe gpu-2b-l4-devops-agent --region us-east4 --format=&#39;yaml(metadata.annotations)&#39;
+    run.googleapis.com/manualInstanceCount: &#39;1&#39;
+    run.googleapis.com/scalingMode: manual</code></pre>
+<p>gcloud only accepts a positive instance count for manual scaling, so
+this cannot pin the service at zero. The min and max flags are passed
+only in auto mode, because gcloud's help does not say how they combine
+with a fixed count. One L4 now runs until you change it.</p>
+<p>Plain <code>make deploy</code>, and the <code>cloudrun_deploy</code>
+and <code>cloudrun_update_scaling</code> tools, all pass
+<code>--scaling=auto</code> on purpose — a service stuck in manual
+scaling at zero returns 503 to every request. So any of them quietly
+takes a demo back to scale-to-zero.</p>
+<hr />
+<h4 id="step-9--validate">Step 9 — Validate</h4>
+<p>Ask vLLM what it loaded:</p>
+<pre class="shell"><code>curl -s -H &quot;Authorization: Bearer $(gcloud auth print-identity-token)&quot; \
+  https://gpu-2b-l4-devops-agent-289270257791.us-east4.run.app/v1/models | python3 -m json.tool
+{
+    &quot;object&quot;: &quot;list&quot;,
+    &quot;data&quot;: [
+        {
+            &quot;id&quot;: &quot;/mnt/models/gemma-4-E2B-it&quot;,
+            &quot;object&quot;: &quot;model&quot;,
+            &quot;owned_by&quot;: &quot;vllm&quot;,
+            &quot;max_model_len&quot;: 16384
+        }
+    ]
+}</code></pre>
+<p>The model id is the mount path, not the Hugging Face repo id. The
+container is started with <code>--model=/mnt/models/&lt;path&gt;</code>,
+so that path is the name the OpenAI API expects.</p>
+<p>Then ask the agent for <code>cloudrun_verify_model_health</code>:</p>
+<pre class="plaintext"><code>✅ Model health check PASSED.
+Model: /mnt/models/gemma-4-E2B-it
+Response: &#39;Hello! Yes, I am working. I am Gemma 4, a Large La...&#39;
+Latency: 2.48 seconds.</code></pre>
+<p>That answer came through the migrated server: Claude Code called the
+tool over MCP, and the tool called vLLM. 🟢</p>
+<hr />
+<h4 id="step-10--benchmark-sweep">Step 10 — Benchmark Sweep</h4>
+<p>Ask the agent for <code>cloudrun_run_benchmark</code> with its
+defaults: one warmup request, then 20 requests at each concurrency level
+of 1, 2, 4 and 8, up to 128 output tokens each, one fixed prompt at
+temperature 0.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-2B-cloudrun-devops-agent/docs/medium/img/devto-mcp2-migration-table-4.png"
+alt="Table: Concurrency, Req/s, Tokens/s, Avg latency, P95 latency" /></p>
+<p>Every request at every level succeeded. Three readings:</p>
+<p><strong>From 1 to 4, throughput scales almost linearly.</strong>
+188.46 tokens/s is 3.8x the single-stream 49.63 (arithmetic), while
+average latency moves from 2.58 s to 2.71 s. The L4 is nowhere near full
+at 4.</p>
+<p><strong>From 4 to 8, it stops.</strong> Throughput rises 0.6%
+(arithmetic) while average latency goes from 2.71 s to 4.86 s. Half the
+requests are waiting.</p>
+<p><strong>The ceiling is a Cloud Run setting, not the GPU.</strong> One
+instance accepts <code>--concurrency=4</code> requests at a time, and
+vLLM would batch up to <code>--max-num-seqs=8</code>. The next sweep
+worth running redeploys with <code>--concurrency=8</code> and measures
+the L4 instead of the setting.</p>
+<p>And the SDK version cannot move any of these numbers. The benchmark's
+HTTP calls go from <code>server.py</code> to vLLM; MCP only carries the
+one tool call that starts them. The sweep is here to show the migrated
+server driving the whole lifecycle, not to measure the SDK.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<pre class="shell"><code>make destroy</code></pre>
+<p>Not run for this article — the demo service is still up. It deletes
+the Cloud Run service; the weights stay in the bucket for the next
+deploy.</p>
+<hr />
+<h4 id="cheat-sheet">Cheat Sheet</h4>
+<pre class="shell"><code># exposure
+grep -rn &quot;mcp.server.fastmcp&quot; .
+grep -A1 &quot;^@mcp\.&quot; server.py | grep -c &quot;^def&quot;
+grep -n &quot;^import httpx&quot; server.py; grep -n &quot;^httpx&quot; requirements.txt
+ 
+# the rename, in ONE edit
+#   from mcp.server.fastmcp import FastMCP  -&gt;  from mcp.server.mcpserver import MCPServer
+#   FastMCP(&quot;name&quot;)                         -&gt;  MCPServer(&quot;name&quot;)
+# requirements.txt: mcp -&gt; mcp&gt;=2 (or mcp&gt;=2,&lt;3), and declare httpx if you import it
+ 
+make lint &amp;&amp; make test
+ 
+# stdio smoke test: hold stdin open
+{ printf &#39;%s\n&#39; &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;initialize&quot;,&quot;params&quot;:{&quot;protocolVersion&quot;:&quot;2025-06-18&quot;,&quot;capabilities&quot;:{},&quot;clientInfo&quot;:{&quot;name&quot;:&quot;p&quot;,&quot;version&quot;:&quot;0&quot;}}}&#39; \
+                &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;method&quot;:&quot;notifications/initialized&quot;}&#39; \
+                &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:2,&quot;method&quot;:&quot;tools/list&quot;,&quot;params&quot;:{}}&#39;; sleep 5; } | python3 server.py 2&gt;/dev/null
+ 
+# deploy, demo, teardown
+make deploy
+make deploy SCALING=1
+make destroy</code></pre>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to move a Python MCP server off FastMCP
+and onto the MCP Python SDK 2.x without changing what it does. The key
+to the solution was measuring exposure against the migration guide
+before editing, which reduced the change to one import and one class
+name. The migration results were:</p>
+<ul>
+<li>🟢 The code change was the import and the constructor; all 27 tools
+and the resource registered unchanged</li>
+<li>⚠️ <code>mcp</code> 2.x no longer installs <code>httpx</code>; this
+server was safe only because it declared <code>httpx</code> itself</li>
+<li>🟢 The 12 sync handlers now run on a worker thread, so their
+blocking calls no longer stall the event loop</li>
+<li>❌ A formatter hook deleted the new import mid-edit; change the
+usage and the import together</li>
+<li>🟢 The migrated server deployed Gemma 4 E2B to a Cloud Run L4 and
+drove a benchmark sweep that peaked at 189.53 tokens/s, capped by Cloud
+Run's <code>--concurrency=4</code></li>
+</ul>
+<p>Scope: mcp 2.2.0 on Python 3.14.7, with the 1.30.0 wheel as the v1
+reference. One Cloud Run instance with one NVIDIA L4 in
+<code>us-east4</code>, vLLM <code>v0.26.0-cu129</code>, Gemma 4 E2B, in
+manual scaling at one fixed instance during the sweep. One sweep of 20
+requests per level, a single fixed prompt, 128 max output tokens. It
+measures the serving stack, not the SDK.</p>
+<p>The strategy for using MCP for migrating a Python MCP server to the
+MCP SDK 2.x was validated with an incremental step by step approach.</p>
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://py.sdk.modelcontextprotocol.io/v2/migration/">Migration
+Guide: v1 to v2 | MCP Python SDK</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-2B-cloudrun-devops-agent">gpu-2B-cloudrun-devops-agent
+| GitHub</a></li>
+</ul>
+<hr />
+<p><em>mcp 2.2.0 (mcp-types 2.2.0), Python 3.14.7, ruff 0.16.6, Google
+Cloud SDK 583.0.0, vLLM v0.26.0 on one NVIDIA L4, Cloud Run
+<code>us-east4</code>.</em></p>
+</body>
+</html>
