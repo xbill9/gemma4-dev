@@ -3,7 +3,7 @@
 Serve **`google/gemma-4-E2B-it`** with **vLLM** on **AWS EC2 G5g** — an AWS Graviton2
 (64-bit Arm) host paired with an **NVIDIA T4G Tensor Core** GPU.
 
-The rig ships a single-file FastMCP server exposing a devops agent that provisions G5g
+The rig ships a single-file MCP server (`MCPServer`, MCP Python SDK 2.x) exposing a devops agent that provisions G5g
 capacity with boto3, brings up the model server, and does SRE diagnostics against the
 endpoint.
 

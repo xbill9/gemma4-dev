@@ -40,7 +40,7 @@ class ToolCatalogTests(unittest.TestCase):
 
     def test_annotations(self):
         destructive = {
-            name for name, tool in self.tools.items() if tool.annotations.destructiveHint
+            name for name, tool in self.tools.items() if tool.annotations.destructive_hint
         }
         self.assertEqual(destructive, {"stop_g5g_instance", "terminate_g5g_instance"})
         for name, tool in self.tools.items():
@@ -50,7 +50,7 @@ class ToolCatalogTests(unittest.TestCase):
 
     def test_launch_defaults_to_spot_and_build(self):
         for name in ("create_g5g_instance", "get_deployment_config"):
-            schema = self.tools[name].inputSchema["properties"]
+            schema = self.tools[name].input_schema["properties"]
             self.assertTrue(schema["spot"]["default"], name)
             self.assertEqual(schema["serving"]["enum"], ["build", "stock"], name)
             self.assertEqual(schema["serving"]["default"], "build", name)
