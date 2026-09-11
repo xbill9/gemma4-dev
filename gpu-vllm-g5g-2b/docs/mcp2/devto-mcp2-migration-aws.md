@@ -3,7 +3,7 @@ title: "FastMCP Is Now MCPServer on AWS: Moving a boto3 EC2 MCP Server to the MC
 published: false
 description: "What basic MCP Python SDK 2.x support takes for an AWS EC2 MCP server built on boto3: one rename in server.py, snake_case in the tests, a floor in requirements.txt, and why neither the wire format nor the boto3 calls change."
 tags: aws, mcp, python, ec2
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/docs/mcp2/devto-cover.9681da89.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-g5g-2b/docs/mcp2/devto-cover.c9eb2ee2.jpg
 ---
 
 This article provides a step by step migration guide for an AWS MCP server from the MCP Python SDK 1.x (`FastMCP`) to 2.x (`MCPServer`). The server manages Gemma 4 E2B on an Amazon EC2 G5g instance, a Graviton2 host with an NVIDIA T4G GPU, and a suite of Python MCP tools built on boto3 simplifies management of the vLLM hosted deployment.
