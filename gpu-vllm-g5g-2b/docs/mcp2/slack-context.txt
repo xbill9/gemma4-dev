@@ -1,0 +1,3 @@
+The MCP Python SDK 2.x renamed FastMCP to MCPServer, and an unpinned requirements.txt picks it up on the next pip install: the server dies on import before the MCP handshake. I moved a boto3 MCP server that manages Gemma 4 on an EC2 G5g instance over to 2.x.
+
+The server needed only the rename. The tests broke, because v2 reads protocol fields in snake_case, and the one that broke guards EC2 stop and terminate. The wire format did not change, so clients see nothing different. The Medium link is the companion piece, the same migration on Cloud Run.
