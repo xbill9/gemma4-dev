@@ -1,0 +1,16 @@
+# g5g at HEAD c5457a2 (before migration) — captured 2026-09-11T11:30:05-04:00 on debian
+# run from an archived copy of the rig; mcp 1.30.0 from an isolated --target dir, mcp 2.2.0 from system python
+
+$ PYTHONPATH=<mcp 1.30.0> python3 -m unittest discover -s tests    # mcp 1.30.0
+Ran 27 tests in 0.010s
+
+OK
+
+$ python3 -m unittest discover -s tests    # mcp 2.2.0
+    raise ModuleNotFoundError(_MESSAGE, name=__name__)
+ModuleNotFoundError: No module named 'mcp.server.fastmcp'. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin 'mcp<2' to keep running v1 code.
+Ran 1 test in 0.000s
+FAILED (errors=1)
+
+$ python3 -c "import server"    # mcp 2.2.0
+ModuleNotFoundError: No module named 'mcp.server.fastmcp'. This is mcp 2.x, where FastMCP was renamed to MCPServer (from mcp.server.mcpserver import MCPServer) and other APIs changed; see the migration guide at https://py.sdk.modelcontextprotocol.io/v2/migration/#fastmcp-renamed-to-mcpserver or pin 'mcp<2' to keep running v1 code.

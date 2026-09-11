@@ -1,0 +1,28 @@
+# fleet exposure after the g5g migration — captured 2026-09-11T11:30:14-04:00 on debian, cwd gemma4-dev
+$ grep -l "from mcp.server.fastmcp import" */server.py | wc -l
+37
+$ grep -l "from mcp.server.fastmcp import" {gpu-*-g4dn-*,gpu-*-g5g-*,gpu-*-g6-*,*-inf2-*}/server.py 2>/dev/null   # EC2 rigs
+gpu-jax-g4dn-2b/server.py
+gpu-jax-g5g-2b/server.py
+gpu-jax-g6-2b/server.py
+gpu-jaxrust-g5g-2b/server.py
+gpu-llamacpp-g5g-2b-q4_0/server.py
+gpu-ollama-g5g-2b-q4_0/server.py
+gpu-pytorch-g4dn-2b/server.py
+gpu-pytorch-g5g-2b/server.py
+gpu-pytorch-g6-2b/server.py
+gpu-vllm-g4dn-2b/server.py
+gpu-vllm-g6-2b/server.py
+tpu-jax-inf2-2b/server.py
+tpu-pytorch-inf2-2b/server.py
+$ grep -l "from mcp.server.mcpserver import" */server.py
+gpu-2B-cloudrun-devops-agent/server.py
+local-llamacpp-1650ti-2b-q4_0/server.py
+gpu-vllm-g5g-2b/server.py
+$ grep -hE "^mcp" */requirements.txt | sort | uniq -c
+     34 mcp
+      3 mcp>=1.2.0,<2
+      2 mcp>=2
+      1 mcp>=2,<3
+$ ls {gpu-*-g4dn-*,gpu-*-g5g-*,gpu-*-g6-*,*-inf2-*}/server.py | xargs grep -l "from mcp.server.fastmcp import" | wc -l   # EC2 + Inferentia rigs still on FastMCP
+13

@@ -1,0 +1,30 @@
+# g5g exposure audit — captured 2026-09-11T11:28:56-04:00 on debian, cwd gpu-vllm-g5g-2b
+$ grep -c "^@mcp\.\(tool\|resource\|prompt\)" server.py
+15
+$ grep -A1 "^@mcp\." server.py | grep -c "^async def"
+15
+$ grep -A1 "^@mcp\." server.py | grep -c "^def"
+0
+$ grep -n "get_running_loop\|asyncio.run(" server.py || echo "(no matches)"
+(no matches)
+$ grep -n "MCP_\|dotenv" server.py || echo "(no matches)"
+53:MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
+56:mcp = MCPServer(MCP_SERVER_NAME)
+$ grep -n "^import httpx" server.py; grep -n "^httpx" requirements.txt
+26:import httpx
+2:httpx
+$ grep -n "MCPServer(\|FastMCP(" server.py
+56:mcp = MCPServer(MCP_SERVER_NAME)
+$ grep -c "annotations=" server.py
+15
+$ grep -n "ToolAnnotations(" server.py
+57:READ_ONLY = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
+58:WRITE = ToolAnnotations(destructiveHint=False)
+59:DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
+$ grep -n "Hint\b\|inputSchema\|outputSchema\|mimeType" tests/*.py
+43:            name for name, tool in self.tools.items() if tool.annotations.destructiveHint
+53:            schema = self.tools[name].inputSchema["properties"]
+$ grep -n "to_thread\|run_in_executor" server.py
+171:    return await asyncio.to_thread(func, **kwargs)
+$ grep -c "boto3\.\|_client(\|\.describe_\|\.run_instances\|\.send_command" server.py
+16

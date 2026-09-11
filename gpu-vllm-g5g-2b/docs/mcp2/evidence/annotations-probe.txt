@@ -1,0 +1,11 @@
+# ToolAnnotations / Tool field probe — captured 2026-09-11T11:31:52-04:00 on debian, mcp 2.2.0
+>>> ToolAnnotations(destructiveHint=True).destructive_hint
+True
+>>> ToolAnnotations(destructiveHint=True).destructiveHint
+AttributeError: 'ToolAnnotations' object has no attribute 'destructiveHint'
+>>> Tool(...).inputSchema
+AttributeError: 'Tool' object has no attribute 'inputSchema'
+>>> Tool(...).model_dump(exclude_none=True)
+{'name': 'x', 'input_schema': {'type': 'object'}}
+>>> Tool(...).model_dump(by_alias=True, exclude_none=True)
+{'name': 'x', 'inputSchema': {'type': 'object'}}

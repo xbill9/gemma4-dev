@@ -1,0 +1,40 @@
+# g5g suite after the rename only, tests untouched — captured 2026-09-11T11:28:48-04:00 on debian, mcp 2.2.0
+$ python3 -m unittest discover -s tests
+.............F.E.E.........
+======================================================================
+ERROR: test_annotations (test_server.ToolCatalogTests.test_annotations)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xbill/gemma4-dev/gpu-vllm-g5g-2b/tests/test_server.py", line 43, in test_annotations
+    name for name, tool in self.tools.items() if tool.annotations.destructiveHint
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.pyenv/versions/3.14.7/lib/python3.14/site-packages/pydantic/main.py", line 1042, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'ToolAnnotations' object has no attribute 'destructiveHint'. Did you mean: 'destructive_hint'?
+======================================================================
+ERROR: test_launch_defaults_to_spot_and_build (test_server.ToolCatalogTests.test_launch_defaults_to_spot_and_build)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xbill/gemma4-dev/gpu-vllm-g5g-2b/tests/test_server.py", line 53, in test_launch_defaults_to_spot_and_build
+    schema = self.tools[name].inputSchema["properties"]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.pyenv/versions/3.14.7/lib/python3.14/site-packages/pydantic/main.py", line 1042, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'Tool' object has no attribute 'inputSchema'. Did you mean: 'input_schema'?
+======================================================================
+FAIL: test_skill_is_complete_in_both_copies (test_server.RepoHygieneTests.test_skill_is_complete_in_both_copies)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/xbill/gemma4-dev/gpu-vllm-g5g-2b/tests/test_server.py", line 244, in test_skill_is_complete_in_both_copies
+    self.assertTrue(
+    ~~~~~~~~~~~~~~~^
+        filecmp.cmp(ROOT / source, ROOT / prefix / "mcp" / source, shallow=False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        f"{prefix}/mcp/{source} is stale — run `make skill`",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+AssertionError: False is not true : .claude/skills/gpu-vllm-g5g-2b-management/mcp/server.py is stale — run `make skill`
+----------------------------------------------------------------------
+Ran 27 tests in 0.012s
+FAILED (failures=1, errors=2)
