@@ -1,0 +1,19 @@
+More Claude Code adventures.
+What does it actually take to move a Python MCP server to the MCP SDK 2.x?
+
+The MCP Python SDK 2.x renamed FastMCP to MCPServer. An unpinned requirements.txt picks it up on the next pip install, and the server dies on import before the MCP handshake.
+
+On Cloud Run the whole fix was one import and one class name. On an AWS EC2 server built on boto3, the server survived the rename and the tests broke: v2 reads protocol fields in snake_case, so destructiveHint became destructive_hint, in the very test that guards EC2 terminate.
+
+What did not change is the wire. tools/list still sends inputSchema and destructiveHint, so clients see nothing different, and boto3 was already off the event loop.
+
+The catch is a shared Python. Upgrading mcp moves every server on it at once, and 37 of mine still import FastMCP.
+
+Write ups are here: the Cloud Run migration on dev.to (Google Developer Experts) and Medium, the AWS EC2 one on dev.to (AWS Community Builders) and AWS Builder Center.
+
+dev.to (Google Developer Experts): https://dev.to/gde/fastmcp-is-now-mcpserver-migrating-a-python-mcp-server-to-the-mcp-sdk-2x-2nhj
+dev.to (AWS Community Builders): PENDING
+AWS Builder Center: PENDING
+Medium: PENDING
+
+#mcp #python #aws #claudecode
