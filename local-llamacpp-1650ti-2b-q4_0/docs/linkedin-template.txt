@@ -1,0 +1,15 @@
+{hook}
+
+I ran Gemma 4 E2B on a Lenovo Yoga 9 that has been on sale since January 2021, with a 4 GB GTX 1650 Ti, and managed it from Claude Code through a Python MCP server.
+
+In bfloat16 the model is 9.5 GiB of weights. Even int8 would not fit the card. Google's quantization-aware-trained checkpoint does: a 3.35 GB GGUF, of which only 1.31 GiB ever has to be on the GPU, because llama.cpp leaves the largest tensor in host memory.
+
+It loaded in 1618 MiB of 4096 and decodes at 73.75 tok/s on a GPU with no tensor cores.
+
+Quantizing further was a loss. A q8_0 KV cache cost 11-12% of decode speed, because QAT had already taken the memory pressure away.
+
+Write ups are here:
+
+{links}
+
+#gemma #llamacpp #mcp #claudecode
