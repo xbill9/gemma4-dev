@@ -46,7 +46,7 @@ import os
 import time
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
 try:
@@ -73,7 +73,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(RIG_NAME)
 
 MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
-mcp = FastMCP(MCP_SERVER_NAME)
+mcp = MCPServer(MCP_SERVER_NAME)
 READ_ONLY = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
 WRITE = ToolAnnotations(destructiveHint=False)
 DESTRUCTIVE = ToolAnnotations(destructiveHint=True)

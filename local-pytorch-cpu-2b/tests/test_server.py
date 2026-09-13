@@ -13,7 +13,7 @@ RIG_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RIG_DIR))
 
 
-class _FakeFastMCP:
+class _FakeMCPServer:
     def __init__(self, name):
         self.name = name
 
@@ -30,10 +30,10 @@ class _FakeFastMCP:
 
 
 _m = MagicMock()
-_m.FastMCP = _FakeFastMCP
+_m.MCPServer = _FakeMCPServer
 sys.modules["mcp"] = MagicMock()
 sys.modules["mcp.server"] = MagicMock()
-sys.modules["mcp.server.fastmcp"] = _m
+sys.modules["mcp.server.mcpserver"] = _m
 
 import server  # noqa: E402
 

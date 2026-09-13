@@ -42,34 +42,34 @@ class ToolCatalogTests(unittest.TestCase):
 
     def test_destructive_hints_match_expected_set(self):
         destructive = {
-            name for name, t in self.tools.items() if t.annotations.destructiveHint
+            name for name, t in self.tools.items() if t.annotations.destructive_hint
         }
         self.assertEqual(destructive, EXPECTED_DESTRUCTIVE)
 
     def test_read_only_tools_never_marked_destructive(self):
         for name, t in self.tools.items():
-            if t.annotations.readOnlyHint:
+            if t.annotations.read_only_hint:
                 self.assertFalse(
-                    t.annotations.destructiveHint,
+                    t.annotations.destructive_hint,
                     f"{name} is both readOnly and destructive",
                 )
 
     def test_action_and_type_enums_in_schema(self):
-        props = self.tools["manage_vllm_docker"].inputSchema["properties"]
+        props = self.tools["manage_vllm_docker"].input_schema["properties"]
         self.assertEqual(
             props["action"]["enum"], ["start", "stop", "restart", "status", "log", "rm"]
         )
         self.assertEqual(
-            self.tools["estimate_deployment_cost"].inputSchema["properties"]["tpu_type"]["enum"],
+            self.tools["estimate_deployment_cost"].input_schema["properties"]["tpu_type"]["enum"],
             ["v6e", "v5e", "v5p"],
         )
         for name in ("create_tpu_vm_instance", "find_tpu_vm"):
-            workload = self.tools[name].inputSchema["properties"]["workload"]
+            workload = self.tools[name].input_schema["properties"]["workload"]
             self.assertEqual(workload["enum"], ["vllm", "pytorch"], name)
 
     def test_log_tails_are_bounded(self):
         for name in ("get_vllm_docker_logs", "get_tpu_system_logs", "get_tpu_vm_serial_log"):
-            tail = self.tools[name].inputSchema["properties"]["tail"]
+            tail = self.tools[name].input_schema["properties"]["tail"]
             self.assertIn("maximum", tail, f"{name}.tail has no upper bound")
 
 

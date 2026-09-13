@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-file MCP server (`server.py`, FastMCP) that serves Gemma 4 (`google/gemma-4-E2B-it`) with vLLM on one
+A single-file MCP server (`server.py`, MCPServer) that serves Gemma 4 (`google/gemma-4-E2B-it`) with vLLM on one
 Google Cloud TPU **v6e-1 (Trillium)** chip — provisioned as a **Compute Engine instance**, not a Cloud TPU API
 Queued Resource. Its tools shell out to `gcloud compute instances` and talk HTTP to the vLLM
 OpenAI-compatible endpoint on port 8000.
@@ -332,7 +332,7 @@ throughout — keep new code on the chat endpoint.
 ## Names derive from the rig directory
 
 `RIG_NAME` is `os.path.basename(...)` of this directory. `INSTANCE_NAME` defaults to it and is the default
-name of every MCP tool; `MCP_SERVER_NAME` defaults to it and names the FastMCP server; the Makefile's
+name of every MCP tool; `MCP_SERVER_NAME` defaults to it and names the MCP server (`MCPServer`); the Makefile's
 `SERVICE_NAME` is `$(notdir $(CURDIR))`. All resolve to `gce-vllm-v6e1-2b`.
 
 `RESOURCE_ID` is kept as a back-compat alias of `INSTANCE_NAME` because the forked tool signatures spell it
@@ -342,8 +342,8 @@ The MCP server name has to match the key the client registers it under, because 
 tool: `mcp__gce-vllm-v6e1-2b__find_tpu`. That is what distinguishes this rig's tools from the TPU-API twin's
 `mcp__tpu-vllm-v6e1-2b__…`, and with both loaded the prefix is the *only* thing that does.
 
-`load_dotenv` runs *before* `FastMCP(...)` is constructed, because `MCP_SERVER_NAME` set in `tpu.env` would
-otherwise arrive too late to name the server. Don't move the FastMCP construction back above the dotenv
+`load_dotenv` runs *before* `MCPServer(...)` is constructed, because `MCP_SERVER_NAME` set in `tpu.env` would
+otherwise arrive too late to name the server. Don't move the MCPServer construction back above the dotenv
 block.
 
 **Renaming the rig directory orphans anything already provisioned** — pin `INSTANCE_NAME` in `tpu.env`

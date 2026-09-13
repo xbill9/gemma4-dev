@@ -17,7 +17,7 @@ verify health, benchmark, and tear down. Two ways to act:
 
 ## Bundled files
 
-- `mcp/server.py` — the FastMCP DevOps agent (snapshot of the repo-root `server.py`;
+- `mcp/server.py` — the MCPServer DevOps agent (snapshot of the repo-root `server.py`;
   the live copy at the repo root is authoritative if the two differ).
 - `mcp/project-setup.sh` — one-command installer: copies this skill into a target project and
   registers the MCP server (see "Registering the MCP server").

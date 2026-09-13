@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-file MCP server (`server.py`, FastMCP) that acts as a devops agent for serving Gemma 4
+A single-file MCP server (`server.py`, MCPServer) that acts as a devops agent for serving Gemma 4
 (`google/gemma-4-E2B-it`) with vLLM on a Google Cloud TPU v6e-1 (Trillium) Flex-start Queued Resource. Its tools shell
 out to `gcloud` and talk HTTP to the vLLM OpenAI-compatible endpoint on port 8000. This rig is used for
 **live demos** — prefer changes that keep the demo working over broad refactors.
@@ -102,7 +102,7 @@ tool.
 `os.path.basename(...)` of the rig directory; `RESOURCE_ID` defaults to it and is the default `resource_id`
 of every MCP tool, and the Makefile's `SERVICE_NAME` is `$(notdir $(CURDIR))`. So in this directory both
 resolve to `tpu-vllm-v6e1-2b`. `RIG_NAME` also supplies the default `MCP_SERVER_NAME`, which names the
-FastMCP server. Nothing here reads a *slot* out of
+MCP server (`MCPServer`). Nothing here reads a *slot* out of
 the directory — that is still forbidden (`v6e1` never becomes a gcloud flag); it reads the whole name as an
 identifier, which is what keeps sibling rigs off each other's capacity in a shared project and zone.
 
@@ -119,9 +119,9 @@ entirely (it has no committed `.mcp.json`). `mcp_config.json` is the committed e
 `make mcp-config` writes a real `.mcp.json` using `MCP_SERVER_NAME` (default `$(notdir $(CURDIR))`), merging
 into any existing file rather than replacing it. `.mcp.json` is gitignored at the monorepo root.
 
-Note the ordering constraint in `server.py`: `load_dotenv` now runs *before* `FastMCP(...)` is constructed,
+Note the ordering constraint in `server.py`: `load_dotenv` now runs *before* `MCPServer(...)` is constructed,
 because `MCP_SERVER_NAME` set in `tpu.env` would otherwise arrive too late to name the server. Don't move
-the FastMCP construction back above the dotenv block.
+the MCPServer construction back above the dotenv block.
 
 **The Makefile's TPU targets are still a separate, hand-provisioned path.** `make endpoint` / `status` /
 `benchmark` / `query` all `describe` a tpu-vm named `$(SERVICE_NAME)` = `tpu-vllm-v6e1-2b`, while the MCP

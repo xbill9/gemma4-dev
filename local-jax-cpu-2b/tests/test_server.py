@@ -149,7 +149,7 @@ class ToolCatalogTests(unittest.TestCase):
 
     def test_annotations(self):
         destructive = {
-            name for name, tool in self.tools.items() if tool.annotations.destructiveHint
+            name for name, tool in self.tools.items() if tool.annotations.destructive_hint
         }
         # Only stopping. There is nothing here whose loss is expensive: nothing
         # was built, and the warm compilations survive in a disk cache that is
@@ -166,7 +166,7 @@ class ToolCatalogTests(unittest.TestCase):
         # one here would be the clearest sign the fork was incomplete.
         for name, tool in self.tools.items():
             with self.subTest(tool=name):
-                self.assertNotIn("instance_id", tool.inputSchema.get("properties", {}))
+                self.assertNotIn("instance_id", tool.input_schema.get("properties", {}))
 
 
 class NoCloudControlPlaneTests(unittest.TestCase):

@@ -85,7 +85,7 @@ different silicon — which is why the hardware slot is `1650ti` and not
 
 ```
 tpu.env            source of truth — model, hardware, endpoint, serving flags
-server.py          FastMCP server: GPU/model info, start/stop, status, query
+server.py          MCP server (`MCPServer`): GPU/model info, start/stop, status, query
 inspect_gguf.py    re-derives the resident-vs-lazy split from the artifact
 Makefile           serve / status / query / info / test / lint
 tests/             offline unittest suite (11 tests)

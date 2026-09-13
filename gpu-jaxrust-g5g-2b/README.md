@@ -19,7 +19,7 @@ No PyTorch, no torch_xla, no vLLM. The engine is this repo's own Gemma 4 port
 (`jax_openai_server.py`), run under **systemd — not docker**. Replacing that Python with a
 Rust binary lowering to the same XLA is the entire point of the fork.
 
-The rig ships a single-file FastMCP server exposing a devops agent that provisions G5g
+The rig ships a single-file MCP server (`MCPServer`) exposing a devops agent that provisions G5g
 capacity with boto3, ships the serving payload over SSM, and does SRE diagnostics against the
 endpoint.
 

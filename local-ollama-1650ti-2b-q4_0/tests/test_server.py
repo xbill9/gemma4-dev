@@ -21,7 +21,7 @@ sys.path.insert(0, str(RIG_DIR))
 # awaited" — which reads as a broken server and is really a broken fake.
 
 
-class _FakeFastMCP:
+class _FakeMCPServer:
     def __init__(self, name):
         self.name = name
 
@@ -37,11 +37,11 @@ class _FakeFastMCP:
         raise AssertionError("mcp.run() must never be called from a test")
 
 
-_fastmcp_module = MagicMock()
-_fastmcp_module.FastMCP = _FakeFastMCP
+_mcpserver_module = MagicMock()
+_mcpserver_module.MCPServer = _FakeMCPServer
 sys.modules["mcp"] = MagicMock()
 sys.modules["mcp.server"] = MagicMock()
-sys.modules["mcp.server.fastmcp"] = _fastmcp_module
+sys.modules["mcp.server.mcpserver"] = _mcpserver_module
 
 import server  # noqa: E402
 

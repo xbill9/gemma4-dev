@@ -129,7 +129,7 @@ require an SSH key or an internet-wide port 22 rule. Instances are tagged
 ## Part 2 — Google Cloud TPU (`tpu-devops`, bundled skill)
 
 The bundled `tpu-management` skill (`.claude/skills/tpu-management/`) wraps
-the `tpu-devops` FastMCP agent covering the full TPU serving lifecycle:
+the `tpu-devops` MCPServer agent covering the full TPU serving lifecycle:
 
 - **Capacity discovery & provisioning:** sweep zones for available capacity
   (`find_tpu_vm` for flex-start VMs, `find_tpu` for queued resources), check

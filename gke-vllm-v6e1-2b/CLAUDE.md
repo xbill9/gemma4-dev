@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-file MCP server (`server.py`, FastMCP) that serves Gemma 4 (`google/gemma-4-E2B-it`) with vLLM on one
+A single-file MCP server (`server.py`, MCPServer) that serves Gemma 4 (`google/gemma-4-E2B-it`) with vLLM on one
 Google Cloud TPU **v6e-1 (Trillium)** chip, provisioned as a **GKE node pool** — not a Cloud TPU API Queued
 Resource, and not a Compute Engine instance either. Its tools shell out to `gcloud container` and `kubectl`,
 and talk HTTP to the vLLM OpenAI-compatible endpoint behind a Service on port 8000.
@@ -374,7 +374,7 @@ chat endpoint.
 
 `RIG_NAME` is `os.path.basename(...)` of this directory. `GKE_CLUSTER_NAME` defaults to it and names the
 cluster; `GKE_NODE_POOL` defaults to `tpu-v6e-1`; `MCP_SERVER_NAME` defaults to `RIG_NAME` and names the
-FastMCP server. All resolve under `gke-vllm-v6e1-2b`.
+MCP server (`MCPServer`). All resolve under `gke-vllm-v6e1-2b`.
 
 `INSTANCE_NAME` survives only as the tpu.env-compatible default the cluster name derives from — **nothing
 here provisions an instance**, and the `RESOURCE_ID` alias the forked tool signatures used is gone with them.
@@ -384,8 +384,8 @@ tool: `mcp__gke-vllm-v6e1-2b__find_tpu`. That is what distinguishes this rig's t
 `mcp__tpu-vllm-v6e1-2b__…` and the Compute Engine twin's `mcp__gce-vllm-v6e1-2b__…`; with all three loaded the
 prefix is the *only* thing that does.
 
-`load_dotenv` runs *before* `FastMCP(...)` is constructed, because `MCP_SERVER_NAME` set in `tpu.env` would
-otherwise arrive too late to name the server. Don't move the FastMCP construction back above the dotenv
+`load_dotenv` runs *before* `MCPServer(...)` is constructed, because `MCP_SERVER_NAME` set in `tpu.env` would
+otherwise arrive too late to name the server. Don't move the MCPServer construction back above the dotenv
 block.
 
 **Renaming the rig directory orphans anything already provisioned** — pin `GKE_CLUSTER_NAME` in `tpu.env`

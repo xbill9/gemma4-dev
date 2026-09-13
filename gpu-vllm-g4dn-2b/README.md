@@ -3,7 +3,7 @@
 Serve **`google/gemma-4-E2B-it`** with **vLLM** on **AWS EC2 G4dn** — an x86_64 (Intel) host
 paired with an **NVIDIA T4 Tensor Core** GPU (Turing, SM 7.5).
 
-The rig ships a single-file FastMCP server exposing a devops agent that provisions G4dn
+The rig ships a single-file MCP server (`MCPServer`) exposing a devops agent that provisions G4dn
 capacity with boto3, brings up the model server, and does SRE diagnostics against the
 endpoint.
 

@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project Overview
 
-This repository packages one Claude Code skill (`tpu-vllm-v6e8-2b-management`) and one **Model Context Protocol (MCP) server** (`tpu-vllm-v6e8-2b`, a FastMCP app in `server.py`). Together they:
+This repository packages one Claude Code skill (`tpu-vllm-v6e8-2b-management`) and one **Model Context Protocol (MCP) server** (`tpu-vllm-v6e8-2b`, an MCPServer app in `server.py`). Together they:
 
 1. **Operate TPU infrastructure:** find, provision, and destroy Google Cloud TPU capacity (flex-start VMs, queued resources) and run Gemma 4 vLLM serving on it.
 2. **Do SRE diagnostics:** verify model health, fetch vLLM/system/Cloud Logging logs, and use the self-hosted Gemma 4 model to triage them (`analyze_cloud_logging`).

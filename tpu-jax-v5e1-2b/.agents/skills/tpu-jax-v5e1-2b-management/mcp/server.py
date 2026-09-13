@@ -14,7 +14,7 @@ from typing import Annotated, Literal, Optional
 
 import httpx
 from google.cloud import secretmanager
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from openai import AsyncOpenAI
 from pydantic import Field
@@ -25,9 +25,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("vllm-devops-agent")
 
-# Initialize FastMCP server. The name stays generic — model and topology come
+# Initialize MCPServer server. The name stays generic — model and topology come
 # from env vars, so they don't belong in the server identity.
-mcp = FastMCP(os.getenv("MCP_SERVER_NAME", "tpu-jax-v5e1-2b"))
+mcp = MCPServer(os.getenv("MCP_SERVER_NAME", "tpu-jax-v5e1-2b"))
 
 # Annotation presets — hints that let clients (e.g. permission layers) auto-allow
 # reads and require confirmation before destructive calls.

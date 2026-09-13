@@ -5,7 +5,7 @@ AWS Inferentia2, and NVIDIA GPUs.
 
 Each rig is a self-contained project that serves one Gemma 4 checkpoint on one hardware shape through one
 runtime. A serving rig ships the same shape of thing: a single-file [MCP](https://modelcontextprotocol.io)
-server (`server.py`, built on FastMCP) exposing a devops agent that provisions capacity, starts a model
+server (`server.py`, built on MCPServer) exposing a devops agent that provisions capacity, starts a model
 server on it, and does SRE diagnostics against the running endpoint. A handful of **artifact rigs** carry
 only measurements — see the second table below.
 

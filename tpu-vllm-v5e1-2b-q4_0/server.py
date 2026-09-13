@@ -11,7 +11,7 @@ from typing import NamedTuple, Optional
 
 import httpx
 from google.cloud import secretmanager
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from openai import AsyncOpenAI
 
 # Setup logging
@@ -32,7 +32,7 @@ logger = logging.getLogger(RIG_NAME)
 # not overwrite variables that are already set, so a real environment variable (or an
 # MCP client's env block) still wins over the file.
 #
-# This has to run before FastMCP is constructed: MCP_SERVER_NAME is read below, and a value
+# This has to run before MCPServer is constructed: MCP_SERVER_NAME is read below, and a value
 # set in tpu.env would otherwise arrive too late to name the server.
 try:
     from dotenv import load_dotenv
@@ -49,8 +49,8 @@ except Exception as e:  # python-dotenv missing or unreadable file — fall back
 # has already registered this server under something else.
 MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
 
-# Initialize FastMCP server
-mcp = FastMCP(MCP_SERVER_NAME)
+# Initialize MCPServer server
+mcp = MCPServer(MCP_SERVER_NAME)
 
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "aisprint-491218")
 ZONE = os.getenv("GOOGLE_CLOUD_ZONE", "us-west4-a")

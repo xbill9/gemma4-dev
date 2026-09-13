@@ -5,7 +5,7 @@ Guidance for Codex and other coding agents working in this directory.
 ## Project overview
 
 This is a live-demo DevOps/SRE agent for serving `google/gemma-4-E2B-it` with vLLM on a Google Cloud TPU
-v5e-1 Flex-start Queued Resource. The main application is a single-file FastMCP server in `server.py`. Its
+v5e-1 Flex-start Queued Resource. The main application is a single-file MCP server (`MCPServer`) in `server.py`. Its
 tools invoke `gcloud`, inspect Google Cloud resources and logs, manage the remote vLLM container, and call the
 OpenAI-compatible inference API on port 8000.
 
@@ -25,7 +25,7 @@ make query PROMPT="Your question"    # query the deployed model
 ```
 
 Run the narrowest useful check while developing, then run `make test` and `make lint` when the change warrants
-the full suite. Tests mock FastMCP and Google Cloud dependencies before importing `server.py`; keep unit tests
+the full suite. Tests mock MCPServer and Google Cloud dependencies before importing `server.py`; keep unit tests
 offline and mock cloud, subprocess, and network boundaries.
 
 ## Source of truth

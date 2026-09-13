@@ -14,7 +14,7 @@ from typing import Annotated, Literal, Optional
 
 import httpx
 from google.cloud import secretmanager
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from openai import AsyncOpenAI
 from pydantic import Field
@@ -33,13 +33,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(RIG_NAME)
 
-# Initialize FastMCP server. The name has to match the key the client registers this
+# Initialize MCPServer server. The name has to match the key the client registers this
 # server under, because that key prefixes every tool — mcp__<key>__find_tpu. Every
 # sibling rig used to answer to "tpu-devops", so with more than one registered you could
 # not tell which rig a tool call would reach. It now defaults to the rig directory name;
 # MCP_SERVER_NAME overrides it, and project-setup.sh passes the key it registered.
 MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
-mcp = FastMCP(MCP_SERVER_NAME)
+mcp = MCPServer(MCP_SERVER_NAME)
 
 # Annotation presets — hints that let clients (e.g. permission layers) auto-allow
 # reads and require confirmation before destructive calls.

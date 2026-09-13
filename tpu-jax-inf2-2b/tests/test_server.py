@@ -34,7 +34,7 @@ class ToolCatalogTests(unittest.TestCase):
     def test_annotations(self):
         destructive = {
             name for name, tool in self.tools.items()
-            if tool.annotations.destructiveHint
+            if tool.annotations.destructive_hint
         }
         self.assertEqual(
             destructive, {"stop_inf2_instance", "terminate_inf2_instance"}
@@ -45,7 +45,7 @@ class ToolCatalogTests(unittest.TestCase):
             self.assertIsNotNone(tool.annotations, name)
 
     def test_log_tail_is_bounded(self):
-        tail = self.tools["get_vllm_logs"].inputSchema["properties"]["tail"]
+        tail = self.tools["get_vllm_logs"].input_schema["properties"]["tail"]
         self.assertEqual(tail["minimum"], 1)
         self.assertEqual(tail["maximum"], 5000)
 
@@ -98,7 +98,7 @@ class Inf2HelpersTests(unittest.TestCase):
     def test_launch_defaults_to_spot(self):
         tools = {tool.name: tool for tool in run(server.mcp.list_tools())}
         for name in ("create_inf2_instance", "get_deployment_config"):
-            schema = tools[name].inputSchema["properties"]
+            schema = tools[name].input_schema["properties"]
             self.assertTrue(schema["spot"]["default"], name)
             self.assertEqual(schema["serving"]["enum"], ["vllm", "optb"], name)
 

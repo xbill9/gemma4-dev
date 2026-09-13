@@ -95,7 +95,7 @@ class ToolCatalogTests(unittest.TestCase):
 
     def test_annotations(self):
         destructive = {
-            name for name, tool in self.tools.items() if tool.annotations.destructiveHint
+            name for name, tool in self.tools.items() if tool.annotations.destructive_hint
         }
         self.assertEqual(destructive, {"stop_g6_instance", "terminate_g6_instance"})
         for name, tool in self.tools.items():
@@ -107,7 +107,7 @@ class ToolCatalogTests(unittest.TestCase):
     def test_launch_defaults_to_spot(self):
         for name in ("create_g6_instance", "get_deployment_config"):
             with self.subTest(tool=name):
-                schema = self.tools[name].inputSchema["properties"]
+                schema = self.tools[name].input_schema["properties"]
                 self.assertTrue(schema["spot"]["default"])
                 # There is no `serving` mode here: nothing is built, so there is
                 # no stock-vs-build choice the vLLM sibling has to offer.

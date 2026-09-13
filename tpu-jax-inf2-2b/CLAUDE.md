@@ -1,7 +1,7 @@
 # CLAUDE.md — AWS Inferentia2 + TPU PyTorch DevOps MCP
 
 This repository packages the `tpu-pytorch-inf2-2b-management` Claude Code skill and the
-`tpu-pytorch-inf2-2b` FastMCP server for AWS EC2 Inf2 instances, plus a bundled copy
+`tpu-pytorch-inf2-2b` MCP server (`MCPServer`) for AWS EC2 Inf2 instances, plus a bundled copy
 of the `tpu-management` skill / `tpu-devops` MCP agent for Google Cloud TPUs
 (authoritative home: the `tpu-skill-claude` repo).
 

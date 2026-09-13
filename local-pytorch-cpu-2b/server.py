@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 RIG_DIR = Path(__file__).resolve().parent
 load_dotenv(RIG_DIR / "tpu.env")
@@ -57,7 +57,7 @@ TORCH_NUM_THREADS = int(os.environ.get("TORCH_NUM_THREADS", "6"))
 MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "1024"))
 
 GIB = 1024 ** 3
-mcp = FastMCP(MCP_SERVER_NAME)
+mcp = MCPServer(MCP_SERVER_NAME)
 
 # The loaded model, held for the life of the process. Loading is ~3 s off a warm
 # page cache, so this is a convenience rather than the necessity it is on a rig

@@ -84,7 +84,7 @@ Because installs are refresh-and-copy (not symlinks), an installed copy goes sta
 
 | Path | Purpose |
 | :--- | :--- |
-| `server.py` | The `gce-pytorch-v6e1-2b` FastMCP server — the authoritative source (full tool catalog in `SKILL.md` / the `get_help` tool) |
+| `server.py` | The `gce-pytorch-v6e1-2b` MCP server (`MCPServer`) — the authoritative source (full tool catalog in `SKILL.md` / the `get_help` tool) |
 | `project-setup.sh` | One-command installer: skill + MCP registration for a target project |
 | `refresh_skill.py` | Regenerates the bundled skill snapshots from the repo-root sources |
 | `requirements.txt` | Python dependencies for the MCP server |

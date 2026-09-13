@@ -25,7 +25,7 @@ The MCP server expects a running vLLM instance. Your TPU deployment for the mode
 
 ### 2. Software & API Dependencies
 The agent relies on several Google Cloud services and Python libraries:
-*   **Libraries:** `mcp` (FastMCP ships inside it), `google-cloud-logging`, `google-cloud-secret-manager`, `openai`, and `httpx`.
+*   **Libraries:** `mcp` (`MCPServer` ships inside it; v1 called it FastMCP), `google-cloud-logging`, `google-cloud-secret-manager`, `openai`, and `httpx`.
 *   **Permissions:** The service account running the agent needs:
     *   `logging.logEntries.list` (to read logs).
     *   `tpu.nodes.get` and `tpu.nodes.list` (for discovery).

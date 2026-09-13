@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A monorepo of **accelerator rigs** for serving Gemma 4. Each rig serves one checkpoint on one hardware shape through one runtime, and ships a single-file FastMCP server (`server.py`) exposing a devops agent that provisions capacity via `gcloud`, starts the model server, and does SRE diagnostics against the endpoint.
+A monorepo of **accelerator rigs** for serving Gemma 4. Each rig serves one checkpoint on one hardware shape through one runtime, and ships a single-file MCP server (`server.py`, built on `MCPServer`) exposing a devops agent that provisions capacity via `gcloud`, starts the model server, and does SRE diagnostics against the endpoint.
 
 **A rig's MCP server is named after its directory**, and that name is the key it is registered under, so it prefixes every tool: `mcp__tpu-vllm-v5e1-2b__find_tpu`. Every rig used to register as `tpu-devops`, so with two loaded you could not tell which rig a call would reach — and a user-scope `tpu-devops` silently shadowed any rig with no `.mcp.json`. The default is derived (`RIG_NAME` in the vLLM rig, a literal matching the directory elsewhere); `MCP_SERVER_NAME` overrides it, and `project-setup.sh --server-name` sets both the registered key and what the server advertises. Registration lives in four places per rig — `.mcp.json`, `.claude-plugin/plugin.json`, `.codex/config.toml`, and `.claude/settings.local.json`'s `enabledMcpjsonServers` — keep them agreeing.
 

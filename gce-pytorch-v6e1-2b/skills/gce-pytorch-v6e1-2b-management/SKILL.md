@@ -1,12 +1,12 @@
 ---
 name: gce-pytorch-v6e1-2b-management
-description: Manage Google Cloud TPU capacity and Gemma 4 vLLM serving on TPU VMs. Use when the user asks about provisioning, finding, listing, or destroying TPUs / queued resources / flex-start VMs, starting or debugging vLLM on TPU (v6e, v5p, v5e), TPU quotas and zones, TPU cost estimates, benchmarking TPU serving, or the TPU devops MCP agent. Triggers include "TPU", "queued resource", "flex-start", "v6e", "vLLM on TPU", "TPU quota".
+description: Manage Compute Engine TPU capacity and Gemma 4 on PyTorch/XLA for the gce-pytorch-v6e1-2b rig. Use when the user asks about provisioning, finding, listing, or destroying flex-start TPU VMs on Compute Engine, installing or debugging PyTorch/XLA on TPU (v6e), profiling with xprof/tensorboard, TPU quotas and zones, TPU cost estimates, benchmarking TPU serving, or this rig's devops MCP agent. Triggers include "TPU", "flex-start", "v6e", "torch_xla", "PyTorch on TPU", "xprof", "TPU quota".
 ---
 
-# TPU Management
+# TPU Management — gce-pytorch-v6e1-2b
 
-Operate Google Cloud TPU serving infrastructure for Gemma 4: acquire capacity, run vLLM,
-verify health, benchmark, and tear down. Two ways to act:
+Operate Google Cloud TPU serving infrastructure for Gemma 4: acquire capacity, run the
+model, verify health, benchmark, and tear down. Two ways to act:
 
 1. **Preferred — MCP agent tools.** If the `gce-pytorch-v6e1-2b` MCP server is
    connected in this session, use its tools (catalog below). They wrap the correct
@@ -17,7 +17,7 @@ verify health, benchmark, and tear down. Two ways to act:
 
 ## Bundled files
 
-- `mcp/server.py` — the FastMCP DevOps agent (snapshot of the repo-root `server.py`;
+- `mcp/server.py` — the MCPServer DevOps agent (snapshot of the repo-root `server.py`;
   the live copy at the repo root is authoritative if the two differ).
 - `mcp/project-setup.sh` — one-command installer: copies this skill into a target project and
   registers the MCP server (see "Registering the MCP server").
@@ -65,15 +65,47 @@ the active gcloud config), `GOOGLE_CLOUD_ZONE` (default `europe-west4-a`),
 A Hugging Face token must exist as Secret Manager secret `hf-token` (save one with the
 `save_hf_token` tool) before any resource creation.
 
+## This rig's two defining choices
+
+**Capacity comes from Compute Engine, not the Cloud TPU API.** `gcloud compute instances
+create --machine-type=ct6e-standard-1t --provisioning-model=FLEX_START`. The
+queued-resource tools are still registered and still work — a project can hold capacity on
+both planes at once — but they are not this rig's path, and `discover_vllm_url()` (which
+walks ACTIVE queued resources) returns `None` here no matter how healthy the VM is. Resolve
+the endpoint with `get_tpu_vm_endpoint(instance_name)` instead.
+
+**`workload="pytorch"` installs one of two mutually exclusive torch stacks**, chosen by
+whether `TPU_BACKEND_INDEX` is set:
+
+| `TPU_BACKEND_INDEX` | Stack | torch device | Credentials |
+| --- | --- | --- | --- |
+| unset (**default**) | public `torch` + `torch_xla[tpu]` from PyPI | `xla` | none |
+| set | the private operator-supplied backend | `tpu` | Artifact Registry reader, or a GCS wheel mirror |
+
+Installing torch_xla is what registers the `xla` device; installing the private backend is
+what registers `tpu`. Never import the private backend package in code. The smoke test at
+`/opt/tpu_smoke.py` and the benchmark harness both read `TORCH_DEVICE` from
+`/etc/environment` rather than hardcoding one.
+
+The boot also installs the profiling kit — `xprof`, `tensorboard` **and**
+`tensorboard-plugin-profile`, all three of which are needed for a trace to be viewable —
+and stages the checkpoint so a benchmark measures serving rather than a download. Traces
+land in `/opt/profiles`.
+
 ## Standard lifecycle
 
 1. **Status first.** `get_system_status` (dashboard) or `list_queued_resources` /
    `find_gpu`. Never create before checking what already exists.
 2. **Acquire capacity.**
-   - Preferred (v6e/v5p): `create_tpu_vm_instance` — GCE flex-start VM with vLLM
-     auto-start — or `find_tpu_vm` to sweep zones until one grants capacity (family
-     quota is only discoverable by attempting creation). Then `wait_for_vllm_ready`
-     polls until serving is up; `get_tpu_vm_serial_log` for manual watching.
+   - **This rig's path:** `create_tpu_vm_instance(workload="pytorch")` — GCE flex-start
+     VM that installs the torch stack, the profiling kit and the checkpoint — or
+     `find_tpu_vm` to sweep zones until one grants capacity (family quota is only
+     discoverable by attempting creation). Then `wait_for_pytorch_ready` polls for the
+     `TPU environment ready.` marker; `get_tpu_vm_serial_log` for manual watching, and
+     `verify_pytorch_tpu` to confirm torch actually sees the chip.
+   - `workload="vllm"` on the same tool serves through Docker instead and waits on
+     `wait_for_vllm_ready`. It works, but a number measured that way is a **vLLM** result
+     and belongs in a `*-vllm-*` rig's benchmarks, not this one's.
    - Known zone, legacy API: `create_tpu_queued_resource` (non-destructive; skips if
      the resource already exists) or `manage_queued_resource` (destructive — deletes
      every other queued resource in the zone). Flex-start by default: 4h max-run;
@@ -81,7 +113,7 @@ A Hugging Face token must exist as Secret Manager secret `hf-token` (save one wi
    - Unknown zone: `get_zones_with_available_quota`, or `find_tpu` which sweeps every
      zone with quota, polls until ACTIVE (3 min, extended to 10 min once PROVISIONING),
      and cleans up failures. It skips zones previously marked failed in
-     `~/.cache/tpu-devops/tpu_zones_status.md`.
+     `~/.cache/gce-pytorch-v6e1-2b/tpu_zones_status.md`.
 3. **Wait for ACTIVE.** `describe_queued_resource`.
    Queued resources move QUEUED → PROVISIONING → ACTIVE; FAILED/SUSPENDED means
    delete and retry (the manage tool does this automatically).
@@ -105,9 +137,10 @@ A Hugging Face token must exist as Secret Manager secret `hf-token` (save one wi
    metrics as a `throughput.sweep[]` entry for the repo's benchmark report format
    (`benchmarks/serving-report.schema.json`) — use it once per concurrency level
    when building a report.
-7. **Tear down.** `destroy_queued_resource`. Flex-start bills until deletion and
-   cannot be paused — always confirm teardown of idle resources with the user, and
-   remind them a flex-start resource left running expires at max-run-duration.
+7. **Tear down.** `destroy_tpu_vm_instance` on this rig's GCE path
+   (`destroy_queued_resource` is for the legacy plane). Flex-start bills until deletion
+   and cannot be paused — always confirm teardown of idle resources with the user, and
+   remind them a flex-start VM left running self-deletes at max-run-duration.
 
 ## MCP tool catalog (by task)
 

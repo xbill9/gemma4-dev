@@ -17,7 +17,7 @@ This repository packages a Claude Code skill (`tpu-pytorch-v5e1-12b-management`)
 
 Key entrypoints in the codebase:
 
-- **MCP server source:** [server.py](server.py) — the authoritative `tpu-pytorch-v5e1-12b` FastMCP agent (full tool catalog in `SKILL.md` / the `get_help` tool)
+- **MCP server source:** [server.py](server.py) — the authoritative `tpu-pytorch-v5e1-12b` MCPServer agent (full tool catalog in `SKILL.md` / the `get_help` tool)
 - **Skill definition:** [.claude/skills/tpu-pytorch-v5e1-12b-management/SKILL.md](.claude/skills/tpu-pytorch-v5e1-12b-management/SKILL.md) — lifecycle, tool catalog, required vLLM flags, field notes
 - **Installer:** [project-setup.sh](project-setup.sh) — one-command skill install + MCP registration
 - **Root Makefile:** [Makefile](Makefile) — `skill` / `skill-install` / `skill-package` / `init` targets

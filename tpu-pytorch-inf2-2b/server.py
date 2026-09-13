@@ -14,7 +14,7 @@ import time
 from typing import Annotated, Literal
 
 import httpx
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from openai import AsyncOpenAI
 from pydantic import Field
@@ -49,7 +49,7 @@ logger = logging.getLogger(RIG_NAME)
 # defaults to the rig directory name; MCP_SERVER_NAME overrides it, and project-setup.sh
 # passes the key it registered.
 MCP_SERVER_NAME = os.getenv("MCP_SERVER_NAME", RIG_NAME)
-mcp = FastMCP(MCP_SERVER_NAME)
+mcp = MCPServer(MCP_SERVER_NAME)
 READ_ONLY = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
 WRITE = ToolAnnotations(destructiveHint=False)
 DESTRUCTIVE = ToolAnnotations(destructiveHint=True)

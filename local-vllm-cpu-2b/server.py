@@ -60,7 +60,7 @@ from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 RIG_DIR = Path(__file__).resolve().parent
 load_dotenv(RIG_DIR / "tpu.env")
@@ -90,7 +90,7 @@ PID_FILE = RUN_DIR / "vllm.pid"
 LOG_FILE = RUN_DIR / "vllm.log"
 
 GIB = 1024 ** 3
-mcp = FastMCP(MCP_SERVER_NAME)
+mcp = MCPServer(MCP_SERVER_NAME)
 
 
 async def run_command(cmd: list[str], timeout: int = 120) -> tuple[int, str, str]:

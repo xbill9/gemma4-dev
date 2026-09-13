@@ -7,7 +7,7 @@ Serve **`google/gemma-4-E2B-it`** with **pure JAX** on **AWS EC2 G5g** — an AW
 Gemma 4 port (`ports/gemma4/`) driven by `jax_engine.py` behind an OpenAI-compatible FastAPI
 server (`jax_openai_server.py`), run under **systemd — not docker**.
 
-The rig ships a single-file FastMCP server exposing a devops agent that provisions G5g
+The rig ships a single-file MCP server (`MCPServer`) exposing a devops agent that provisions G5g
 capacity with boto3, ships the serving payload over SSM, and does SRE diagnostics against the
 endpoint.
 

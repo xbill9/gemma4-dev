@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project Overview
 
-This repository packages one Claude Code skill (`gce-pytorch-v6e1-2b-management`) and one **Model Context Protocol (MCP) server** (`gce-pytorch-v6e1-2b`, a FastMCP app in `server.py`). Together they:
+This repository packages one Claude Code skill (`gce-pytorch-v6e1-2b-management`) and one **Model Context Protocol (MCP) server** (`gce-pytorch-v6e1-2b`, an MCPServer app in `server.py`). Together they:
 
 1. **Operate TPU infrastructure on Compute Engine:** find, provision, and destroy flex-start TPU VMs and run Gemma 4 on them.
 2. **Do SRE diagnostics:** verify model health, fetch serving/system/Cloud Logging logs, and triage them (`analyze_cloud_logging`).

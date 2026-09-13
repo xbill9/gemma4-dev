@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project Overview
 
-This repository packages one Claude Code skill (`tpu-jax-v5e1-2b-management`) and one **Model Context Protocol (MCP) server** (`tpu-jax-v5e1-2b`, a FastMCP app in `server.py`). Together they:
+This repository packages one Claude Code skill (`tpu-jax-v5e1-2b-management`) and one **Model Context Protocol (MCP) server** (`tpu-jax-v5e1-2b`, an MCPServer app in `server.py`). Together they:
 
 1. **Operate TPU infrastructure:** find, provision, and destroy Google Cloud TPU capacity (flex-start VMs, queued resources).
 2. **Serve Gemma 4 with pure JAX — the default path:** provision flex-start VMs with `workload="jax"` — the startup script installs a current CPython + `jax[tpu]` and asserts a TPU device is visible (`wait_for_jax_ready`, `verify_jax_tpu`). No docker, no HF token. `jax_openai_server.py` then serves the QAT checkpoint over an OpenAI-compatible API.

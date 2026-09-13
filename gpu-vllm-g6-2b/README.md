@@ -3,7 +3,7 @@
 Serve **`google/gemma-4-E2B-it`** with **vLLM** on **AWS EC2 G6** — an x86_64 host paired
 with an **NVIDIA L4 Tensor Core** GPU (Ada, SM 8.9).
 
-The rig ships a single-file FastMCP server exposing a devops agent that provisions G6
+The rig ships a single-file MCP server (`MCPServer`) exposing a devops agent that provisions G6
 capacity with boto3, brings up the model server, and does SRE diagnostics against the
 endpoint.
 

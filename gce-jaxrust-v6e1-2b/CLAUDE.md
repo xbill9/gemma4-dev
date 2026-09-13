@@ -5,7 +5,7 @@ Guidance for Claude Code when working in this repository.
 ## Project Overview
 
 This rig packages one Claude Code skill (`gce-jaxrust-v6e1-2b-management`) and one
-**Model Context Protocol (MCP) server** (`gce-jaxrust-v6e1-2b`, a FastMCP app in
+**Model Context Protocol (MCP) server** (`gce-jaxrust-v6e1-2b`, an MCPServer app in
 `server.py`). Together they:
 
 1. **Operate TPU infrastructure:** find, probe, provision, and destroy Google Cloud TPU
