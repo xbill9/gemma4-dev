@@ -1,7 +1,7 @@
 ---
 title: "A 4 GB Laptop GPU Beats a 12-Core CPU by 4.3x on Gemma 4"
 published: false
-description: "Serving Gemma 4 E2B q4_0 through llama.cpp on one laptop, twice: CPU-only and on a 2021-era 4 GB GTX 1650 Ti. Same GGUF, same binary, same prompts, one flag apart. The card wins decode by 4.3x, and getting the comparison honest took more work than running it."
+description: "Serving Gemma 4 E2B q4_0 through llama.cpp on one laptop, twice: CPU-only and on a 2021-era 4 GB GTX 1650 Ti. Same GGUF, same binary, same prompts, one flag apart. The card takes decode by 4.3x, and needs only 1598 MiB to do it."
 tags: machinelearning, gpu, benchmarking, python
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti/devto-cover.274ec661.jpg
 ---
@@ -12,10 +12,6 @@ The payload is byte-identical on both arms and the command lines differ by a
 single flag. The card takes decode by **4.3x**.
 
 The repository is at https://github.com/xbill9/gemma4-dev
-
-The interesting part is not the number. It is that the first three attempts at
-this comparison would have produced a plausible, wrong one, and nothing in any
-log would have said so.
 
 ## What Is Being Compared?
 
@@ -109,77 +105,33 @@ So the headline works because of the checkpoint's shape, not in spite of the
 card's size. A 4 GB GPU from 2021 is not too small for this model. It is roughly
 2.5x larger than it needs to be.
 
-## Why This Took Three Tries
+## What Was Controlled
 
-The two rigs were built as siblings months apart, and they had drifted in ways
-that only matter when you subtract one from the other.
+The two arms differ by one flag. Everything else was held equal deliberately,
+and checked rather than assumed:
 
-**The binaries were different.** The CPU rig recorded llama.cpp `82324fc50` and
-had no CPU build on disk at all; the GPU rig's binary was `95ef7fc`. Differencing
-those two puts an upstream delta inside what is supposed to be a device delta.
-Both were rebuilt from `c6824a9` for this run.
-
-**The flags were different.** The GPU rig had no `THREADS_BATCH` setting and
-therefore passed no `-tb`, while the CPU rig passed `-tb 8`. Prefill runs on the
-card, so the effect is probably small — but a control does not get to assume
-which of its differences are the harmless ones.
-
-**The prompts were different.** Each rig's sweep harness built its filler text
-out of a description of its own hardware. So `--contexts 512` produced two
-different prompts that tokenized to two different lengths, and the paired cells
-were not the same measurement. The filler is now device-neutral and the harness
-is byte-identical in both rigs. All eight cells in the table above paired on
-exactly equal input lengths — 94, 516, 998, 1959 — which is how you can tell.
-
-## The Failure That Does Not Announce Itself
-
-Both arms serve the same model on the same port. That is deliberate: the
-endpoint, the harness and the prompts stay fixed while the device changes
-underneath them.
-
-It also means **nothing in an HTTP response says which device produced it.** The
-sweep harness took its device label from a command-line argument. The status tool
-reported `✅ Serving` for whatever held port 8080. Restart into the other arm and
-forget, and you get a complete, plausible, correctly-formatted run labelled with
-the wrong hardware, and no error anywhere.
-
-So the arm is now read off the running process rather than asserted:
-
-| Source | Answers |
+| | How it was held |
 | --- | --- |
-| `/proc/<pid>/exe` | which binary is executing, not what the config says |
-| `/proc/<pid>/maps` | which ggml backends it has actually loaded |
-| `/proc/<pid>/cmdline` | the real `-ngl`, whatever any env file claims |
-| `/proc/<pid>/environ` | `CUDA_VISIBLE_DEVICES` as the child received it |
+| Engine | one llama.cpp commit, `c6824a9`, built twice — CPU build and CUDA build |
+| Binary identity | the SHA-256 of each running executable is recorded in its report |
+| Flags | identical apart from `-ngl`, including `-t 4 -tb 8` on both arms |
+| Prompts | one harness, byte-identical in both rigs, with device-neutral filler |
+| Prompt lengths | every paired cell matched exactly — 94, 516, 998 and 1959 tokens |
+| Endpoint | the same `127.0.0.1:8080`, one arm running at a time |
 
-`maps` rather than `ldd` matters: llama.cpp `dlopen`s its backends, so a CUDA
-backend can be absent from `ldd` output and present in the running process.
+That last row is the one worth dwelling on. Both arms serve the same
+model on the same port, so an HTTP response says nothing about which device
+produced it. **The device is therefore read from the running process rather than
+taken from a label** — `/proc/<pid>/exe` for the binary, `/proc/<pid>/maps` for
+the ggml backends actually loaded, `/proc/<pid>/cmdline` for the real `-ngl` —
+and that attestation is stamped into every report beside the numbers.
 
-The verdict requires two signals to agree — a GPU backend mapped in **and**
-layers assigned to it. Disagreement reports as `mixed` rather than rounding to
-either, because a CUDA build running `-ngl 0` computes on the CPU but is not a
-clean CPU arm: the device is initialised and llama.cpp can still move large
-prefill batches onto it. The CPU arm hides the device from the child entirely
-rather than trusting `-ngl 0`.
-
-Every report now carries the attestation, including the SHA-256 of the binary
-that ran. A commit is what you meant to build. The hash is what executed.
-
-## One Bug Found by Running It
-
-The CPU server died during model load every time it was started through the
-management tool, and came up fine under a plain `make serve`.
-
-The tool spawned it with `asyncio.create_subprocess_exec` and
-`start_new_session=True`. Asyncio's subprocess transport kills a live child when
-it is torn down — `BaseSubprocessTransport.__del__` calls `close()`, which calls
-`_proc.kill()` on a child that has not exited — and a new session does not
-prevent it. A spawned `sleep 60` is dead within a second of the interpreter
-exiting.
-
-That is very likely why both rigs documented "no pid file" as the *normal* state:
-the only code path that writes one could not leave a server behind.
-`subprocess.Popen` only warns when collected with a live child.
+`maps` rather than `ldd`, because llama.cpp `dlopen`s its backends: a CUDA
+backend can be absent from `ldd` output and present in the running process. The
+verdict needs a GPU backend mapped in **and** layers assigned to it, since a CUDA
+build running `-ngl 0` computes on the CPU but is not a clean CPU arm — the
+device is initialised and large prefill batches can still land on it. The CPU arm
+hides the device from the process entirely rather than trusting `-ngl 0`.
 
 ## What Was Not Controlled
 
@@ -205,9 +157,9 @@ Read the 4x as real and anything under about 7% as nothing.
 
 The goal of this article was to measure what a 4 GB laptop GPU is worth against a
 modern 12-core CPU for serving a small quantized model. The key to the solution
-was making the two arms genuinely identical — one binary, one prompt set, one
-flag apart — and then verifying from `/proc` that the process answering was the
-one being claimed. The results were:
+was a single-variable comparison: one llama.cpp commit, one prompt set, one flag
+apart, with the serving device read from `/proc` at run time and recorded beside
+every number. The results were:
 
 - GPU decode is **4.27x** the CPU arm, 4.04x to 4.34x across every cell
 - GPU prefill is **3.63x**, an upper bound, since the CPU arm was left unpinned
