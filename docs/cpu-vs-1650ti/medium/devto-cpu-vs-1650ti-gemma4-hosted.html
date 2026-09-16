@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>A 4 GB Laptop GPU Beats a 12-Core CPU by 4.3x on Gemma 4</title>
+  <meta name="description" content="Serving Gemma 4 E2B q4_0 through llama.cpp on one laptop, twice: CPU-only and on a 2021-era 4 GB GTX 1650 Ti. Same GGUF, same binary, same prompts, one flag apart. The card takes decode by 4.3x, and needs only 1598 MiB to do it." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti/medium/img/devto-cover.274ec661.jpg" alt="A 4 GB Laptop GPU Beats a 12-Core CPU by 4.3x on Gemma 4" /></figure>
+<p>This article compares two ways of serving the same small language
+model on the same laptop: CPU-only, and on the 4 GB GTX 1650 Ti sitting
+in the same chassis. The payload is byte-identical on both arms and the
+command lines differ by a single flag. The card takes decode by
+<strong>4.3x</strong>.</p>
+<p>The repository is at <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<h4 id="what-is-being-compared">What Is Being Compared?</h4>
+<p>One machine, a 13th Gen Intel Core i7-1360P laptop with a GTX 1650 Ti
+(Max-Q) in it. Two arms:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti/medium/img/devto-cpu-vs-1650ti-gemma4-table-1.png"
+alt="Table: CPU arm, GPU arm" /></p>
+<p>Everything else matches, and that is the whole exercise:</p>
+<pre><code>-m gemma-4-E2B_q4_0-it.gguf --host 127.0.0.1 --port 8080 \
+  -ngl {0|99} -c 8192 -ctk f16 -ctv f16 -fa 1 -t 4 -tb 8 --parallel 1 --metrics</code></pre>
+<p>The model is <code>google/gemma-4-E2B-it-qat-q4_0-gguf</code>, a 3.35
+GB quantization-aware GGUF. The two arms were run alternately against
+the same endpoint, CPU first, with a fixed 120 second cooldown between
+them.</p>
+<h4 id="the-result">The Result</h4>
+<p>Eight cells: four prompt lengths by two output lengths, three repeats
+each, concurrency 1. Decode is client-side inter-token rate measured off
+the SSE stream, which is the only decode statistic both arms can
+produce.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti/medium/img/devto-cpu-vs-1650ti-gemma4-table-2.png"
+alt="Table: in tok, out tok, CPU decode, GPU decode, 1, CPU TTFT ms, GPU TTFT ms, 1" /></p>
+<p>Medians over the eight cells: decode <strong>4.27x</strong>, prefill
+<strong>3.63x</strong>, end-to-end <strong>3.81x</strong>.</p>
+<h4 id="is-that-difference-real">Is That Difference Real?</h4>
+<p>Within-cell spread over three repeats was <strong>6.29%</strong>
+worst case on the CPU arm and <strong>0.84%</strong> on the GPU arm. The
+decode ratio spans 4.04x to 4.34x across every cell. The effect is an
+order of magnitude clear of the noise, which is the only reason it is
+worth reporting at all.</p>
+<h4 id="decode-is-flat-prefill-is-linear">Decode Is Flat, Prefill Is
+Linear</h4>
+<p>Look down the decode columns rather than across them.</p>
+<p>CPU decode moves from 17.61 to 15.66 tok/s. GPU decode moves from
+71.22 to 67.61. Across a <strong>21x range of prompt length</strong>, on
+both arms, decode barely moves. TTFT over the same range goes from 1143
+ms to 23926 ms on the CPU and 385 ms to 6522 ms on the GPU — linear in
+the prompt.</p>
+<p>That is the expected shape stated twice. Decode reads the whole model
+per token and is bandwidth-bound; prefill multiplies through the prompt
+and is compute-bound. An accelerator helps both, but it helps them for
+different reasons, and a benchmark that quotes one number hides
+that.</p>
+<p>The decode <em>ratio</em> also climbs with context — 4.04x at 94
+tokens, 4.34x at 998. The CPU arm loses ground as the KV cache grows and
+the GPU arm barely does.</p>
+<h4 id="how-does-335-gb-fit-in-a-4-gb-card">How Does 3.35 GB Fit in a 4
+GB Card?</h4>
+<p>It does not have to. With the model loaded and serving, the card
+holds <strong>1598 MiB</strong>.</p>
+<p>The artifact is only 32% Q4_0. Both embedding tensors are Q6_K and
+account for 2.257 GB of the 3.334 GB of tensor bytes, and the largest of
+them — <code>per_layer_token_embd</code>, at 1.93 GB, 58% of the file —
+is created with <code>TENSOR_READ_LAZY</code> in llama.cpp's
+<code>src/models/gemma4.cpp</code> and served by
+<code>GGML_OP_GET_ROWS</code> straight out of the mmap. A few rows are
+touched per token. It never goes to the card.</p>
+<p>What is resident is the ~1.08 GB Q4_0 transformer body, which is what
+decode reads every token, plus about 60 MiB of KV cache and the compute
+buffers.</p>
+<p>The same mechanism costs something on the CPU arm instead of saving
+something. <code>RssAnon</code> there is 1,202,152 kB, because llama.cpp
+repacks Q4_0 weights into an interleaved layout for its AVX2 kernels,
+copying the body out of the mmap into anonymous memory.</p>
+<p>So the headline works because of the checkpoint's shape, not in spite
+of the card's size. A 4 GB GPU from 2021 is not too small for this
+model. It is roughly 2.5x larger than it needs to be.</p>
+<h4 id="what-was-controlled">What Was Controlled</h4>
+<p>The two arms differ by one flag. Everything else was held equal
+deliberately, and checked rather than assumed:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti/medium/img/devto-cpu-vs-1650ti-gemma4-table-3.png"
+alt="Table: How it was held" /></p>
+<p>That last row is the one worth dwelling on. Both arms serve the same
+model on the same port, so an HTTP response says nothing about which
+device produced it. <strong>The device is therefore read from the
+running process rather than taken from a label</strong> —
+<code>/proc/&lt;pid&gt;/exe</code> for the binary,
+<code>/proc/&lt;pid&gt;/maps</code> for the ggml backends actually
+loaded, <code>/proc/&lt;pid&gt;/cmdline</code> for the real
+<code>-ngl</code> — and that attestation is stamped into every report
+beside the numbers.</p>
+<p><code>maps</code> rather than <code>ldd</code>, because llama.cpp
+<code>dlopen</code>s its backends: a CUDA backend can be absent from
+<code>ldd</code> output and present in the running process. The verdict
+needs a GPU backend mapped in <strong>and</strong> layers assigned to
+it, since a CUDA build running <code>-ngl 0</code> computes on the CPU
+but is not a clean CPU arm — the device is initialised and large prefill
+batches can still land on it. The CPU arm hides the device from the
+process entirely rather than trusting <code>-ngl 0</code>.</p>
+<h4 id="what-was-not-controlled">What Was Not Controlled</h4>
+<p>Read the 4x as real and anything under about 7% as nothing.</p>
+<ul>
+<li><strong>Order and thermals.</strong> The CPU arm ran first and
+saturated 12 cores. An i7-1360P and a Max-Q card share one thermal
+envelope, so the GPU arm started on a warm package. The 120 second
+cooldown was sized, not measured. If this biases anything it understates
+the GPU arm.</li>
+<li><strong>Page cache.</strong> The GGUF was hot for both arms. This
+says nothing about cold start, and the lazy-embedding claim above is
+inferred from the source and the resident-memory figures rather than
+from a dropped-cache experiment.</li>
+<li><strong>CPU affinity.</strong> Nothing was pinned. A separate
+<code>llama-bench</code> sweep on this die found affinity worth
+<strong>1.61x on prefill</strong>, because llama.cpp splits work evenly
+and every barrier waits on the slowest thread, so adding the eight
+E-cores to the four P-cores makes prefill <em>slower</em>. The CPU arm
+here is therefore not at its best, and <strong>3.63x is an upper bound
+on the prefill gap</strong>. Decode is unaffected — thread count is a
+weak lever there — so the 4.27x stands.</li>
+<li><strong>Concurrency.</strong> Single stream throughout,
+<code>--parallel 1</code>.</li>
+</ul>
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to measure what a 4 GB laptop GPU is
+worth against a modern 12-core CPU for serving a small quantized model.
+The key to the solution was a single-variable comparison: one llama.cpp
+commit, one prompt set, one flag apart, with the serving device read
+from <code>/proc</code> at run time and recorded beside every number.
+The results were:</p>
+<ul>
+<li>GPU decode is <strong>4.27x</strong> the CPU arm, 4.04x to 4.34x
+across every cell</li>
+<li>GPU prefill is <strong>3.63x</strong>, an upper bound, since the CPU
+arm was left unpinned</li>
+<li>End-to-end is <strong>3.81x</strong></li>
+<li>Decode is flat in context on both arms; TTFT is linear in it on
+both</li>
+<li>The model needs <strong>1598 MiB</strong> of the card, because 58%
+of the file is a lazily read embedding table that never leaves host
+memory</li>
+</ul>
+<p>Scope: one laptop, one GGUF, llama.cpp <code>c6824a9</code> built
+twice from the same commit, eight paired cells, three repeats per cell,
+concurrency 1, CPU arm first with a 120 second cooldown. CPU affinity
+was not set on either arm and the page cache was warm for both.</p>
+<p>The strategy for using MCP for local accelerator comparison was
+validated with an incremental step by step approach.</p>
+</body>
+</html>
