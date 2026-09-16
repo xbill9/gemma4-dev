@@ -51,6 +51,7 @@ serve:
 	  -ctk $(KV_CACHE_TYPE) -ctv $(KV_CACHE_TYPE) \
 	  -fa $(FLASH_ATTENTION) \
 	  -t $(THREADS) \
+	  -tb $(THREADS_BATCH) \
 	  --parallel $(PARALLEL_SLOTS) \
 	  $(if $(filter 1,$(METRICS)),--metrics,)
 
@@ -86,7 +87,7 @@ test:
 # A NEW TOP-LEVEL MODULE IS SILENTLY UNLINTED UNTIL IT IS ADDED HERE.
 lint:
 	@command -v ruff >/dev/null || { echo "ruff not found; install with: pip install ruff"; exit 1; }
-	ruff check server.py inspect_gguf.py sweep.py tests
+	ruff check server.py attest.py inspect_gguf.py sweep.py tests
 	@echo "lint OK"
 
 bench-validate:

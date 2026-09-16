@@ -62,7 +62,10 @@ import os
 import statistics
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+
+import attest
 
 # Prompt lengths in TOKENS (approximate: built by repetition, then measured from
 # the server's own usage.prompt_tokens, which is what the report records).
@@ -70,11 +73,26 @@ CONTEXTS = (64, 512, 1024, 2048)
 OUTPUTS = (32, 128)
 REPEATS = 3
 
+# DEVICE-NEUTRAL ON PURPOSE, AND BYTE-IDENTICAL TO THE TWIN ARM'S COPY.
+# local-llamacpp-cpu-2b-q4_0 and local-llamacpp-1650ti-2b-q4_0 are two arms of one
+# control, and the prompt is part of the apparatus. Until 2026-09-16 each arm
+# described its own
+# hardware in this string, so the same `--contexts 512` built two different prompts that
+# tokenized to two different lengths -- and the paired cells were not the same
+# measurement. Mentioning a device in the filler is what made them diverge, so
+# this text names none. Change it in BOTH arms or in neither.
 FILLER = (
-    "The Intel Core i7-1360P is a hybrid laptop processor with four performance "
-    "cores and eight efficiency cores. It supports AVX2 and AVX-VNNI but not "
-    "AVX-512, so llama.cpp runs its AVX2 kernels on it with no accelerator at all. "
+    "The Gemma 4 E2B checkpoint is a small instruction-tuned decoder released as "
+    "a quantized GGUF artifact. It emits a thinking block before its answer, and "
+    "its vocabulary is large relative to the size of its transformer body. "
 )
+
+
+def _port_of(base: str) -> int:
+    """The port `base` points at. Attestation is local-only: it reads /proc, so it
+    can only speak for a server on this machine, which is exactly this rig's case."""
+    parsed = urllib.parse.urlparse(base)
+    return parsed.port or (443 if parsed.scheme == "https" else 80)
 
 
 def post(base: str, path: str, payload: dict, timeout: int = 900) -> dict:
@@ -368,6 +386,12 @@ def main() -> int:
     ap.add_argument("--decode-source", choices=("auto", "usage", "stream", "both"),
                     default="auto",
                     help="where the decode figure comes from; see the module docstring")
+    ap.add_argument("--expect-device", choices=("cpu", "gpu", "any"),
+                    default=attest.EXPECTED_DEVICE,
+                    help="refuse to run unless the process serving the endpoint is this "
+                         "kind of arm (default: this rig's own, %(default)s). `any` "
+                         "disables the check -- a run recorded that way is not a "
+                         "controlled arm and says so in the report.")
     ap.add_argument("--rig", default=None,
                     help="rig name for the artifact when /health does not report one")
     # MEASURED 2026-08-31, and it invalidated a TTFT comparison before anyone
@@ -395,6 +419,20 @@ def main() -> int:
 
     os.makedirs(args.out, exist_ok=True)
     root = args.base.rstrip("/").removesuffix("/v1")
+
+    # WHICH ARM ANSWERED IS MEASURED, NOT PASSED IN. `--rig` is a string a human
+    # types, and the twin serves the same model on the same port, so a mistyped
+    # or forgotten flag used to be enough to label a GPU run as a CPU one with
+    # nothing anywhere disagreeing. Read it off the live process instead, before
+    # spending an hour, and record it beside the numbers.
+    attestation = attest.attest_port(_port_of(args.base))
+    print("arm:", attest.describe(attestation), flush=True)
+    wrong_arm = attest.mismatch(attestation, args.expect_device)
+    if wrong_arm:
+        print(f"REFUSING TO MEASURE: {wrong_arm}", flush=True)
+        print(f"Expected a {args.expect_device} arm. Start the right one, or pass "
+              f"--expect-device to say what you meant.", flush=True)
+        return 2
 
     # vLLM's /health is an empty 200, not JSON. Tolerate it rather than making
     # the harness rig-specific again.
@@ -463,6 +501,8 @@ def main() -> int:
                    key=lambda p: p["output_tokens_per_second"], default=None)
         result = {
             "rig": health.get("rig") or args.rig,
+            "attestation": attestation,
+            "device": attestation.get("device"),
             "build_id": health.get("build_id"),
             "model": args.model,
             "health": health,
@@ -568,6 +608,8 @@ def main() -> int:
         summary["stream_over_usage_median"] = round(statistics.median(ratios), 4)
     result = {
         "rig": health.get("rig") or args.rig,
+        "attestation": attestation,
+        "device": attestation.get("device"),
         "build_id": health.get("build_id"),
         "model": args.model,
         "health": health,

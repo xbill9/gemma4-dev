@@ -44,6 +44,7 @@ sys.modules["mcp"] = MagicMock()
 sys.modules["mcp.server"] = MagicMock()
 sys.modules["mcp.server.mcpserver"] = _mcpserver_module
 
+import attest  # noqa: E402
 import server  # noqa: E402
 
 
@@ -163,13 +164,13 @@ class TestPidDiscovery(unittest.TestCase):
             "   2: 0100007F:0050 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 55503 1 0 0\n"
         )
         with patch.object(server.Path, "read_text", return_value=table):
-            self.assertEqual(server._listening_inodes(8080), {"55501"})
-            self.assertEqual(server._listening_inodes(80), {"55503"})
-            self.assertEqual(server._listening_inodes(9999), set())
+            self.assertEqual(attest.listening_inodes(8080), {"55501"})
+            self.assertEqual(attest.listening_inodes(80), {"55503"})
+            self.assertEqual(attest.listening_inodes(9999), set())
 
     def test_listening_inodes_survives_missing_proc_files(self):
         with patch.object(server.Path, "read_text", side_effect=OSError("no /proc")):
-            self.assertEqual(server._listening_inodes(8080), set())
+            self.assertEqual(attest.listening_inodes(8080), set())
 
 
 class TestStopModelServerDiscovered(unittest.IsolatedAsyncioTestCase):
@@ -185,8 +186,26 @@ class TestStopModelServerDiscovered(unittest.IsolatedAsyncioTestCase):
         self.assertIn("not started through this server", out)
 
 
+def fake_attest(device="gpu", **over):
+    """An attestation as attest_port would return it. Offline: /proc is not read."""
+    att = {
+        "serving": True, "port": 8080, "pid": 4242,
+        "exe": "/home/xbill/llama.cpp/build/bin/llama-server",
+        "exe_sha256": "a" * 64,
+        "device": device,
+        "gpu_libs": [] if device == "cpu" else ["ggml-cuda", "libcuda"],
+        "n_gpu_layers": 0 if device in ("cpu", "mixed") else 99,
+        "cuda_visible_devices": "" if device == "cpu" else "0",
+        "model_arg": "/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf",
+        "threads": "4", "threads_batch": "8", "ctx_size": "8192",
+        "argv": ["llama-server"],
+    }
+    att.update(over)
+    return att
+
+
 class TestModelServerStatus(unittest.IsolatedAsyncioTestCase):
-    """/health decides the verdict; the pid only annotates it."""
+    """/health decides whether something is UP; attestation decides whose arm it is."""
 
     def _client(self, status_code=None, error=None):
         client = MagicMock()
@@ -204,6 +223,7 @@ class TestModelServerStatus(unittest.IsolatedAsyncioTestCase):
         # THE REGRESSION. Before the fix this returned ❌ at a live server.
         with patch.object(server, "_read_pid", return_value=4242), \
              patch.object(server, "_pidfile_pid", return_value=None), \
+             patch.object(server, "attest_port", return_value=fake_attest("gpu")), \
              patch.object(server.httpx, "AsyncClient", return_value=self._client(200)):
             out = await server.model_server_status()
         self.assertIn("✅", out)
@@ -213,10 +233,23 @@ class TestModelServerStatus(unittest.IsolatedAsyncioTestCase):
     async def test_healthy_from_pid_file_is_success(self):
         with patch.object(server, "_read_pid", return_value=4242), \
              patch.object(server, "_pidfile_pid", return_value=4242), \
+             patch.object(server, "attest_port", return_value=fake_attest("gpu")), \
              patch.object(server.httpx, "AsyncClient", return_value=self._client(200)):
             out = await server.model_server_status()
         self.assertIn("✅", out)
         self.assertNotIn("not started through this server", out)
+
+    async def test_healthy_but_cpu_arm_is_not_success(self):
+        """THE CONTROL'S SILENT FAILURE, from this side: the CPU twin serves the
+        same model on this same port."""
+        with patch.object(server, "_read_pid", return_value=4242), \
+             patch.object(server, "_pidfile_pid", return_value=None), \
+             patch.object(server, "attest_port", return_value=fake_attest("cpu")), \
+             patch.object(server.httpx, "AsyncClient", return_value=self._client(200)):
+            out = await server.model_server_status()
+        self.assertIn("❌", out)
+        self.assertNotIn("✅", out)
+        self.assertIn("not this arm", out)
 
     async def test_nothing_running_is_reported_down(self):
         with patch.object(server, "_read_pid", return_value=None), \
@@ -320,7 +353,8 @@ class TestQueryModelReasoning(unittest.IsolatedAsyncioTestCase):
         client.__aenter__ = AsyncMock(return_value=client)
         client.__aexit__ = AsyncMock(return_value=False)
         client.post = AsyncMock(return_value=self._response("", "Thinking Process: ...", "length"))
-        with patch.object(server.httpx, "AsyncClient", return_value=client):
+        with patch.object(server, "attest_port", return_value=fake_attest("gpu")), \
+             patch.object(server.httpx, "AsyncClient", return_value=client):
             out = await server.query_model("hi", max_tokens=64)
         self.assertNotIn("✅", out)
         self.assertIn("Reasoning only", out)
@@ -331,11 +365,25 @@ class TestQueryModelReasoning(unittest.IsolatedAsyncioTestCase):
         client.__aenter__ = AsyncMock(return_value=client)
         client.__aexit__ = AsyncMock(return_value=False)
         client.post = AsyncMock(return_value=self._response("TPU v1, TPU v2, TPU v5", "x" * 1274))
-        with patch.object(server.httpx, "AsyncClient", return_value=client):
+        with patch.object(server, "attest_port", return_value=fake_attest("gpu")), \
+             patch.object(server.httpx, "AsyncClient", return_value=client):
             out = await server.query_model("hi")
         self.assertIn("✅", out)
         self.assertIn("TPU v1", out)
         self.assertIn("1274 chars of reasoning", out)
+
+    async def test_refuses_to_query_the_cpu_arm(self):
+        """Refuse BEFORE producing a number that would be labelled with the wrong device."""
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        client.post = AsyncMock(return_value=self._response("some answer", ""))
+        with patch.object(server, "attest_port", return_value=fake_attest("cpu")), \
+             patch.object(server.httpx, "AsyncClient", return_value=client):
+            out = await server.query_model("hi")
+        self.assertIn("❌", out)
+        self.assertIn("Refusing", out)
+        client.post.assert_not_called()
 
     def test_default_max_tokens_is_generous(self):
         import inspect

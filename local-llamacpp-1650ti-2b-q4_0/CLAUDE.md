@@ -10,9 +10,42 @@ mostly does **not** hold here. Read this file before changing anything.
 `google/gemma-4-E2B-it-qat-q4_0-gguf` off one **GTX 1650 Ti (Max-Q)** in the
 machine under the desk. One process, one GGUF file named on the command line.
 
-**STATUS 2026-09-03: nothing has been served.** llama.cpp is built at `95ef7fc`
-and the model file is on disk. No token has been generated, no benchmark has
-been run, and `benchmarks/runs/` is empty on purpose.
+**STATUS 2026-09-16: serving, with three runs on record.** llama.cpp is now built
+at `c6824a9` — see the control section below for why the commit moved.
+
+## This rig is one arm of a control
+
+`local-llamacpp-cpu-2b-q4_0` is the other arm: the same GGUF served by the same
+llama.cpp commit on the same port, CPU-only. The two are run **alternately** so
+that the device is the only thing differing between their numbers. Sharing port
+8080 is deliberate — the endpoint, the harness and the prompts stay fixed while
+the device changes underneath them.
+
+**The arm is measured, never asserted.** Nothing in an HTTP response says which
+binary produced it, and `sweep.py` took the rig name from its own `--rig`
+argument, so restarting into the other arm and forgetting was enough to mislabel
+a whole run. `attest.py` reads it off the live process — `/proc/<pid>/exe`,
+`/proc/<pid>/maps` (what the process HAS LOADED; llama.cpp dlopen's its backends,
+so `ldd` can miss a CUDA backend that is really there), `/proc/<pid>/cmdline` for
+the real `-ngl`, `/proc/<pid>/environ` for `CUDA_VISIBLE_DEVICES`.
+
+`model_server_status` now leads with ❌ when the healthy server on 8080 is the CPU
+arm, `query_model` refuses, and `sweep.py` aborts before measuring
+(`--expect-device`, default `gpu`) and stamps the attestation into every report.
+
+### Three things changed here on 2026-09-16, none of them measured on this rig
+
+| | why |
+| --- | --- |
+| `LLAMA_CPP_COMMIT` `95ef7fc` → `c6824a9` | the CPU twin was at `82324fc50`. Differencing two arms built from different commits puts an upstream delta inside what is supposed to be a device delta. Both rebuilt. |
+| `THREADS_BATCH=8`, so `-tb` is passed | this rig had no such key and the CPU twin passed `-tb 8`, so the arms differed by a prefill-thread flag too. Prefill runs on the card here so the effect should be small — a control does not get to assume which of its differences are harmless. **UNMEASURED here.** |
+| `sweep.py` FILLER is device-neutral | each arm's filler described its own hardware, so one `--contexts 512` built two prompts that tokenized to different lengths. `sweep.py` is now byte-identical in both arms. |
+
+**The three runs in `benchmarks/runs/` predate all of this.** They were measured
+at `95ef7fc`, without `-tb`, with the old GPU-specific filler. They remain this
+rig's own record and are still valid as that. They are **not** the GPU arm of a
+paired comparison against anything measured after 2026-09-16 — re-run this arm
+for that, and do not difference an old run against a new CPU one.
 
 ## It is the first `local` rig, and that is most of what is different
 

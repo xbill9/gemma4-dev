@@ -21,6 +21,74 @@ kept both `tpu.env` thread values and found CPU affinity to be the real lever at
 1.61x on prefill. No serving benchmark exists yet: `benchmarks/reports/` is empty
 and `sweep.py` has never run here.
 
+## This rig is one arm of a control
+
+`local-llamacpp-1650ti-2b-q4_0` is the other arm. Same GGUF, same llama.cpp
+commit, same port, same harness, same prompts — run **alternately**, so that the
+only thing differing between their numbers is the device. Sharing port 8080 is
+deliberate and load-bearing: the endpoint, the harness and the prompt set stay
+fixed while the device changes underneath them.
+
+**The arm is measured, never asserted.** Nothing in an HTTP response says which
+binary produced it, and `sweep.py` used to take the rig name from its own `--rig`
+argument. So restarting into the other arm and forgetting was enough to label a
+whole run with the wrong device, with nothing anywhere disagreeing. `attest.py`
+reads it off the live process instead:
+
+| source | answers |
+| --- | --- |
+| `/proc/<pid>/exe` | which binary is executing — not what `LLAMA_SERVER_BIN` says |
+| `/proc/<pid>/maps` | which ggml backends it **has loaded** |
+| `/proc/<pid>/cmdline` | the real `-ngl`, whatever any env file claims |
+| `/proc/<pid>/environ` | `CUDA_VISIBLE_DEVICES` as the child actually got it |
+
+`maps` rather than `ldd` on purpose: llama.cpp **dlopen's** its backends, so a
+CUDA backend can be absent from `ldd` output and present in the running process.
+It is also evidence about the process that ran rather than about a file on disk
+that may since have been rebuilt.
+
+The verdict needs two signals to **agree** — a GPU backend mapped in, *and*
+layers assigned to it. Disagreement is reported as `mixed`, never rounded to
+either: a CUDA build with `-ngl 0` computes on the CPU but is not a clean CPU
+arm, because the device is initialised and llama.cpp can still move large prefill
+batches onto it. That is why this rig hides the device from the child rather than
+trusting `-ngl 0` alone.
+
+- `model_server_status` leads with ❌ when a healthy server is the **other** arm.
+  Until 2026-09-16 it answered ✅ and merely annotated "not started through this
+  server" — in a control that is the entire failure mode.
+- `query_model` refuses before spending up to 900 s producing a mislabelled number.
+- `sweep.py` attests before it measures, aborts on a mismatch (`--expect-device`,
+  defaulting to this rig's own arm), and **stamps the attestation into every
+  report** as `attestation` / `device`.
+- `attest_arm` reports the whole picture, including `exe_sha256` — which, not a
+  commit string, is what makes two arms pairable. A commit is what you meant to
+  build; the hash is what ran.
+
+### What must match between the arms, and what did not
+
+| | status |
+| --- | --- |
+| llama.cpp commit | **fixed 2026-09-16** — was 82324fc50 here vs 95ef7fc there; both now `c6824a9` |
+| `-tb` | **fixed 2026-09-16** — this arm passed it, the GPU arm had no `THREADS_BATCH` key at all |
+| `sweep.py` FILLER | **fixed 2026-09-16** — each arm described its own hardware, so one `--contexts 512` built two differently-tokenizing prompts. Now device-neutral and byte-identical; `sweep.py` is byte-identical in both arms |
+| `-c`, `-ctk`/`-ctv`, `-fa`, `--parallel`, `--metrics`, the GGUF, the port | already matched |
+
+### Running the pair
+
+Order effects are real on this host and are **not** yet controlled for: an
+i7-1360P and a Max-Q card share one thermal envelope, so the CPU arm saturating
+12 cores leaves the package hot and downclocked for whatever runs next. Page
+cache is the same kind of problem from the other side — this arm reads the Q4_0
+body every token across a 3.35 GB mmap, while the GPU arm loads to VRAM once.
+Neither is measured. Until they are: fix an order, cool down between arms, keep
+the cache state the same rule for both, and **record what you did in the report**
+rather than assuming it did not matter. A-B-B-A detects the drift if you can
+afford four runs.
+
+Do not start an arm while anything else is loading the machine. A model load was
+lost to an OOM on 2026-09-16 because a 12-way CUDA build was running beside it.
+
 ## Read this first: what this directory was until 2026-09-15
 
 **A byte-identical copy of `local-llamacpp-1650ti-2b-q4_0`** (`diff -rq` empty):
@@ -59,9 +127,15 @@ cannot be confused with a GPU build in the same checkout.
 | Topology | hybrid: 4 P-cores with SMT (logical 0-7), 8 E-cores (logical 8-15) |
 | SIMD | `avx avx2 avx_vnni` — **no AVX-512** |
 | RAM | 15 GiB total, ~8 GiB available when checked |
-| GPU | none (`/dev/nvidia*` absent) |
+| GPU | **GTX 1650 Ti, 4096 MiB, driver 615.71.09** — present, and the other arm |
 
 The `cpu_status` tool re-reads all of this from `/proc` and `/sys`.
+
+**The GPU row was wrong until 2026-09-16** — it read "none (`/dev/nvidia*`
+absent)". `/dev/nvidia0` is there and `nvidia-smi` reports the card. That error
+pointed the wrong way: it made the CPU-only guards look like belt-and-braces on a
+machine with no GPU to hit, when they are in fact the only thing keeping this arm
+honest. They do work — `start_model_server` refuses the GPU build, verified.
 
 `local-pytorch-cpu-2b/CLAUDE.md` says this machine has 6 physical cores and six SMT
 siblings. `lscpu` and `/sys/devices/cpu_{core,atom}` disagree (12 cores, only the

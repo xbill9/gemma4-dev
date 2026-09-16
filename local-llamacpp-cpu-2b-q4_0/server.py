@@ -18,8 +18,15 @@ of the mmap. On a GPU that decided whether the model fit the card; on a CPU it
 decides how much of the file stays hot in the page cache. --no-mmap breaks the
 mechanism outright either way. See CLAUDE.md.
 
-STATUS 2026-09-15: NOTHING HAS BEEN SERVED ON CPU. llama.cpp is not built on this
-host and the model file is not downloaded.
+THIS RIG IS ONE ARM OF A CONTROL. `local-llamacpp-1650ti-2b-q4_0` is the other:
+same GGUF, same llama.cpp checkout, same port, same harness, same prompts, run
+alternately so that the device is the only thing that differs. Nothing in an HTTP
+response says which arm answered, so the arm is read off the running process --
+see attest.py, which every status and query path here goes through.
+
+STATUS 2026-09-16: SERVING. One smoke test (328 tokens, 24.8 tok/s end-to-end)
+and an 18-cell llama-bench thread sweep. No serving benchmark yet: sweep.py has
+never run here and benchmarks/reports/ is empty.
 """
 
 import asyncio
@@ -32,6 +39,9 @@ from typing import Optional
 import httpx
 from dotenv import load_dotenv
 from mcp.server.mcpserver import MCPServer
+
+from attest import EXPECTED_DEVICE, attest_port, describe, mismatch
+from attest import pid_owning_port as _pid_owning_port
 
 RIG_DIR = Path(__file__).resolve().parent
 load_dotenv(RIG_DIR / "tpu.env")
@@ -104,52 +114,6 @@ def _pidfile_pid() -> Optional[int]:
     except (ValueError, OSError):
         return None
     return pid if Path(f"/proc/{pid}").exists() else None
-
-
-def _listening_inodes(port: int) -> set[str]:
-    """Socket inodes in TCP_LISTEN on `port`, from /proc/net/tcp and tcp6."""
-    inodes: set[str] = set()
-    for table in ("tcp", "tcp6"):
-        try:
-            rows = Path(f"/proc/net/{table}").read_text().splitlines()[1:]
-        except OSError:
-            continue
-        for row in rows:
-            fields = row.split()
-            if len(fields) < 10 or fields[3] != "0A":  # 0A == TCP_LISTEN
-                continue
-            try:
-                if int(fields[1].rsplit(":", 1)[1], 16) != port:
-                    continue
-            except (IndexError, ValueError):
-                continue
-            inodes.add(fields[9])
-    return inodes
-
-
-def _pid_owning_port(port: int) -> Optional[int]:
-    """The pid holding the listening socket on `port`, or None.
-
-    Read out of /proc rather than shelling out to `ss`/`lsof`: no subprocess, no
-    dependency, and it answers the exact question both callers have — who owns
-    ENDPOINT — rather than "is there a process whose cmdline looks like ours".
-    """
-    targets = {f"socket:[{inode}]" for inode in _listening_inodes(port)}
-    if not targets:
-        return None
-    for entry in Path("/proc").iterdir():
-        if not entry.name.isdigit():
-            continue
-        try:
-            for fd in (entry / "fd").iterdir():
-                try:
-                    if os.readlink(fd) in targets:
-                        return int(entry.name)
-                except OSError:  # fd closed under us, or not ours to read
-                    continue
-        except OSError:  # process exited between iterdir and open
-            continue
-    return None
 
 
 def _read_pid() -> Optional[int]:
@@ -239,7 +203,12 @@ async def cpu_status() -> str:
     body += [
         f"- **SIMD:** {' '.join(facts['simd']) or 'none reported'}",
         f"- **RAM:** {facts['mem_available_gib']:.2f} GiB available of {facts['mem_total_gib']:.2f} GiB",
-        f"- **Threads configured:** decode `-t {THREADS}`, prefill `-tb {THREADS_BATCH}` (UNMEASURED — sweep them)",
+        f"- **Threads configured:** decode `-t {THREADS}`, prefill `-tb {THREADS_BATCH}` "
+        f"(SWEPT 2026-09-16, 18 cells — both survive, but thread count is a WEAK lever: "
+        f"decode spans only 22.97-25.58 t/s over -t 4/8/12/16)",
+        "- **CPU affinity:** not set, and it is the LARGEST measured lever — prefill "
+        "spans 86.61-139.77 t/s (1.61x) by which cores run it. E-cores are stragglers: "
+        "4 P-cores prefill at 135.52, adding all 8 E-cores DROPS it to 116.77.",
     ]
     if not any(f.startswith("avx512") for f in facts["simd"]):
         body += ["", "⚠️  No AVX-512. llama.cpp takes its AVX2 kernels here; do not compare "
@@ -378,9 +347,15 @@ async def stop_model_server() -> str:
 
 @mcp.tool()
 async def model_server_status() -> str:
-    """Check whether llama-server is up and serving at the known local endpoint."""
-    # /health DECIDES, the pid annotates. Gating on the pid first is what made
-    # the GPU sibling return ❌ against a healthy server on 2026-09-08.
+    """Check whether llama-server is up, and whether the process serving is THIS arm."""
+    # /health DECIDES whether something is up. Gating on the pid first is what
+    # made the GPU sibling return ❌ against a healthy server on 2026-09-08.
+    #
+    # BUT UP IS NOT THE SAME QUESTION AS OURS. The GPU twin serves the same model
+    # on this same port, and until 2026-09-16 this tool answered ✅ against it --
+    # annotating "not started through this server" while still leading with the
+    # tick. In a control that is the whole failure mode, so the device now
+    # decides the prefix.
     pid = _read_pid()
     if pid is None:
         who = "pid unknown"
@@ -390,6 +365,12 @@ async def model_server_status() -> str:
         who = f"pid {pid}, found on port {PORT} — not started through this server, so `{LOG_FILE}` may not be its log"
 
     try:
+        att = attest_port(int(PORT))
+    except ValueError:
+        att = {"serving": False, "port": PORT}
+    wrong_arm = mismatch(att)
+
+    try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.get(f"{ENDPOINT}/health")
     except httpx.HTTPError as exc:
@@ -397,9 +378,20 @@ async def model_server_status() -> str:
             return f"❌ llama-server is not running. Endpoint would be {ENDPOINT}."
         return f"📡 Process is up ({who}) but {ENDPOINT} is not answering yet ({exc}). Still loading?"
 
-    if resp.status_code == 200:
-        return f"✅ Serving at {ENDPOINT} ({who}). `/health` → 200."
-    return f"📡 Reachable at {ENDPOINT} ({who}) but `/health` → {resp.status_code}. Still loading?"
+    if resp.status_code != 200:
+        return f"📡 Reachable at {ENDPOINT} ({who}) but `/health` → {resp.status_code}. Still loading?"
+
+    if wrong_arm:
+        return (
+            f"❌ **Healthy, but it is not this arm.** {wrong_arm}\n\n"
+            f"`/health` → 200 at {ENDPOINT}, so something IS serving — it is the "
+            f"`{att.get('device')}` arm, and this rig is `{EXPECTED_DEVICE}`. A number "
+            f"taken now would be labelled with the wrong device.\n\n"
+            f"Stop it (`stop_model_server`) and start this arm, or measure it from the "
+            f"rig it belongs to."
+        )
+    return (f"✅ Serving at {ENDPOINT} ({who}). `/health` → 200.\n\n"
+            f"Arm attested **{att['device']}** — {describe(att)}")
 
 
 @mcp.tool()
@@ -418,6 +410,16 @@ async def query_model(prompt: str, max_tokens: int = 1024) -> str:
     The 900 s timeout is sized for a CPU, not measured on one: 1024 tokens of
     thinking at a single-digit decode rate is minutes, not seconds.
     """
+    # The twin serves the same model on this same port, so "did I get a reply"
+    # does not establish which device produced it. Attest before spending 900 s.
+    try:
+        wrong_arm = mismatch(attest_port(int(PORT)))
+    except ValueError:
+        wrong_arm = None
+    if wrong_arm:
+        return (f"❌ Refusing to query: {wrong_arm}. This rig is the `{EXPECTED_DEVICE}` arm. "
+                f"Use `model_server_status` for the full attestation.")
+
     payload = {
         "model": MODEL_NAME,
         "messages": [{"role": "user", "content": prompt}],
@@ -459,6 +461,49 @@ async def query_model(prompt: str, max_tokens: int = 1024) -> str:
         return f"❌ Could not reach {ENDPOINT}: {exc}. Is llama-server running?"
     except (KeyError, IndexError, ValueError) as exc:
         return f"❌ Unexpected response shape from {ENDPOINT}: {exc}"
+
+
+@mcp.tool()
+async def attest_arm() -> str:
+    """Report which binary is answering on the endpoint, read from /proc — not from config.
+
+    The control's one silent failure: this rig and `local-llamacpp-1650ti-2b-q4_0`
+    serve the same GGUF on the same port, and an HTTP response says nothing about
+    which device produced it. Everything below is read off the live process, so a
+    disagreement between `tpu.env` and reality shows up rather than being assumed
+    away.
+    """
+    try:
+        att = attest_port(int(PORT))
+    except ValueError:
+        return f"❌ PORT is not an integer: `{PORT}`"
+    if not att["serving"]:
+        return (f"📡 Nothing is listening on port {PORT}. Expected arm: "
+                f"**{EXPECTED_DEVICE}** (`{RIG_NAME}`).")
+
+    verdict = mismatch(att)
+    lines = [
+        f"{'❌' if verdict else '✅'} **Arm attested: {att['device']}** "
+        f"(this rig expects **{EXPECTED_DEVICE}**)",
+        "",
+        f"- **pid:** {att['pid']}",
+        f"- **exe:** `{att['exe']}`",
+        f"- **sha256:** `{att['exe_sha256'][:16]}…` — the pairing identity. Two arms are "
+        f"comparable only if they were built from one commit; the hash is what actually ran.",
+        f"- **`-ngl`:** {att['n_gpu_layers']}",
+        f"- **GPU libraries mapped:** {', '.join(att['gpu_libs']) if att['gpu_libs'] else 'none'}",
+        f"- **CUDA_VISIBLE_DEVICES:** "
+        f"{'(empty — devices hidden)' if att['cuda_visible_devices'] == '' else att['cuda_visible_devices'] or '(unset)'}",
+        f"- **model:** `{att['model_arg']}`",
+        f"- **threads:** `-t {att['threads']}` `-tb {att['threads_batch']}` · **ctx:** {att['ctx_size']}",
+    ]
+    if verdict:
+        lines += ["", f"⚠️  {verdict}"]
+    if att["device"] == "mixed":
+        lines += ["", "⚠️  **mixed**: a GPU backend is mapped into the process AND `-ngl` is 0. "
+                      "That computes on the CPU but is not a clean CPU arm — the device is "
+                      "initialised and llama.cpp can still move large prefill batches onto it."]
+    return "\n".join(lines)
 
 
 @mcp.tool()
