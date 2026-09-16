@@ -32,6 +32,7 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-09-03-full-sweep-1650ti` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b1-95ef7fc | 2-D (6ctx × 6conc) | 60 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
 | `2026-09-04-first-light-ollama-1650ti` | gemma4:e2b-it-qat | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ollama 0.33.2 | 2-D (6ctx × 6conc)<br>6 failed | 59 | — | 1.1 | ok | local-ollama-1650ti-2b-q4_0 |
 | `2026-09-04-text-only-ollama-1650ti` | gemma4:e2b-it-qat-text | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ollama 0.33.2 | 2-D (1ctx × 6conc) | 46 | — | 1.1 | ok | local-ollama-1650ti-2b-q4_0 |
+| `2026-09-08-conc-shortprompt-1650ti` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b1-95ef7fc | 2-D (1ctx × 5conc) | 164 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
 
 ## Sweep run directories
 
@@ -83,8 +84,11 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-31b-w4a16 | `2026-06-09-vllm-grid-cloudrun-l4` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-31b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-4b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
+| local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
+| local-llamacpp-1650ti-2b-q4_0 | `2026-09-08-conc-shortprompt-1650ti` | 6 | 2 | 0 | yes | **no** |
+| local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 5 | 3 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
 | local-pytorch-cpu-2b | `2026-09-04-first-light-pytorch-cpu` | 2 | 1 | 0 | yes | **no** |
@@ -161,8 +165,9 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-2b-w4a16 | 0 | 1 |
 | gpu-vllm-l4-31b-w4a16 | 0 | 2 |
 | gpu-vllm-l4-4b-w4a16 | 0 | 1 |
-| local-jax-cpu-2b | 0 | 0 |
-| local-llamacpp-1650ti-2b-q4_0 | 2 | 2 |
+| local-jax-cpu-2b | 0 | 1 |
+| local-llamacpp-1650ti-2b-q4_0 | 3 | 3 |
+| local-llamacpp-cpu-2b-q4_0 | 0 | 1 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
 | local-pytorch-cpu-2b | 0 | 1 |
 | local-vllm-cpu-2b | 0 | 0 |
