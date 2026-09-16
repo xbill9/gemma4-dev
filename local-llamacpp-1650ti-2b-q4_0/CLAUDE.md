@@ -10,8 +10,12 @@ mostly does **not** hold here. Read this file before changing anything.
 `google/gemma-4-E2B-it-qat-q4_0-gguf` off one **GTX 1650 Ti (Max-Q)** in the
 machine under the desk. One process, one GGUF file named on the command line.
 
-**STATUS 2026-09-16: serving, with three runs on record.** llama.cpp is now built
-at `c6824a9` — see the control section below for why the commit moved.
+**STATUS 2026-09-16: serving, four runs on record.** llama.cpp is now built at
+`c6824a9` — see the control section below for why the commit moved. The newest run
+is `benchmarks/runs/2026-09-16-paired-sweep-1650ti`, the GPU arm of the first
+controlled A/B here: 8/8 cells, decode 67.61-71.22 tok/s, **4.27x the CPU arm on
+decode and 3.63x on prefill**. The three older runs predate the rebuild and are
+not pairable with it.
 
 ## This rig is one arm of a control
 

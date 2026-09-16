@@ -1,0 +1,243 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-16-paired-sweep-1650ti",
+    "date": "2026-09-16",
+    "source": "local-llamacpp-1650ti-2b-q4_0",
+    "notes": "PAIRED A/B, GPU ARM. Context sweep at concurrency 1, 4 contexts x 2 output lengths, 3 repeats. The other arm is the same GGUF served by the same llama.cpp commit on the same port, run alternately; CPU arm first, then a fixed 120 s cooldown, then this one. Arm attested from /proc, not asserted: device=gpu, exe=/home/xbill/llama.cpp/build/bin/llama-server, sha256=a1b368b993e5efbc. UNCONTROLLED: order and thermal state (one package shared by an i7-1360P and a Max-Q card, CPU arm ran first and heated it), and page-cache state (the GGUF was hot from the preceding arm). Neither is measured; do not read a small delta as real."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+    "chips": 1,
+    "hbm_gb_per_chip": 4.294,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "TU117, compute capability 7.5, NO tensor cores. Max-Q thermal envelope shared with the CPU package."
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+    "family": "gemma-4",
+    "parameters_b": 4.63,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 8192,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes. sweep.py counts both. Only ~1.08 GB of the 3.33 GB artifact is Q4_0; both embeddings are Q6_K, and per_layer_token_embd (1.93 GB) is TENSOR_READ_LAZY."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b218-c6824a9",
+    "backend": "CUDA",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-m",
+      "/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "99",
+      "-c",
+      "8192",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "4",
+      "-tb",
+      "8",
+      "--parallel",
+      "1",
+      "--metrics"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (byte-identical in both arms)",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 3,
+      "notes": "decode-source auto -> stream; llama-server emits no usage.decode_tokens_per_second, so decode is client-side inter-token latency off the SSE stream. Prompts are device-neutral and identical across arms. prompt_mode=unique (per-request nonce first, so the prefix cache cannot hit)."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 41.106,
+        "per_stream_tok_per_s": 71.224,
+        "ttft_ms": {
+          "median": 384.958,
+          "p99": 384.958
+        },
+        "tpot_ms": {
+          "median": 14.0403
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.84,
+          "min": 71.117,
+          "max": 71.716
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 60.146,
+        "per_stream_tok_per_s": 71.197,
+        "ttft_ms": {
+          "median": 385.09,
+          "p99": 385.09
+        },
+        "tpot_ms": {
+          "median": 14.0455
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.38,
+          "min": 71.001,
+          "max": 71.27
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 15.917,
+        "per_stream_tok_per_s": 69.927,
+        "ttft_ms": {
+          "median": 1609.819,
+          "p99": 1609.819
+        },
+        "tpot_ms": {
+          "median": 14.3007
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.29,
+          "min": 69.761,
+          "max": 69.965
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 37.698,
+        "per_stream_tok_per_s": 69.493,
+        "ttft_ms": {
+          "median": 1611.582,
+          "p99": 1611.582
+        },
+        "tpot_ms": {
+          "median": 14.3899
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.29,
+          "min": 69.475,
+          "max": 69.677
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 8.762,
+        "per_stream_tok_per_s": 68.597,
+        "ttft_ms": {
+          "median": 3243.609,
+          "p99": 3243.609
+        },
+        "tpot_ms": {
+          "median": 14.5778
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.56,
+          "min": 68.378,
+          "max": 68.758
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 25.34,
+        "per_stream_tok_per_s": 68.519,
+        "ttft_ms": {
+          "median": 3241.846,
+          "p99": 3241.846
+        },
+        "tpot_ms": {
+          "median": 14.5945
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.44,
+          "min": 68.494,
+          "max": 68.795
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 4.614,
+        "per_stream_tok_per_s": 67.61,
+        "ttft_ms": {
+          "median": 6522.107,
+          "p99": 6522.107
+        },
+        "tpot_ms": {
+          "median": 14.7906
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.52,
+          "min": 67.472,
+          "max": 67.821
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 15.319,
+        "per_stream_tok_per_s": 67.643,
+        "ttft_ms": {
+          "median": 6522.099,
+          "p99": 6522.099
+        },
+        "tpot_ms": {
+          "median": 14.7835
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.2,
+          "min": 67.617,
+          "max": 67.75
+        }
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 3.638,
+    "weights_gib": 1.311,
+    "kv_bytes_per_token": 18432,
+    "notes": "1598-1624 MiB resident on the card with -c 8192 --parallel 1: the Q4_0 body plus KV. per_layer_token_embd stays in host mmap."
+  }
+}

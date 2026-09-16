@@ -10,7 +10,7 @@ imported across a rig boundary. Read this file before changing anything.
 GPU, no control plane, no cloud. One process, one GGUF file named on the command
 line.
 
-**STATUS 2026-09-16: serving. One smoke test, nothing benchmarked.** llama.cpp is
+**STATUS 2026-09-16: serving, and benchmarked against the GPU arm.** llama.cpp is
 built CPU-only at `~/llama.cpp/build-cpu` (commit `82324fc50`, recorded as
 `LLAMA_CPP_COMMIT`), the GGUF is at `MODEL_PATH`, and `llama-server` came up on the
 `tpu.env` defaults and answered correctly. One datapoint: prompt 25 tok, completion
@@ -18,8 +18,13 @@ built CPU-only at `~/llama.cpp/build-cpu` (commit `82324fc50`, recorded as
 test, not a measurement. The thread and affinity levers **have** since been swept
 (`benchmarks/runs/2026-09-16-thread-sweep-cpu`, 18 cells, `llama-bench`), which
 kept both `tpu.env` thread values and found CPU affinity to be the real lever at
-1.61x on prefill. No serving benchmark exists yet: `benchmarks/reports/` is empty
-and `sweep.py` has never run here.
+1.61x on prefill. `sweep.py` has now run: `benchmarks/runs/2026-09-16-paired-sweep-cpu`,
+8/8 cells, the CPU arm of the first controlled A/B here. **Decode is 15.66-17.61
+tok/s and flat across a 21x range of prompt length** (bandwidth-bound per token),
+while TTFT is linear in it — 1.1 s at 94 tokens to 23.9 s at 1959. The GPU arm is
+4.27x on decode, 3.63x on prefill, 3.81x end-to-end. Nothing was pinned, so the
+CPU prefill here is not its best: affinity is worth 1.61x on this die, which makes
+that 3.63x an UPPER bound on the device gap.
 
 ## This rig is one arm of a control
 

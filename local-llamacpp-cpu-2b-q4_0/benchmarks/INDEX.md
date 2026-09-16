@@ -9,10 +9,11 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| _none_ | | | | | |
+| `2026-09-16-paired-sweep-cpu.json` | google/gemma-4-E2B-it-qat-q4_0-gguf | 13th Gen Intel(R) Core(TM) i7-1360P×1 | — | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
-| `2026-09-16-thread-sweep-cpu` | 5 | 3 | 0 | yes |
+| `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes |
+| `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes |
