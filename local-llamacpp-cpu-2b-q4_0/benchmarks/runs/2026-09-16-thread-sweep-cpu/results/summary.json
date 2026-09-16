@@ -1,0 +1,146 @@
+{
+  "run": {
+    "id": "2026-09-16-thread-sweep-cpu",
+    "date": "2026-09-16",
+    "rig": "local-llamacpp-cpu-2b-q4_0",
+    "what": "thread count and CPU affinity lever sweep",
+    "instrument": "llama-bench",
+    "not_a_serving_report": "llama-bench measures the engine directly, with no HTTP path. These numbers are NOT comparable to sweep.py/serving-report.schema.json figures and no report was written to benchmarks/reports/. Engine-level tg128 at t=4 was 25.36 t/s against 24.8 tok/s end-to-end through llama-server, so the serving path costs ~2%."
+  },
+  "engine": {
+    "llama_cpp_commit": "82324fc50",
+    "build": "build-cpu, GGML_CUDA=OFF GGML_VULKAN=OFF GGML_NATIVE=ON",
+    "backend": "CPU"
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+    "file": "gemma-4-E2B_q4_0-it.gguf",
+    "quantization": "q4_0",
+    "note": "llama-bench reports 4.63 B params / 3.10 GiB \u2014 E2B's TOTAL params, not the 2B effective."
+  },
+  "host": {
+    "cpu": "13th Gen Intel Core i7-1360P",
+    "topology": "4 P-cores with SMT (logical 0-7), 8 E-cores (logical 8-15)",
+    "simd": "avx2 avx_vnni, no avx512"
+  },
+  "fixed": {
+    "ngl": 0,
+    "cache_type_k": "f16",
+    "cache_type_v": "f16",
+    "flash_attn": "on",
+    "n_prompt": 512,
+    "n_gen": 128,
+    "repetitions_unpinned": 3,
+    "repetitions_pinned": 5
+  },
+  "coverage": {
+    "measured": 18,
+    "failed": 0,
+    "infeasible": 0,
+    "note": "18 cells = 9 configs x {pp512, tg128}. Nothing skipped."
+  },
+  "cells": [
+    {
+      "label": "t4-unpinned",
+      "threads": 4,
+      "cpu_mask": null,
+      "cpu_strict": 0,
+      "pp512_tps": 135.72,
+      "pp512_stddev": 2.64,
+      "tg128_tps": 25.36,
+      "tg128_stddev": 0.13
+    },
+    {
+      "label": "t8-unpinned",
+      "threads": 8,
+      "cpu_mask": null,
+      "cpu_strict": 0,
+      "pp512_tps": 131.86,
+      "pp512_stddev": 14.45,
+      "tg128_tps": 22.97,
+      "tg128_stddev": 0.42
+    },
+    {
+      "label": "t12-unpinned",
+      "threads": 12,
+      "cpu_mask": null,
+      "cpu_strict": 0,
+      "pp512_tps": 118.17,
+      "pp512_stddev": 0.73,
+      "tg128_tps": 25.58,
+      "tg128_stddev": 0.27
+    },
+    {
+      "label": "t16-unpinned",
+      "threads": 16,
+      "cpu_mask": null,
+      "cpu_strict": 0,
+      "pp512_tps": 132.65,
+      "pp512_stddev": 1.55,
+      "tg128_tps": 23.1,
+      "tg128_stddev": 0.15
+    },
+    {
+      "label": "t4-P-distinct",
+      "threads": 4,
+      "cpu_mask": "0x55",
+      "cpu_strict": 1,
+      "pp512_tps": 135.52,
+      "pp512_stddev": 2.69,
+      "tg128_tps": 24.89,
+      "tg128_stddev": 0.59
+    },
+    {
+      "label": "t4-2P-smt-paired",
+      "threads": 4,
+      "cpu_mask": "0x0F",
+      "cpu_strict": 1,
+      "pp512_tps": 73.5,
+      "pp512_stddev": 2.89,
+      "tg128_tps": 21.66,
+      "tg128_stddev": 0.83
+    },
+    {
+      "label": "t8-E-only",
+      "threads": 8,
+      "cpu_mask": "0xFF00",
+      "cpu_strict": 1,
+      "pp512_tps": 86.61,
+      "pp512_stddev": 3.75,
+      "tg128_tps": 19.17,
+      "tg128_stddev": 0.63
+    },
+    {
+      "label": "t12-P-distinct+E",
+      "threads": 12,
+      "cpu_mask": "0xFF55",
+      "cpu_strict": 1,
+      "pp512_tps": 116.77,
+      "pp512_stddev": 2.18,
+      "tg128_tps": 24.96,
+      "tg128_stddev": 1.37
+    },
+    {
+      "label": "t8-P-smt-doubled",
+      "threads": 8,
+      "cpu_mask": "0xFF",
+      "cpu_strict": 1,
+      "pp512_tps": 139.77,
+      "pp512_stddev": 5.71,
+      "tg128_tps": 23.49,
+      "tg128_stddev": 0.39
+    }
+  ],
+  "findings": {
+    "thread_count_is_a_weak_lever": "Decode spans 22.97-25.58 t/s across t=4/8/12/16, non-monotonic, best cell 0.9% over the t=4 default and inside the error bars. Decode is memory-bandwidth bound; more cores add no bandwidth.",
+    "placement_is_the_real_lever": "Prefill spans 86.61-139.77 t/s, a 1.61x swing, decided by WHICH cores run it rather than how many threads.",
+    "e_cores_are_stragglers": "4 P-cores alone prefill at 135.52; adding all 8 E-cores DROPS it to 116.77 (-13.8%). llama.cpp splits work evenly, so every barrier waits on the slowest thread. E-cores alone: 86.61 pp / 19.17 tg, i.e. 64% and 76% of the P-cores.",
+    "smt_is_not_the_prefill_mechanism": "Clean control, same 4 physical P-cores: 8 threads (0xFF) 139.77 pp vs 4 threads (0x55) 135.52 pp \u2014 +3.1% with overlapping error bars. SMT is neutral-to-good for prefill. It does cost decode 5.6% (23.49 vs 24.89), error bars just clear.",
+    "confounded_cell_retained": "t4-2P-smt-paired (0x0F) puts 4 threads on 2 physical cores: half the P-core compute AND SMT doubling, confounded. Its 73.50 pp is about what halving the cores alone predicts (131.86/1.8), so it is evidence about core count, not SMT. Kept because t8-P-smt-doubled was added as the clean control; do not cite 0x0F for SMT."
+  },
+  "config_implications": {
+    "THREADS": "4 \u2014 keep. Within noise of the best decode cell, and SMT costs decode 5.6%.",
+    "THREADS_BATCH": "8 \u2014 keep, and the tpu.env rationale is CORRECT: pinned to the P-core logical threads it is the fastest prefill cell (139.77). Unpinned it measures 131.86 because threads leak onto E-cores.",
+    "affinity": "UNSET AND UNTESTED END-TO-END. The 1.61x prefill swing is reachable only by pinning, which tpu.env has no key for and server.py never passes. llama-server supports the exact split: -C 0x55 --cpu-strict 1 (decode) and -Cb 0xFF --cpu-strict-batch 1 (prefill). Engine-level only so far."
+  }
+}
