@@ -3,7 +3,7 @@ title: "A 4 GB Laptop GPU Beats a 12-Core CPU by 4.3x on Gemma 4"
 published: false
 description: "Serving Gemma 4 E2B q4_0 through llama.cpp on one laptop, twice: CPU-only and on a 2021-era 4 GB GTX 1650 Ti. Same GGUF, same binary, same prompts, one flag apart. The card wins decode by 4.3x, and getting the comparison honest took more work than running it."
 tags: machinelearning, gpu, benchmarking, python
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti/devto-cover.a3124dd6.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti/devto-cover.274ec661.jpg
 ---
 
 This article compares two ways of serving the same small language model on the
