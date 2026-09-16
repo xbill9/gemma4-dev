@@ -1,0 +1,50 @@
+Host, GPU and build facts for docs/cpu-vs-1650ti/, captured 2026-09-16 on the
+laptop that ran both arms. Verbatim command output; this file is the citation.
+
+$ nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv
+name, memory.total [MiB], driver_version
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 4096 MiB, 615.71.09
+
+$ nvidia-smi --query-gpu=name,compute_cap,memory.total --format=csv
+name, compute_cap, memory.total [MiB]
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 7.5, 4096 MiB
+(compute capability 7.5 == sm_75. Turing TU117, which carries no tensor cores.)
+
+$ /home/xbill/llama.cpp/build-cpu/bin/llama-server --version
+version: 0.4.1-dev (build 218, commit c6824a9)
+built with GNU 14.2.0 for Linux x86_64
+
+$ /home/xbill/llama.cpp/build/bin/llama-server --version
+version: 0.4.1-dev (build 218, commit c6824a9)
+built with GNU 14.2.0 for Linux x86_64
+
+$ nvidia-smi --query-compute-apps=pid,used_memory --format=csv   # GPU arm serving
+pid, used_gpu_memory [MiB]
+125068, 1598 MiB
+
+CPU: 13th Gen Intel(R) Core(TM) i7-1360P, 12 cores / 16 threads.
+Hybrid: 4 P-cores with SMT at logical 0-7, 8 E-cores at logical 8-15.
+SIMD: avx avx2 avx_vnni. No AVX-512 of any kind. 15 GiB RAM.
+(Read from /proc/cpuinfo, /proc/meminfo and /sys/devices/cpu_{core,atom}/cpus
+by the rig's cpu_status tool; recorded in local-llamacpp-cpu-2b-q4_0/tpu.env.)
+
+CPU arm resident anonymous memory with the model loaded:
+$ grep RssAnon /proc/<pid>/status
+RssAnon:         1202152 kB
+(llama.cpp repacks Q4_0 weights into an interleaved AVX2 layout, copying the
+body out of the mmap. Recorded in local-llamacpp-cpu-2b-q4_0/CLAUDE.md.)
+
+GGUF tensor split, from inspect_gguf.py over the artifact (541 tensors,
+3.334 GB of tensor bytes), recorded in local-llamacpp-cpu-2b-q4_0/CLAUDE.md:
+  per_layer_token_embd.weight  [8960, 262144]  Q6_K  1926.8 MB  lazy
+  token_embd.weight            [1536, 262144]  Q6_K   330.3 MB
+  35 transformer blocks                        Q4_0  ~1080 MB
+  file on disk: 3349516256 bytes (3.35 GB)
+Both embeddings are Q6_K: 2.257 GB of 3.334 GB. Only ~1.08 GB is Q4_0.
+per_layer_token_embd is created with TENSOR_READ_LAZY in llama.cpp's
+src/models/gemma4.cpp and served by GGML_OP_GET_ROWS out of the mmap.
+
+Attested binaries for the two paired runs (SHA-256 of the exe that ran, read
+from /proc/<pid>/exe by attest.py and stamped into each sweep.json):
+  CPU arm  61432a48569c1acf...
+  GPU arm  a1b368b993e5efbc...

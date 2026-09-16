@@ -1,0 +1,241 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-16-paired-sweep-cpu",
+    "date": "2026-09-16",
+    "source": "local-llamacpp-cpu-2b-q4_0",
+    "notes": "PAIRED A/B, CPU ARM. Context sweep at concurrency 1, 4 contexts x 2 output lengths, 3 repeats. The other arm is the same GGUF served by the same llama.cpp commit on the same port, run alternately; CPU arm first, then a fixed 120 s cooldown, then this one. Arm attested from /proc, not asserted: device=cpu, exe=/home/xbill/llama.cpp/build-cpu/bin/llama-server, sha256=61432a48569c1acf. UNCONTROLLED: order and thermal state (one package shared by an i7-1360P and a Max-Q card, CPU arm ran first and heated it), and page-cache state (the GGUF was hot from the preceding arm). Neither is measured; do not read a small delta as real."
+  },
+  "hardware": {
+    "accelerator": "13th Gen Intel(R) Core(TM) i7-1360P",
+    "chips": 1,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "12 cores / 16 threads, hybrid: 4 SMT P-cores (logical 0-7) + 8 E-cores (8-15). avx2 + avx_vnni, NO AVX-512. 15 GiB RAM. No CPU affinity was set for this run, which a prior llama-bench sweep found to be a 1.61x prefill lever."
+    }
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+    "family": "gemma-4",
+    "parameters_b": 4.63,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 8192,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes. sweep.py counts both. Only ~1.08 GB of the 3.33 GB artifact is Q4_0; both embeddings are Q6_K, and per_layer_token_embd (1.93 GB) is TENSOR_READ_LAZY."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b218-c6824a9",
+    "backend": "CPU (AVX2)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-m",
+      "/home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "0",
+      "-c",
+      "8192",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "4",
+      "-tb",
+      "8",
+      "--parallel",
+      "1",
+      "--metrics"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (byte-identical in both arms)",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 3,
+      "notes": "decode-source auto -> stream; llama-server emits no usage.decode_tokens_per_second, so decode is client-side inter-token latency off the SSE stream. Prompts are device-neutral and identical across arms. prompt_mode=unique (per-request nonce first, so the prefix cache cannot hit)."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 11.666,
+        "per_stream_tok_per_s": 17.611,
+        "ttft_ms": {
+          "median": 1143.345,
+          "p99": 1143.345
+        },
+        "tpot_ms": {
+          "median": 56.7831
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.86,
+          "min": 17.504,
+          "max": 17.655
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 15.182,
+        "per_stream_tok_per_s": 17.22,
+        "ttft_ms": {
+          "median": 1218.912,
+          "p99": 1218.912
+        },
+        "tpot_ms": {
+          "median": 58.0722
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.27,
+          "min": 17.178,
+          "max": 17.224
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 4.141,
+        "per_stream_tok_per_s": 16.16,
+        "ttft_ms": {
+          "median": 5978.316,
+          "p99": 5978.316
+        },
+        "tpot_ms": {
+          "median": 61.8813
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 6.29,
+          "min": 15.332,
+          "max": 16.296
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 9.452,
+        "per_stream_tok_per_s": 16.395,
+        "ttft_ms": {
+          "median": 5994.994,
+          "p99": 5994.994
+        },
+        "tpot_ms": {
+          "median": 60.9949
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 2.47,
+          "min": 16.035,
+          "max": 16.43
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 2.369,
+        "per_stream_tok_per_s": 15.815,
+        "ttft_ms": {
+          "median": 11747.879,
+          "p99": 11747.879
+        },
+        "tpot_ms": {
+          "median": 63.2306
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 1.35,
+          "min": 15.813,
+          "max": 16.028
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 6.623,
+        "per_stream_tok_per_s": 16.098,
+        "ttft_ms": {
+          "median": 11532.445,
+          "p99": 11532.445
+        },
+        "tpot_ms": {
+          "median": 62.1201
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 1.51,
+          "min": 15.888,
+          "max": 16.128
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 1.244,
+        "per_stream_tok_per_s": 15.662,
+        "ttft_ms": {
+          "median": 23925.805,
+          "p99": 23925.805
+        },
+        "tpot_ms": {
+          "median": 63.847
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 3.8,
+          "min": 15.477,
+          "max": 16.066
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 4.041,
+        "per_stream_tok_per_s": 15.799,
+        "ttft_ms": {
+          "median": 23773.157,
+          "p99": 23773.157
+        },
+        "tpot_ms": {
+          "median": 63.2965
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 1.34,
+          "min": 15.688,
+          "max": 15.897
+        }
+      }
+    ]
+  },
+  "memory": {
+    "weights_gib": 1.311,
+    "kv_bytes_per_token": 18432,
+    "notes": "RssAnon 1,202,152 kB with the model loaded: llama.cpp repacks Q4_0 weights into an interleaved AVX2 layout, copying the body out of the mmap into anonymous memory."
+  }
+}
