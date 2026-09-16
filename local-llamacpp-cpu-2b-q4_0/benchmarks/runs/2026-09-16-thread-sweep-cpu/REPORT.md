@@ -92,3 +92,32 @@ as the clean control. Cite `0xFF` vs `0x55` for SMT, never `0x0F`.
 `./run.sh` — stop `llama-server` first so it is not holding ~4.2 GB and 4 threads
 beside the benchmark. Raw output in `results/llama-bench-threads.md` and
 `results/llama-bench-affinity.md`; machine-readable cells in `results/summary.json`.
+
+## Re-running on another host
+
+`./run.sh` is portable: `topology.py` derives every thread count and every mask
+from sysfs, so nothing in it is specific to this die. On an i7-1360P it
+regenerates this run's exact configuration — thread list `4,8,12,16` and masks
+`0x55`/`0xFF`/`0xFF00`/`0xFF55`. On a homogeneous non-SMT CPU the prefill and
+decode masks collapse to the same value and the two E-core cells are **recorded
+as infeasible** rather than dropped. `results/topology.json` records what was
+derived, so two hosts' runs can be told apart after the fact.
+
+Three things to get right when re-running elsewhere:
+
+- **Match the engine commit.** These numbers are llama.cpp `82324fc50`. A CPU
+  figure from a different commit differenced against a GPU figure from
+  `95ef7fc` mixes an engine delta into the device delta.
+- **`<hw-short>` cannot distinguish two CPUs.** Both hosts' runs would be
+  `<date>-thread-sweep-cpu`, since the hardware slot is just `cpu`. Put the CPU
+  in the free-form `<what>` — `thread-sweep-i7-1360p` — or the two runs are
+  told apart only by date.
+- **A different box is not a device-only A/B.** Prefill, sampling and memory
+  bandwidth all move with the host, and decode here was bandwidth bound. A CPU
+  number from another machine is not this machine's 25 t/s, so the CPU leg has
+  to be re-measured on whichever box hosts the GPU.
+
+- **`CUDA_VISIBLE_DEVICES=` stops being belt-and-braces on a box with a GPU.**
+  With `-ngl 0` alone a CUDA build still initialises the device and can offload
+  large prompt batches; `run.sh` sets it, and the binary must still come from
+  `build-cpu` (`GGML_CUDA=OFF`).
