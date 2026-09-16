@@ -32,19 +32,29 @@
       "description": "EC2 G6 DevOps for the pure-JAX Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution, JAX-on-Ada verification, and SRE diagnostics via the gpu-jax-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9, 23034 MiB). Forked from gpu-jax-g5g-2b 2026-08-28 to move the same engine off Turing onto a native bfloat16 datapath: measured the same day at 48.3-48.5 tok/s against the T4G's 12.80 at an identical config, with the 54% dtype-conversion tax at 0.0% and decode at the bandwidth roofline."
     },
     {
-      "name": "gpu-pytorch-g6-2b",
-      "source": "./gpu-pytorch-g6-2b",
-      "description": "EC2 G6 DevOps for the stock-PyTorch Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 PyTorch DLAMI resolution, torch-on-Ada verification, and SRE diagnostics via the gpu-pytorch-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9, 23034 MiB) through HF transformers -- no custom port, no XLA, no build. Retargeted from gpu-pytorch-g5g-2b 2026-08-29 and measured the same day at 20.93 tok/s, a clean 1.92x over the T4G at byte-identical weights. Sits at 71% of the bandwidth roofline where the JAX rig on the same chip reaches 99%: the gap is eager-mode kernel-launch overhead, and batching is untried."
-    },
-    {
       "name": "gpu-jaxrust-g5g-2b",
       "source": "./gpu-jaxrust-g5g-2b",
       "description": "EC2 G5g DevOps for the Rust-driven-XLA Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, Turing verification, and SRE diagnostics via the gpu-jaxrust-g5g-2b MCP server. Forked from gpu-jax-g5g-2b 2026-08-28 to move the engine off CPython onto Rust. The control plane is complete and measured nothing yet — the Rust engine is not written, and the rig currently runs the inherited Python JAX engine as its fallback and parity oracle."
     },
     {
+      "name": "gpu-llamacpp-g5g-2b-q4_0",
+      "source": "./gpu-llamacpp-g5g-2b-q4_0",
+      "description": "EC2 G5g DevOps for the llama.cpp Gemma 4 E2B rig serving the QAT Q4_0 GGUF: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, from-source llama.cpp build pinned to CMAKE_CUDA_ARCHITECTURES=75, and SRE diagnostics via the gpu-llamacpp-g5g-2b-q4_0 MCP server. Serves google/gemma-4-E2B-it-qat-q4_0-gguf on an NVIDIA T4G (Turing, SM 7.5) behind a Graviton2 host. Scaffolded 2026-09-02 and HAS SERVED NOTHING. The only rig here serving 4-bit weights on a GPU: vLLM 0.26.0 has no gguf module on any platform, no GGUF reader exists in JAX, and transformers dequantizes to fp32 while silently dropping 35 layer_scalar tensors. It compiles because llama.cpp publishes no prebuilt Linux aarch64 CUDA binary — the asymmetry against its gpu-ollama-g5g-2b-q4_0 sibling, which ships one with native sm_75 SASS."
+    },
+    {
+      "name": "gpu-ollama-g5g-2b-q4_0",
+      "source": "./gpu-ollama-g5g-2b-q4_0",
+      "description": "EC2 G5g DevOps for the Ollama Gemma 4 E2B rig serving the QAT Q4_0 weights: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, Ollama bundle install with the CUDA variant pinned to cuda_v12, and SRE diagnostics via the gpu-ollama-g5g-2b-q4_0 MCP server. Serves gemma4:e2b-it-qat on an NVIDIA T4G (Turing, SM 7.5) behind a Graviton2 host. Created 2026-09-02 and HAS SERVED NOTHING. Shares an engine with gpu-llamacpp-g5g-2b-q4_0 — Ollama links libllama.so — so slot 2 names the front end, not the decoder; the pair exists for the four differences a benchmark can still see. No build step: Ollama ships an aarch64 CUDA bundle with native sm_75 SASS where llama.cpp publishes none. Its failure mode is a CPU-resident model, which serves correctly and slowly and logs nothing, so the rig asserts on size_vram from /api/ps."
+    },
+    {
       "name": "gpu-pytorch-g4dn-2b",
       "source": "./gpu-pytorch-g4dn-2b",
       "description": "EC2 G4dn DevOps for the PyTorch/transformers Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 PyTorch DLAMI resolution, torch-on-Turing verification, and SRE diagnostics via the gpu-pytorch-g4dn-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4 (Turing, SM 7.5, 15360 MiB, 14.07 GiB usable). Forked from gpu-pytorch-g5g-2b 2026-08-29 as the fourth corner of the {jax, pytorch} x {g5g, g4dn} square. HAS SERVED NOTHING. Torch comes from the AMI rather than pip — the bootstrap installs into the DLAMI's own venv — so the image is a PyTorch DLAMI (2.13 / Ubuntu 26.04) and not the base driver image the JAX rigs use. Now that gpu-jax-g4dn-2b has closed the host axis, this is the runtime A/B on identical hardware: is the 86.9% dtype-plus-fp32-GEMV tax Turing, or XLA?"
+    },
+    {
+      "name": "gpu-pytorch-g6-2b",
+      "source": "./gpu-pytorch-g6-2b",
+      "description": "EC2 G6 DevOps for the stock-PyTorch Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 PyTorch DLAMI resolution, torch-on-Ada verification, and SRE diagnostics via the gpu-pytorch-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9, 23034 MiB) through HF transformers -- no custom port, no XLA, no build. Retargeted from gpu-pytorch-g5g-2b 2026-08-29 and measured the same day at 20.93 tok/s, a clean 1.92x over the T4G at byte-identical weights. Sits at 71% of the bandwidth roofline where the JAX rig on the same chip reaches 99%: the gap is eager-mode kernel-launch overhead, and batching is untried."
     },
     {
       "name": "gpu-vllm-g5g-2b",
@@ -55,6 +65,11 @@
       "name": "gpu-vllm-g6-2b",
       "source": "./gpu-vllm-g6-2b",
       "description": "EC2 G6 DevOps for the vLLM Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution, SM 8.9 verification, and SRE diagnostics via the gpu-vllm-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9). Forked from gpu-vllm-g5g-2b 2026-08-28, and the fork REMOVES that rig's reason for existing: G6 is x86_64 and SM 8.9, both carried by the published amd64 image, so there is no from-source build, no CUDA toolkit, no Rust and no Triton patch. Exists as the runtime control for gpu-jax-g6-2b on identical silicon. Has served nothing."
+    },
+    {
+      "name": "gpu-vllm-mi300x-2b",
+      "source": "./gpu-vllm-mi300x-2b",
+      "description": "AMD MI300X DevOps for the vLLM Gemma 4 E2B rig: DigitalOcean droplet lifecycle (no create/destroy, by design), rocm-smi diagnostics that parse output rather than trust an exit code, image vetting that catches the newest vendor build being unable to load Gemma 4 at all, serving deployment with the gemma4 reasoning and tool-call parsers, and text/thinking/tool-calling/vision verification via the gpu-vllm-mi300x-2b MCP server. Serves google/gemma-4-E2B-it on one Instinct MI300X (gfx942, 191.69 GiB) reached through AMD Developer Cloud. The first AMD rig in this monorepo; added 2026-09-16."
     },
     {
       "name": "tpu-jax-v5e1-2b",
@@ -75,16 +90,6 @@
       "name": "tpu-pytorch-v5e1-2b",
       "source": "./tpu-pytorch-v5e1-2b",
       "description": "TPU DevOps for the PyTorch/torch_xla Gemma 4 2B rig: provisioning, queued resources, quotas, cost estimates, benchmarking, and SRE diagnostics via the tpu-pytorch-v5e1-2b MCP server. Static-shape decode server on v5e-1."
-    },
-    {
-      "name": "gpu-llamacpp-g5g-2b-q4_0",
-      "source": "./gpu-llamacpp-g5g-2b-q4_0",
-      "description": "EC2 G5g DevOps for the llama.cpp Gemma 4 E2B rig serving the QAT Q4_0 GGUF: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, from-source llama.cpp build pinned to CMAKE_CUDA_ARCHITECTURES=75, and SRE diagnostics via the gpu-llamacpp-g5g-2b-q4_0 MCP server. Serves google/gemma-4-E2B-it-qat-q4_0-gguf on an NVIDIA T4G (Turing, SM 7.5) behind a Graviton2 host. Scaffolded 2026-09-02 and HAS SERVED NOTHING. The only rig here serving 4-bit weights on a GPU: vLLM 0.26.0 has no gguf module on any platform, no GGUF reader exists in JAX, and transformers dequantizes to fp32 while silently dropping 35 layer_scalar tensors. It compiles because llama.cpp publishes no prebuilt Linux aarch64 CUDA binary — the asymmetry against its gpu-ollama-g5g-2b-q4_0 sibling, which ships one with native sm_75 SASS."
-    },
-    {
-      "name": "gpu-ollama-g5g-2b-q4_0",
-      "source": "./gpu-ollama-g5g-2b-q4_0",
-      "description": "EC2 G5g DevOps for the Ollama Gemma 4 E2B rig serving the QAT Q4_0 weights: instance lifecycle, G-family quotas, arm64 GPU DLAMI resolution, Ollama bundle install with the CUDA variant pinned to cuda_v12, and SRE diagnostics via the gpu-ollama-g5g-2b-q4_0 MCP server. Serves gemma4:e2b-it-qat on an NVIDIA T4G (Turing, SM 7.5) behind a Graviton2 host. Created 2026-09-02 and HAS SERVED NOTHING. Shares an engine with gpu-llamacpp-g5g-2b-q4_0 — Ollama links libllama.so — so slot 2 names the front end, not the decoder; the pair exists for the four differences a benchmark can still see. No build step: Ollama ships an aarch64 CUDA bundle with native sm_75 SASS where llama.cpp publishes none. Its failure mode is a CPU-resident model, which serves correctly and slowly and logs nothing, so the rig asserts on size_vram from /api/ps."
     }
   ]
 }

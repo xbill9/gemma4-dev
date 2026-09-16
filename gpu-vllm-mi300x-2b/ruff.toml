@@ -1,0 +1,23 @@
+# Pinned rule set for gpu-vllm-mi300x-2b, matching amd-gputools.
+#
+# Pinned, not left to ruff's implicit defaults, because those defaults drift
+# across releases. Two rules are wrong for this codebase on purpose:
+#
+#   UP045  wants `str | None` and flags the `Optional[str]` style the sibling
+#          rigs use. Match the surrounding code, not the release.
+#   BLE001 flags the blind `except Exception` that every MCP tool ends with.
+#          That is the design: a tool returns an "❌ ..." string to the client
+#          instead of raising, because an exception escaping a tool kills the
+#          server process for every later call.
+
+target-version = "py313"
+line-length = 120
+
+extend-exclude = [".claude/skills", "skills", "dist"]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "ISC"]
+ignore = ["E501"]  # Line length is enforced by the formatter, not the linter.
+
+[format]
+quote-style = "double"

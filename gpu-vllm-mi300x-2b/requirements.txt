@@ -1,0 +1,15 @@
+# gpu-vllm-mi300x-2b
+#
+# Install into the system python3: `pip install -r requirements.txt`.
+# Never create a virtualenv — see CLAUDE.md.
+
+# mcp 2.x, NOT 1.x. 2.x renamed FastMCP to MCPServer (`from mcp.server.mcpserver
+# import MCPServer`); `tool()`, `list_tools()` and `run()` are unchanged.
+mcp>=2,<3
+
+# The DigitalOcean v2 API is called over plain HTTP rather than through a
+# client library: the surface used here is five endpoints, and a dependency
+# that wraps them would still need this to be installed.
+httpx>=0.27.0
+
+python-dotenv>=1.0.0
