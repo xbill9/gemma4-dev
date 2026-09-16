@@ -89,6 +89,20 @@ afford four runs.
 Do not start an arm while anything else is loading the machine. A model load was
 lost to an OOM on 2026-09-16 because a 12-way CUDA build was running beside it.
 
+### `start_model_server` could not leave a server running (fixed 2026-09-16)
+
+It spawned through `asyncio.create_subprocess_exec` with `start_new_session=True`.
+Asyncio's subprocess transport **kills a live child when it is torn down** —
+`BaseSubprocessTransport.__del__` calls `close()`, which calls `_proc.kill()` on
+a child that has not exited — and a new session does not prevent it. MEASURED
+2026-09-16: a spawned `sleep 60` is dead within a second of the interpreter
+exiting. `make serve` (a plain exec) was never affected.
+
+That is very likely the real reason "no pid file" is documented here as the
+NORMAL case: the only path that writes one could not leave a server behind. The
+spawn is now `subprocess.Popen`, which merely warns when collected with a live
+child. Still no shell — the rule is against `shell=True`, not against the module.
+
 ## Read this first: what this directory was until 2026-09-15
 
 **A byte-identical copy of `local-llamacpp-1650ti-2b-q4_0`** (`diff -rq` empty):

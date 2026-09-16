@@ -33,6 +33,7 @@ import asyncio
 import logging
 import os
 import signal
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -291,6 +292,33 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
     return cmd
 
 
+def _spawn_detached(cmd: list[str]) -> int:
+    """Start llama-server as a daemon that OUTLIVES this process, and return its pid.
+
+    DELIBERATELY NOT asyncio.create_subprocess_exec, which is what `run_command`
+    uses and what this did until 2026-09-16. Asyncio's subprocess transport KILLS
+    a live child when it is torn down: BaseSubprocessTransport.__del__ calls
+    close(), and close() calls _proc.kill() on a child that has not exited.
+    `start_new_session=True` does not save it -- MEASURED 2026-09-16, a spawned
+    `sleep 60` is dead within a second of the interpreter exiting.
+
+    So a server started through this tool did not survive, while `make serve` (a
+    plain exec) was unaffected. That is very likely why "no pid file" is
+    documented here as the NORMAL case: the path that writes one could not leave
+    a server running.
+
+    subprocess.Popen only warns when collected with a live child; it does not
+    kill it. Still no shell -- the rule in CLAUDE.md is against shell=True, not
+    against the module.
+    """
+    with open(LOG_FILE, "ab") as log:
+        proc = subprocess.Popen(
+            cmd, stdout=log, stderr=log, stdin=subprocess.DEVNULL,
+            start_new_session=True, env=_server_env(),
+        )
+    return proc.pid
+
+
 @mcp.tool()
 async def start_model_server(context_size: Optional[str] = None) -> str:
     """Start llama-server on the local CPU. No-op if it is already running."""
@@ -313,14 +341,10 @@ async def start_model_server(context_size: Optional[str] = None) -> str:
 
     RUN_DIR.mkdir(exist_ok=True)
     cmd = _server_command(context_size)
-
-    with open(LOG_FILE, "ab") as log:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd, stdout=log, stderr=log, start_new_session=True, env=_server_env()
-        )
-    PID_FILE.write_text(str(proc.pid))
+    pid = _spawn_detached(cmd)
+    PID_FILE.write_text(str(pid))
     return (
-        f"📡 Started llama-server (pid {proc.pid}) → {ENDPOINT}\n\n"
+        f"📡 Started llama-server (pid {pid}) → {ENDPOINT}\n\n"
         f"```\n{' '.join(cmd)}\n```\n\n"
         f"Loading is not instant. Poll `model_server_status`; log at `{LOG_FILE}`."
     )

@@ -212,7 +212,7 @@ class TestStartModelServer(unittest.IsolatedAsyncioTestCase):
     async def test_spawns_with_cuda_hidden(self):
         proc = MagicMock()
         proc.pid = 5150
-        spawn = AsyncMock(return_value=proc)
+        spawn = MagicMock(return_value=proc)
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(server, "LLAMA_SERVER_BIN", __file__), \
              patch.object(server, "MODEL_PATH", __file__), \
@@ -221,12 +221,27 @@ class TestStartModelServer(unittest.IsolatedAsyncioTestCase):
              patch.object(server, "RUN_DIR", Path(tmp)), \
              patch.object(server, "PID_FILE", Path(tmp) / "pid"), \
              patch.object(server, "LOG_FILE", Path(tmp) / "log"), \
-             patch.object(server.asyncio, "create_subprocess_exec", spawn):
+             patch.object(server.subprocess, "Popen", spawn):
             out = await server.start_model_server()
         self.assertIn("5150", out)
         self.assertEqual(spawn.call_args.kwargs["env"]["CUDA_VISIBLE_DEVICES"], "")
-        argv = spawn.call_args.args
+        argv = spawn.call_args.args[0]
         self.assertEqual(argv[argv.index("-ngl") + 1], "0")
+        self.assertTrue(spawn.call_args.kwargs["start_new_session"])
+
+    async def test_spawn_survives_this_process(self):
+        """REGRESSION 2026-09-16. asyncio's subprocess transport kills a live
+        child when it is torn down (__del__ -> close() -> _proc.kill()), and
+        start_new_session does not prevent it, so every server started through
+        this tool died with the interpreter. Verified against a real `sleep 60`.
+        subprocess.Popen only warns; it does not kill."""
+        src = (RIG_DIR / "server.py").read_text()
+        spawn = src[src.index("def _spawn_detached"):src.index("async def start_model_server")]
+        # The docstring names the trap; the CODE must not use it.
+        body = spawn.split('"""')[-1]
+        self.assertIn("subprocess.Popen", body)
+        self.assertNotIn("create_subprocess_exec", body)
+        self.assertIn("start_new_session=True", body)
 
 
 class TestStopModelServer(unittest.IsolatedAsyncioTestCase):

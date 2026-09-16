@@ -47,6 +47,20 @@ rig's own record and are still valid as that. They are **not** the GPU arm of a
 paired comparison against anything measured after 2026-09-16 — re-run this arm
 for that, and do not difference an old run against a new CPU one.
 
+### `start_model_server` could not leave a server running (fixed 2026-09-16)
+
+It spawned through `asyncio.create_subprocess_exec` with `start_new_session=True`.
+Asyncio's subprocess transport **kills a live child when it is torn down** —
+`BaseSubprocessTransport.__del__` calls `close()`, which calls `_proc.kill()` on
+a child that has not exited — and a new session does not prevent it. MEASURED
+2026-09-16: a spawned `sleep 60` is dead within a second of the interpreter
+exiting. `make serve` (a plain exec) was never affected.
+
+That is very likely the real reason "no pid file" is documented here as the
+NORMAL case: the only path that writes one could not leave a server behind. The
+spawn is now `subprocess.Popen`, which merely warns when collected with a live
+child. Still no shell — the rule is against `shell=True`, not against the module.
+
 ## It is the first `local` rig, and that is most of what is different
 
 `local` was added to slot 1 of `@NAMING.md` on 2026-09-03 for this rig. It names
