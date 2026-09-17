@@ -224,7 +224,7 @@ Cost per million output tokens is the hourly rate over the measured rate, which 
 
 Serving one stream at a time costs **30x more per token** than serving 64, on the same card at the same hourly rate. Batching is a far bigger lever than any hardware choice here, and the spread is wider than on the small cards precisely because there is so much headroom left to fill.
 
-Compute only. No storage, no transfer, and no idle time — a card at $1.99 an hour producing nothing costs exactly what one producing 10,000 tokens a second costs.
+Compute only. No storage, no transfer, and no idle time — a card at $1.99 an hour producing nothing costs exactly what one producing 10,293.6 tokens a second costs.
 
 #### What Was Controlled
 

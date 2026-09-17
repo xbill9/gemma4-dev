@@ -1,0 +1,197 @@
+# Excerpt from gemma4-dev/HARDWARE.md, copied verbatim 2026-09-16.
+# Source of the fp8 1.77x GEMM ratio this article cites but did not measure.
+# Measured in the companion work on the same droplet, not by this sweep.
+#
+### Native format support — the oldest part in this repo, and it shows
+
+| Format | T4G (SM 7.5) | L4 (SM 8.9), for contrast |
+| --- | :---: | :---: |
+| fp16 | **yes** | yes |
+| bf16 | **no** | yes |
+| fp8 | **no** | yes |
+| int8 | yes (Turing tensor cores) | yes |
+
+**bf16 arrives with Ampere (SM 8.0); fp8 with Ada/Hopper.** T4G predates both. This is the same shape
+of finding as the v5e/v6e rows at the top of this file — *quantization and dtype conclusions do not
+carry forward across generations* — except that here the direction is backwards: every other GPU rig
+in this monorepo targets L4 and hardcodes `--dtype bfloat16 --kv-cache-dtype fp8`, and both of those
+are unavailable one generation earlier. `--dtype bfloat16` on T4G is a hard failure, not a slow path.
+
+FlashAttention also requires SM 8.0+, so the Turing-capable vLLM attention backend is `XFORMERS`.
+
+### TU117 is Turing without tensor cores, and fp16 there is a 4x PENALTY
+
+**MEASURED 2026-09-04 on the GTX 1650 Ti (Max-Q) in `local-llamacpp-1650ti-2b-q4_0`'s host**, torch
+2.15.0.dev20260904+cu130, square matmul, 10 warm-up iterations then best of 3:
+
+| N | fp32 | fp16 | bf16 | fp16 / fp32 |
+| ---: | ---: | ---: | ---: | ---: |
+| 1024 | 1.41 | **0.41** | 1.87 | **0.29x** |
+| 2048 | 1.72 | **0.41** | 1.61 | **0.24x** |
+| 4096 | 1.68 | **0.41** | 1.59 | **0.25x** |
+
+TFLOP/s. **fp16 is pinned at 0.41 across a 64x range in FLOP count**, and that flatness is the
+diagnostic: it is a fixed-rate path, not a cache or occupancy effect. bf16 tracks fp32 (0.93–1.33x).
+
+**The table above is right for the T4 and wrong for the GTX 16-series, and the difference is tensor
+cores.** T4/T4G is TU104 and has them; TU116/TU117 does not — Nvidia cut both the RT and the tensor
+cores from that die. Same compute capability 7.5, different silicon. So:
+
+- **`float16` is the recommended Turing compute dtype in `@QUANTIZATION.md`'s table, and that
+  recommendation does not transfer to TU116/TU117.** It is correct where fp16 reaches tensor cores
+  and a 4x regression where it does not.
+- **`bf16` is not a "hard failure" on this part.** The T4G paragraph above says `--dtype bfloat16`
+  fails rather than running slowly; under torch on TU117 it runs at parity with fp32. That paragraph
+  is about vLLM's dtype validation refusing the flag, not about the silicon being unable — worth
+  keeping distinct, because the remedies differ.
+- **This is a torch/cuBLAS matmul measurement, not a serving measurement.** It says what the part
+  delivers for a dense GEMM; it does not by itself predict a decode loop, which on this card is
+  bandwidth- and launch-bound rather than matmul-bound (`local-llamacpp-1650ti-2b-q4_0` measured
+  `GGML_CUDA_FORCE_MMQ` — llama.cpp's own suggestion for a tensor-core-less device — moving decode
+  by −1%).
+
+**Practical rule: never pick a compute dtype for a `7.5` device without asking which die it is.**
+The compute capability is shared; the tensor cores are not, and the penalty for guessing wrong here
+is 4x on the format the shared capability number recommends.
+
+### The packaging gap: aarch64 and SM 7.5 are not published together
+
+**This is the property that makes T4G unlike every other GPU here, and it is a fact about the
+ecosystem's binaries rather than about the silicon.** Read directly from the published image config of
+`vllm/vllm-openai:v0.27.1` on 2026-08-12 — one manifest list, two platforms:
+
+| Manifest | `NVARCH` | `TORCH_CUDA_ARCH_LIST` | SM 7.5? |
+| --- | --- | --- | :---: |
+| `linux/amd64` | `x86_64` | `7.5 8.0 8.6 8.9 9.0 10.0 12.0` | **yes** |
+| `linux/arm64` | `sbsa` | `8.0 8.7 8.9 9.0 10.0 11.0 12.0` | **no** |
+
+The arm64 build targets the ARM+NVIDIA parts that actually ship at volume — A100, Jetson Orin, GH200,
+Blackwell. T4G is the one combination that falls between the two images, and vLLM's Dockerfile sets
+**no `+PTX`** (deliberately, with a comment explaining that vLLM filters torch's global PTX flag), so
+there is no JIT fallback. The failure is `no kernel image is available for execution on the device`.
+
+The Dockerfile's *default* `torch_cuda_arch_list` does include 7.5 — the release pipeline overrides it
+per platform. So rebuilding the arm64 image with `--build-arg torch_cuda_arch_list=7.5` is the
+supported route, and it is what the rig's `serving='build'` path does.
+
+**One layer below that is not yet verified first-hand.** PyTorch's own aarch64/SBSA CUDA wheels appear
+to be built for 9.0/10.0/12.0, also without 7.5. If that holds, rebuilding vLLM is *necessary but not
+sufficient* and a from-source PyTorch is needed too. The rig's `verify_gpu_arch` tool measures it on a
+live instance (`torch.cuda.get_arch_list()` plus a real matmul) rather than settling it by argument;
+update this section when it runs. Detail in `gpu-vllm-g5g-2b/docs/turing-aarch64-gap.md`.
+
+CUDA 13 is **not** an additional obstacle: 13.0 dropped Maxwell, Pascal and Volta, and Turing survived
+that cut as the new floor. The toolchain can target this GPU; only the shipped binaries do not.
+
+## inf2 — AWS Inferentia2
+
+Served by `tpu-pytorch-inf2-2b`. Takes platform slot `tpu` per `NAMING.md` (a dedicated inference
+accelerator on a VM), with the part in the hardware slot.
+
+Measured on `inf2.xlarge`, 2026-07-31/08-01, with jax 0.6.2 / jax-neuronx 0.6.2.1.0.6446 /
+neuronx-cc 2.24.8799.0 / Neuron runtime 2.31.24. Full workings in
+`tpu-pytorch-inf2-2b/docs/neuron-jax-quirks.md`.
+
+| Spec | Value | How known |
+| :--- | ---: | :--- |
+| HBM **per NeuronCore** | **16 GiB** | `hbm_limit_bytes` = 17,179,869,184, reported identically whether one core or two is visible |
+| HBM per chip | 32 GB | 16 GiB × 2 cores |
+| NeuronCores per `inf2.xlarge` | 2 | |
+| HBM bandwidth | ~820 GB/s | published, **not calibrated here** — used only as an order-of-magnitude bound |
+
+**The 16 GiB is per core, not a pool.** `NEURON_RT_NUM_CORES=1` therefore withholds a *device*, not
+memory — a single-device engine always had its 16 GiB. Setting it to 2 cut parameter load from 263.0 s
+to **68.8 s (3.8x)** and exposed the second core, but changed serving latency not at all: a visible
+device that a single-device engine never targets cannot help.
+
+A second process can claim the other core with `NEURON_RT_VISIBLE_CORES=1`, which is useful for
+probing a live deployment. With `NEURON_RT_NUM_CORES=2` the server claims both and that stops working.
+
+### Native format support: worse than the TPU rows above, not better
+
+**There is no compressed-compute path at all.** `_CAPS.pallas` is `False`, so a fused W4A16 kernel
+cannot lower — neuronx-cc will not accept Mosaic — and the W4A16 implementation is forced to
+`"reference"`, which **materializes a dense BF16 copy of every weight before the matmul**:
+
+| variant | s/call | compile s |
+| :--- | ---: | ---: |
+| W4A16 reference (dequantize + matmul) | **0.027** | 39.5 |
+| dense BF16 matmul | **0.001** | 3.9 |
+
+**27x per call, 10x compile.** So on this part 4-bit weights are *stored* compressed and *read* dense,
+and it happens silently — the loud fallback warning only fires when `"auto"` or `"fused"` degrades at
+runtime, and the default is already `"reference"`.
+
+**Buffer donation also fails at runtime**, removing the lever that keeps a large argument in place on
+TPU. Do not "fix" that by closing over the parameters instead: measured, that is strictly worse — JAX
+captures them as lowering constants and parks the whole tree in host RAM permanently.
+
+### Three failure modes with no TPU equivalent
+
+1. **A too-large gather returns zeros, not an error.** Above roughly 4–5 GB in a single device tensor,
+   a gather that "ran" can yield an all-zero result and execution continues. Zero logits make `argmax`
+   return token 0 — the pad id, which is in the EOS set — so the server returns a clean `200 OK` with
+   `finish_reason: "stop"` and **zero completion tokens**. Nothing in the response, the logs or
+   `/metrics` indicates a fault. The same gather is exactly correct at every geometry that fits
+   (0.81 GB `embed_tokens` included). **The gather primitive is fine; the allocation is not.** Check a
+   norm, never a shape.
+2. **Eager ops invoke the compiler at runtime.** A bare `jnp.full` reaches `RunNeuronCCImpl` — the
+   first symptom was `FileNotFoundError: 'neuronx-cc'` raised from an array *construction*. Fixed
+   shapes are cached and free; a **new** shape costs ~3.9 s per call. Anything shape-varying in a
+   per-token path is a compile per token.
+3. **Per-buffer dispatch has a cliff above ~128 buffers.** At a constant 2.05 GB total split across N
+   arrays: 8 arrays → 0.008 s/call, 128 → 0.008, **512 → 0.418**. A 52x jump at identical total bytes.
+   A Gemma 4 E2B parameter pytree has several hundred leaves and sits past the cliff.
+
+**Do not carry TPU intuition here.** Sizes and dtypes matter in ways they do not on TPU, and the
+platform announces itself with `Platform 'neuron' is experimental and not all JAX functionality may be
+correctly supported!` — and then means it.
+
+
+## MI300X — AMD CDNA 3 (AMD Developer Cloud, DigitalOcean underneath)
+
+Served by `gpu-vllm-mi300x-2b`; the general MI300 tooling is a separate repo, `~/amd-gputools`.
+Platform slot `gpu`, hardware slot **`mi300x`**. **The only AMD part in this monorepo** and the only
+one whose control plane is neither Google Cloud nor EC2.
+
+All figures below **measured on the part** 2026-09-16 on `debian-gpu-mi300x1-192gb-devcloud-atl1`,
+not read off a spec sheet.
+
+| | |
+| --- | --- |
+| Arch | `gfx942:sramecc+:xnack-`, CDNA 3, Aqua Vanjaram, `1002:74b5` |
+| Compute Units | **304** across 8 XCDs; 4 SIMDs/CU → 1216 matrix cores, 19456 shader cores |
+| Wavefront | **64**, not 32 — warp-level intuition from CUDA does not port |
+| Clock | 2100 MHz max |
+| Cache | L1 32 KB, L2 4 MB, **L3 / Infinity 256 MB** |
+| VRAM | 205,822,885,888 B = **191.7 GiB**, HBM3, 8192-bit |
+| Bandwidth | 5.3 TB/s spec; **3.76 TB/s measured** device-to-device copy, under load |
+
+It presents as an SR-IOV **VF** (`AMD Instinct MI300X VF`) but is not a partition: all 304 CUs and
+the whole 191.7 GiB are there.
+
+### Native format support
+
+| Format | MI300X (gfx942) | Note |
+| --- | :---: | :--- |
+| bf16 | **yes** | 1307.4 TFLOP/s peak — the baseline |
+| fp16 | yes | same matrix cores, same peak; not a change from bf16 |
+| fp8 `e4m3fnuz` | **yes** | 2614.9 TFLOP/s peak, **1.77x bf16 measured** |
+| fp8 `e4m3fn` | **no** | `HIPBLAS_STATUS_NOT_SUPPORTED` — the OCP flavour NVIDIA publishes |
+| int8 | runs | equal peak on paper, **0.69x bf16 measured** — no win |
+| fp4 / MX | **no** | torch: `only supported on gfx950,gfx1250`. CDNA 4 |
+
+**This is the first row in this file where fp8 is a genuine compute format**, and it inverts the
+v5e/v6e conclusion at the top: there fp8 is storage-only and int8 is the sole compute win. Here fp8
+is the sole compute win and int8 measures *slower than bf16*. **Do not carry a TPU quantization
+conclusion onto this part** — and note the inversion runs opposite to the T4G finding too.
+
+The `fnuz` spelling is the expensive part. CDNA 3 uses the no-NaN / unsigned-zero fp8 variants, so
+**an fp8 checkpoint published for H100 is not drop-in** — `e4m3fn` raises rather than falling back.
+vLLM keys on `"gfx94"` in `is_fp8_fnuz()`. Quantize online from bf16 instead of hunting a checkpoint.
+
+Measured 8192³ matmul, 30 iterations, torch 2.12.0+rocm10.0.0, card concurrently serving:
+bf16 664.3 / fp16 662.5 / **fp8 1172.5** / int8 455.6 TFLOP/s. `QUANTIZATION.md` carries the stack
+side of this.
+
+### CUDA equivalents, for reading the rest of this file
