@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gemma 4 Console</title>
+<style>
+:root {
+  --bg: #fbfaf9; --panel: #ffffff; --ink: #1a1815; --muted: #6b6560;
+  --line: #e4e0db; --accent: #c2410c; --accent-soft: #fff1e9;
+  --user: #f2efec; --think: #f7f5f2; --ok: #15803d; --bad: #b91c1c;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17161a; --panel: #1e1d22; --ink: #eceae7; --muted: #9b9490;
+    --line: #2e2c33; --accent: #fb923c; --accent-soft: #2a1f18;
+    --user: #26242b; --think: #201f25; --ok: #4ade80; --bad: #f87171;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17161a; --panel: #1e1d22; --ink: #eceae7; --muted: #9b9490;
+  --line: #2e2c33; --accent: #fb923c; --accent-soft: #2a1f18;
+  --user: #26242b; --think: #201f25; --ok: #4ade80; --bad: #f87171;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex; flex-direction: column;
+}
+header {
+  border-bottom: 1px solid var(--line); background: var(--panel);
+  padding: 10px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.brand { font-weight: 650; letter-spacing: -0.01em; white-space: nowrap; }
+.brand span { color: var(--muted); font-weight: 400; font-size: 13px; }
+.grow { flex: 1 1 auto; }
+input, select, textarea, button {
+  font: inherit; color: inherit; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px;
+}
+input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+button { background: var(--panel); cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+button.primary:disabled { opacity: .5; cursor: default; }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 6px; }
+button.ghost:hover { color: var(--accent); }
+#endpoint { width: 290px; font-family: var(--mono); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+#status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+#settings {
+  display: none; gap: 18px; flex-wrap: wrap; padding: 12px 16px;
+  border-bottom: 1px solid var(--line); background: var(--panel); font-size: 13px;
+}
+#settings.open { display: flex; }
+#settings label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); }
+#settings input[type="number"] { width: 110px; }
+#settings textarea { width: min(460px, 60vw); height: 54px; resize: vertical; }
+.chk { flex-direction: row !important; align-items: center; gap: 7px !important; color: var(--ink) !important; }
+
+main { flex: 1 1 auto; overflow-y: auto; }
+.thread { max-width: 860px; margin: 0 auto; padding: 24px 16px 8px; }
+.msg { margin-bottom: 22px; }
+.role { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin-bottom: 6px; }
+.bubble { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); white-space: pre-wrap; word-wrap: break-word; }
+.msg.user .bubble { background: var(--user); border-color: transparent; }
+.msg.user img { max-width: 220px; border-radius: 7px; margin-top: 8px; display: block; }
+details.think { margin-bottom: 8px; background: var(--think); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+details.think summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+details.think .body { white-space: pre-wrap; color: var(--muted); font-size: 14px; margin-top: 8px; }
+.meta { font-size: 12px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+.err { color: var(--bad); }
+.empty { color: var(--muted); text-align: center; padding: 56px 16px; }
+.empty code { background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; font-size: 13px; }
+
+footer { border-top: 1px solid var(--line); background: var(--panel); padding: 12px 16px; }
+.composer { max-width: 860px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; }
+#prompt { flex: 1 1 auto; resize: none; min-height: 46px; max-height: 190px; }
+#thumbs { max-width: 860px; margin: 0 auto 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+#thumbs figure { margin: 0; position: relative; }
+#thumbs img { height: 54px; border-radius: 6px; border: 1px solid var(--line); display: block; }
+#thumbs button { position: absolute; top: -7px; right: -7px; border-radius: 50%; width: 21px; height: 21px; padding: 0; line-height: 1; background: var(--panel); }
+.hint { max-width: 860px; margin: 8px auto 0; font-size: 12px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+@media (max-width: 640px) { #endpoint { width: 100%; } .brand span { display: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Gemma 4 Console <span id="modelName">— no model</span></div>
+  <input id="endpoint" spellcheck="false" placeholder="http://host:8000/v1">
+  <button id="connect">Connect</button>
+  <div id="status"><span class="dot" id="dot"></span><span id="statusText">idle</span></div>
+  <div class="grow"></div>
+  <button class="ghost" id="toggleSettings" title="Settings">⚙</button>
+  <button class="ghost" id="toggleTheme" title="Light / dark">◐</button>
+  <button class="ghost" id="clear" title="Clear conversation">⌫</button>
+</header>
+
+<div id="settings">
+  <label>temperature<input type="number" id="temp" min="0" max="2" step="0.1" value="0.7"></label>
+  <label>max tokens<input type="number" id="maxTok" min="1" max="32768" step="64" value="1024"></label>
+  <label>top_p<input type="number" id="topP" min="0" max="1" step="0.05" value="0.95"></label>
+  <label>system prompt<textarea id="system" spellcheck="false" placeholder="(none)"></textarea></label>
+  <label class="chk"><input type="checkbox" id="showThink" checked> show reasoning</label>
+  <label class="chk"><input type="checkbox" id="keepCtx" checked> send history</label>
+</div>
+
+<main id="main">
+  <div class="thread" id="thread">
+    <div class="empty" id="empty">
+      Point at an OpenAI-compatible endpoint and start typing.<br>
+      <code>/v1/models</code> is polled on connect to find the model id.
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div id="thumbs"></div>
+  <div class="composer">
+    <textarea id="prompt" placeholder="Message…  (Enter sends, Shift+Enter newline)" rows="1"></textarea>
+    <button class="ghost" id="attach" title="Attach image">🖼</button>
+    <input type="file" id="file" accept="image/*" multiple hidden>
+    <button class="primary" id="send">Send</button>
+    <button id="stop" style="display:none">Stop</button>
+  </div>
+  <div class="hint">
+    <span id="lastStats">—</span>
+    <span>images: 4 max per prompt · audio unsupported on ROCm builds</span>
+  </div>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const LS = 'gemma4-console';
+const state = { model: null, images: [], history: [], abort: null };
+
+/* ---------- persistence (per-viewer convenience only; safe to lose) ---------- */
+function save() {
+  try {
+    localStorage.setItem(LS, JSON.stringify({
+      endpoint: $('endpoint').value, temp: $('temp').value, maxTok: $('maxTok').value,
+      topP: $('topP').value, system: $('system').value, theme: document.documentElement.dataset.theme || '',
+      showThink: $('showThink').checked, keepCtx: $('keepCtx').checked,
+    }));
+  } catch (e) { /* private window, blocked storage — the page still works */ }
+}
+function load() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem(LS) || '{}'); } catch (e) { s = {}; }
+  $('endpoint').value = s.endpoint || 'http://129.212.178.87:8000/v1';
+  if (s.temp) $('temp').value = s.temp;
+  if (s.maxTok) $('maxTok').value = s.maxTok;
+  if (s.topP) $('topP').value = s.topP;
+  if (s.system) $('system').value = s.system;
+  if (s.theme) document.documentElement.dataset.theme = s.theme;
+  if (s.showThink === false) $('showThink').checked = false;
+  if (s.keepCtx === false) $('keepCtx').checked = false;
+}
+
+/* ---------- connection ---------- */
+function setStatus(text, cls) {
+  $('statusText').textContent = text;
+  $('dot').className = 'dot' + (cls ? ' ' + cls : '');
+}
+async function connect() {
+  const base = $('endpoint').value.replace(/\/+$/, '');
+  setStatus('connecting…', '');
+  try {
+    const r = await fetch(base + '/models');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const m = (j.data || [])[0];
+    if (!m) throw new Error('no models listed');
+    state.model = m.id;
+    $('modelName').textContent = '— ' + m.id + (m.max_model_len ? '  ·  ' + m.max_model_len.toLocaleString() + ' ctx' : '');
+    setStatus('connected', 'ok');
+  } catch (e) {
+    state.model = null;
+    $('modelName').textContent = '— no model';
+    setStatus(e.message, 'bad');
+  }
+  save();
+}
+
+/* ---------- rendering ---------- */
+function bubble(role) {
+  $('empty').style.display = 'none';
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  wrap.innerHTML = '<div class="role">' + role + '</div>';
+  const think = document.createElement('details');
+  think.className = 'think'; think.style.display = 'none';
+  think.innerHTML = '<summary>reasoning</summary><div class="body"></div>';
+  const body = document.createElement('div');
+  body.className = 'bubble';
+  const meta = document.createElement('div');
+  meta.className = 'meta'; meta.style.display = 'none';
+  wrap.append(think, body, meta);
+  $('thread').appendChild(wrap);
+  return { wrap, think, thinkBody: think.querySelector('.body'), body, meta };
+}
+function scroll() { $('main').scrollTop = $('main').scrollHeight; }
+
+/* ---------- send ---------- */
+async function send() {
+  const text = $('prompt').value.trim();
+  if (!text && !state.images.length) return;
+  if (!state.model) { await connect(); if (!state.model) return; }
+
+  const parts = [];
+  if (text) parts.push({ type: 'text', text });
+  for (const src of state.images) parts.push({ type: 'image_url', image_url: { url: src } });
+  const userMsg = { role: 'user', content: state.images.length ? parts : text };
+
+  const u = bubble('user');
+  u.body.textContent = text || '(image only)';
+  for (const src of state.images) {
+    const img = document.createElement('img'); img.src = src; u.wrap.appendChild(img);
+  }
+  state.history.push(userMsg);
+  $('prompt').value = ''; $('prompt').style.height = 'auto';
+  state.images = []; $('thumbs').innerHTML = '';
+  scroll();
+
+  const messages = [];
+  const sys = $('system').value.trim();
+  if (sys) messages.push({ role: 'system', content: sys });
+  messages.push(...($('keepCtx').checked ? state.history : [userMsg]));
+
+  const a = bubble('assistant');
+  a.body.textContent = '';
+  $('send').disabled = true; $('stop').style.display = '';
+  state.abort = new AbortController();
+
+  const t0 = performance.now();
+  let firstTok = null, out = '', reasoning = '', usage = null;
+
+  try {
+    const r = await fetch($('endpoint').value.replace(/\/+$/, '') + '/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: state.abort.signal,
+      body: JSON.stringify({
+        model: state.model, messages, stream: true,
+        stream_options: { include_usage: true },
+        temperature: parseFloat($('temp').value),
+        top_p: parseFloat($('topP').value),
+        max_tokens: parseInt($('maxTok').value, 10),
+      }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + (await r.text()).slice(0, 300));
+
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') continue;
+        let j; try { j = JSON.parse(payload); } catch (e) { continue; }
+        if (j.usage) usage = j.usage;
+        const d = (j.choices && j.choices[0] && j.choices[0].delta) || {};
+        // vLLM emits reasoning separately when started with --reasoning-parser gemma4.
+        // Field name varies by build: `reasoning_content` streaming, `reasoning` elsewhere.
+        // It only appears once the parser sees the end-of-thinking token — a response
+        // truncated by max_tokens leaves the thinking inline in `content` instead.
+        const think = d.reasoning_content || d.reasoning;
+        if (think) {
+          if (firstTok === null) firstTok = performance.now();
+          reasoning += think;
+          if ($('showThink').checked) {
+            a.think.style.display = ''; a.thinkBody.textContent = reasoning;
+          }
+        }
+        if (d.content) {
+          if (firstTok === null) firstTok = performance.now();
+          out += d.content; a.body.textContent = out;
+        }
+        scroll();
+      }
+    }
+    if (out) state.history.push({ role: 'assistant', content: out });
+  } catch (e) {
+    a.body.innerHTML += '<div class="err">' + (e.name === 'AbortError' ? '— stopped —' : e.message) + '</div>';
+  } finally {
+    const elapsed = (performance.now() - t0) / 1000;
+    const ttft = firstTok ? (firstTok - t0) : null;
+    const gen = firstTok ? (performance.now() - firstTok) / 1000 : null;
+    const n = usage && usage.completion_tokens;
+    const bits = [];
+    if (ttft !== null) bits.push('ttft ' + ttft.toFixed(0) + ' ms');
+    if (n && gen) bits.push(n + ' tok · ' + (n / gen).toFixed(1) + ' tok/s');
+    bits.push(elapsed.toFixed(1) + ' s total');
+    if (usage && usage.prompt_tokens) bits.push('prompt ' + usage.prompt_tokens);
+    a.meta.textContent = bits.join('  ·  ');
+    a.meta.style.display = '';
+    $('lastStats').textContent = bits.join('  ·  ');
+    $('send').disabled = false; $('stop').style.display = 'none';
+    state.abort = null; scroll();
+  }
+}
+
+/* ---------- images ---------- */
+function addImages(files) {
+  for (const f of files) {
+    if (state.images.length >= 4) break;      // --limit-mm-per-prompt image:4
+    const fr = new FileReader();
+    fr.onload = () => {
+      state.images.push(fr.result);
+      const fig = document.createElement('figure');
+      const img = document.createElement('img'); img.src = fr.result;
+      const rm = document.createElement('button'); rm.textContent = '×';
+      rm.onclick = () => {
+        state.images = state.images.filter(s => s !== fr.result);
+        fig.remove();
+      };
+      fig.append(img, rm); $('thumbs').appendChild(fig);
+    };
+    fr.readAsDataURL(f);
+  }
+}
+
+/* ---------- wiring ---------- */
+$('connect').onclick = connect;
+$('send').onclick = send;
+$('stop').onclick = () => state.abort && state.abort.abort();
+$('attach').onclick = () => $('file').click();
+$('file').onchange = e => { addImages(e.target.files); e.target.value = ''; };
+$('toggleSettings').onclick = () => $('settings').classList.toggle('open');
+$('toggleTheme').onclick = () => {
+  const now = document.documentElement.dataset.theme;
+  const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = now ? (now === 'dark' ? 'light' : 'dark') : (sysDark ? 'light' : 'dark');
+  save();
+};
+$('clear').onclick = () => {
+  state.history = []; $('thread').innerHTML = '';
+  const e = document.createElement('div');
+  e.className = 'empty'; e.id = 'empty';
+  e.textContent = 'Conversation cleared.';
+  $('thread').appendChild(e);
+  $('lastStats').textContent = '—';
+};
+$('prompt').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$('prompt').addEventListener('input', e => {
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(e.target.scrollHeight, 190) + 'px';
+});
+document.addEventListener('paste', e => {
+  const imgs = [...(e.clipboardData?.items || [])]
+    .filter(i => i.type.startsWith('image/')).map(i => i.getAsFile()).filter(Boolean);
+  if (imgs.length) { e.preventDefault(); addImages(imgs); }
+});
+for (const id of ['temp', 'maxTok', 'topP', 'system', 'showThink', 'keepCtx', 'endpoint']) {
+  $(id).addEventListener('change', save);
+}
+
+load();
+connect();
+</script>
+</body>
+</html>
