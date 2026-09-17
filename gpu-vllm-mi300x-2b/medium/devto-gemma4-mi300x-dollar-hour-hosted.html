@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Serving Gemma 4 on an AMD MI300X: What $1.99 an Hour Buys</title>
+  <meta name="description" content="A step by step deployment of Gemma 4 E2B to a single AMD Instinct MI300X on AMD Developer Cloud, driven by Python MCP tools, and the throughput a 191.7 GiB card returns for its hourly rate." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/medium/img/devto-dollar-hour-cover.02475528.jpg" alt="Serving Gemma 4 on an AMD MI300X: What $1.99 an Hour Buys" /></figure>
+<p><em>This article provides a step by step deployment guide for
+<strong>Gemma 4 E2B</strong> to an <strong>AMD Instinct MI300X</strong>
+hosted GPU enabled system. A suite of Python MCP tools is built to
+simplify management of the vLLM hosted deployment. The card is reached
+through AMD Developer Cloud, which is DigitalOcean underneath, and the
+workstation driving it has no AMD GPU in it at all.</em></p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b">github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b</a></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/medium/img/devto-gemma4-mi300x-dollar-hour-table-1.png"
+alt="Table: Model, Hardware, Host, Control plane" /></p>
+<hr />
+<h4 id="where-do-i-start">Where Do I Start?</h4>
+<p>The card is a DigitalOcean GPU droplet reached through AMD Developer
+Cloud (<code>devcloud.amd.com</code>) — same v2 API, same droplet ids,
+token from the My AMD Team account. Creating and destroying it are
+console actions, deliberately: both are dollar-per-hour decisions and
+neither belongs in a tool an agent can call.</p>
+<p>Everything after creation is scripted. The droplet carries a tag,
+every tool is scoped to that tag, and nothing in the toolkit can touch
+an instance that does not have it.</p>
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A GPU droplet running, tagged, and reachable by SSH key</li>
+<li><code>DIGITALOCEAN_ACCESS_TOKEN</code> in a mode 0600
+<code>.env</code> beside the server</li>
+<li>Docker on the droplet with <code>/dev/kfd</code> and
+<code>/dev/dri</code> present</li>
+<li>A Hugging Face token on the droplet for the gated Gemma 4
+weights</li>
+<li>Python 3 on your workstation, and no expectation of a GPU in it</li>
+</ul>
+<h4 id="there-is-no-gpu-on-the-machine-you-run-this-from">There Is No
+GPU on the Machine You Run This From</h4>
+<p><code>rocm-smi</code>, <code>amd-smi</code>, <code>rocminfo</code>
+and <code>hipcc</code> do not exist locally and never will. A ROCm
+command in a local shell is a bug, not a check. Every reading in this
+article came back over SSH or through the DigitalOcean API.</p>
+<p>That constraint shapes the whole toolkit. The MCP server runs on the
+workstation, holds no device, and reaches the hardware the same way you
+would by hand.</p>
+<h4 id="the-mcp-server-speaks-stdio">The MCP Server Speaks stdio</h4>
+<p>One file, <code>server.py</code>, exposes 21 tools over stdio:
+droplet lifecycle, image checks, deploy, logs, benchmark cells, and the
+SRE probes below. Every subprocess goes through one
+<code>run_command(cmd: list[str])</code> helper using
+<code>asyncio.create_subprocess_exec</code> — never a shell.</p>
+<pre><code>$ grep -c &quot;^@mcp.tool&quot; server.py
+21</code></pre>
+<h4 id="what-the-droplet-is">What the Droplet Is</h4>
+<pre><code>$ droplet_status
+📡 debian-gpu-mi300x1-192gb-devcloud-atl1 (601418522)
+ 
+- status: `active`
+- size: `gpu-mi300x1-192gb-devcloud` — 20 vCPU, 240 GB RAM, 720 GB disk
+- region: atl1
+- cost: $1.99/hr — billed while powered off, too</code></pre>
+<p>The rate comes from the DigitalOcean v2 API's own
+<code>droplet.size.price_hourly</code> field, read at the time of the
+run, not from a pricing page.</p>
+<h4 id="the-card-before-anything-runs">The Card Before Anything
+Runs</h4>
+<pre><code>$ gpu_status
+✅ GPU reporting on `debian-gpu-mi300x1-192gb-devcloud-atl1`.
+ 
+| Card | Product | GPU use % | VRAM used % |
+| card0 | Aqua Vanjaram [Instinct MI300X VF] | 0 | 0 |</code></pre>
+<p>It presents as an SR-IOV virtual function, which looks like a
+partition and is not one: all 304 compute units and the whole 191.7 GiB
+are there. Neither <code>rocm-smi</code> nor <code>amd-smi</code> sets a
+useful exit code, so the tool parses the output and ignores the status
+code entirely.</p>
+<h4 id="which-image">Which Image</h4>
+<p><code>vllm/vllm-openai-rocm:nightly-rocm100</code>. Read the version
+out of the running container rather than trusting the tag, because a
+nightly tag moves under you:</p>
+<pre><code>$ docker exec vllm python3 -c &quot;import vllm;print(vllm.__version__)&quot;
+0.3.1.dev3+g0bfc7a15d</code></pre>
+<p>Not every ROCm vLLM image can load this checkpoint — Gemma 4 runs
+256-wide heads on its sliding-attention layers and 512 on its
+full-attention ones, and an image whose vLLM predates that split cannot
+parse the config. The measured comparison of three images is in the <a
+href="https://github.com/xbill9/amd-gputools">companion article</a>.
+Here the practical rule is enough: pin what you measured, and check a
+new image before you adopt it.</p>
+<h4 id="starting-the-server">Starting the Server</h4>
+<pre><code>$ deploy_vllm
+✅ Started `vllm` serving `google/gemma-4-E2B-it`.
+ 
+- image: `vllm/vllm-openai-rocm:nightly-rocm100`
+- context: 32768, gpu-memory-utilization 0.90
+- multimodal: `{&quot;image&quot;: 4, &quot;audio&quot;: 0}`</code></pre>
+<p>The serve arguments, in full:</p>
+<pre><code>vllm serve google/gemma-4-E2B-it --host 0.0.0.0 --port 8000 \
+  --max-model-len 32768 --gpu-memory-utilization 0.90 \
+  --enable-auto-tool-choice --reasoning-parser gemma4 --tool-call-parser gemma4 \
+  --chat-template /app/vllm/examples/tool_chat_template_gemma4.jinja \
+  --limit-mm-per-prompt &#39;{&quot;image&quot;: 4, &quot;audio&quot;: 0}&#39; --async-scheduling</code></pre>
+<p><code>audio</code> is <code>0</code> on purpose. E2B has a conformer
+audio encoder and no ROCm vLLM image ships the <code>vllm[audio]</code>
+extras, so a non-zero limit would allocate encoder memory for a path
+that cannot be used.</p>
+<h4 id="up-is-not-ready">Up Is Not Ready</h4>
+<p><code>docker run</code> returns in about a second. The endpoint does
+not answer for another two and a half minutes, while weights load,
+<code>torch.compile</code> runs and graphs are captured.</p>
+<pre><code># polling /v1/models every 10s from the moment docker run returned
+READY after 160s
+{&quot;object&quot;:&quot;list&quot;,&quot;data&quot;:[{&quot;id&quot;:&quot;google/gemma-4-E2B-it&quot;,&quot;max_model_len&quot;:32768,...}]}</code></pre>
+<p>This is why <code>serving_status</code> reports the container and the
+endpoint as two separate facts. A running container is not a serving
+model, and conflating them turns a normal boot into a phantom hang.</p>
+<pre><code>$ serving_status
+✅ container: Up 3 minutes | endpoint: answering on `127.0.0.1:8000`
+   served: `google/gemma-4-E2B-it`</code></pre>
+<h4 id="does-it-actually-serve">Does It Actually Serve?</h4>
+<p>A flag being accepted is not evidence it did anything, so every
+modality is probed with a request whose correct answer is known in
+advance. The vision probe is a generated checkerboard rather than a
+fetched photo, so the expected answer is a fact about the image and not
+a caption.</p>
+<pre><code>$ verify_capabilities
+✅ 4/4 capabilities verified.
+ 
+| text         | ✅ | The AMD MI300X is based on the CDNA 3 architecture. |
+| thinking     | ✅ | 1404 chars, 447 reasoning tokens |
+| tool calling | ✅ | tool_calls → get_weather{&quot;city&quot;: &quot;Reykjavik&quot;} |
+| vision       | ✅ | alternating bright red and royal blue squares |
+ 
+📡 Audio is not probed — no ROCm vLLM image ships the `vllm[audio]` extras.</code></pre>
+<h4 id="what-the-engine-allocates">What the Engine Allocates</h4>
+<p>The boot log is worth reading before sizing anything, because the
+engine states its own arithmetic:</p>
+<pre><code>Available KV cache memory: 155.04 GiB
+GPU KV cache size: 9,026,017 tokens
+Maximum concurrency for 32,768 tokens per request: 275.45x</code></pre>
+<p>Nine million tokens of KV on one card. Hold that number — it decides
+which of the two ceilings below you actually hit.</p>
+<h4 id="the-sweep">The Sweep</h4>
+<p>Four concurrencies against four context lengths, 128 output tokens
+throughout, three repeats per cell, load generated by vLLM's own bench
+client in a second container with no GPU device attached.</p>
+<pre><code>$ python3 benchmarking_suite.py --droplet debian-gpu-mi300x1-192gb-devcloud-atl1 \
+    --run-id 2026-09-17-vllm-sweep-mi300x-rerun --repeat 3 --seed-base 27000
+16 cells, 12 runnable, 4 infeasible at max_model_len 32768</code></pre>
+<p>The 32,768 row is infeasible rather than missing: 32,768 input plus
+128 output does not fit a 32,768 context, and a cell that cannot exist
+is recorded as such rather than dropped.</p>
+<p>One detail is load-bearing. <code>vllm bench serve</code> derives its
+prompts from <code>--seed</code>, which defaults to 0, and this
+deployment caches prefixes — so two runs sharing a seed measure the
+cache, not the card. Every cell and every repeat here uses a seed no
+other run in the sweep uses.</p>
+<h4 id="raw-tokens-per-second">Raw Tokens per Second</h4>
+<p>Output tokens per second, median of three repeats, worst-cell
+coefficient of variation 7.96%:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/medium/img/devto-gemma4-mi300x-dollar-hour-table-2.png"
+alt="Table: context, 1 stream, 4, 16, 64" /></p>
+<p>Counting prefill as well, the busiest cell moves <strong>48,583
+tokens a second</strong> — 64 streams at 1,024 context. Single-stream
+latency at 1,024 context is 32.67 ms to first token and 3.04 ms per
+token after it.</p>
+<h4 id="where-the-ceiling-is">Where the Ceiling Is</h4>
+<p>Two things happen as context grows, and only one of them is the one
+people plan for.</p>
+<p>Time per output token barely moves: 2.85 ms at 128 context, 3.04 at
+1,024, 3.9 at 8,192. Time to first token rises steeply: 12.97 ms, 32.67
+ms, 169.61 ms. Decode stays cheap; prefill gets expensive.</p>
+<p>So the 8,192 row flattens — 688 tok/s at 16 streams, 703 at 64 —
+while the 128 row keeps climbing to 10,284. <strong>The constraint at
+long context is prefill, not memory.</strong> The heaviest cell in the
+grid wants 64 x 8,192 = 524,288 KV tokens against the 9,026,017 the
+engine allocated — 5.8% of the pool, by arithmetic.</p>
+<p>That inverts the sizing rule the TPU rigs in this monorepo run on,
+where KV capacity is the thing you run out of first. On a 192 GB card
+serving a 2B model, it never becomes the binding constraint.</p>
+<h4 id="and-priceperformance">And Price/Performance?</h4>
+<p>Throughput divided by hourly rate, in=1024, out=128. Every row is the
+same checkpoint under vLLM, each from its own schema-valid report:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/medium/img/devto-gemma4-mi300x-dollar-hour-table-3.png"
+alt="Table: rig, $/hr, basis, 1, 4, 16, 64" /></p>
+<p>Tokens per second per dollar-hour. The MI300X wins the busiest column
+outright and the v5e wins the other three — but those two rows are not
+priced the same way, which is the whole of the next section.</p>
+<h4 id="the-same-table-priced-the-same-way">The Same Table, Priced the
+Same Way</h4>
+<p>A spot rate against an on-demand rate is a discount, not a hardware
+result. Put all three on on-demand list and the ranking is uniform:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/medium/img/devto-gemma4-mi300x-dollar-hour-table-4.png"
+alt="Table: rig, $/hr, 1, 4, 16, 64" /></p>
+<p>At matched pricing the MI300X returns <strong>1.4x to 2.9x</strong>
+the tokens per dollar of a v5e — 1.53x, 1.42x, 1.76x and 2.86x across
+the four concurrencies, by arithmetic over the two measured rows
+above.</p>
+<h4 id="the-spot-asterisk">The Spot Asterisk</h4>
+<p>That advantage has one real qualifier: DigitalOcean publishes no
+preemptible tier for GPU droplets, so $1.99 is a floor. The v5e spot
+rate of $0.5779 per chip-hour is a purchasable option, and at 16 streams
+or fewer it buys more tokens per dollar than this card does.</p>
+<p>So the honest form of the finding is conditional. If you want a
+non-preemptible box, or you keep dozens of streams busy, this is the
+best tokens-per-dollar measured across these rigs. If your traffic is
+light and you tolerate preemption, a spot TPU is cheaper.</p>
+<h4 id="what-stops-the-meter">What Stops the Meter</h4>
+<p>Powering the droplet off does <strong>not</strong> stop DigitalOcean
+billing it. The resources stay reserved and the hourly rate keeps
+running; only destroying the droplet stops the meter.</p>
+<p>That is why this toolkit ships no <code>create</code> and no
+<code>destroy</code> tool. Both are dollar-per-hour decisions, they stay
+a deliberate step in the console, and a rate quoted per hour means
+nothing until you know which hours you are paying for.</p>
+<pre><code>$ stop_vllm
+✅ `docker rm -f vllm` exited 0.</code></pre>
+<p>That frees the card's memory. It does not free your wallet.</p>
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to deploy Gemma 4 E2B to a single AMD
+Instinct MI300X and measure what its hourly rate returns in tokens. The
+key to the solution was a tag-scoped MCP toolkit that reaches the card
+over SSH and the DigitalOcean API, because the machine running it has no
+GPU. The measured results were:</p>
+<ul>
+<li><strong>305 tok/s</strong> single stream at 1,024 context, 32.67 ms
+to first token</li>
+<li><strong>10,284 tok/s</strong> at 64 streams and 128 context;
+<strong>48,583 tok/s</strong> counting prefill</li>
+<li><strong>2,713 tokens per second per dollar-hour</strong>, 1.4x to
+2.9x a TPU v5e at matched on-demand pricing</li>
+<li><strong>160 seconds</strong> from <code>docker run</code> to an
+endpoint that answers</li>
+<li>KV pool of <strong>9,026,017 tokens</strong>, of which the heaviest
+cell used 5.8% — the long-context ceiling is prefill, not memory</li>
+<li>Text, thinking, tool calling and vision all verified against the
+live endpoint; audio is unreachable on every ROCm image tried</li>
+</ul>
+<p>One droplet, one MI300X, region <code>atl1</code>, three repeats per
+cell with a unique prompt seed each, worst-cell coefficient of variation
+7.96%. The comparison rows differ from this one in ways worth naming
+once: the TPU and L4 reports are single runs per cell on earlier vLLM
+builds, the v5e and L4 figures were measured on spot capacity while the
+MI300X and v6e were on-demand, and nothing else in this monorepo serves
+this checkpoint on AMD, so there is no twin to difference against.</p>
+<p>The strategy for using MCP for AMD Instinct deployment and
+benchmarking was validated with an incremental step by step
+approach.</p>
+</body>
+</html>
