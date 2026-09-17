@@ -305,7 +305,9 @@ async def _remote(droplet: str, command: str, timeout: int = 300) -> tuple[int, 
     return await run_command(_ssh_argv(ip, command), timeout=timeout)
 
 
-async def _curl_endpoint(droplet: str, path: str, payload: Optional[dict] = None, timeout: int = 120) -> tuple[int, str, str]:
+async def _curl_endpoint(
+    droplet: str, path: str, payload: Optional[dict] = None, timeout: int = 120
+) -> tuple[int, str, str]:
     """Call the vLLM endpoint from inside the droplet, not across the internet.
 
     The serving port is published on the droplet's own interface and there is
@@ -436,8 +438,10 @@ async def droplet_status(droplet: str) -> str:
             f"📡 **{item.get('name')}** ({item.get('id')})",
             "",
             f"- status: `{item.get('status')}`",
-            f"- size: `{item.get('size_slug')}` — {size.get('vcpus', '?')} vCPU, "
-            f"{size.get('memory', 0) // 1024} GB RAM, {size.get('disk', '?')} GB disk",
+            (
+                f"- size: `{item.get('size_slug')}` — {size.get('vcpus', '?')} vCPU, "
+                f"{size.get('memory', 0) // 1024} GB RAM, {size.get('disk', '?')} GB disk"
+            ),
             f"- region: {item.get('region', {}).get('slug', '-')}",
             f"- public IPv4: {ip or '-'}",
             f"- cost: {f'${hourly:.2f}/hr' if hourly else 'unknown'} — **billed while powered off, too**",
@@ -654,11 +658,13 @@ async def check_image(droplet: str, image: Optional[str] = None) -> str:
         if code != 0:
             verdict.append("the probe itself failed")
         else:
-            verdict.append("carries the Gemma 4 convertor" if ok else "**lacks `Gemma4ModelArchConfigConvertor`** — it cannot load Gemma 4")
+            verdict.append(
+                "carries the Gemma 4 convertor"
+                if ok
+                else "**lacks `Gemma4ModelArchConfigConvertor`** — it cannot load Gemma 4"
+            )
             verdict.append("carries gfx942 kernels" if has_arch else "**no gfx94x in the arch list**")
-        return (
-            f"{icon} `{target}`: {'; '.join(verdict)}.\n\n```\n{_truncate(out or err, 2000)}\n```"
-        )
+        return f"{icon} `{target}`: {'; '.join(verdict)}.\n\n```\n{_truncate(out or err, 2000)}\n```"
     except Exception as exc:
         return _error(exc)
 
@@ -685,8 +691,7 @@ async def download_weights(droplet: str, model: Optional[str] = None) -> str:
     """
     target = model or VLLM_MODEL
     probe = (
-        "from huggingface_hub import snapshot_download; "
-        f"snapshot_download({target!r}, max_workers=8); print('DONE')"
+        f"from huggingface_hub import snapshot_download; snapshot_download({target!r}, max_workers=8); print('DONE')"
     )
     cmd = (
         f"docker run --rm -v {shlex.quote(HF_CACHE)}:/root/.cache/huggingface "
@@ -842,7 +847,12 @@ async def query_model(
         lines = [f"✅ `{VLLM_MODEL}` answered in {usage.get('completion_tokens', '?')} tokens."]
         reasoning = message.get("reasoning") or message.get("reasoning_content")
         if reasoning:
-            lines += ["", f"**Thinking** ({details.get('reasoning_tokens', '?')} tokens):", "", "> " + reasoning.strip().replace("\n", "\n> ")]
+            lines += [
+                "",
+                f"**Thinking** ({details.get('reasoning_tokens', '?')} tokens):",
+                "",
+                "> " + reasoning.strip().replace("\n", "\n> "),
+            ]
         lines += ["", "**Answer:**", "", (message.get("content") or "(empty)").strip()]
         return "\n".join(lines)
     except Exception as exc:
@@ -885,7 +895,12 @@ async def verify_capabilities(droplet: str) -> str:
             "/v1/chat/completions",
             {
                 "model": VLLM_MODEL,
-                "messages": [{"role": "user", "content": "A snail climbs 3 feet a day up a 20-foot well and slides 2 back each night. How many days to the top?"}],
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "A snail climbs 3 feet a day up a 20-foot well and slides 2 back each night. How many days to the top?",
+                    }
+                ],
                 "max_tokens": 1200,
                 "temperature": 0,
                 "chat_template_kwargs": {"enable_thinking": True},
@@ -897,7 +912,9 @@ async def verify_capabilities(droplet: str) -> str:
             msg = body["choices"][0]["message"]
             reasoning = msg.get("reasoning") or msg.get("reasoning_content") or ""
             tokens = (body.get("usage", {}).get("completion_tokens_details") or {}).get("reasoning_tokens", 0)
-            results.append(("thinking", "✅" if reasoning else "❌", f"{len(reasoning)} chars, {tokens} reasoning tokens"))
+            results.append(
+                ("thinking", "✅" if reasoning else "❌", f"{len(reasoning)} chars, {tokens} reasoning tokens")
+            )
         except (ValueError, KeyError, IndexError):
             results.append(("thinking", "❌", _truncate(out, 110)))
 
@@ -932,9 +949,12 @@ async def verify_capabilities(droplet: str) -> str:
             body = json.loads(out)
             choice = body["choices"][0]
             calls = choice["message"].get("tool_calls") or []
-            detail = f"{choice.get('finish_reason')} → " + ", ".join(
-                f"{c['function']['name']}{c['function']['arguments']}" for c in calls
-            ) if calls else f"no tool call ({choice.get('finish_reason')})"
+            detail = (
+                f"{choice.get('finish_reason')} → "
+                + ", ".join(f"{c['function']['name']}{c['function']['arguments']}" for c in calls)
+                if calls
+                else f"no tool call ({choice.get('finish_reason')})"
+            )
             results.append(("tool calling", "✅" if calls else "❌", detail[:110]))
         except (ValueError, KeyError, IndexError):
             results.append(("tool calling", "❌", _truncate(out, 110)))
@@ -950,7 +970,10 @@ async def verify_capabilities(droplet: str) -> str:
                         "role": "user",
                         "content": [
                             {"type": "text", "text": "Describe this image in one sentence: what colors and pattern?"},
-                            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{CHECKERBOARD_PNG_B64}"}},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{CHECKERBOARD_PNG_B64}"},
+                            },
                         ],
                     }
                 ],

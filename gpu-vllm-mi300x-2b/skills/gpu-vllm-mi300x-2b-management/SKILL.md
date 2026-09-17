@@ -164,3 +164,13 @@ indistinguishable at the call site.
 
 The DigitalOcean token goes in `.env` (gitignored, mode 0600) or the environment, as
 `DIGITALOCEAN_ACCESS_TOKEN`. **Never in `tpu.env`**, which is committed.
+
+## Further reading
+
+Neither is embedded here — they are published, so a snapshot would only drift.
+
+- [`devto-gemma4-mi300x-mcp.md`](../../../devto-gemma4-mi300x-mcp.md) (rig root) — step-by-step
+  deployment of this rig through these tools, with the MCP SDK 2.x details.
+- [The port write-up](https://github.com/xbill9/amd-gputools/blob/main/devto-gemma4-mi300x-vllm.md)
+  in `amd-gputools` — the three-image comparison this rig's image caveat comes from, including the
+  `head_dim` traceback in full and the two free pre-pull checks.
