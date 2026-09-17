@@ -1,0 +1,33 @@
+# Checkpoints. The 10.25 GB safetensors lives in the HF cache outside this tree
+# (on this host that is `~/.cache` -> `/opt1/cache`), but these patterns stay as a
+# guard against a stray copy being committed.
+gemma-4-*/
+*.safetensors
+*.gguf
+*.bin
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Local MCP registration (generated)
+.mcp.json
+
+# Local env config
+.env
+
+# Runtime state: pid/log written by `make serve`
+run/
+
+# NOTE: tpu.env is NOT ignored. It is the rig's source of truth and is committed
+# on purpose — never add *.env here.
