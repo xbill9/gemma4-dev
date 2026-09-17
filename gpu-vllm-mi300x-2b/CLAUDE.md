@@ -48,6 +48,27 @@ audio requests fail at request time whatever `--limit-mm-per-prompt` says. Setti
 anything but `0` allocates encoder memory for a path that cannot be used and makes the failure
 later and more confusing. Audio needs a derived image; that is a real change, not a flag.
 
+## Quantization: fp8 only, and it has to be `fnuz`
+
+Measured on the part 2026-09-16 — `../HARDWARE.md` carries the full table. The short version:
+**fp8 is 1.77x bf16 and is the only format on this card faster than bf16.** int8 measured
+*slower* (0.69x) despite an equal spec peak, fp4 does not exist on gfx942, and GGUF is compiled
+out of the image entirely.
+
+The serving default stays bf16 — the engine reports `dtype=torch.bfloat16, quantization=None`,
+matching the checkpoint's own `dtype: bfloat16`. To turn fp8 on, add `--quantization fp8` and let
+vLLM derive the scales from the bf16 weights at load.
+
+**Do not pull an fp8 checkpoint from the Hub to do that.** CDNA 3 uses `e4m3fnuz`; every fp8
+checkpoint published for H100 is `e4m3fn`, and that dtype does not quietly fall back here — it
+raises `HIPBLAS_STATUS_NOT_SUPPORTED`. Online quantization from bf16 sidesteps the question.
+This is the same shape of trap as the image caveat above: the plausible artifact is the broken one.
+
+Not yet measured, and worth keeping honest about: **end-to-end tokens/sec at fp8.** The 1.77x is a
+GEMM ratio, and E2B spends much of decode in attention and kernel-launch overhead that fp8 does not
+touch, so it will not carry over whole. `VLLM_ROCM_USE_AITER=1` is a second untested lever — the
+server currently selects `TRITON_ATTN`.
+
 ## Code style
 
 Matches the siblings, and `ruff.toml` is pinned here for the same reason `amd-gputools` pins

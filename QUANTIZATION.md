@@ -398,6 +398,7 @@ Verified 2026-09-02 against the installed versions named.
 | Stack | Loads Google's Gemma 4 GGUF? |
 | :--- | :--- |
 | **vLLM 0.26.0** (CUDA or TPU) | **No.** No `gguf` module at all — see the correction in the route table above |
+| **vLLM 0.29.1rc1** (ROCm, gfx942) | **No, and it got further away.** Still no `gguf` module, `'gguf'` is absent from the global `QUANTIZATION_METHODS` registry, and **no ggml/gguf symbols are compiled into `vllm._custom_ops`**. Verified 2026-09-16 on MI300X |
 | **JAX** | **No.** No GGUF reader exists in the JAX ecosystem |
 | **transformers 5.12.1** | Yes, `from_pretrained(gguf_file=…)` — but see the two defects below |
 | **llama.cpp / Ollama** | Yes, natively — upstream `src/models/gemma4.cpp`, plus the four `mtmd` multimodal variants |
@@ -449,6 +450,16 @@ on `w13_blocks` / `w2_blocks` / `gate_up_proj_scales`, i.e. gpt-oss-style **MoE 
 E2B is dense (`enable_moe_block=False`, `num_experts=None`), so there are no `JaxRoutedExperts` layers for
 it to attach to. It also calls `dequantize_tensor_from_mxfp4_packed` in `process_weights_after_loading`,
 so even where it does apply it unpacks to bf16 — consistent with there being no fp4 MXU anywhere yet.
+
+**Confirmed against silicon 2026-09-16, and the "anywhere yet" now has a boundary.** On MI300X
+(gfx942, CDNA 3) torch refuses outright — `Block-wise scaling for Float8_e8m0fnu is only supported
+on gfx950,gfx1250` — and `Float4_e2m1fn_x2` cannot even be cast to. vLLM gates the same way:
+`supports_mx()` is `any(gfx in _GCN_ARCH for gfx in ["gfx95", "gfx1250"])`, False on gfx942, so it
+falls back to `EmulationMxfp4LinearKernel`, whose `apply_weights` dequantizes the weights to bf16
+**every forward pass** and runs `F.linear` in high precision. Same unpack-to-bf16 shape as the JAX
+path above, reached by a different route. **fp4 as arithmetic arrives with CDNA 4 (gfx950) /
+Blackwell**; on everything this monorepo currently touches it is storage or emulation. See the
+MI300X section of `HARDWARE.md`.
 
 ## qwix is the only way in, and as of 2026-08-07 it does not get there
 

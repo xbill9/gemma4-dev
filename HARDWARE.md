@@ -410,6 +410,8 @@ loop). Those are the likely first failures, not the machine type.
 - **L4** — the five `gpu-vllm-l4-*` artifact rigs. SM 8.9 (Ada), 24 GB. Their serving flags assume
   native bf16 and fp8; see the T4G section below for why that does not generalize backwards.
 - **T4G** — see below. The only part here whose required build (aarch64 + SM 7.5) is not published.
+- **MI300X** — see below. The only AMD part here, and the first row in this file where fp8 is a
+  genuine *compute* format rather than storage.
 
 ## T4G — NVIDIA Turing on an Arm host (EC2 G5g)
 
@@ -616,3 +618,63 @@ captures them as lowering constants and parks the whole tree in host RAM permane
 **Do not carry TPU intuition here.** Sizes and dtypes matter in ways they do not on TPU, and the
 platform announces itself with `Platform 'neuron' is experimental and not all JAX functionality may be
 correctly supported!` — and then means it.
+
+
+## MI300X — AMD CDNA 3 (AMD Developer Cloud, DigitalOcean underneath)
+
+Served by `gpu-vllm-mi300x-2b`; the general MI300 tooling is a separate repo, `~/amd-gputools`.
+Platform slot `gpu`, hardware slot **`mi300x`**. **The only AMD part in this monorepo** and the only
+one whose control plane is neither Google Cloud nor EC2.
+
+All figures below **measured on the part** 2026-09-16 on `debian-gpu-mi300x1-192gb-devcloud-atl1`,
+not read off a spec sheet.
+
+| | |
+| --- | --- |
+| Arch | `gfx942:sramecc+:xnack-`, CDNA 3, Aqua Vanjaram, `1002:74b5` |
+| Compute Units | **304** across 8 XCDs; 4 SIMDs/CU → 1216 matrix cores, 19456 shader cores |
+| Wavefront | **64**, not 32 — warp-level intuition from CUDA does not port |
+| Clock | 2100 MHz max |
+| Cache | L1 32 KB, L2 4 MB, **L3 / Infinity 256 MB** |
+| VRAM | 205,822,885,888 B = **191.7 GiB**, HBM3, 8192-bit |
+| Bandwidth | 5.3 TB/s spec; **3.76 TB/s measured** device-to-device copy, under load |
+
+It presents as an SR-IOV **VF** (`AMD Instinct MI300X VF`) but is not a partition: all 304 CUs and
+the whole 191.7 GiB are there.
+
+### Native format support
+
+| Format | MI300X (gfx942) | Note |
+| --- | :---: | :--- |
+| bf16 | **yes** | 1307.4 TFLOP/s peak — the baseline |
+| fp16 | yes | same matrix cores, same peak; not a change from bf16 |
+| fp8 `e4m3fnuz` | **yes** | 2614.9 TFLOP/s peak, **1.77x bf16 measured** |
+| fp8 `e4m3fn` | **no** | `HIPBLAS_STATUS_NOT_SUPPORTED` — the OCP flavour NVIDIA publishes |
+| int8 | runs | equal peak on paper, **0.69x bf16 measured** — no win |
+| fp4 / MX | **no** | torch: `only supported on gfx950,gfx1250`. CDNA 4 |
+
+**This is the first row in this file where fp8 is a genuine compute format**, and it inverts the
+v5e/v6e conclusion at the top: there fp8 is storage-only and int8 is the sole compute win. Here fp8
+is the sole compute win and int8 measures *slower than bf16*. **Do not carry a TPU quantization
+conclusion onto this part** — and note the inversion runs opposite to the T4G finding too.
+
+The `fnuz` spelling is the expensive part. CDNA 3 uses the no-NaN / unsigned-zero fp8 variants, so
+**an fp8 checkpoint published for H100 is not drop-in** — `e4m3fn` raises rather than falling back.
+vLLM keys on `"gfx94"` in `is_fp8_fnuz()`. Quantize online from bf16 instead of hunting a checkpoint.
+
+Measured 8192³ matmul, 30 iterations, torch 2.12.0+rocm10.0.0, card concurrently serving:
+bf16 664.3 / fp16 662.5 / **fp8 1172.5** / int8 455.6 TFLOP/s. `QUANTIZATION.md` carries the stack
+side of this.
+
+### CUDA equivalents, for reading the rest of this file
+
+| AMD | NVIDIA |
+| --- | --- |
+| Compute Unit (304) | SM (132 on H100) |
+| Matrix Core (1216) | Tensor Core (528) |
+| wavefront = 64 | warp = 32 |
+| `gfx942` | `sm_90` |
+
+The closest NVIDIA part is H100 SXM / H200. On paper MI300X has 2.4x an H100's memory, 1.6x its
+bandwidth and 2.6x its dense fp16 peak; software closes much of that, and a plain torch bf16 matmul
+reached 50.8% of peak here.
