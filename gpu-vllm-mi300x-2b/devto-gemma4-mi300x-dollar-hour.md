@@ -24,7 +24,7 @@ cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-m
 
 ## Where Do I Start?
 
-The card is a DigitalOcean GPU droplet reached through [AMD Developer Cloud](https://devcloud.amd.com) — same v2 API, same droplet ids, token from the My AMD Team account. Creating and destroying it are console actions, deliberately: both are dollar-per-hour decisions and neither belongs in a tool an agent can call.
+The card is a DigitalOcean GPU droplet reached through AMD Developer Cloud (`devcloud.amd.com`) — same v2 API, same droplet ids, token from the My AMD Team account. Creating and destroying it are console actions, deliberately: both are dollar-per-hour decisions and neither belongs in a tool an agent can call.
 
 Everything after creation is scripted. The droplet carries a tag, every tool is scoped to that tag, and nothing in the toolkit can touch an instance that does not have it.
 
