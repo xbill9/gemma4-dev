@@ -12,6 +12,8 @@ functions survive.
 """
 
 import asyncio
+import contextlib
+import io
 import json
 import sys
 import unittest
@@ -337,3 +339,266 @@ class TestGetHelp(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestBenchArgv(unittest.TestCase):
+    """The bench container must not be able to touch the card."""
+
+    def test_no_gpu_device_is_attached(self):
+        """The load generator is an HTTP client with a tokenizer, nothing more.
+
+        If it ever gained /dev/kfd it could perturb the very thing it measures.
+        """
+        argv = server._bench_argv()
+        self.assertNotIn("--device", argv)
+        self.assertNotIn("--group-add", argv)
+
+    def test_entrypoint_is_overridden_for_every_image(self):
+        """Unconditionally, unlike _serve_argv, which branches on the image.
+
+        The official image's ENTRYPOINT ["vllm","serve"] would read `bench` as
+        a model id, and the vendor images have no entrypoint at all.
+        """
+        for image in ("vllm/vllm-openai-rocm:nightly-rocm100", "rocm/vllm:rocm7.13.0_x_vllm_0.19.1"):
+            with patch.object(server, "VLLM_IMAGE", image):
+                argv = server._bench_argv()
+            self.assertEqual(argv[argv.index("--entrypoint") + 1], "vllm")
+            self.assertEqual(argv[argv.index(image) + 1 : argv.index(image) + 3], ["bench", "serve"])
+
+    def test_boolean_flags_take_no_argument(self):
+        argv = server._bench_argv(None, ignore_eos="", num_prompts=8)
+        self.assertEqual(argv[argv.index("--ignore-eos") + 1], "--num-prompts")
+
+    def test_underscores_become_hyphens(self):
+        argv = server._bench_argv(None, random_input_len=1024)
+        self.assertIn("--random-input-len", argv)
+        self.assertNotIn("--random_input_len", argv)
+
+    def test_percentiles_are_requested_explicitly(self):
+        """Without these the dump carries p99 only, and the reports record p90."""
+        argv = server._bench_argv()
+        self.assertEqual(argv[argv.index("--metric-percentiles") + 1], "90,99")
+
+    def test_save_result_is_omitted_when_no_filename_is_given(self):
+        self.assertNotIn("--save-result", server._bench_argv())
+        self.assertIn("--save-result", server._bench_argv("out.json"))
+
+
+BENCH_DUMP = {
+    "request_throughput": 12.3456,
+    "output_throughput": 1580.5,
+    "total_token_throughput": 3161.0,
+    "mean_ttft_ms": 40.1,
+    "median_ttft_ms": 39.0,
+    "p90_ttft_ms": 55.5,
+    "p99_ttft_ms": 80.2,
+    "median_tpot_ms": 10.0,
+    "mean_itl_ms": 9.8,
+    "random_input_len": None,
+    "ttfts": [1.0, 2.0],
+    "input_lens": [128, 128],
+}
+
+
+class TestSweepPoint(unittest.TestCase):
+    def test_maps_a_dump_to_a_schema_entry(self):
+        point = server._sweep_point_from_bench_result(BENCH_DUMP, 16, 1024, 128)
+        self.assertEqual(point["concurrency"], 16)
+        self.assertEqual(point["input_len"], 1024)
+        self.assertEqual(point["output_len"], 128)
+        self.assertEqual(point["status"], "ok")
+        self.assertEqual(point["request_rate_rps"], 12.35)
+        self.assertEqual(point["output_tok_per_s"], 1580.5)
+        self.assertEqual(point["ttft_ms"], {"mean": 40.1, "median": 39.0, "p90": 55.5, "p99": 80.2})
+
+    def test_per_stream_rate_is_derived_from_median_tpot(self):
+        point = server._sweep_point_from_bench_result(BENCH_DUMP, 1, 128, 128)
+        self.assertEqual(point["per_stream_tok_per_s"], 100.0)
+
+    def test_input_len_is_not_taken_from_the_dump(self):
+        """vLLM records random_input_len as null, and it is a sweep axis."""
+        point = server._sweep_point_from_bench_result(BENCH_DUMP, 1, 8192, 128)
+        self.assertEqual(point["input_len"], 8192)
+
+    def test_per_request_arrays_are_dropped_from_raw(self):
+        raw = server._sweep_point_from_bench_result(BENCH_DUMP, 1, 128, 128)["raw"]
+        self.assertNotIn("ttfts", raw)
+        self.assertNotIn("input_lens", raw)
+        self.assertIn("request_throughput", raw)
+
+
+class TestBenchCell(unittest.TestCase):
+    def _remote_returning(self, stdout):
+        return AsyncMock(return_value=(0, stdout, ""))
+
+    def test_splits_the_result_json_from_the_bench_stdout(self):
+        out = f"running…\n{server.BENCH_RESULT_MARKER}\n{json.dumps(BENCH_DUMP)}"
+        with patch.object(server, "_remote", self._remote_returning(out)):
+            point, stdout = run(server.bench_cell("mi300", max_concurrency=4))
+        self.assertEqual(point["concurrency"], 4)
+        self.assertEqual(stdout, "running…")
+
+    def test_concurrency_defaults_to_num_prompts_when_unbounded(self):
+        """No --max-concurrency means every prompt is in flight at once."""
+        out = f"{server.BENCH_RESULT_MARKER}\n{json.dumps(BENCH_DUMP)}"
+        with patch.object(server, "_remote", self._remote_returning(out)):
+            point, _ = run(server.bench_cell("mi300", num_prompts=37))
+        self.assertEqual(point["concurrency"], 37)
+
+    def test_a_missing_marker_raises_rather_than_returning_a_blank_cell(self):
+        with patch.object(server, "_remote", self._remote_returning("bench crashed")):
+            with self.assertRaises(RuntimeError):
+                run(server.bench_cell("mi300"))
+
+    def test_a_nonzero_exit_raises(self):
+        with patch.object(server, "_remote", AsyncMock(return_value=(1, "", "boom"))):
+            with self.assertRaises(RuntimeError):
+                run(server.bench_cell("mi300"))
+
+    def test_the_tool_returns_markdown_instead_of_raising(self):
+        """Every tool swallows its exception — an escape kills the server."""
+        with patch.object(server, "_remote", AsyncMock(side_effect=RuntimeError("no droplet"))):
+            out = run(server.run_vllm_benchmark("mi300"))
+        self.assertTrue(out.startswith("❌"))
+
+
+class TestRocmSmiCommand(unittest.TestCase):
+    def test_fields_are_named_explicitly(self):
+        """Bare `rocm-smi --json` is refused: the concise table has no JSON form.
+
+        Measured 2026-09-16 on the live droplet — it printed "Cannot print
+        JSON/CSV output for concise output" and gpu_status reported no card on
+        a perfectly healthy MI300X.
+        """
+        self.assertIn("--json", server.ROCM_SMI_CMD)
+        self.assertIn("--showproductname", server.ROCM_SMI_CMD)
+        self.assertNotEqual(server.ROCM_SMI_CMD.strip(), "rocm-smi --json")
+
+    def test_parses_the_vram_key_the_card_actually_emits(self):
+        """The MI300X VF reports "GPU Memory Allocated (VRAM%)", not "GPU memory use (%)"."""
+        raw = json.dumps(
+            {
+                "card0": {
+                    "Card Series": "Aqua Vanjaram [Instinct MI300X VF]",
+                    "GPU use (%)": "0",
+                    "GPU Memory Allocated (VRAM%)": "87",
+                }
+            }
+        )
+        table = server._summarize_rocm_smi(raw)
+        self.assertIn("| 87 |", table)
+
+
+class TestSweepPlan(unittest.TestCase):
+    """The grid lives in benchmarking_suite; the infeasibility rule is the point."""
+
+    def setUp(self):
+        import benchmarking_suite
+
+        self.suite = benchmarking_suite
+
+    def test_cells_beyond_the_context_window_are_marked_not_dropped(self):
+        cells = self.suite.plan([1, 4], [128, 32768], 128, 32768)
+        self.assertEqual(len(cells), 4)
+        beyond = [c for c in cells if c["input_len"] == 32768]
+        self.assertTrue(all(c["status"] == "infeasible" for c in beyond))
+        self.assertTrue(all("max_model_len" in c["error"] for c in beyond))
+
+    def test_a_cell_that_exactly_fits_is_runnable(self):
+        cells = self.suite.plan([1], [32640], 128, 32768)
+        self.assertEqual(cells[0]["status"], "pending")
+
+    def test_prompt_count_follows_the_sibling_rule(self):
+        self.assertEqual([self.suite._num_prompts(c) for c in (1, 4, 16, 64)], [8, 8, 32, 128])
+
+
+class TestRepeatReduction(unittest.TestCase):
+    """Repeats exist so a reader can tell a 3% difference from a real one."""
+
+    def setUp(self):
+        import benchmarking_suite
+
+        self.suite = benchmarking_suite
+
+    def _point(self, rate):
+        return {"concurrency": 4, "output_tok_per_s": rate, "raw": {"duration": 1.0}}
+
+    def test_the_median_run_is_reported_not_the_mean(self):
+        """Averaging repeats would invent a p99 no single run ever saw."""
+        chosen = self.suite._reduce([self._point(100.0), self._point(300.0), self._point(110.0)])
+        self.assertEqual(chosen["output_tok_per_s"], 110.0)
+
+    def test_the_spread_is_recorded_alongside_it(self):
+        chosen = self.suite._reduce([self._point(100.0), self._point(102.0), self._point(104.0)])
+        repeats = chosen["raw"]["repeats"]
+        self.assertEqual(repeats["n"], 3)
+        self.assertEqual(repeats["output_tok_per_s"], [100.0, 102.0, 104.0])
+        self.assertAlmostEqual(repeats["cv_pct"], 1.96, places=1)
+
+    def test_a_single_run_claims_no_spread(self):
+        chosen = self.suite._reduce([self._point(100.0)])
+        self.assertNotIn("repeats", chosen["raw"])
+        self.assertIsNone(self.suite._cv_pct([100.0]))
+
+    def test_reducing_does_not_mutate_the_runs_it_was_given(self):
+        points = [self._point(100.0), self._point(101.0)]
+        self.suite._reduce(points)
+        self.assertNotIn("repeats", points[0]["raw"])
+        self.assertNotIn("repeats", points[1]["raw"])
+
+    def test_the_noise_floor_is_the_worst_cell_not_the_average(self):
+        sweep = [
+            {"raw": {"repeats": {"cv_pct": 0.4}}},
+            {"raw": {"repeats": {"cv_pct": 7.1}}},
+            {"status": "infeasible"},
+        ]
+        self.assertEqual(self.suite._worst_cv(sweep), 7.1)
+
+
+class TestBenchSeeding(unittest.TestCase):
+    """Same seed = same prompts, and this deployment caches prefixes."""
+
+    def test_the_seed_is_always_passed_explicitly(self):
+        captured = {}
+
+        async def fake(_droplet, cmd, timeout=0):
+            captured["cmd"] = cmd
+            return (0, f"{server.BENCH_RESULT_MARKER}\n{json.dumps(BENCH_DUMP)}", "")
+
+        with patch.object(server, "_remote", fake):
+            run(server.bench_cell("mi300", seed=7))
+        self.assertIn("--seed 7", captured["cmd"])
+
+    def test_no_cell_or_repeat_in_a_sweep_shares_a_seed(self):
+        """Cells at one context length draw from the same prompt pool.
+
+        Seeding per repeat alone left c4-in128 replaying c1-in128's prompts
+        into a warm prefix cache — worth 2.2x at 8192 context.
+        """
+        import benchmarking_suite
+
+        seeds = [benchmarking_suite._seed(0, i, r) for i in range(16) for r in range(3)]
+        self.assertEqual(len(set(seeds)), len(seeds))
+
+    def test_seed_base_shifts_a_whole_sweep_off_earlier_ones(self):
+        import benchmarking_suite
+
+        first = {benchmarking_suite._seed(0, i, r) for i in range(16) for r in range(3)}
+        later = {benchmarking_suite._seed(5000, i, r) for i in range(16) for r in range(3)}
+        self.assertEqual(first & later, set())
+
+    def test_repeats_do_not_reuse_a_seed(self):
+        import benchmarking_suite
+
+        seeds = []
+
+        async def fake(_droplet, **kwargs):
+            seeds.append(kwargs["seed"])
+            return ({"concurrency": 1, "output_tok_per_s": 1.0, "raw": {}}, "")
+
+        srv = MagicMock()
+        srv.bench_cell = fake
+        cells = benchmarking_suite.plan([1], [128], 128, 32768)
+        with contextlib.redirect_stdout(io.StringIO()):
+            run(benchmarking_suite.run_sweep(srv, "mi300", cells, None, repeat=3))
+        self.assertEqual(len(set(seeds)), 3)

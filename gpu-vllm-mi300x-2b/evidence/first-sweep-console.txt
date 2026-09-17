@@ -1,0 +1,33 @@
+# First sweep of the day, console output, captured verbatim
+#
+# Host:    debian-gpu-mi300x1-192gb-devcloud-atl1 (DigitalOcean, atl1)
+# When:    2026-09-16, ~01:23-01:27 UTC, first load on a server idle ~3h
+# Command: python3 benchmarking_suite.py --droplet <name> --run-id 2026-09-16-vllm-sweep-mi300x
+#          (1 run per cell, seed 0 throughout — before --repeat and --seed-base existed)
+#
+# Kept because its c64/ctx128 cell read 4202 tok/s against 10294 in the reported run,
+# a 2.4x gap on a cell where prefix caching is worth 1.03x. One observation, not a
+# characterised effect. The report JSON for this pass was not retained.
+#
+16 cells, 12 runnable, 4 infeasible at max_model_len 32768
+340.97 out tok/s in 18s
+1122.76 out tok/s in 16s
+1027.21 out tok/s in 19s
+4202.38 out tok/s in 19s
+305.6 out tok/s in 19s
+1059.78 out tok/s in 16s
+2902.69 out tok/s in 17s
+6293.76 out tok/s in 18s
+196.58 out tok/s in 21s
+765.23 out tok/s in 17s
+897.51 out tok/s in 21s
+998.92 out tok/s in 36s
+[13/16] c1-in32768-out128: infeasible — input_len 32768 + output_len 128 exceeds configured max_model_len 32768
+[14/16] c4-in32768-out128: infeasible — input_len 32768 + output_len 128 exceeds configured max_model_len 32768
+[15/16] c16-in32768-out128: infeasible — input_len 32768 + output_len 128 exceeds configured max_model_len 32768
+[16/16] c64-in32768-out128: infeasible — input_len 32768 + output_len 128 exceeds configured max_model_len 32768
+
+wrote benchmarks/reports/2026-09-16-vllm-sweep-mi300x.json
+      benchmarks/runs/2026-09-16-vllm-sweep-mi300x/ (12 cell logs)
+
+[exited with code 0]

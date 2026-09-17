@@ -9,10 +9,12 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| _none_ | | | | | |
+| `2026-09-16-vllm-sweep-mi300x-seedcollision.json` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand | ok | — |
+| `2026-09-16-vllm-sweep-mi300x.json` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
-| _none_ | | | | |
+| `2026-09-16-vllm-sweep-mi300x` | 36 | 0 | 0 | **no** |
+| `2026-09-16-vllm-sweep-mi300x-seedcollision` | 38 | 0 | 0 | **no** |

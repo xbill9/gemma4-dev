@@ -79,10 +79,18 @@ else
   mkdir -p "$TARGET"
   echo "$CONFIG_JSON" > "$TARGET/.mcp.json"
   echo "wrote $TARGET/.mcp.json (gitignored by convention — it is generated)"
-  mkdir -p "$TARGET/.claude/skills"
-  rm -rf "${TARGET:?}/.claude/skills/$SKILL_NAME"
-  cp -r "$RIG_DIR/.claude/skills/$SKILL_NAME" "$TARGET/.claude/skills/$SKILL_NAME"
-  echo "installed skill -> $TARGET/.claude/skills/$SKILL_NAME"
+  # Installing into the rig itself would rm -rf the source and then copy from
+  # the hole it just made. MEASURED 2026-09-16: it deleted the rig's own skill
+  # snapshot, and only git had it. Registering in place is a legitimate thing
+  # to want, so write the .mcp.json and skip the copy rather than refusing.
+  if [ "$(cd "$TARGET" 2>/dev/null && pwd -P)" = "$(cd "$RIG_DIR" && pwd -P)" ]; then
+    echo "note: target is the rig itself — .mcp.json written, skill copy skipped (it is already here)"
+  else
+    mkdir -p "$TARGET/.claude/skills"
+    rm -rf "${TARGET:?}/.claude/skills/$SKILL_NAME"
+    cp -r "$RIG_DIR/.claude/skills/$SKILL_NAME" "$TARGET/.claude/skills/$SKILL_NAME"
+    echo "installed skill -> $TARGET/.claude/skills/$SKILL_NAME"
+  fi
 fi
 
 echo "✅ $SERVER_NAME registered. Tools will appear as mcp__${SERVER_NAME}__*"

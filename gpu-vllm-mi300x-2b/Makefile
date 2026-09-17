@@ -21,8 +21,8 @@ install:  ## Install dependencies into the system python3 (no virtualenv)
 
 lint:  ## Lint and format-check the rig sources (snapshots are generated copies)
 	@command -v ruff >/dev/null || { echo "ruff not found; install with: pip install ruff"; exit 1; }
-	ruff format --check server.py refresh_skill.py tests
-	ruff check server.py refresh_skill.py tests
+	ruff format --check server.py benchmarking_suite.py refresh_skill.py tests
+	ruff check server.py benchmarking_suite.py refresh_skill.py tests
 	@for s in project-setup.sh init.sh; do bash -n $$s || exit 1; done
 	@echo "lint OK"
 

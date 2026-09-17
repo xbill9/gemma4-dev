@@ -32,6 +32,9 @@ deliberately has no tool that destroys one.
   copy is authoritative if the two differ).
 - `mcp/project-setup.sh` — one-command installer: copies this skill into a target project and
   registers the MCP server.
+- `mcp/benchmarking_suite.py` — drives a whole concurrency-by-context sweep through
+  `bench_cell` and writes a report against the monorepo's serving-report schema. A CLI, not a
+  tool; it stubs the MCP SDK rather than depending on it.
 - `mcp/requirements.txt`, `mcp/tpu.env` — dependencies and the committed configuration.
 
 ## The image decides whether the model loads at all
@@ -108,6 +111,20 @@ not a configuration change.
    whose right answer is known in advance.
 8. `analyze_logs` — the rig triaging itself; falls back to the raw tail when the endpoint is
    the thing that is broken.
+9. `run_vllm_benchmark` — one sweep cell against the live endpoint, returned as a ready-made
+   `throughput.sweep[]` entry. The load generator runs in its own container with no GPU device
+   attached, so it costs host CPU rather than card time.
+
+## Benchmarking measures the prefix cache unless you stop it
+
+`vllm bench serve` derives its prompts from `--seed`, default **0**, and this deployment runs
+with `enable_prefix_caching=True`. Two runs sharing a seed send identical prompts, so the second
+reads the first's cache and reports a speedup that is the cache rather than the card — **2.25x at
+8192-token context**, 1.00x at 128. Nothing errors and nothing warns.
+
+Per-repeat seeding is not enough: cells at one context length draw from the same prompt pool, so
+`c4-in128` replays `c1-in128`. Pass a distinct `seed` to every `run_vllm_benchmark` call;
+`benchmarking_suite.py` does this itself and `--seed-base` shifts a whole sweep off an earlier one.
 
 ## Tool catalog
 
@@ -132,6 +149,7 @@ not a configuration change.
 | `query_model` | One chat completion, reporting reasoning tokens |
 | `verify_capabilities` | Probe all four working modalities |
 | `analyze_logs` | Feed the logs to the model and ask what is wrong |
+| `run_vllm_benchmark` | One sweep cell; **vary `seed` between calls** or you measure the cache |
 | `get_help` | This server's tools and active configuration |
 
 ## Cautions

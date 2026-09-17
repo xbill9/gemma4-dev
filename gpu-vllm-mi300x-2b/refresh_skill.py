@@ -30,7 +30,7 @@ SKILL = ROOT / ".claude" / "skills" / SKILL_NAME
 # time for every default it has. A skill installed without it falls back to the
 # literals in server.py, which are the same values — but only until one of them
 # changes here and not there.
-SOURCES = ["server.py", "project-setup.sh", "requirements.txt", "tpu.env"]
+SOURCES = ["server.py", "benchmarking_suite.py", "project-setup.sh", "requirements.txt", "tpu.env"]
 
 
 def main() -> int:

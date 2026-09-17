@@ -114,11 +114,30 @@ as `DIGITALOCEAN_ACCESS_TOKEN`.
 
 ## Measurement
 
-Nothing here is a benchmark yet. `benchmarks/` carries the synced root schema and README and
-no reports — the KV and concurrency figures in `README.md` are vLLM's own allocation report,
-not a measured rate, and are labelled as such. **Do not let a figure from this rig be
-differenced against a TPU rig and read as a control-plane result**: nothing else in the
-monorepo serves this checkpoint on AMD, so there is no twin to difference against.
+First sweep landed 2026-09-16: `benchmarks/reports/2026-09-16-vllm-sweep-mi300x.json`, 12 cells
+of a 4x4 concurrency-by-context grid, 3 repeats each, worst-cell cv 8.4%. **Do not let a figure
+from this rig be differenced against a TPU rig and read as a control-plane result**: nothing else
+in the monorepo serves this checkpoint on AMD, so there is no twin to difference against.
+
+**Benchmarking this server measures its prefix cache unless you stop it.** `vllm bench serve`
+derives its prompts from `--seed`, which defaults to 0, and `enable_prefix_caching=True` here. Two
+runs sharing a seed generate identical prompts, so the second reads the first's cache — worth
+**2.25x at 8192 context** and 1.00x at 128, which is the gradient a prefill-saving cache predicts.
+Cells at one context length draw from the same pool, so per-repeat seeding is not enough either.
+`benchmarking_suite.py` gives every cell and repeat a seed no other run uses; `--seed-base` shifts
+a whole sweep off an earlier one. The contaminated sweep is kept as
+`...-seedcollision` with `prefix-cache-effect.txt` beside it, because the difference between the
+two runs is the measurement. Its worst-cell cv was 51.1% against 8.4% clean.
+
+**The KV pool is never this workload's constraint.** The engine allocates 155.04 GiB / 9,026,017
+tokens and the heaviest cell in the grid wants 524,288 — 5.8%. Long-context throughput flattens on
+prefill, not memory, which inverts the TPU siblings' sizing rule. The same figures put KV at
+18,443.7 B/token, matching `../MODELS.md`'s geometry derivation to 0.06% and refuting the
+engine-policy hypothesis its open-discrepancy block proposed; that block now records this run.
+
+**`run_vllm_benchmark` runs the load generator in a container with no GPU device attached.** It
+cannot touch the card, which is what makes it safe beside a live server, and `--entrypoint vllm` is
+set unconditionally rather than branching on the image the way `_serve_argv` does.
 
 A config flag being accepted is not evidence it did anything. `verify_capabilities` probes
 each modality with a request whose correct answer is known in advance, which is why the vision

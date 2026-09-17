@@ -73,6 +73,9 @@ from mcp.types import ToolAnnotations
 
 PROJECT_DIR = Path(__file__).resolve().parent
 load_dotenv(PROJECT_DIR / "tpu.env")
+# .env holds the API token and is gitignored, mode 0600. Loaded second and
+# without override, so a real environment variable still wins over both files.
+load_dotenv(PROJECT_DIR / ".env")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -551,8 +554,14 @@ async def run_on_droplet(droplet: str, command: str, timeout: int = 300) -> str:
         return _error(exc)
 
 
+# Bare `rocm-smi --json` is rejected — "Cannot print JSON/CSV output for concise
+# output" — because the default concise table has no JSON form. Naming the
+# fields explicitly is what makes it emit JSON at all.
+ROCM_SMI_CMD = "rocm-smi --showid --showproductname --showtemp --showuse --showmemuse --json"
+
+
 def _summarize_rocm_smi(raw: str) -> Optional[str]:
-    """Turn `rocm-smi --json` output into a table, or None if it isn't that."""
+    """Turn rocm-smi's JSON output into a table, or None if it isn't that."""
     try:
         data = json.loads(raw)
     except ValueError:
@@ -575,7 +584,7 @@ def _summarize_rocm_smi(raw: str) -> Optional[str]:
         count += 1
         rows.append(
             f"| {card} | {pick(values, 'cardseries', 'devicename', 'productname')} "
-            f"| {pick(values, 'gpuuse(%)', 'gpuuse')} | {pick(values, 'gpumemoryuse(%)', 'memoryuse(%)')} |"
+            f"| {pick(values, 'gpuuse(%)', 'gpuuse')} | {pick(values, 'gpumemoryallocated(vram%)', 'gpumemoryuse(%)', 'memoryuse(%)')} |"
         )
     if not count:
         return None
@@ -594,7 +603,7 @@ async def gpu_status(droplet: str) -> str:
     exit code is not consulted at all.
     """
     try:
-        _, out, err = await _remote(droplet, "rocm-smi --json", timeout=60)
+        _, out, err = await _remote(droplet, ROCM_SMI_CMD, timeout=60)
         table = _summarize_rocm_smi(out)
         if table:
             return f"✅ GPU reporting on `{droplet}`.\n\n{table}"
@@ -1001,6 +1010,201 @@ async def verify_capabilities(droplet: str) -> str:
             lines.append(f"| {name} | {icon} | {detail.replace('|', '/')} |")
         lines += ["", "📡 Audio is not probed — no ROCm vLLM image ships the `vllm[audio]` extras."]
         return "\n".join(lines)
+    except Exception as exc:
+        return _error(exc)
+
+
+# The bench client writes its --save-result JSON inside the container; /dev/shm
+# is bind-mounted, so the file outlives the --rm container and can be read back
+# in the same SSH session. The marker separates it from the bench's own stdout.
+BENCH_RESULT_MARKER = "---BENCH-RESULT-JSON---"
+
+
+def _bench_argv(result_name: Optional[str] = None, **params: str) -> list[str]:
+    """The docker argv that runs `vllm bench serve` against the live endpoint.
+
+    Two things differ from `_serve_argv` and both are deliberate. The bench
+    client is an HTTP load generator that only needs a tokenizer, so **no GPU
+    device is passed**: this container cannot touch the card, which is what
+    makes it safe to run beside a live server. And `--entrypoint vllm` is set
+    unconditionally rather than branching on `_is_official_image`, because it
+    overrides whatever the image declares — the official image's
+    ENTRYPOINT ["vllm","serve"] would otherwise swallow `bench` as a model id.
+    """
+    argv = [
+        "docker",
+        "run",
+        "--rm",
+        "--net",
+        "host",
+        "-v",
+        f"{HF_CACHE}:/root/.cache/huggingface",
+        "-v",
+        "/dev/shm:/dev/shm",
+        "--shm-size",
+        "8g",
+        "--entrypoint",
+        "vllm",
+        VLLM_IMAGE,
+        "bench",
+        "serve",
+        "--backend",
+        "vllm",
+        "--base-url",
+        f"http://127.0.0.1:{VLLM_PORT}",
+        "--model",
+        VLLM_MODEL,
+        # Without these the dump carries p99 only, and the sibling reports
+        # record p90 as well.
+        "--percentile-metrics",
+        "ttft,tpot,itl",
+        "--metric-percentiles",
+        "90,99",
+    ]
+    for flag, value in params.items():
+        name = f"--{flag.replace('_', '-')}"
+        # A boolean switch is passed as an empty value; it takes no argument,
+        # and appending one would be read as the next flag's value.
+        argv += [name] if value == "" else [name, str(value)]
+    if result_name:
+        argv += ["--save-result", "--result-dir", "/dev/shm", "--result-filename", result_name]
+    return argv
+
+
+def _sweep_point_from_bench_result(result: dict, concurrency: int, input_len: int, output_len: int) -> dict:
+    """Map a `vllm bench serve --save-result` dump to a `throughput.sweep[]` entry of
+    benchmarks/serving-report.schema.json v1.1.
+
+    input_len is passed in rather than read from the dump: vLLM records
+    `random_input_len` as null there, and it is the second axis of a 2-D sweep,
+    so losing it would collapse the cell key. The full dump goes under `raw`
+    minus its list-valued keys, which are per-request arrays with one element
+    per prompt.
+    """
+
+    def _stats(metric: str) -> dict:
+        out = {}
+        for stat in ("mean", "median", "p90", "p99"):
+            value = result.get(f"{stat}_{metric}_ms")
+            if isinstance(value, (int, float)):
+                out[stat] = round(value, 2)
+        return out
+
+    point: dict = {
+        "concurrency": concurrency,
+        "input_len": input_len,
+        "output_len": output_len,
+        "status": "ok",
+    }
+    for key, src in (
+        ("request_rate_rps", "request_throughput"),
+        ("output_tok_per_s", "output_throughput"),
+        ("total_tok_per_s", "total_token_throughput"),
+    ):
+        value = result.get(src)
+        if isinstance(value, (int, float)):
+            point[key] = round(value, 2)
+    for key, metric in (("ttft_ms", "ttft"), ("tpot_ms", "tpot"), ("itl_ms", "itl")):
+        stats = _stats(metric)
+        if stats:
+            point[key] = stats
+    tpot_median = point.get("tpot_ms", {}).get("median")
+    if tpot_median:
+        point["per_stream_tok_per_s"] = round(1000 / tpot_median, 1)
+    point["raw"] = {k: v for k, v in result.items() if not isinstance(v, list)}
+    return point
+
+
+async def bench_cell(
+    droplet: str,
+    num_prompts: int = 100,
+    input_len: int = 1024,
+    output_len: int = 128,
+    max_concurrency: Optional[int] = None,
+    seed: int = 0,
+    timeout: int = 1800,
+) -> tuple[dict, str]:
+    """Run one sweep cell and return (sweep_point, bench stdout).
+
+    Not a tool: `run_vllm_benchmark` wraps it for the agent and
+    `benchmarking_suite.py` loops it for a whole grid, so the argv and the
+    result parsing have exactly one implementation. Raises on failure.
+    """
+    result_name = f"vllm-bench-{os.urandom(4).hex()}.json"
+    params = {
+        "dataset_name": "random",
+        # The bench client seeds at 0, so two runs of the same cell generate
+        # the SAME prompts — and prefix caching is on in this deployment, so
+        # the second run would replay into a warm cache and report a speedup
+        # that is the cache, not the card. Repeats must vary the seed.
+        "seed": str(int(seed)),
+        "num_prompts": str(int(num_prompts)),
+        "random_input_len": str(int(input_len)),
+        "random_output_len": str(int(output_len)),
+        # Without ignore-eos an instruction-tuned checkpoint stops early and
+        # output_len becomes an upper bound rather than the cell's second axis.
+        "ignore_eos": "",
+    }
+    if max_concurrency:
+        params["max_concurrency"] = str(int(max_concurrency))
+    argv = _bench_argv(result_name, **params)
+    cmd = " ".join(shlex.quote(part) for part in argv)
+    cmd += f" && echo {BENCH_RESULT_MARKER} && cat /dev/shm/{result_name} && rm -f /dev/shm/{result_name}"
+
+    code, out, err = await _remote(droplet, cmd, timeout=timeout)
+    if code != 0:
+        raise RuntimeError(f"`vllm bench serve` exited {code}.\n{_truncate(err or out, 2000)}")
+    stdout, sep, payload = out.partition(BENCH_RESULT_MARKER)
+    if not sep:
+        raise RuntimeError(f"Benchmark ran but no result JSON came back.\n{_truncate(out, 2000)}")
+    try:
+        result = json.loads(payload)
+    except ValueError as exc:
+        raise RuntimeError(f"Benchmark result JSON did not parse ({exc}).\n{_truncate(payload, 1500)}") from exc
+
+    concurrency = int(max_concurrency) if max_concurrency else int(num_prompts)
+    return _sweep_point_from_bench_result(result, concurrency, int(input_len), int(output_len)), stdout.strip()
+
+
+@mcp.tool(title="Run one serving benchmark cell", annotations=WRITE)
+async def run_vllm_benchmark(
+    droplet: str,
+    num_prompts: int = 100,
+    input_len: int = 1024,
+    output_len: int = 128,
+    max_concurrency: Optional[int] = None,
+    seed: int = 0,
+) -> str:
+    """Load-test the live endpoint with vLLM's own bench client and return one sweep cell.
+
+    The result is a ready-made `throughput.sweep[]` entry for
+    benchmarks/serving-report.schema.json — one call per sweep point. The load
+    generator runs in its own container with no GPU device attached, so it adds
+    host CPU but cannot disturb the serving process on the card.
+
+    Leaving `max_concurrency` unset sends all `num_prompts` at once, which
+    measures saturation rather than a fixed concurrency.
+
+    Re-running a cell with the same `seed` measures the prefix cache, not the
+    card: the prompts are identical and this deployment caches prefixes. Vary
+    `seed` between repeats.
+    """
+    try:
+        point, stdout = await bench_cell(
+            droplet,
+            num_prompts=num_prompts,
+            input_len=input_len,
+            output_len=output_len,
+            max_concurrency=max_concurrency,
+            seed=seed,
+        )
+        return (
+            f"✅ Benchmark cell on `{droplet}`: concurrency {point['concurrency']}, "
+            f"{point['input_len']}→{point['output_len']} tokens.\n\n"
+            "`throughput.sweep[]` entry for `benchmarks/serving-report.schema.json`:\n"
+            f"```json\n{json.dumps({k: v for k, v in point.items() if k != 'raw'}, indent=2)}\n```\n\n"
+            f"Bench output:\n```\n{_truncate(stdout, 2500)}\n```"
+        )
     except Exception as exc:
         return _error(exc)
 

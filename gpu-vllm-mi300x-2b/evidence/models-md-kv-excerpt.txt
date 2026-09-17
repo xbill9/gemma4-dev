@@ -1,0 +1,35 @@
+# Excerpt from gemma4-dev/MODELS.md, copied verbatim 2026-09-16.
+# The source of the 18,432 B/token geometry figure and of the 9,622 B/token L4 datum
+# this article's ROCm measurement is compared against. Not measured by this run.
+#
+| `n_ctx` | 18 KiB/token predicts | llama.cpp allocates | over by |
+| ---: | ---: | ---: | ---: |
+| 8,192 | 144 MiB | 60 MiB | 2.4x |
+| 32,768 | 576 MiB | 204 MiB | 2.8x |
+| ∞ | 18 KiB/token | → 6 KiB/token | → 3.0x |
+
+**So the number to use depends on which question you are asking.** 18 KiB/token is what the checkpoint
+*needs* if every cached layer holds the full context, which is what the TPU path does and what the two
+v5e/v6e cross-checks above confirm. 6 KiB/token + 12 MiB is what llama.cpp and Ollama *allocate*. Both
+are correct; neither is a correction of the other.
+
+**This confirms the mechanism the open discrepancy below proposes, and does not close it.** vLLM's
+9,622 B/token on an L4 is a 1.92x gap; a pure window cap predicts **3.0x** at large context. The policy
+is real and is now measured on one engine — but the magnitude still does not match vLLM's, so that block
+stays open.
+
+**Practical rule: this error is always a floor error, so it never OOMs — it silently wastes budget you
+thought you had spent.** Read the engine's own allocation log before sizing context from this section.
+
+> **OPEN DISCREPANCY — the vLLM CUDA path reports about half this, 2026-08-30.** Serving E2B under
+> stock vLLM 0.28.0 on an NVIDIA L4 (`gpu-vllm-g6-2b`, `benchmarks/runs/2026-08-30-first-serve-g6/`),
+> the engine allocated a **9.65 GiB KV pool** and reported **1,076,849 tokens** of capacity —
+> **9,622 B/token, a 1.92x gap against the 18,432 B derived above.**
+>
+> **Neither number has been shown wrong, and neither should be edited to match the other.** The
+> 18 KiB derivation is geometry plus two exact TPU cross-checks. The 9.4 KiB figure is a
+> *divided-out average* — pool ÷ reported capacity — taken on a **different serving stack**
+> (`vllm` on CUDA, not `tpu_inference`). The most likely reconciliation is that vLLM v1 charges
+> sliding-window layers only their **window** rather than the full context, in which case the two
+> figures answer different questions and 1.92x is close to what a 12-sliding/3-full split would
+> predict. That is a hypothesis, **not a measurement** — it needs vLLM's KV-cache-group accounting

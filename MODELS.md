@@ -200,6 +200,25 @@ thought you had spent.** Read the engine's own allocation log before sizing cont
 > predict. That is a hypothesis, **not a measurement** — it needs vLLM's KV-cache-group accounting
 > read before anyone relies on it.
 >
+> **The leading hypothesis does not survive a third stack, 2026-09-16.** Serving the same
+> checkpoint under vLLM **0.29.1rc1.dev187+gaf1c01499.rocm100** on one AMD MI300X
+> (`gpu-vllm-mi300x-2b`, `benchmarks/reports/2026-09-16-vllm-sweep-mi300x.json`), the engine
+> allocated a **155.04 GiB KV pool** and reported **9,026,017 tokens** —
+> **18,443.7 B/token, 0.06% off the 18,432 B derived above.**
+>
+> That is the same `vllm` v1 engine, one minor version newer, on ROCm rather than CUDA. If vLLM
+> charged sliding-window layers only their window **as an engine-level policy**, this run would
+> report about half too. It reports the geometry figure to four significant figures. **So the
+> mechanism is not "the vLLM path", and the block above should no longer be read as a
+> CUDA-versus-TPU split** — it is one L4 measurement that neither of the other two stacks
+> reproduces.
+>
+> What it does not do is explain the L4 number, which still has no account and is still not
+> shown wrong. Candidates the MI300X run cannot distinguish between: the L4's much smaller pool
+> interacting with block allocation, a different `kv_cache_dtype` or attention backend
+> (`TRITON_ATTN` here), a chunked-prefill or sliding-window config difference, or vLLM 0.28.0
+> behaviour that 0.29.1 changed. **Read the L4 run's own config before assuming which.**
+>
 > Practical consequence for sizing: **on the vLLM CUDA path, do not budget KV at 18 KiB/token** —
 > you will under-provision context by ~2x. Size from the engine's own allocation log, which is the
 > rule this section already gives for the TPU path.
