@@ -1,66 +1,35 @@
 ---
-title: "Nine Million Tokens of KV Cache, and Prefill Is Still the Wall: Gemma 4 E2B on One MI300X"
+title: "Gemma 4 E2B on One MI300X: What 155 GiB of KV Cache Buys, and What It Doesn't"
 published: false
-description: "A 12-cell serving sweep of Gemma 4 E2B on one AMD Instinct MI300X under vLLM on ROCm. The card allocates 155 GiB of KV cache and never comes close to filling it — and the first sweep was measuring the prefix cache rather than the card."
-tags: amd, vllm, rocm, gemma
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-benchmark-cover.2ff88304.jpg
+series: Gemma4
+description: "A twelve cell serving sweep of Gemma 4 E2B on one AMD Instinct MI300X under vLLM on ROCm, driven through a tag scoped Python MCP server. The engine allocates nine million tokens of KV cache and the heaviest cell in the grid uses 5.8 percent of it. Two sweeps were thrown away first, because the benchmark was measuring the prefix cache."
+tags: amd, vllm, rocm, benchmarking
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-benchmark-cover.b82c1b5e.jpg
 ---
 
-This article provides a step by step benchmark of Gemma 4 E2B on one AMD Instinct MI300X hosted GPU
-enabled system. A suite of Python MCP tools is built to simplify management of the vLLM hosted
-deployment, and the sweep itself runs through those same tools.
+This article provides a step by step serving benchmark of Gemma 4 E2B on a single AMD Instinct MI300X hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM deployment, and the sweep itself is driven through the same server.
 
 https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b
 
-The deployment walk-through that gets to a serving endpoint — droplet lifecycle, vetting the ROCm
-image before a 35 GB pull, and verifying every modality the checkpoint claims — is a separate
-article in the same directory. This one starts where that one stops: the endpoint is up, and the
-question is what it actually does under load.
+The companion piece on the same droplet inventories the card and measures what its matrix cores execute, and states plainly that it measured no serving throughput. This is that number. The workstation writing it has no AMD GPU and never will; everything that reaches the hardware goes through tag scoped MCP tools or explicit SSH.
 
----
+Three results came out of the grid, and only the first was the one I set out to measure. The card sustains **10,293.6 output tokens a second** across 64 streams at short context, at **$0.054 per million output tokens**. The KV pool it advertises so loudly is never the constraint — the heaviest cell in the grid wants 5.8 percent of it — so the ceiling at long context is prefill, which inverts the sizing rule every TPU rig in this monorepo runs on. And two full sweeps went in the bin before either number was trustworthy, because `vllm bench serve` seeds its prompts at zero and this deployment caches prefixes.
 
-#### What is this project trying to Do?
+#### Prerequisites
 
-Measure one card honestly. One AMD Instinct MI300X on a DigitalOcean GPU droplet reached through
-AMD Developer Cloud, serving `google/gemma-4-E2B-it` through vLLM in Docker, swept across four
-concurrency levels and three context lengths.
+- An AMD Developer Cloud account with a GPU droplet already created and serving. `devcloud.amd.com`
+  is DigitalOcean underneath — same v2 API, same droplet ids — and the token comes from the
+  **My AMD Team** account, not a personal DigitalOcean one.
+- The droplet tagged. Every lookup is scoped by `tag_name`, so an untagged droplet is invisible to
+  the server and a mistyped id cannot power cycle an unrelated machine.
+- `DIGITALOCEAN_ACCESS_TOKEN` in the environment or in a mode 0600 `.env`. Never in `tpu.env`,
+  which is committed.
+- `vllm` already up and answering. Getting there — vetting the ROCm image before a 35 GB pull, and
+  the vendor build that cannot load Gemma 4 at all — is the subject of a different article.
+- Python 3 with `httpx` and `python-dotenv` in the system interpreter. No virtualenv; `.mcp.json`
+  launches the server with a bare `python3`.
 
-Three things came out of it, and only one was the thing I set out to measure:
-
-- **The card allocates 155.04 GiB of KV cache — nine million tokens — and the workload never used
-  more than 5.8% of it.** The throughput ceiling at long context is prefill, not memory. That
-  inverts the intuition the TPU siblings in this monorepo built up, where the KV pool is the wall.
-- **My first two sweeps were partly measuring vLLM's prefix cache.** `vllm bench serve` seeds its
-  random prompts at 0, so cells and repeats generated *identical* prompts and read each other's
-  cache entries. At 8192-token context that was worth **2.25x**. Nothing warned me.
-- **KV costs 18,443 bytes per token on this stack**, which matches the geometry-derived 18,432 B in
-  this monorepo's `MODELS.md` to 0.06% — and therefore does not reproduce the roughly-half figure
-  an earlier NVIDIA L4 run reported.
-
----
-
-#### Where do I start?
-
-The same incremental approach as the sibling rigs, one step further along. The endpoint has to be up
-and verified before a number off it means anything, so the order is: confirm the droplet, confirm the
-container, confirm the engine's own view of its memory, and only then put load on it.
-
-Every step below is cheap and reversible. The only thing that costs money is the droplet, and it is
-already running.
-
----
-
-#### At this point you should have
-
-- A DigitalOcean GPU droplet tagged `gemma`, powered on, with an MI300X visible to ROCm.
-- `vllm` running in Docker on it, answering on `127.0.0.1:8000`.
-- The rig's MCP server registered, so the tools below are reachable from Claude Code.
-- `DIGITALOCEAN_ACCESS_TOKEN` in the rig's `.env`, mode 0600 and gitignored. It is never in
-  `tpu.env`, which is committed.
-
----
-
-#### Confirm the Droplet Before Anything Else
+#### The Box, Briefly
 
 ```
 list_droplets
@@ -74,53 +43,13 @@ list_droplets
 | `debian-gpu-mi300x1-192gb-devcloud-atl1` | 601142018 | active | gpu-mi300x1-192gb-devcloud | atl1 | 165.245.134.217 |
 ```
 
-Every lookup is filtered by the tag, so the server can only ever see droplets somebody deliberately
-tagged for it. An untagged droplet in the same account is invisible, which is the point — a mistyped
-id cannot power-cycle an unrelated machine.
+One card, `gfx942`, 191.69 GiB, billing at $1.99 an hour read from `droplet.size.price_hourly` rather than a price page. It presents as an SR-IOV virtual function, which reads alarmingly like a partition and is not one: all 304 compute units and the whole 191.69 GiB are there.
 
-There is no `create` tool and no `destroy` tool, on purpose. Both are dollar-per-hour decisions and
-they stay a deliberate step in the console. Worth repeating because it catches people: **powering a
-droplet off does not stop DigitalOcean billing it.** The resources stay reserved and the meter runs.
-Only destroying it stops the charge.
+There is no `create` tool and no `destroy` tool in this server, deliberately. Both are dollar per hour decisions and they stay a human step in the console. Worth repeating because it catches people: powering a droplet off does not stop DigitalOcean billing it. Only destroying it stops the meter.
 
----
+#### Where the 191.69 GiB Actually Goes
 
-#### Verify the GPU Architecture
-
-```
-gpu_status debian-gpu-mi300x1-192gb-devcloud-atl1
-```
-
-```
-✅ GPU reporting on `debian-gpu-mi300x1-192gb-devcloud-atl1`.
-
-| Card | Product | GPU use % | VRAM used % |
-| --- | --- | --- | --- |
-| card0 | Aqua Vanjaram [Instinct MI300X VF] | 0 | 87 |
-
-📡 1 GPU(s) reported by rocm-smi.
-```
-
-The card presents as an SR-IOV **VF**, which reads alarmingly like a partition. It is not: all 304
-compute units and the whole 191.7 GiB are there.
-
-This tool was broken when I started and the failure was instructive. It ran `rocm-smi --json`, which
-**rocm-smi refuses** — `Cannot print JSON/CSV output for concise output` — because the default
-concise table has no JSON form. The fix is to name the fields:
-
-```
-rocm-smi --showid --showproductname --showtemp --showuse --showmemuse --json
-```
-
-Naming fields is what makes it emit JSON at all. The tool had been reporting *no card* on a perfectly
-healthy MI300X, and since `rocm-smi` exits 0 when it fails, nothing upstream noticed.
-
----
-
-#### Read the Engine's Own Memory Accounting
-
-Before measuring throughput, get the engine to say what it did with the card. This is the single most
-useful thing in the boot log and it is printed exactly once.
+vLLM prints its whole memory budget once, at startup, and then never again.
 
 ```
 docker logs vllm 2>&1 | grep -E 'Available KV cache memory|GPU KV cache size|Actual usage is'
@@ -130,81 +59,83 @@ docker logs vllm 2>&1 | grep -E 'Available KV cache memory|GPU KV cache size|Act
 Available KV cache memory: 155.04 GiB
 GPU KV cache size: 9,026,017 tokens, Maximum concurrency for 32,768 tokens per request: 275.45x
 Free memory on device (191.36/191.69 GiB) on startup. Desired GPU memory utilization is (0.9,
-172.52 GiB). Actual usage is 11.88 GiB for consumed memory (weights + non-torch), 5.59 GiB for peak
-activation, and 3.9 GiB for CUDAGraph memory. Current kv cache memory in use is 155.04 GiB.
+172.52 GiB). Actual usage is 11.88 GiB for consumed memory (weights + non-torch), 5.59 GiB for
+peak activation, and 3.9 GiB for CUDAGraph memory.
 ```
 
-The whole HBM budget, from the engine rather than from arithmetic:
-
-| Component | GiB | Share of 191.69 GiB |
+| Component | GiB | Share |
 | --- | ---: | ---: |
 | KV cache | 155.04 | 80.9% |
 | Weights + non-torch | 11.88 | 6.2% |
 | Peak activation | 5.59 | 2.9% |
 | CUDA graph pool | 3.90 | 2.0% |
-| Unallocated (below `--gpu-memory-utilization 0.90`) | 15.28 | 8.0% |
+| Unallocated below `--gpu-memory-utilization 0.90` | 15.28 | 8.0% |
 
-A 2B-class checkpoint on a 192 GiB card spends four fifths of the card on KV. That is the shape of
-the whole result: there is so much KV that nothing in the sweep can exhaust it.
+A 2B class checkpoint on a 192 GiB card spends four fifths of the card on KV cache. Hold that number; the rest of the article is about how little of it gets used.
 
----
+#### One Division Settles an Open Question
 
-#### The KV Number Settles an Open Question in This Repo
+Divide the engine's own pool by the engine's own token count and you get **18,443.7 bytes per token**. That is arithmetic on two measured inputs rather than a measurement, but both inputs come off the same log line.
 
-Divide the engine's pool by the engine's token count:
+This repository's `MODELS.md` derives **18,432 bytes per token** for E2B from the checkpoint's layer geometry — sliding attention layers 256 wide, full attention layers 512 wide — and cross checks it exactly against two TPU runs. The ROCm figure lands **0.06 percent off it**.
+
+That matters because the same file carries an open discrepancy. An NVIDIA L4 under stock vLLM 0.28.0 reported 9,622 bytes per token, a 1.92x gap, and the leading explanation was that vLLM v1 charges sliding window layers only their **window** rather than the full context. If that were an engine level policy it would apply here too, on vLLM 0.29.1, on the same v1 engine. It does not. The hypothesis does not survive a third stack, and whatever produced the L4 number is narrower than "the vLLM path".
+
+It does not explain the L4 figure, and nothing here shows that figure wrong. One card, one run, recorded in `MODELS.md` beside the other two.
+
+#### The Load Generator Must Not Be Able to Touch the Card
+
+The sibling vLLM rigs expose a `run_vllm_benchmark` tool. This one had none, so building it was the first job, and one decision inside it is worth stating.
 
 ```
-155.04 GiB x 1073741824 / 9,026,017 tokens = 18,443.7 bytes/token
-```
-
-*(That division is arithmetic, not a measurement. Both inputs are the engine's.)*
-
-This monorepo's `MODELS.md` derives **18,432 B/token** for E2B from the checkpoint's layer geometry —
-sliding-attention layers 256-wide, full-attention layers 512-wide — and cross-checks it exactly on two
-TPU runs. The ROCm figure lands **0.06% off it**.
-
-That matters because `MODELS.md` carries an open discrepancy: an NVIDIA L4 run under stock vLLM
-reported 9,622 B/token, a 1.92x gap, and the leading hypothesis was that **vLLM v1 charges
-sliding-window layers only their window** rather than the full context. If that were an engine-level
-policy it would apply here too, on vLLM 0.29.1 — and it does not. So the hypothesis does not survive
-this data point, and whatever produced the L4 figure is narrower than "the vLLM path".
-
-**One card, one run.** It is a third data point on a third stack, not a closed case.
-
----
-
-#### The Benchmark Tool, and Why It Runs in Its Own Container
-
-The sibling vLLM rigs expose a `run_vllm_benchmark` tool that drives `vllm bench serve`. This rig had
-no such tool, so the first job was adding one.
-
-```python
 docker run --rm --net host \
   -v /opt/hf-cache:/root/.cache/huggingface -v /dev/shm:/dev/shm --shm-size 8g \
   --entrypoint vllm \
   vllm/vllm-openai-rocm:nightly-rocm100 bench serve ...
 ```
 
-Two details differ from the serving container and both are deliberate.
+No `--device /dev/kfd`, no `--device /dev/dri`, no `--group-add`. The bench client is an HTTP load generator that needs a tokenizer and nothing else, so with no device mapped in it **cannot** touch the card, which is what makes it safe to run beside a live server. It costs host CPU, not card time.
 
-**No GPU device is attached.** No `--device /dev/kfd`, no `--device /dev/dri`, no `--group-add`. The
-bench client is an HTTP load generator that needs a tokenizer and nothing else. Without a device it
-*cannot* touch the card, which is what makes it safe to run beside a live server — it costs host CPU,
-not card time.
+`--entrypoint vllm` is set unconditionally, unlike the serving path in this rig, which branches on the image because `vllm/vllm-openai-rocm` declares `ENTRYPOINT ["vllm","serve"]` while AMD's own `rocm/vllm` images declare none. Overriding outright works for both. Without it, the official image reads `bench` as a model id.
 
-**`--entrypoint vllm` is set unconditionally.** The serving path in this rig branches on the image,
-because `vllm/vllm-openai-rocm` declares `ENTRYPOINT ["vllm","serve"]` while AMD's own `rocm/vllm`
-images declare none. For the bench that branch is unnecessary and harmful: overriding the entrypoint
-outright works for both, and without it the official image reads `bench` as a model id.
+#### The Benchmark Was Measuring the Prefix Cache
 
----
+This is the part worth carrying to any other engine, and it cost two complete sweeps.
 
-#### The Sweep Grid
+`vllm bench serve` derives its random prompts from `--seed`, which defaults to **0**. vLLM's default configuration has `enable_prefix_caching=True`, and this deployment left it on because that is how the rig actually serves. Two runs that share a seed therefore generate the *same prompts*, and the second reads the first's cache entries and reports a speedup that is the cache rather than the card.
 
-Four concurrency levels against four context lengths, 128 output tokens throughout, `ignore_eos` so
-every request produces exactly 128 tokens rather than stopping early. `num_prompts = max(8, 2 x
-concurrency)`. The grid matches `tpu-vllm-v5e1-2b` and `tpu-vllm-v6e1-2b` so the *shape* is
-comparable.
+It is worse than per repeat. Cells at the same context length draw from the same prompt pool, so `c4-in128` replayed `c1-in128`. Nothing errors, nothing warns, the throughput simply looks good.
+
+Measured inside a single sweep, where repeat 1 used seeds an earlier sweep had already served and repeats 2 and 3 did not, all three inside the same minute so card warm up is not the explanation:
+
+| Context | Clients | Warm tok/s | Cold tok/s | Ratio |
+| ---: | ---: | ---: | ---: | ---: |
+| 128 | 1 | 340.7 | 340.5 | 1.00x |
+| 128 | 64 | 10,849.2 | 10,496.2 | 1.03x |
+| 1,024 | 16 | 3,415.4 | 2,891.3 | 1.18x |
+| 1,024 | 64 | 8,930.4 | 6,252.7 | 1.43x |
+| 8,192 | 16 | 1,961.5 | 870.2 | 🥇 2.25x |
+| 8,192 | 64 | 2,095.8 | 948.9 | 2.21x |
+
+The gradient is what makes this believable rather than a story. A prefix cache saves prefill, prefill's share of the work grows with context, so the effect should be nothing at 128 tokens and large at 8192. It is exactly that: **1.00x and 2.25x**. The 1.00x row is the control, and without it the 2.25x would be an anecdote.
+
+The fix is one line — give every cell and every repeat a seed no other run in the sweep uses:
+
+```python
+def _seed(base: int, index: int, rep: int) -> int:
+    return base + index * 100 + rep
+```
+
+| Sweep | Worst cell spread | Cells under 1% spread |
+| --- | ---: | ---: |
+| Seeds 0, 1, 2 per cell | 51.1% | 4 of 12 |
+| 🥇 Unique seed per cell and repeat | 8.4% | 9 of 12 |
+
+A 51 percent coefficient of variation is not noise. It is two different experiments averaged together. The contaminated run is kept in the repository next to the clean one, because the difference between them is itself the measurement.
+
+#### The Grid
+
+Four client counts against four context lengths, 128 output tokens throughout, `ignore_eos` so every request produces exactly 128 tokens instead of stopping early, and `num_prompts = max(8, 2 x clients)`. The shape matches `tpu-vllm-v5e1-2b` and `tpu-vllm-v6e1-2b` so the grid is comparable even though the numbers are not.
 
 ```
 python3 benchmarking_suite.py --droplet debian-gpu-mi300x1-192gb-devcloud-atl1 \
@@ -215,66 +146,13 @@ python3 benchmarking_suite.py --droplet debian-gpu-mi300x1-192gb-devcloud-atl1 \
 16 cells, 12 runnable, 4 infeasible at max_model_len 32768
 ```
 
-The 32768-context row cannot exist: `32768 + 128 > 32768`. Those four cells are recorded
-`infeasible` with the reason rather than dropped, because a missing cell is indistinguishable from
-one nobody ran. Schema 1.1 has a status field for exactly this.
+The 32768 context row cannot exist, because 32768 + 128 is more than 32768. Those four cells are recorded `infeasible` with the reason rather than dropped — a missing cell is indistinguishable from one nobody ran, and the report schema has a status field for exactly this.
 
----
+#### The Result
 
-#### The Benchmark Was Measuring the Prefix Cache
+Median of three repeats per cell, every cell a prompt set no other cell saw.
 
-This is the part worth carrying to any other engine, and it cost two full sweeps.
-
-`vllm bench serve` derives its random prompts from `--seed`, which defaults to **0**. vLLM's default
-config has `enable_prefix_caching=True`. Put those together and two runs that share a seed generate
-the *same prompts* — so the second one reads the first one's cache entries and reports a speedup that
-is the cache, not the card.
-
-It is worse than per-repeat. Cells at the same context length draw from the same pool, so `c4-in128`
-replayed `c1-in128`'s prompts. Nothing errors. Nothing warns. The throughput just looks good.
-
-The size of it, measured within a single sweep — repeat 1 ran seeds a previous sweep had already
-served, repeats 2 and 3 did not, and all three ran inside the same minute so card warm-up is not the
-explanation:
-
-| Context | Concurrency | Warm tok/s | Cold tok/s | Ratio |
-| ---: | ---: | ---: | ---: | ---: |
-| 128 | 1 | 340.7 | 340.5 | 1.00x |
-| 128 | 64 | 10,849.2 | 10,496.2 | 1.03x |
-| 1,024 | 16 | 3,415.4 | 2,891.3 | 1.18x |
-| 1,024 | 64 | 8,930.4 | 6,252.7 | 1.43x |
-| 8,192 | 16 | 1,961.5 | 870.2 | 🥇 2.25x |
-| 8,192 | 64 | 2,095.8 | 948.9 | 2.21x |
-
-The gradient is the tell. A prefix cache saves prefill, prefill's share of the work grows with
-context, so the benefit should be nil at 128 tokens and large at 8192. It is exactly that: **1.00x
-and 2.25x**. Those two numbers are the control that makes the rest of the table mean something.
-
-The fix is one line — give every cell and every repeat a seed no other run in the sweep uses:
-
-```python
-def _seed(base: int, index: int, rep: int) -> int:
-    return base + index * 100 + rep
-```
-
-What it bought, in the reported run's own spread:
-
-| Sweep | Worst-cell spread (cv) | Cells under 1% cv |
-| --- | ---: | ---: |
-| Seeds 0,1,2 per cell | 51.1% | 4 of 12 |
-| 🥇 Unique seed per cell and repeat | 8.4% | 9 of 12 |
-
-A 51% coefficient of variation is not noise. It is two different experiments averaged together.
-
-**Prefix caching was left on**, because that is how the rig actually serves. The numbers below are
-the unique-prompt case, which is the conservative end: real traffic with a shared system prompt will
-do better than this, and the table above says roughly how much better.
-
----
-
-#### Results: Aggregate Output Tokens/sec
-
-Median of 3 repeats per cell, 12 cells, every cell a unique prompt set.
+Aggregate output tokens a second:
 
 | context ↓ / clients → | 1 | 4 | 16 | 64 |
 | --- | ---: | ---: | ---: | ---: |
@@ -282,7 +160,7 @@ Median of 3 repeats per cell, 12 cells, every cell a unique prompt set.
 | 1,024 | 305.6 | 967.3 | 2,681.4 | 5,447.6 |
 | 8,192 | 193.2 | 449.3 | 711.2 | 725.3 |
 
-#### Median Time to First Token (ms)
+Median time to first token, milliseconds:
 
 | context ↓ / clients → | 1 | 4 | 16 | 64 |
 | --- | ---: | ---: | ---: | ---: |
@@ -290,7 +168,7 @@ Median of 3 repeats per cell, 12 cells, every cell a unique prompt set.
 | 1,024 | 30.1 | 68.1 | 197.1 | 568.8 |
 | 8,192 | 164.3 | 497.3 | 1,387.0 | **4,640.1** |
 
-#### Per-stream Tokens/sec — What One User Feels
+Per stream tokens a second, which is what one user feels:
 
 | context ↓ / clients → | 1 | 4 | 16 | 64 |
 | --- | ---: | ---: | ---: | ---: |
@@ -298,158 +176,97 @@ Median of 3 repeats per cell, 12 cells, every cell a unique prompt set.
 | 1,024 | 326.8 | 278.6 | 220.8 | 136.4 |
 | 8,192 | 255.1 | 198.0 | 84.8 | **19.1** |
 
----
+#### Is That Difference Real?
 
-#### The Three Regimes
+Worst cell spread over three repeats is **8.4 percent**, and nine of the twelve cells are under 1 percent. Both loose cells are at 8192 context, which is where a single slow prefill moves a median furthest.
 
-**Short context scales almost linearly to 64 clients.** 340.4 to 10,293.6 output tok/s is **30.2x** *(arithmetic)* for
-64 times the clients, and a single stream still feels fast at 196.5 tok/s with the card fully loaded.
-This is the regime agent traffic lives in, and the card barely notices it.
+So read the 30x scaling at short context and the flat line at long context as real, and anything under about 9 percent as nothing. The 2 percent between 711.2 and 725.3 tok/s is inside the noise and is being read as "flat", not as a rise.
 
-**Long context stops scaling at 16 clients.** 711.2 to 725.3 tok/s going from 16 to 64 is **2%** *(arithmetic)* for
-4 times the clients, while median TTFT goes 1,387 ms to 4,640 ms and p99 reaches 8,746 ms. Past 16 clients at 8K
-you are buying latency, not throughput.
+#### Short Context Scales, Long Context Stops, and Memory Is Not Why
 
-**And the reason is not memory.** This is where the MI300X parts company with the TPU siblings, where
-the same collapse is a KV wall:
+Going from 1 client to 64 at 128 token context is **30.2x the throughput**, and a single stream still feels quick at 196.5 tokens a second with the card fully loaded. That is the regime agent traffic lives in, and the card barely notices it.
+
+At 8192 tokens the same step from 16 clients to 64 is **2 percent**, while median time to first token goes from 1,387 ms to 4,640 ms and p99 reaches 8,746 ms. Past 16 clients at long context you are buying latency, not throughput.
+
+On the TPU rigs in this monorepo that collapse is a KV wall, and the sizing rule is `clients x context < KV pool`. Here that rule never binds:
 
 ```
-64 clients x 8,192 tokens = 524,288 KV tokens
-Resident KV pool          = 9,026,017 tokens
-Occupancy                 = 5.8%
+64 clients x 8,192 tokens = 524,288 KV tokens wanted
+resident pool             = 9,026,017 tokens
+occupancy                 = 5.8%
 ```
 
-*(Arithmetic; both inputs measured.)* The pool is 17x larger than the workload's peak demand *(arithmetic: 9,026,017 / 524,288)*. Nothing
-is being evicted and nothing is queueing for blocks. The limit is prefill throughput: the same cell
-moves **47,142 total tok/s** including prompt tokens, against 46,231 at 16 clients — the card is
-saturated on prefill work and the extra clients only lengthen the queue.
+The pool is seventeen times larger than the heaviest cell's peak demand. Nothing is being evicted and nothing is queueing for blocks. What saturates is prefill: that same cell moves **47,142 total tokens a second** counting prompt tokens, against 46,231 at 16 clients — the card is already doing all the prefill work it can, and the extra 48 clients only lengthen the queue.
 
-**So on this part, the sizing question is inverted.** On the TPU rigs the rule is `clients x context
-< KV pool`. Here that rule never binds — 275x concurrency at full 32K context, per the engine's own
-report — and the operating point is set by how much prefill you are willing to pay for.
-
----
-
-#### Recommended Client Counts
+So on this part the sizing question is inverted. The KV budget is not the thing to plan around, and the operating point is set by how much prefill latency you are willing to pay for.
 
 | workload | context | clients | expected |
 | --- | ---: | ---: | --- |
-| Interactive chat / agent turns | ≤1K | **64** | 5,448–10,294 tok/s, 126–569 ms TTFT |
-| Latency-sensitive interactive | ≤1K | **16** | 2,681–3,584 tok/s, 50–197 ms TTFT |
-| RAG / long documents | 8K | **16** | 711 tok/s, 1,387 ms TTFT |
-| Long-context interactive | 8K | **≤4** | 449 tok/s, 497 ms TTFT, 198 tok/s per stream |
+| Interactive chat and agent turns | ≤1K | **64** | 5,448–10,294 tok/s, 126–569 ms TTFT |
+| Latency sensitive interactive | ≤1K | **16** | 2,681–3,584 tok/s, 50–197 ms TTFT |
+| RAG and long documents | 8K | **16** | 711 tok/s, 1,387 ms TTFT |
+| Long context interactive | 8K | **≤4** | 449 tok/s, 497 ms TTFT, 198 tok/s per stream |
 
-The 8K/64 cell is in the report and is not in this table on purpose. It is 2% more throughput than
-8K/16 for 3.3 times the time to first token *(arithmetic on the TTFT table)*.
+The 8192 by 64 cell is in the report and deliberately not in that table. It is 2 percent more throughput for 3.3 times the time to first token.
 
----
+#### And Price/Performance?
 
-#### Cost Analysis
-
-The droplet bills at **$1.99/hour**, read from the DigitalOcean v2 API rather than a price page —
-`droplet.size.price_hourly` for `gpu-mi300x1-192gb-devcloud`, read 2026-09-16.
-
-Cost per million output tokens is `1.99 / (tok/s x 3600) x 1,000,000`. *(Arithmetic on a measured
-rate and a measured price.)*
+Cost per million output tokens is the hourly rate over the measured rate, which is arithmetic on a measured price and a measured throughput.
 
 | Operating point | tok/s | $/M output tokens |
 | --- | ---: | ---: |
-| 🥇 128 ctx, 64 clients | 10,293.6 | **0.054** |
-| 🥈 128 ctx, 16 clients | 3,583.6 | 0.154 |
-| 1,024 ctx, 64 clients | 5,447.6 | 0.102 |
-| 8,192 ctx, 16 clients | 711.2 | 0.777 |
-| 128 ctx, single stream | 340.4 | 1.624 |
-| 8,192 ctx, single stream | 193.2 | 2.862 |
+| 🥇 128 context, 64 clients | 10,293.6 | **0.054** |
+| 🥈 128 context, 16 clients | 3,583.6 | 0.154 |
+| 1,024 context, 64 clients | 5,447.6 | 0.102 |
+| 8,192 context, 16 clients | 711.2 | 0.777 |
+| 128 context, single stream | 340.4 | 1.624 |
+| 8,192 context, single stream | 193.2 | 2.862 |
 
-**Serving one stream at a time costs 30x more per token than serving 64** *(arithmetic: 1.624 / 0.054)*, on the same card at the same
-hourly rate.** Batching is a far bigger lever here than any hardware choice, and the spread is wider
-than on the smaller cards precisely because there is so much headroom to fill.
+Serving one stream at a time costs **30x more per token** than serving 64, on the same card at the same hourly rate. Batching is a far bigger lever than any hardware choice here, and the spread is wider than on the small cards precisely because there is so much headroom left to fill.
 
-Compute only — no storage, no transfer, and no idle time. A card at $1.99/hour producing nothing
-costs the same as one producing 10,000 tok/s.
+Compute only. No storage, no transfer, and no idle time — a card at $1.99 an hour producing nothing costs exactly what one producing 10,000 tokens a second costs.
 
----
+#### What Was Controlled
 
-#### Why There Is No Comparison Table
+| | How it was held |
+| --- | --- |
+| Engine | one container, up throughout, never restarted between cells |
+| Config | one `docker run`, read back from `docker inspect` into the report rather than copied from `tpu.env` |
+| Prompts | vLLM's own `random` dataset, `ignore_eos`, exactly 128 output tokens per request |
+| Prompt identity | every cell and every repeat given a seed no other run in the sweep used |
+| Load generator | same host, own container, **no GPU device mapped in** |
+| Repeats | three per cell, median throughput run reported, spread recorded beside it |
+| Infeasible cells | recorded with the reason, not dropped |
 
-The sibling articles end with a table putting two deployments side by side. This one cannot, and the
-reason is worth stating rather than quietly omitting.
+The prompt identity row is the one worth dwelling on. Everything else on that list is ordinary hygiene. That one is the difference between the numbers above and numbers up to 2.25x higher that would have looked entirely plausible.
 
-**Nothing else in this monorepo serves this checkpoint on AMD.** There is no A/B twin — the TPU rigs
-differ in chip, runtime, control plane and cloud all at once, and the CUDA rigs differ in chip,
-cloud and instance shape. Differencing a number from here against one of those and reading the
-result as a hardware finding would be four confounded variables reported as one.
+#### What This Does Not Cover
 
-What can be said honestly is narrower and still useful: this card serves a 2B-class checkpoint at
-**$0.054 per million output tokens** at its best measured operating point, and the constraint is
-prefill throughput rather than memory.
+**No cross hardware comparison, and that is a deliberate omission rather than an oversight.** Nothing else in this monorepo serves this checkpoint on AMD, so there is no A/B twin. The TPU rigs differ in chip, runtime, control plane and cloud at once; the CUDA rigs differ in chip, cloud and instance shape. Differencing a number here against one of those and reading the result as a hardware finding would be four confounded variables reported as one.
 
----
+**bf16 throughout.** The engine reports `quantization=None`. fp8 `e4m3fnuz` is the only format on this card faster than bf16 and it is worth 1.77x on a matmul, but that is a GEMM ratio measured in the companion article, not tokens per second, and no fp8 serving arm was run.
 
-#### What I Was Wrong About
+**The attention backend was not varied.** The engine selected `TRITON_ATTN` and it was left there. `VLLM_ROCM_USE_AITER=1` is an untested lever.
 
-**I assumed a 192 GiB card would be interesting because of the KV pool.** It is not. The pool is so
-far oversized for a 2B checkpoint that it never enters the picture; the card would serve this model
-with a tenth of it. The interesting property is prefill throughput, which is the thing the headline
-HBM number tells you nothing about.
+**Contexts beyond 8192 were not sampled at all.** The 32768 row is infeasible at this `--max-model-len`, and nothing in between was measured, so the prefill ceiling is bounded from one side only.
 
-**I assumed repeated runs of a benchmark were independent.** They are not, on any engine with prefix
-caching and a seeded prompt generator. This is not an AMD or a vLLM problem, it is a property of
-benchmarking a cache-bearing server with deterministic inputs, and it will bite the same way on
-CUDA.
-
-**I assumed a config the engine accepted was a config that did something.** `--limit-mm-per-prompt`
-with a non-zero audio count is accepted here and cannot work, because no ROCm vLLM image ships the
-`vllm[audio]` extras. `audio: 0` in this rig is a fact about the images, not a preference.
-
-**I assumed the first sweep was as good as the second.** It was not, and I still cannot fully explain
-it: the first sweep of the day, on a server idle for three hours, read 4,202 tok/s on a cell that
-later read 10,294 — a 2.4x gap on a cell where prefix caching is worth 1.03x. One observation, not a
-characterised effect, and the console output is archived in the repo rather than written up as a
-finding. **Discard your first sweep.**
-
----
-
-#### Tear Down
-
-There is nothing to tear down, and that is the deliberate part. `stop_vllm` releases the card:
-
-```
-stop_vllm debian-gpu-mi300x1-192gb-devcloud-atl1
-```
-
-```
-✅ `docker rm -f vllm` exited 0.
-```
-
-The droplet keeps billing. `stop_droplet` warns about this rather than implying otherwise, and there
-is no `destroy_droplet` tool in this rig — destroying the droplet is the only thing that stops the
-meter, and it stays a human decision in the DigitalOcean console.
-
----
+**The first sweep of the day is unexplained.** On a server idle for three hours it read 4,202 tok/s on a cell that later read 10,294 — a 2.4x gap on a cell where prefix caching is worth 1.03x. One observation, not a characterised effect, and the console output is archived in the repository rather than written up as a finding. The practical version is: discard your first sweep.
 
 #### Summary
 
-The goal of this article was to measure what one AMD Instinct MI300X does serving Gemma 4 E2B under
-vLLM on ROCm. The key to the solution was making the load generator independent of the serving
-container and giving every cell a prompt set no other cell had seen. The measured results were:
+The goal of this article was to measure what one AMD Instinct MI300X does serving Gemma 4 E2B under vLLM on ROCm. The key to the solution was making the load generator physically unable to touch the card, and giving every cell a prompt set no other cell had seen. The measured results were:
 
-- **10,293.6 output tokens/sec** at 64 concurrent streams and 128-token context, 30.2x the
-  single-stream rate, at **$0.054 per million output tokens**.
-- **The KV pool is never the constraint.** 9,026,017 resident tokens against a peak workload demand
-  of 524,288 — 5.8% occupancy. Throughput at 8K context flattens on prefill, not memory.
-- **18,443 bytes/token of KV**, matching this repo's geometry-derived 18,432 B to 0.06%, and
-  therefore not reproducing the ~9.6 KiB an earlier NVIDIA L4 run reported.
-- **Prefix caching inflated an uncontrolled sweep by up to 2.25x** at 8192 context and 1.00x at 128,
-  and dropped the worst-cell spread from 51.1% to 8.4% once seeds were made unique.
-- **155.04 GiB of the card's 191.69 GiB goes to KV cache** — 80.9% — for a 2B-class checkpoint.
+- **10,293.6 output tokens a second** at 64 clients and 128 token context, 30.2x the single
+  stream rate, at **$0.054 per million output tokens**.
+- **The KV pool is never the constraint.** 9,026,017 resident tokens against 524,288 wanted by
+  the heaviest cell, 5.8 percent. Long context flattens on prefill, not memory, which inverts
+  the sizing rule the TPU rigs run on.
+- **18,443.7 bytes per token of KV**, 0.06 percent off this repository's geometry derivation,
+  which refutes the engine policy explanation offered for an earlier NVIDIA L4 reading.
+- **Prefix caching inflated an uncontrolled sweep by up to 2.25x** at 8192 context and 1.00x at
+  128, and unique seeds took the worst cell spread from 51.1 percent to 8.4 percent.
+- **155.04 GiB of the card's 191.69 GiB is KV cache**, 80.9 percent, for a 2B class checkpoint.
 
-Scope: one droplet, `debian-gpu-mi300x1-192gb-devcloud-atl1` in DigitalOcean's `atl1` region, one
-MI300X at tensor-parallel 1, vLLM `0.29.1rc1.dev187+gaf1c01499.rocm100` on
-`vllm/vllm-openai-rocm:nightly-rocm100`, bf16 with `quantization=None` and the `TRITON_ATTN` backend,
-`--max-model-len 32768` and `--gpu-memory-utilization 0.90`. Twelve cells, three repeats each,
-median reported, worst-cell coefficient of variation 8.4%. The load generator ran on the same host as
-the server. No cell was compared against a run on other hardware.
+Scope: one droplet, `debian-gpu-mi300x1-192gb-devcloud-atl1` in DigitalOcean's `atl1` region, one MI300X at tensor parallel 1, vLLM `0.29.1rc1.dev187+gaf1c01499.rocm100` on `vllm/vllm-openai-rocm:nightly-rocm100`, bf16 with the `TRITON_ATTN` backend, `--max-model-len 32768` and `--gpu-memory-utilization 0.90`. Twelve cells, three repeats each, median reported, worst cell spread 8.4 percent. The load generator ran on the same host as the server. No cell was compared against a run on other hardware.
 
-The strategy for using MCP for AMD GPU benchmarking was validated with an incremental step by step
-approach.
+The strategy for using MCP for AMD GPU serving benchmarks was validated with an incremental step by step approach.
