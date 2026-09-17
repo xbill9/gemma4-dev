@@ -4,7 +4,7 @@ published: false
 series: Gemma4
 description: "A twelve cell serving sweep of Gemma 4 E2B on one AMD Instinct MI300X under vLLM on ROCm, driven through a tag scoped Python MCP server. The engine allocates nine million tokens of KV cache and the heaviest cell in the grid uses 5.8 percent of it. Two sweeps were thrown away first, because the benchmark was measuring the prefix cache."
 tags: amd, vllm, rocm, benchmarking
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-benchmark-cover.b82c1b5e.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-benchmark-cover.47634b3a.jpg
 ---
 
 This article provides a step by step serving benchmark of Gemma 4 E2B on a single AMD Instinct MI300X hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM deployment, and the sweep itself is driven through the same server.
