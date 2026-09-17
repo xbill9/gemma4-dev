@@ -1,0 +1,53 @@
+Captured 2026-09-17 from the workstation against droplet
+debian-gpu-mi300x1-192gb-devcloud-atl1 (601418522), region atl1.
+Verbatim tool output; the workstation has no AMD GPU.
+
+$ droplet_status
+📡 **debian-gpu-mi300x1-192gb-devcloud-atl1** (601418522)
+- status: `active`
+- size: `gpu-mi300x1-192gb-devcloud` — 20 vCPU, 240 GB RAM, 720 GB disk
+- region: atl1
+- public IPv4: <masked>
+- cost: $1.99/hr — **billed while powered off, too**
+  (source: DigitalOcean v2 API, droplet.size.price_hourly, read 2026-09-17)
+
+$ gpu_status            # before deploy
+✅ GPU reporting on `debian-gpu-mi300x1-192gb-devcloud-atl1`.
+| Card | Product | GPU use % | VRAM used % |
+| card0 | Aqua Vanjaram [Instinct MI300X VF] | 0 | 0 |
+
+$ serving_status        # before deploy
+❌ No container named `vllm`. Run `deploy_vllm`.
+
+$ deploy_vllm
+✅ Started `vllm` serving `google/gemma-4-E2B-it`.
+- image: `vllm/vllm-openai-rocm:nightly-rocm100`
+- context: 32768, gpu-memory-utilization 0.90
+- multimodal: `{"image": 4, "audio": 0}`
+
+# poll of /v1/models over SSH, every 10s from the moment `docker run` returned:
+READY after 160s
+{"object":"list","data":[{"id":"google/gemma-4-E2B-it","max_model_len":32768,...}]}
+
+$ serving_status        # after
+✅ container: Up 3 minutes | endpoint: answering on `127.0.0.1:8000`
+   served: `google/gemma-4-E2B-it`
+
+$ verify_capabilities
+✅ 4/4 capabilities verified.
+| text         | ✅ | The AMD MI300X is based on the CDNA 3 architecture. |
+| thinking     | ✅ | 1404 chars, 447 reasoning tokens |
+| tool calling | ✅ | tool_calls → get_weather{"city": "Reykjavik"} |
+| vision       | ✅ | alternating bright red and royal blue squares |
+📡 Audio is not probed — no ROCm vLLM image ships the `vllm[audio]` extras.
+
+$ gpu_status            # during a 3-stream generation
+| card0 | Aqua Vanjaram [Instinct MI300X VF] | 100 | 89 |
+
+# engine build actually running, read from inside the container:
+$ docker exec vllm python3 -c "import vllm;print(vllm.__version__)"
+0.3.1.dev3+g0bfc7a15d
+$ docker inspect -f "{{.Config.Image}} {{.Created}}" vllm
+vllm/vllm-openai-rocm:nightly-rocm100 2026-09-17T15:34:27Z
+$ docker image inspect vllm/vllm-openai-rocm:nightly-rocm100 -f "{{.Created}}"
+2026-09-17T05:20:37Z

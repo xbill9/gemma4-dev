@@ -1,0 +1,40 @@
+ARITHMETIC, not a measurement. Derived 2026-09-17 from two measured inputs:
+  (a) output tok/s from each rig's own schema-valid benchmark report
+  (b) the chip-hour rate recorded in that report, or HARDWARE.md:51 for on-demand list
+Formula: rate = output_tok_per_s / dollars_per_hour. in=1024, out=128.
+
+AS MEASURED AND AS PRICED
+rig                                            $/hr       c1       c4      c16      c64   basis
+MI300X   2026-09-17-vllm-sweep-mi300x-rerun  1.9900      153      487     1333     2713   on-demand, DO v2 API
+TPU v5e-1 2026-08-06-gemma4-e2b-v5e1         0.5779      208      711     1572     1972   spot, Cloud Billing Catalog
+TPU v6e-1 2026-08-25-gemma4-e2b-v6e1         2.9700       67      233      587      719   on-demand, europe-west4
+NVIDIA L4 2026-08-30-gemma4-e2b-g6           0.9412       49      187        -        -   spot, EC2 g6.2xlarge
+
+SAME THROUGHPUT, ALL AT ON-DEMAND LIST (v5e ~$1.20, v6e ~$2.70 per HARDWARE.md:51)
+rig                                            $/hr       c1       c4      c16      c64
+MI300X                                         1.99      153      487     1333     2713
+TPU v5e-1                                      1.20      100      342      757      950
+TPU v6e-1                                      2.70       74      257      646      790
+
+Raw output tok/s these are derived from (in=1024):
+  MI300X   2026-09-17-vllm-sweep-mi300x-rerun c1=305.1  c4=969.1  c16=2653.6  c64=5398.2
+  TPU v5e-1 2026-08-06-gemma4-e2b-v5e1        c1=120.0  c4=410.9  c16=908.5  c64=1139.7
+  TPU v6e-1 2026-08-25-gemma4-e2b-v6e1        c1=199.4  c4=692.6  c16=1744.3  c64=2134.2
+  NVIDIA L4 2026-08-30-gemma4-e2b-g6          c1=46.1  c4=175.8
+
+
+DERIVED RATIOS AND OCCUPANCY — ARITHMETIC, stated literally so they are citable
+(the digits of these appear by coincidence inside benchmark floats; that is not a citation)
+
+  MI300X / v5e-1 at on-demand list, c1: (305.11/1.99) / (120.05/1.20) = 1.53x
+  MI300X / v5e-1 at on-demand list, c4: (969.1/1.99) / (410.91/1.20) = 1.42x
+  MI300X / v5e-1 at on-demand list, c16: (2653.6/1.99) / (908.52/1.20) = 1.76x
+  MI300X / v5e-1 at on-demand list, c64: (5398.16/1.99) / (1139.73/1.20) = 2.86x
+
+  range across the four concurrencies: 1.4x to 2.9x
+
+  KV occupancy of the heaviest cell: 64 streams x 8192 context = 524,288 tokens
+  against the engine's allocated pool of 9,026,017 tokens
+  524288/9026017 = 5.8%
+
+  card HBM as reported by the driver: 191.7 GiB (HARDWARE.md, measured 2026-09-16)
