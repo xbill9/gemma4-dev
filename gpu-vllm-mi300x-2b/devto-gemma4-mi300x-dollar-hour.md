@@ -3,7 +3,7 @@ title: "Serving Gemma 4 on an AMD MI300X: What $1.99 an Hour Buys"
 published: false
 description: "A step by step deployment of Gemma 4 E2B to a single AMD Instinct MI300X on AMD Developer Cloud, driven by Python MCP tools, and the throughput a 191.7 GiB card returns for its hourly rate."
 tags: amd, vllm, rocm, machinelearning
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-dollar-hour-cover.2e51b319.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-dollar-hour-cover.02475528.jpg
 ---
 
 *This article provides a step by step deployment guide for **Gemma 4 E2B** to an **AMD Instinct MI300X** hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM hosted deployment. The card is reached through AMD Developer Cloud, which is DigitalOcean underneath, and the workstation driving it has no AMD GPU in it at all.*
