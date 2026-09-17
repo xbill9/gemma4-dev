@@ -1,7 +1,7 @@
-"""Draw the dev.to cover for the MI300X serving benchmark.
+"""Draw the KV-occupancy figure for the MI300X serving benchmark article.
 
-The house cover generator renders stat tiles, which is the right default and the
-wrong picture for this result. The finding here is a *proportion* — the engine
+This began as a cover and is better as a figure: the cover is generated art,
+and this belongs beside the paragraph it illustrates. The finding here is a *proportion* — the engine
 allocates 9,026,017 tokens of KV cache and the heaviest cell in the grid wants
 524,288 of them — so the cover draws that proportion at true scale instead of
 printing it. The lit run of page blocks is 5.8% of the rail because the number
@@ -13,9 +13,9 @@ Colours are the dataviz reference palette's dark-mode steps on its dark
 surface, and the pair passes every check in scripts/validate_palette.js:
 blue #3987e5 carries capacity, orange #d95926 carries work.
 
-    python3 make_benchmark_cover.py --report benchmarks/reports/<run>.json
+    python3 make_kv_occupancy_figure.py --report benchmarks/reports/<run>.json
 
-Writes a content-addressed file, so a regenerated cover is a URL no proxy has
+Writes a content-addressed file, so a regenerated figure is a URL no proxy has
 cached and the old bytes stay put for anything already published.
 """
 
@@ -258,7 +258,7 @@ def render(facts: dict, out: Path, content_address: bool, url_base: str) -> Path
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--report", default="benchmarks/reports/2026-09-16-vllm-sweep-mi300x.json")
-    p.add_argument("--out", default="devto-benchmark-cover.jpg")
+    p.add_argument("--out", default="devto-kv-occupancy.jpg")
     p.add_argument("--content-address", action="store_true")
     p.add_argument("--url-base", default="")
     a = p.parse_args()

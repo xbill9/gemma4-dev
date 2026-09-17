@@ -4,7 +4,7 @@ published: false
 series: Gemma4
 description: "A twelve cell serving sweep of Gemma 4 E2B on one AMD Instinct MI300X under vLLM on ROCm, driven through a tag scoped Python MCP server. The engine allocates nine million tokens of KV cache and the heaviest cell in the grid uses 5.8 percent of it. Two sweeps were thrown away first, because the benchmark was measuring the prefix cache."
 tags: amd, vllm, rocm, benchmarking
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-benchmark-cover.47634b3a.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-benchmark-cover.26c70342.jpg
 ---
 
 This article provides a step by step serving benchmark of Gemma 4 E2B on a single AMD Instinct MI300X hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM deployment, and the sweep itself is driven through the same server.
@@ -195,6 +195,8 @@ On the TPU rigs in this monorepo that collapse is a KV wall, and the sizing rule
 resident pool             = 9,026,017 tokens
 occupancy                 = 5.8%
 ```
+
+![One hundred blocks, one per percent of the resident KV pool. The lit run on the left is the 5.8 percent the heaviest cell in the grid used; the ninety-four dark blocks to its right are capacity the sweep never touched. Above, output tokens a second against client count: the 128-token series climbs 30.2x from 1 to 64 clients while the 8,192-token series flattens.](https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/devto-kv-occupancy.47634b3a.jpg)
 
 The pool is seventeen times larger than the heaviest cell's peak demand. Nothing is being evicted and nothing is queueing for blocks. What saturates is prefill: that same cell moves **47,142 total tokens a second** counting prompt tokens, against 46,231 at 16 clients — the card is already doing all the prefill work it can, and the extra 48 clients only lengthen the queue.
 
