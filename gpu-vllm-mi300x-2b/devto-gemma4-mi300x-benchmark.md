@@ -40,7 +40,7 @@ list_droplets
 
 | Name | ID | Status | Size | Region | Public IPv4 |
 | --- | --- | --- | --- | --- | --- |
-| `debian-gpu-mi300x1-192gb-devcloud-atl1` | 601142018 | active | gpu-mi300x1-192gb-devcloud | atl1 | 165.245.134.217 |
+| `debian-gpu-mi300x1-192gb-devcloud-atl1` | 601142018 | active | gpu-mi300x1-192gb-devcloud | atl1 | 165.245.xxx.xxx |
 ```
 
 One card, `gfx942`, 191.69 GiB, billing at $1.99 an hour read from `droplet.size.price_hourly` rather than a price page. It presents as an SR-IOV virtual function, which reads alarmingly like a partition and is not one: all 304 compute units and the whole 191.69 GiB are there.
