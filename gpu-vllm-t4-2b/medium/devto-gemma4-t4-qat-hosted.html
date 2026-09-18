@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 on a Tesla T4: QAT Weights Decode 1.79x Faster Than bf16</title>
+  <meta name="description" content="A step by step deployment of Gemma 4 E2B with vLLM on a single Tesla T4 attached to a Compute Engine VM, and a measured comparison of the QAT w4a16 checkpoint against the bf16 reference on the same card." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-t4-qat-cover.74744fbf.jpg" alt="Gemma 4 on a Tesla T4: QAT Weights Decode 1.79x Faster Than bf16" /></figure>
+<p><em>This article provides a step by step deployment guide for
+<strong>Gemma 4 E2B</strong> to a <strong>Tesla T4</strong> hosted GPU
+enabled system. A suite of Python MCP tools is built to simplify
+management of the vLLM hosted deployment. The T4 is already attached to
+the Compute Engine VM the tools run on, so there is nothing to
+provision: the work is getting a Turing GPU to run Gemma 4, and then
+finding out which checkpoint it runs fastest.</em></p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b">github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b</a></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-qat-table-1.png"
+alt="Table: Models, Hardware, Host, Software" /></p>
+<hr />
+<h4 id="where-do-i-start">Where Do I Start?</h4>
+<p>The GPU is already there. A T4 attached to a Compute Engine VM needs
+no queued resource, no instance launch and no image, so this rig has no
+provisioning tools at all. Everything it ships is about the software on
+the box: which Python, which torch, which patch, and which
+checkpoint.</p>
+<p>The MCP server exposes those steps as tools, in the order their
+failures get more expensive: <code>check_host_capacity</code>,
+<code>verify_gpu_arch</code>, <code>apply_turing_patch</code>,
+<code>verify_turing_patch</code>, <code>start_vllm_server</code>.</p>
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Compute Engine VM with one Tesla T4 and the NVIDIA driver
+installed</li>
+<li>Python 3 for the MCP server, and a second interpreter for vLLM if
+your root disk is small</li>
+<li>Room for the checkpoints on a disk that can hold them</li>
+<li>The rig checked out from the repository above</li>
+</ul>
+<h4 id="what-the-machine-is">What the Machine Is</h4>
+<pre><code>machine-type: n1-standard-2
+zone: us-west2-b
+nproc: 2
+MemTotal:        7614824 kB
+Tesla T4, 7.5, 15360 MiB, 615.71.09, 1590 MHz, 5001 MHz, 70.00 W, 70.00 W</code></pre>
+<p>Two vCPU and 7.8 GB of RAM is a small host for this GPU, and the RAM
+shows up below when the weights load.</p>
+<h4 id="three-disks-measured-separately">Three Disks, Measured
+Separately</h4>
+<pre><code>Mounted on    1B-blocks        Avail
+/           33570021376   8701743104
+/tmp         3898789888   3896131584
+/opt1      263086084096 200857096192
+~/.cache -&gt; /opt1/cache</code></pre>
+<p>The root disk is small, <code>/tmp</code> is its own 3.9 GB
+filesystem, and <code>~/.cache</code> is a symlink onto the large
+<code>/opt1</code> volume. A single <code>df /</code> reports the wrong
+answer for all three writes the install makes.
+<code>check_host_capacity</code> measures each target path on its
+own.</p>
+<h4 id="two-pythons">Two Pythons</h4>
+<pre><code>python3: Python 3.12.13 at /home/xbill_glitnir_com/.pyenv/shims/python3
+PYTHON_BIN: Python 3.13.5 at /usr/bin/python3.13</code></pre>
+<p>The MCP server runs under <code>python3</code>. vLLM runs under
+<code>/usr/bin/python3.13</code> with
+<code>PYTHONUSERBASE=/opt1/pyuser</code>, so its packages land on the
+big disk. Every tool that asks about torch or vLLM runs its check under
+that second interpreter.</p>
+<h4 id="the-install-as-found">The Install as Found</h4>
+<pre><code>torch                                    2.11.0+cpu
+vllm                                     0.26.0</code></pre>
+<p>A CUDA build of vLLM sitting on the CPU build of torch.
+<code>import vllm</code> fails on <code>libcudart.so.13</code>, and a
+CPU torch reports an empty list for every GPU architecture. Two packages
+present, neither able to serve.</p>
+<h4 id="which-torch">Which Torch</h4>
+<p>The fix is the CUDA 13 torch from the PyTorch index, installed with
+its dependencies. Installing it with <code>--no-deps</code> skips cuDNN
+and the NVIDIA runtime wheels, and <code>import torch</code> then
+fails:</p>
+<pre><code>ImportError: libcudnn.so.9: cannot open shared object file: No such file or directory</code></pre>
+<p>With the dependencies in place, <code>verify_gpu_arch</code> asks the
+interpreter what it can run:</p>
+<pre><code>torch 2.11.0+cu130
+torch.version.cuda 13.0
+cuda available: True
+arch list: [&#39;sm_75&#39;, &#39;sm_80&#39;, &#39;sm_86&#39;, &#39;sm_90&#39;, &#39;sm_100&#39;, &#39;sm_120&#39;]
+device: Tesla T4
+capability: (7, 5)
+fp16 matmul ok: True</code></pre>
+<p><code>sm_75</code> is in the published wheel. Turing needs no source
+build.</p>
+<h4 id="then-the-latest-vllm">Then the Latest vLLM</h4>
+<p>The stack was upgraded to vLLM 0.29.0. vLLM pins torch to an exact
+version (<code>torch==2.13.0</code>), so the upgrade moves torch with
+it:</p>
+<pre><code>torch                                    2.13.0+cu130
+transformers                             5.17.0
+triton                                   3.7.1
+vllm                                     0.29.0</code></pre>
+<h4 id="the-64-kib-problem">The 64 KiB Problem</h4>
+<p>Gemma 4 has two attention widths: 256 in its sliding-window layers
+and 512 in its global layers. vLLM forces its Triton attention backend
+for that mix, and at width 512 the kernel asks for more shared memory
+than Turing allows in one block. <code>apply_turing_patch</code> clamps
+the tile sizes in the installed vLLM so they fit:</p>
+<pre><code>✅ Patched, in the site-packages this host&#39;s `python3` imports.
+ 
+__FILE__/opt1/pyuser/lib/python3.13/site-packages/vllm/v1/attention/ops/triton_unified_attention.py
+CLAMP PRESENT
+OCCURRENCES 1</code></pre>
+<p>Reinstalling vLLM removes the clamp. Run
+<code>verify_turing_patch</code> after every vLLM change;
+<code>start_vllm_server</code> refuses to start until it reports the
+clamp present.</p>
+<h4 id="loading-the-weights-needs-swap">Loading the Weights Needs
+Swap</h4>
+<p>The first start died during weight loading. The kernel log named the
+process:</p>
+<pre><code>Out of memory: Killed process 14015 (VLLM::EngineCor) total-vm:27144376kB, anon-rss:3993204kB, file-rss:69212kB, shmem-rss:98540kB, UID:2110064466 pgtables:11488kB oom_score_adj:0</code></pre>
+<p>The VM ships with no swap, and 7.8 GB of RAM is too little for vLLM
+to stage these weights. A 16 GB swapfile on the large disk fixes it:</p>
+<pre><code>$ sudo fallocate -l 16G /opt1/swapfile &amp;&amp; sudo chmod 600 /opt1/swapfile &amp;&amp; sudo mkswap /opt1/swapfile &amp;&amp; sudo swapon /opt1/swapfile
+Swap:          16383           0       16383</code></pre>
+<p>Swap use peaked at 6,761 MiB for bf16 and 4,770 MiB for QAT while the
+servers started. Add the swapfile to <code>/etc/fstab</code> so it
+survives a reboot.</p>
+<h4 id="starting-the-server">Starting the Server</h4>
+<pre><code>/usr/bin/python3.13 -m vllm.entrypoints.openai.api_server --model google/gemma-4-E2B-it-qat-w4a16-ct --host 127.0.0.1 --port 8000 --dtype float16 --kv-cache-dtype auto --tensor-parallel-size 1 --gpu-memory-utilization 0.9 --max-model-len 16384 --max-num-seqs 8</code></pre>
+<p><code>--dtype float16</code> because Turing has no bfloat16 datapath.
+vLLM logs the cast and runs the bf16 weights as fp16.</p>
+<h4 id="what-the-engine-allocates">What the Engine Allocates</h4>
+<pre><code>Using MarlinLinearKernel for CompressedTensorsWNA16
+Model loading took 8.02 GiB memory and 98.721582 seconds
+GPU KV cache size: 519,568 tokens, Maximum concurrency for 16,384 tokens per request: 31.71x
+Model loading took 9.8 GiB memory and 157.183441 seconds
+GPU KV cache size: 315,974 tokens, Maximum concurrency for 16,384 tokens per request: 19.29x</code></pre>
+<p>The first block is QAT, the second bf16. The QAT build packs its
+linear layers to 4 bits and keeps its embeddings and vision tower at
+full width, so its weights take 1.78 GiB less and the KV cache gets the
+difference.</p>
+<h4 id="does-it-serve">Does It Serve?</h4>
+<pre><code>17*23 -&gt; 391
+facts -&gt; The capital of Australia is Canberra and the chemical symbol for gold is Au.</code></pre>
+<p>Spot checks at temperature 0 on the QAT build. They show the 4-bit
+kernel producing correct text on this GPU; they are no substitute for an
+accuracy evaluation.</p>
+<h4 id="why-a-single-stream-tops-out-where-it-does">Why a Single Stream
+Tops Out Where It Does</h4>
+<p>Generating one token reads every weight the text path uses. The
+per-layer embedding table is a row lookup and the vision and audio
+towers sit idle, so what gets read is the decoder layers plus the tied
+embedding that serves as the output layer. From the safetensors
+headers:</p>
+<pre><code>== models--google--gemma-4-E2B-it
+  bytes read per decode token: 4.597 GB
+  bound @ 277.0 GB/s measured stream:   60.3 tok/s
+== models--google--gemma-4-E2B-it-qat-w4a16-ct
+  bytes read per decode token: 1.862 GB
+  bound @ 277.0 GB/s measured stream:  148.8 tok/s</code></pre>
+<p>277.0 GB/s is the streaming read measured on this T4 part in an
+earlier run in the same repository. Dividing it by the bytes per token
+gives each build's ceiling. The QAT build reads 2.47x fewer bytes per
+token.</p>
+<h4 id="the-power-cap">The Power Cap</h4>
+<pre><code>100 %, 1290 MHz, 70.99 W, 0x0000000000000004
+100 %, 1290 MHz, 69.97 W, 0x0000000000000004
+100 %, 1275 MHz, 70.05 W, 0x0000000000000004</code></pre>
+<p>During a single-stream bf16 decode the T4 sits at 100% utilization
+and at its 70 W limit, with the software power cap throttling the SM
+clock to 81% of its 1590 MHz maximum. The driver allows no higher limit
+on this card. The host CPU stays light: the engine uses 18-20% of one
+core.</p>
+<h4 id="the-sweep">The Sweep</h4>
+<p><code>vllm bench serve</code> with random prompts, 128 output tokens,
+input lengths of 512 and 4096, concurrency 1, 4, 8 and 16, and three
+repeats per cell. Each cell and repeat gets its own seed, and both
+builds get the same seeds, so they see the same prompts. The server
+flags are identical for both. Sixteen cells, 48 runs, no failed
+requests, and the largest run-to-run variation in any cell is 2.0%.</p>
+<p><code>--max-num-seqs 8</code> caps the engine at eight running
+sequences, so at concurrency 16 the extra requests queue.</p>
+<h4 id="512-token-prompts">512-Token Prompts</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-qat-table-2.png"
+alt="Table: c, bf16 tok/s, QAT tok/s, bf16 per stream, QAT per stream" /></p>
+<p>Per stream is 1000 divided by the median time per output token. QAT
+wins every cell: <strong>1.79x per stream at c=1</strong> and
+<strong>1.31x total at c=8</strong>. Both builds run on the same card at
+the same power cap. The QAT build moves fewer bytes per token.</p>
+<p>Against the bandwidth ceilings above, bf16 reaches 67% of its 60.3
+tok/s and QAT 49% of its 148.8. QAT leaves more headroom, which fits a
+card that is also out of power.</p>
+<h4 id="4096-token-prompts">4096-Token Prompts</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-qat-table-3.png"
+alt="Table: c, bf16 tok/s, QAT tok/s, bf16 TTFT, QAT TTFT" /></p>
+<p>With long prompts the two builds converge at about 15-16 tok/s. Time
+to first token sets the rate here, and it is the same for both:
+processing the prompt costs the same whichever way the weights are
+stored.</p>
+<h4 id="prefill-is-the-t4s-weak-point">Prefill Is the T4's Weak
+Point</h4>
+<p>Time to first token at c=1 grows from 300 ms at 512 tokens to 7,199
+ms at 4096 on bf16: <strong>24x the time for 8x the tokens</strong>.
+Growth that steep points at attention, whose cost rises with the square
+of the prompt. The likely suspect is the Turing tile clamp in the
+512-wide global layers, which trades speed for fitting in 64 KiB. That
+is an inference; no profile has confirmed it yet.</p>
+<p>The engine's prefix cache logged hits during the sweep, averaging
+about 8% even with a unique seed per cell. Both builds saw identical
+prompts, so the comparison between them holds, but the absolute prefill
+times may read slightly faster than a cold T4 delivers.</p>
+<h4 id="memory-never-binds">Memory Never Binds</h4>
+<p>At c=8 with 4096-token prompts, eight sequences need 33,792 KV
+tokens. The bf16 pool holds 315,974, which is 9.4x that. At this serving
+shape GPU memory has room to spare with either build; QAT's 1.64x larger
+pool starts to matter only when the engine is allowed more concurrent
+sequences.</p>
+<h4 id="against-an-ec2-twin">Against an EC2 Twin</h4>
+<p>The same repository has an EC2 <code>g4dn</code> rig on the same T4
+part. It measured bf16 at 512-token prompts at 42.36 tok/s at c=1 and
+242.47 tok/s at c=8. That run used vLLM 0.28.0 in a docker image, its
+own benchmark script with English filler prompts, and a 4 vCPU host. Its
+c=8 figure is 1.47x this run's bf16, and with four variables changed at
+once the cause of that gap is unknown.</p>
+<h4 id="what-stops-the-meter">What Stops the Meter</h4>
+<pre><code>✅ Sent SIGTERM to vLLM (pid 18703). VRAM is released on exit.</code></pre>
+<p><code>stop_vllm_server</code> frees the GPU. The VM and its attached
+T4 bill by the hour whether vLLM runs or not; only stopping the VM stops
+the charge.</p>
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to serve Gemma 4 E2B on a Tesla T4
+attached to a Compute Engine VM and find which checkpoint the card runs
+fastest. The key to the solution was measuring decode as a
+memory-bandwidth problem: the QAT w4a16 build reads 1.862 GB per token
+against bf16's 4.597, and vLLM 0.29's Marlin kernel runs it on Turing.
+The measured results were:</p>
+<ul>
+<li><strong>72.31 tok/s</strong> per stream for QAT against
+<strong>40.44</strong> for bf16 at 512-token prompts, 1.79x</li>
+<li><strong>215.91 tok/s</strong> total at 8 streams for QAT against
+<strong>164.62</strong>, 1.31x</li>
+<li>About <strong>15-16 tok/s</strong> for both builds at 4096-token
+prompts, where prompt processing sets the rate</li>
+<li><strong>519,568</strong> KV tokens for QAT against
+<strong>315,974</strong> for bf16; neither pool binds at eight
+sequences</li>
+<li>The published cu130 torch wheel carries <code>sm_75</code>, and the
+7.8 GB host needs swap to load the weights</li>
+</ul>
+<p>One Tesla T4 on one <code>n1-standard-2</code> VM in
+<code>us-west2-b</code>, vLLM 0.29.0, three repeats per cell with the
+same seeds for both builds, largest variation in any cell 2.0%. The
+prefix cache logged hits despite unique seeds, which affects absolute
+prefill times but applies equally to both builds. The QAT build was
+spot-checked for correct output and was not evaluated for accuracy.</p>
+<p>The strategy for using MCP for Tesla T4 deployment and benchmarking
+was validated with an incremental step by step approach.</p>
+</body>
+</html>
