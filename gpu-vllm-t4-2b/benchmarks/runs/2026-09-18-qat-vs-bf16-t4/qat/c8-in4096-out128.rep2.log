@@ -1,0 +1,39 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7feec97da200>, trust_remote_code=False, seed=240968, num_prompts=32, dataset_name='random', no_stream=False, dataset_path=None, no_oversample=False, skip_chat_template=False, enable_multimodal_chat=False, disable_shuffle=False, custom_output_len=256, custom_ensure_client_side_data=False, spec_bench_output_len=256, spec_bench_category=None, sonnet_input_len=550, sonnet_output_len=150, sonnet_prefix_len=200, sharegpt_output_len=None, timed_trace_chunk_hash_size=16, timed_trace_sec_multiplier=1, timed_trace_label_timestamp='timestamp', timed_trace_label_input_length='input_length', timed_trace_label_output_length='output_length', timed_trace_label_hash_ids='hash_ids', blazedit_min_distance=0.0, blazedit_max_distance=1.0, asr_max_audio_len_sec=inf, asr_min_audio_len_sec=0.0, random_input_len=4096, random_output_len=128, random_range_ratio='0.0', random_prefix_len=0, random_batch_size=1, no_reranker=False, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 1}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, bfcl_categories=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, speed_bench_dataset_subset='qualitative', speed_bench_output_len=4096, speed_bench_category=None, label=None, backend='vllm', base_url='http://127.0.0.1:8000', host='127.0.0.1', port=8000, endpoint='/v1/completions', header=None, max_concurrency=8, model='google/gemma-4-E2B-it-qat-w4a16-ct', input_len=None, output_len=None, tokenizer=None, tokenizer_mode='auto', use_beam_search=False, logprobs=None, request_rate=inf, burstiness=1.0, probe_request_rate=0.0, disable_tqdm=False, num_warmups=2, profile=False, save_result=True, save_detailed=False, append_result=False, metadata=None, result_dir='/home/xbill_glitnir_com/gemma4-dev/gpu-vllm-t4-2b/benchmarks/runs/2026-09-18-qat-vs-bf16-t4/qat', result_filename='c8-in4096-out128.rep2.json', ignore_eos=True, self_timed=None, percentile_metrics=None, metric_percentiles='99', goodput=None, request_id_prefix='bench-5ae6ea2b-', top_p=None, top_k=None, min_p=None, temperature=0.0, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, served_model_name=None, lora_modules=None, lora_assignment='random', ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=0, chat_template_kwargs=None, extra_body=None, skip_tokenizer_init=False, insecure=False, plot_timeline=False, timeline_itl_thresholds='25,50', plot_dataset_stats=False)
+INFO 09-18 16:41:48 [utils.py:90] Sampling input_len from [4096, 4096] and output_len from [128, 128]
+Starting initial single prompt test run...
+Skipping endpoint ready check.
+Warming up with 2 requests...
+  0%|          | 0/2 [00:00<?, ?it/s] 50%|█████     | 1/2 [00:10<00:10, 10.60s/it]100%|██████████| 2/2 [00:10<00:00,  5.31s/it]
+Warmup run completed.
+Starting main benchmark run...
+Traffic request rate: inf
+Burstiness factor: 1.0 (Poisson process)
+Maximum request concurrency: 8
+  0%|          | 0/32 [00:00<?, ?it/s]  3%|▎         | 1/32 [00:58<30:12, 58.48s/it]  6%|▋         | 2/32 [01:00<12:43, 25.46s/it]  9%|▉         | 3/32 [01:06<07:49, 16.20s/it] 12%|█▎        | 4/32 [01:13<05:54, 12.67s/it] 16%|█▌        | 5/32 [01:20<04:49, 10.73s/it] 19%|█▉        | 6/32 [01:27<04:08,  9.57s/it] 22%|██▏       | 7/32 [01:35<03:40,  8.83s/it] 25%|██▌       | 8/32 [01:42<03:20,  8.34s/it] 28%|██▊       | 9/32 [02:04<04:49, 12.59s/it] 31%|███▏      | 10/32 [02:06<03:27,  9.43s/it] 34%|███▍      | 11/32 [02:11<02:50,  8.12s/it] 38%|███▊      | 12/32 [02:19<02:37,  7.87s/it] 41%|████      | 13/32 [02:26<02:26,  7.69s/it] 44%|████▍     | 14/32 [02:33<02:16,  7.57s/it] 47%|████▋     | 15/32 [02:41<02:07,  7.48s/it] 50%|█████     | 16/32 [02:48<01:58,  7.42s/it] 53%|█████▎    | 17/32 [03:10<02:56, 11.79s/it] 56%|█████▋    | 18/32 [03:12<02:05,  8.95s/it] 59%|█████▉    | 19/32 [03:17<01:41,  7.82s/it] 62%|██████▎   | 20/32 [03:25<01:31,  7.66s/it] 66%|██████▌   | 21/32 [03:32<01:23,  7.55s/it] 69%|██████▉   | 22/32 [03:39<01:14,  7.48s/it] 72%|███████▏  | 23/32 [03:46<01:06,  7.42s/it] 75%|███████▌  | 24/32 [03:54<00:59,  7.38s/it] 78%|███████▊  | 25/32 [04:16<01:22, 11.74s/it] 81%|████████▏ | 26/32 [04:16<00:49,  8.27s/it] 84%|████████▍ | 27/32 [04:16<00:29,  5.82s/it] 91%|█████████ | 29/32 [04:16<00:09,  3.17s/it] 97%|█████████▋| 31/32 [04:16<00:01,  1.94s/it]100%|██████████| 32/32 [04:16<00:00,  8.03s/it]
+tip: install termplotlib and gnuplot to plot the metrics
+============ Serving Benchmark Result ============
+Successful requests:                     32        
+Failed requests:                         0         
+Maximum request concurrency:             8         
+Benchmark duration (s):                  256.81    
+Total input tokens:                      131072    
+Total generated tokens:                  4096      
+Request throughput (req/s):              0.12      
+Output token throughput (tok/s):         15.95     
+Peak output token throughput (tok/s):    136.00    
+Peak concurrent requests:                9.00      
+Total token throughput (tok/s):          526.34    
+---------------Time to First Token----------------
+Mean TTFT (ms):                          18269.01  
+Median TTFT (ms):                        16863.10  
+P99 TTFT (ms):                           49915.05  
+-----Time per Output Token (excl. 1st token)------
+Mean TPOT (ms):                          361.19    
+Median TPOT (ms):                        386.13    
+P99 TPOT (ms):                           459.77    
+---------------Inter-token Latency----------------
+Mean ITL (ms):                           361.19    
+Median ITL (ms):                         62.38     
+P99 ITL (ms):                            5054.64   
+==================================================

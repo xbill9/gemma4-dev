@@ -6,10 +6,22 @@ imported across a rig boundary. Read this file before changing anything.
 ## What this rig is
 
 **vLLM on one NVIDIA Tesla T4 that is already attached to the Compute Engine VM
-the rig runs on**, serving `google/gemma-4-E2B-it`.
+the rig runs on**, serving Gemma 4 E2B — by default the QAT w4a16 build
+`google/gemma-4-E2B-it-qat-w4a16-ct`, with the bf16 `google/gemma-4-E2B-it` kept
+for the A/B.
 
-**STATUS 2026-09-17: scaffolded. Nothing installed, nothing served, nothing
-measured.** `benchmarks/runs/` is empty on purpose.
+**STATUS 2026-09-18: serving and measured.** vLLM 0.29.0 on torch 2.13.0+cu130.
+One run, `benchmarks/runs/2026-09-18-qat-vs-bf16-t4/` — read its `REPORT.md`
+before quoting a number from this rig. Headline: **QAT is 1.79x bf16 per stream
+and 1.31x at c=8** on 512-token prompts, because decode is bandwidth-bound and QAT
+reads 1.86 GB per token against 4.60; vLLM 0.29's Marlin runs on SM 7.5. The
+directory name has no `-w4a16` variant slot although QAT is now the default — an
+open `@NAMING.md` question, not a settled one.
+
+**Prefill is this part's weak point and is not yet explained:** a 4096-token
+prompt takes ~7.2 s to first token on both builds, 24x the 512-token time for 8x
+the tokens. The suspect is the Turing clamp's effect on the 512-wide global
+attention layers; that is an inference, not a profile.
 
 Forked from `gpu-vllm-g4dn-2b` (the T4 facts, the Turing patch) with its structure
 taken from `local-vllm-cpu-2b` (a rig with no control plane). Neither parent's
@@ -72,8 +84,9 @@ The same relationship exists between `local-llamacpp-1650ti-2b-q4_0` and
 HBM on this same part and still got a 329,579-token KV pool. A report that names
 VRAM as the blocker on a T4 serving E2B has its arithmetic wrong.
 
-**The install is broken, and instructively so.** `/opt1/pyuser` — the user base for
-`/usr/bin/python3.13` — holds a CUDA vLLM sitting on **`torch 2.11.0+cpu`**:
+**The install was broken, and instructively so** (fixed 2026-09-18 — see `tpu.env`
+for the upgrade command and the `--no-deps` trap). `/opt1/pyuser` — the user base
+for `/usr/bin/python3.13` — held a CUDA vLLM sitting on **`torch 2.11.0+cpu`**:
 
 ```
 2.11.0+cpu  None  []
@@ -113,13 +126,15 @@ untouched.
 
 ## Host facts that differ from every measured sibling
 
-- **No swap at all.** This **inverts** `local-vllm-cpu-2b`'s central warning rather
-  than repeating it. There, exceeding host RAM is *accepted* and paid for in 15.4 GB
-  of swap, so a thrashing serve is indistinguishable from a loading one. Here it is
-  a prompt OOM kill with a `dmesg` line. Do not port that rig's swap prose.
-- **7.80 GB of host RAM against the sibling's 16 GiB.** vLLM mmaps the safetensors
-  and copies shard by shard, so peak RSS is far below the 10.25 GB checkpoint.
-  Recorded as an **UNMEASURED risk, never a verdict** — `_capacity()` deliberately
+- **No swap as provisioned, and vLLM cannot load E2B without it.** MEASURED
+  2026-09-18: the default loader was OOM-killed on host RAM (EngineCore 4.0 GB anon
+  RSS, host peak 7,252 of 7,800 MiB) during weight loading. A 16 GB swapfile on
+  `/opt1` fixed it, peaking at 6.8 GB of swap for bf16 and 4.8 GB for QAT. **It is
+  not in fstab** — after a reboot, re-create it (command in `tpu.env`) before
+  starting the server.
+- **7.80 GB of host RAM against the sibling's 16 GiB.** This was recorded as an
+  UNMEASURED risk and it turned out to be the binding one — see the swap bullet.
+  `_capacity()` still deliberately
   does not let host RAM veto the budget, and a test pins that.
 - **2 vCPU against 4.** Not expected to cap throughput: the g4dn run's own notes
   reason that decode is GPU-bandwidth-bound at these rates and that a 42–48% gap
