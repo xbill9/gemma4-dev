@@ -112,6 +112,16 @@ class TestServeArgv(unittest.TestCase):
         pairs = [argv[i + 1] for i, part in enumerate(argv) if part == "--group-add"]
         self.assertEqual(pairs, ["44", "991"])
 
+    def test_quantization_absent_by_default(self):
+        with patch.object(server, "VLLM_QUANTIZATION", ""):
+            argv = server._serve_argv()
+        self.assertNotIn("--quantization", argv)
+
+    def test_quantization_passed_through(self):
+        with patch.object(server, "VLLM_QUANTIZATION", "fp8"):
+            argv = server._serve_argv()
+        self.assertEqual(argv[argv.index("--quantization") + 1], "fp8")
+
     def test_devices_are_mapped_in(self):
         argv = server._serve_argv()
         devices = [argv[i + 1] for i, part in enumerate(argv) if part == "--device"]

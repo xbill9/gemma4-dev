@@ -51,9 +51,11 @@ later and more confusing. Audio needs a derived image; that is a real change, no
 ## Quantization: fp8 only, and it has to be `fnuz`
 
 Measured on the part 2026-09-16 — `../HARDWARE.md` carries the full table. The short version:
-**fp8 is 1.77x bf16 and is the only format on this card faster than bf16.** int8 measured
-*slower* (0.69x) despite an equal spec peak, fp4 does not exist on gfx942, and GGUF is compiled
-out of the image entirely.
+**fp8 is the only format on this card faster than bf16: 1.77x at 8192³, 1.50x summed over
+E2B's decode GEMMs** (M = 1–64, graph-replayed, 2026-09-18). Per shape it runs 0.86x–1.81x — fp8 is
+*slower* on the small sliding-attention QKV. int8 cannot run at M ≤ 16 at all (`torch._int_mm`
+refuses) and is 0.20x bf16 at M = 64; fp4 does not exist on gfx942, and GGUF is compiled out of the
+image entirely.
 
 The serving default stays bf16 — the engine reports `dtype=torch.bfloat16, quantization=None`,
 matching the checkpoint's own `dtype: bfloat16`. To turn fp8 on, add `--quantization fp8` and let
@@ -64,10 +66,26 @@ checkpoint published for H100 is `e4m3fn`, and that dtype does not quietly fall 
 raises `HIPBLAS_STATUS_NOT_SUPPORTED`. Online quantization from bf16 sidesteps the question.
 This is the same shape of trap as the image caveat above: the plausible artifact is the broken one.
 
-Not yet measured, and worth keeping honest about: **end-to-end tokens/sec at fp8.** The 1.77x is a
-GEMM ratio, and E2B spends much of decode in attention and kernel-launch overhead that fp8 does not
-touch, so it will not carry over whole. `VLLM_ROCM_USE_AITER=1` is a second untested lever — the
-server currently selects `TRITON_ATTN`.
+**End to end, fp8 serving is SLOWER than bf16: 0.53x–0.80x output throughput** (2026-09-18,
+vLLM 0.19.1, concurrency 1–64, `benchmarks/runs/2026-09-18-vllm-sweep-mi300x-v0191-fp8/REPORT.md`).
+fp8 adds 1.3 ms per token at concurrency 1 where the GEMM sweep predicts it saves 0.66 ms, and the
+penalty grows with batch and context. **Keep serving bf16.** The GEMM ratio does not survive vLLM's
+fp8 path.
+
+**`--quantization fp8` does not start on the nightly image at all** (vLLM 0.3.1.dev85, 2026-09-18).
+Inductor emits a −inf fill in `e4m3fnuz`, which has no infinity, and the MLIR lowering rejects it;
+forcing the custom op instead hits `scaled_fp8_quant_kernel_scalar_type not implemented for
+'Float8_e4m3fnuz'`. The engine dies in encoder profiling and `--restart unless-stopped` loops it
+silently. `VLLM_QUANTIZATION=fp8` in `tpu.env` therefore needs the 0.19.1 vendor image today —
+and a number from one image must never be differenced against the other: the nightly is 1.14x–1.24x
+faster in bf16 alone.
+
+**`gemm_decode_shapes.py` times from a HIP graph by default, and that is load-bearing.** Its first,
+eager pass floored every small shape at ~17–20 us of host dispatch and made fp8 read 0.97x bf16 —
+the opposite conclusion. `--mode eager` exists as a diagnostic only. See
+`benchmarks/runs/2026-09-18-gemm-decode-shapes-mi300x/REPORT.md`.
+
+`VLLM_ROCM_USE_AITER=1` is a second untested lever — the server currently selects `TRITON_ATTN`.
 
 ## Code style
 

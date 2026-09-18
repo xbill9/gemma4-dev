@@ -648,9 +648,9 @@ the whole 191.7 GiB are there.
 | --- | :---: | :--- |
 | bf16 | **yes** | 1307.4 TFLOP/s peak — the baseline |
 | fp16 | yes | same matrix cores, same peak; not a change from bf16 |
-| fp8 `e4m3fnuz` | **yes** | 2614.9 TFLOP/s peak, **1.77x bf16 measured** |
+| fp8 `e4m3fnuz` | **yes** | 2614.9 TFLOP/s peak; **1.77x bf16 at 8192³, 1.50x at E2B decode shapes** |
 | fp8 `e4m3fn` | **no** | `HIPBLAS_STATUS_NOT_SUPPORTED` — the OCP flavour NVIDIA publishes |
-| int8 | runs | equal peak on paper, **0.69x bf16 measured** — no win |
+| int8 | runs, M > 16 only | equal peak on paper; **0.40–0.69x bf16 at 8192³, refuses M ≤ 16** — no win |
 | fp4 / MX | **no** | torch: `only supported on gfx950,gfx1250`. CDNA 4 |
 
 **This is the first row in this file where fp8 is a genuine compute format**, and it inverts the
@@ -665,6 +665,29 @@ vLLM keys on `"gfx94"` in `is_fp8_fnuz()`. Quantize online from bf16 instead of 
 Measured 8192³ matmul, 30 iterations, torch 2.12.0+rocm10.0.0, card concurrently serving:
 bf16 664.3 / fp16 662.5 / **fp8 1172.5** / int8 455.6 TFLOP/s. `QUANTIZATION.md` carries the stack
 side of this.
+
+**Decode shapes, 2026-09-18** (`gpu-vllm-mi300x-2b/benchmarks/runs/2026-09-18-gemm-decode-shapes-mi300x/REPORT.md`). 8192³ is the
+friendliest shape a GEMM gets and decode never runs it, so the comparison was rerun at M = 1, 8, 64
+against every E2B linear shape, weights cold (rotated past the 256 MB Infinity Cache), replayed from
+a HIP graph as vLLM decodes. Summed per token, **fp8 is 1.50x / 1.52x / 1.49x bf16** at M = 1 / 8 /
+64. Per shape it ranges from **0.86x** (the 2560x1536 sliding QKV, where fp8 is *slower*) to 1.81x
+(the 262144x1536 LM head): the win tracks how bandwidth-bound the bf16 kernel already was, ~37% of
+measured copy bandwidth at the small end and 95% at the LM head. The 8192³ control reran at 1.78x.
+
+**int8 is worse than the row above first said.** `torch._int_mm` raises for M ≤ 16 (`self.size(0)
+needs to be greater than 16`), so batch-1 decode has no int8 GEMM at all; at M = 64 it is 0.20x bf16
+per token, and the 8192³ control measured 0.40x against the 0.69x of 2026-09-16 — same torch, a
+different nightly under the same tag, unexplained.
+
+**Time decode GEMMs from a graph, never eagerly.** Timed eagerly from Python, every small shape
+floors at ~17 us bf16 / ~20 us fp8 whatever its size — host dispatch, which graph-captured decode
+never pays — and fp8 read 0.97x bf16 per token, the opposite conclusion. Graph replay was 1.30–1.46x
+faster in bf16 alone. A microbenchmark of a skinny GEMM that does not use graphs is measuring Python.
+
+**And the GEMM win does not reach a served token.** End to end on vLLM 0.19.1, `--quantization fp8`
+serves E2B at **0.53x–0.80x** bf16 output throughput across concurrency 1–64 (`gpu-vllm-mi300x-2b/benchmarks/runs/2026-09-18-vllm-sweep-mi300x-v0191-fp8/REPORT.md`).
+That is a property of the serving stack's fp8 path on gfx942 today, not of the matrix cores — but it
+is the number that decides whether to turn fp8 on, and the answer on this card is no.
 
 ### CUDA equivalents, for reading the rest of this file
 

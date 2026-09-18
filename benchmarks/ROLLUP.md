@@ -37,6 +37,11 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-09-16-paired-sweep-cpu` | google/gemma-4-E2B-it-qat-q4_0-gguf | 13th Gen Intel(R) Core(TM) i7-1360P×1 | — | llama.cpp b218-c6824a9 | 2-D (4ctx × 1conc) | 15 | — | 1.1 | ok | local-llamacpp-cpu-2b-q4_0 |
 | `2026-09-16-vllm-sweep-mi300x-seedcollision` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.29.1rc1.dev187+gaf1… | 2-D (4ctx × 4conc)<br>4 infeasible | 10,506 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
 | `2026-09-16-vllm-sweep-mi300x` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.29.1rc1.dev187+gaf1… | 2-D (4ctx × 4conc)<br>4 infeasible | 10,294 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
+| `2026-09-17-vllm-sweep-mi300x-rerun` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.3.1.dev3+g0bfc7a15d… | 2-D (4ctx × 4conc)<br>4 infeasible | 10,284 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
+| `2026-09-17-vllm-sweep-mi300x` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.3.1.dev3+g0bfc7a15d… | 2-D (4ctx × 4conc)<br>4 infeasible | 5,802 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
+| `2026-09-18-vllm-sweep-mi300x-bf16ctl` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.3.1.dev85+gdee37d89… | 2-D (2ctx × 3conc) | 11,810 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
+| `2026-09-18-vllm-sweep-mi300x-v0191-bf16` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.19.1.dev3+rocm7.13.… | 2-D (2ctx × 3conc) | 10,009 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
+| `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.19.1.dev3+rocm7.13.… | 2-D (2ctx × 3conc) | 6,579 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
 
 ## Sweep run directories
 
@@ -90,6 +95,12 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-4b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-16-vllm-sweep-mi300x` | 36 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-16-vllm-sweep-mi300x-seedcollision` | 38 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b | `2026-09-17-vllm-sweep-mi300x` | 36 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b | `2026-09-17-vllm-sweep-mi300x-rerun` | 36 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b | `2026-09-18-gemm-decode-shapes-mi300x` | 9 | 3 | 0 | yes | **no** |
+| gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-bf16ctl` | 18 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-bf16` | 18 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | 19 | 0 | 0 | yes | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
@@ -173,7 +184,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-2b-w4a16 | 0 | 1 |
 | gpu-vllm-l4-31b-w4a16 | 0 | 2 |
 | gpu-vllm-l4-4b-w4a16 | 0 | 1 |
-| gpu-vllm-mi300x-2b | 2 | 2 |
+| gpu-vllm-mi300x-2b | 7 | 8 |
 | local-jax-cpu-2b | 0 | 1 |
 | local-llamacpp-1650ti-2b-q4_0 | 4 | 4 |
 | local-llamacpp-cpu-2b-q4_0 | 1 | 2 |

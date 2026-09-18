@@ -108,6 +108,9 @@ VLLM_CONTAINER = os.environ.get("VLLM_CONTAINER", "vllm")
 HF_CACHE = os.environ.get("HF_CACHE", "/opt/hf-cache")
 MAX_MODEL_LEN = os.environ.get("MAX_MODEL_LEN", "32768")
 GPU_MEMORY_UTILIZATION = os.environ.get("GPU_MEMORY_UTILIZATION", "0.90")
+# Empty serves the checkpoint as published (bf16). "fp8" quantizes online at
+# load to e4m3fnuz, which is what CDNA 3 needs — never pull an e4m3fn checkpoint.
+VLLM_QUANTIZATION = os.environ.get("VLLM_QUANTIZATION", "")
 LIMIT_MM_PER_PROMPT = os.environ.get("LIMIT_MM_PER_PROMPT", '{"image": 4, "audio": 0}')
 CHAT_TEMPLATE = os.environ.get("CHAT_TEMPLATE", "/app/vllm/examples/tool_chat_template_gemma4.jinja")
 
@@ -402,6 +405,8 @@ def _serve_argv() -> list[str]:
         LIMIT_MM_PER_PROMPT,
         "--async-scheduling",
     ]
+    if VLLM_QUANTIZATION:
+        argv += ["--quantization", VLLM_QUANTIZATION]
     return argv
 
 

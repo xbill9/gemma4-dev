@@ -291,8 +291,9 @@ def build_report(
             "id": srv.VLLM_MODEL,
             "family": "gemma-4",
             "parameters_b": 2,
-            "weights_dtype": "bfloat16",
-            "quantization": "none",
+            # Online fp8 quantizes the bf16 checkpoint at load; the served weights are fp8.
+            "weights_dtype": "float8_e4m3fnuz" if srv.VLLM_QUANTIZATION == "fp8" else "bfloat16",
+            "quantization": f"online-{srv.VLLM_QUANTIZATION}" if srv.VLLM_QUANTIZATION else "none",
             "max_model_len": int(srv.MAX_MODEL_LEN),
             "architecture_notes": (
                 "E2B is hybrid: sliding-attention layers are 256-dim and full-attention layers 512-dim. "
