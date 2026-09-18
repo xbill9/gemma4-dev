@@ -72,8 +72,11 @@ EC2-with-provisioning against a GPU that is simply present.
 
 `tpu.env` carries that rig's serving configuration **verbatim** for this reason.
 Changing `GPU_MEMORY_UTILIZATION`, `MAX_MODEL_LEN` or `MAX_NUM_SEQS` before the
-first run here forfeits the comparison. It has MEASURED this configuration on real
-hardware (2026-08-30); this rig has measured nothing.
+first run here forfeits the comparison. Both rigs have now MEASURED this
+configuration (g4dn 2026-08-30, here 2026-09-18), but **the pair is not yet a
+controlled A/B**: the runs differ in vLLM version (0.28.0 vs 0.29.0), benchmark
+tool and prompt content, and host vCPU (4 vs 2). A matched-version run on both is
+what would make the difference attributable to the control plane.
 
 The same relationship exists between `local-llamacpp-1650ti-2b-q4_0` and
 `gpu-llamacpp-g5g-2b-q4_0`, and `@NAMING.md` describes it there in the same terms.

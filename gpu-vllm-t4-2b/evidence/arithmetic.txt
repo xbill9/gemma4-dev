@@ -1,0 +1,20 @@
+# ARITHMETIC derived from 2026-09-18-qat-vs-bf16-t4-results.csv, bytes-per-token.txt,
+# hardware-md-t4-bandwidth.txt and g4dn-2026-08-30-results.csv. Not measurements.
+per-stream c=1 in=512: 72.31 / 40.44 = 1.79x
+total c=8 in=512: 215.91 / 164.62 = 1.31x
+total c=4 in=512: 157.49 / 109.05 = 1.44x
+total c=1 in=4096: 14.0 / 12.11 = 1.16x
+total c=4 in=4096: 15.82 / 15.16 = 1.044x
+total c=8 in=4096: 15.95 / 15.66 = 1.019x
+total c=16 in=4096: 15.75 / 15.46 = 1.019x
+bf16 TTFT 4096/512 at c=1: 7199.1 / 300.1 = 24.0x (24x) for 8x the tokens
+QAT TTFT 4096/512 at c=1: 7243.3 / 316.2 = 22.9x
+bytes per token: 4.597 GB / 1.862 GB = 2.47x
+bf16 bound: 277.0 / 4.597 = 60.3 tok/s; measured 40.44 = 67% of it
+QAT bound: 277.0 / 1.862 = 148.8 tok/s; measured 72.31 = 49% of it
+KV needed at c=8, 4096+128 tokens: 8 x 4224 = 33792 tokens; bf16 pool 315974 = 9.4x that
+KV pool QAT/bf16: 519568 / 315974 = 1.64x
+g4dn c=8 242.47 vs this run's bf16 164.62: 1.47x
+SM clock under cap: 1290 / 1590 MHz = 81%
+weights saved: 9.8 GiB - 8.02 GiB = 1.78 GiB
+worst-cell cv: max(output_tok_per_s_cv) = 1.99% -> 2.0% rounded
