@@ -3,7 +3,7 @@ title: "Gemma 4 on a Tesla T4: QAT Weights Decode 1.79x Faster Than bf16"
 published: false
 description: "A step by step deployment of Gemma 4 E2B with vLLM on a single Tesla T4 attached to a Compute Engine VM, and a measured comparison of the QAT w4a16 checkpoint against the bf16 reference on the same card."
 tags: gemma, vllm, cuda, machinelearning
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/devto-t4-qat-cover.1937562f.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/devto-t4-qat-cover.74744fbf.jpg
 ---
 
 *This article provides a step by step deployment guide for **Gemma 4 E2B** to a **Tesla T4** hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM hosted deployment. The T4 is already attached to the Compute Engine VM the tools run on, so there is nothing to provision: the work is getting a Turing GPU to run Gemma 4, and then finding out which checkpoint it runs fastest.*
