@@ -1,0 +1,49 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server
+# name, same entry point, same env. The path is relative to the project directory, as in
+# .mcp.json; never pin an absolute cwd, which is how the inf2 rig ended up pointing at a
+# directory that does not exist.
+#
+# THE ENTRY POINT IS THE RIG-ROOT server.py, NOT A SKILL BUNDLE, and that is this rig's
+# shape rather than a shortcut. The EC2 and TPU siblings point at
+# `.claude/skills/<rig>-management/mcp/server.py` because they ship that bundle; this rig
+# has no `skills/` and none is owed (it follows the `local` rigs). Writing the skill path
+# anyway would reproduce the failure the g4dn header records — a path that does not exist,
+# so the server never starts and the gates below never load.
+#
+# THE ENV BLOCK CARRIES ONLY MCP_SERVER_NAME, deliberately. server.py calls
+# `load_dotenv(RIG_DIR / "tpu.env")` WITHOUT override, so a real environment variable WINS
+# over tpu.env. The siblings list MODEL_NAME / ACCELERATOR_TYPE / INSTANCE_TYPE here
+# because on those rigs those values come from project-setup.sh flags. Here tpu.env is the
+# committed source of truth, so repeating a value in this file would silently pin it and
+# make edits to tpu.env stop taking effect. MCP_SERVER_NAME is the exception because it
+# must equal the key it is registered under or /mcp and the tool prefix disagree.
+[mcp_servers.gpu-vllm-t4-2b]
+command = "python3"
+args = ["server.py"]
+
+[mcp_servers.gpu-vllm-t4-2b.env]
+MCP_SERVER_NAME = "gpu-vllm-t4-2b"
+
+# GATE THE STATE-CHANGING TOOLS. Nothing here provisions capacity — the VM and its T4 bill
+# whether this server runs or not — so the money argument the EC2 rigs gate on does not
+# apply. What is gated is host damage and the single GPU.
+#
+# EVERY NAME BELOW IS A REAL TOOL. Ground truth: `grep -n "^@mcp.tool" server.py`. A gate
+# on a tool name that does not exist FAILS OPEN AND SAYS NOTHING, which is how a sibling
+# ran every destructive tool ungated while appearing to be gated.
+#
+# apply_turing_patch edits the HOST'S OWN site-packages, shared with everything else on this
+# box and with any sibling script that imports the same vLLM. It is the least contained
+# action this rig can take.
+[mcp_servers.gpu-vllm-t4-2b.tools.apply_turing_patch]
+approval_mode = "approve"
+
+# Claims the whole T4 for minutes and cannot be interrupted usefully: ~6 minutes to healthy
+# on a warm compile cache, longer cold.
+[mcp_servers.gpu-vllm-t4-2b.tools.start_vllm_server]
+approval_mode = "approve"
+
+# Kills a live endpoint. Cheap to undo and slow to undo — the next start pays the startup
+# again.
+[mcp_servers.gpu-vllm-t4-2b.tools.stop_vllm_server]
+approval_mode = "approve"

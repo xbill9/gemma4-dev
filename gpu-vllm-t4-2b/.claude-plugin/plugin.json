@@ -1,0 +1,32 @@
+{
+  "name": "gpu-vllm-t4-2b",
+  "description": "Manage vLLM serving of Gemma 4 E2B on one NVIDIA Tesla T4 (Turing, SM 7.5, 15360 MiB) already attached to a Compute Engine VM: host capacity arithmetic across three filesystems, GPU architecture verification against the target interpreter, the Triton shared-memory clamp Turing needs, server lifecycle, and SRE diagnostics via the gpu-vllm-t4-2b MCP server. Serves google/gemma-4-E2B-it-qat-w4a16-ct by default with the bf16 reference kept for the A/B. The first gpu rig here with no provisioning half — the GPU exists whether or not this code runs, so there is no launch, no image resolution and no teardown.",
+  "version": "0.1.0",
+  "author": {
+    "name": "xbill9",
+    "url": "https://github.com/xbill9"
+  },
+  "homepage": "https://github.com/xbill9/gemma4-dev",
+  "repository": "https://github.com/xbill9/gemma4-dev",
+  "license": "Apache-2.0",
+  "keywords": [
+    "gcp",
+    "compute-engine",
+    "t4",
+    "turing",
+    "sm75",
+    "x86-64",
+    "vllm",
+    "triton",
+    "gemma",
+    "mcp"
+  ],
+  "mcpServers": {
+    "gpu-vllm-t4-2b": {
+      "command": "python3",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/server.py"
+      ]
+    }
+  }
+}
