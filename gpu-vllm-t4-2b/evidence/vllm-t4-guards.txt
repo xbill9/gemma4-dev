@@ -1,0 +1,26 @@
+Each vllm-t4 subcommand's refusal path. MEASURED 2026-09-21, verbatim, with exit codes.
+
+$ ~/bin/vllm-t4 start              # while a server is already running
+vllm-t4: already running (pid 14977) -- 'vllm-t4 status', or 'vllm-t4 stop' first
+exit=1
+
+$ ~/bin/vllm-t4 bogus
+usage: vllm-t4 [start|stop|status|query|log|swap] [nowait]
+exit=2
+
+$ ~/bin/vllm-t4 --help
+usage: vllm-t4 [start|stop|status|query|log|swap] [nowait]
+exit=2
+
+$ ~/bin/vllm-t4 swap               # swapfile already enabled
+vllm-t4: swap already on: /opt1/swapfile (16777212 KB)
+exit=0
+
+$ VLLM_T4_RIG=/nonexistent ~/bin/vllm-t4 status
+vllm-t4: rig not found: /nonexistent (set VLLM_T4_RIG)
+exit=1
+
+$ ~/bin/vllm-t4 status             # serving
+✅ Serving at http://127.0.0.1:8000 (pid 17215).
+
+VRAM 13371 MiB, 15360 MiB, 0 %

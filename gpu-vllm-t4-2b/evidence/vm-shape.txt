@@ -1,0 +1,36 @@
+GCE VM shape for gpu-vllm-t4-2b, read from the instance metadata server and the
+guest OS on 2026-09-21. This is the running VM's own configuration; the
+`gcloud compute instances create` command in the article is reconstructed from
+these values and was not re-executed.
+
+$ curl -H "Metadata-Flavor: Google" .../instance/machine-type
+projects/1056842563084/machineTypes/n1-standard-2
+$ ... /instance/zone
+projects/1056842563084/zones/us-west2-b
+$ ... /instance/image
+projects/debian-cloud/global/images/debian-13-trixie-v20260609
+$ ... /instance/scheduling/?recursive=true
+{"automaticRestart":"TRUE","onHostMaintenance":"TERMINATE","preemptible":"FALSE"}
+$ ... /instance/disks/?recursive=true
+[{"deviceName":"debian13","index":0,"interface":"SCSI","mode":"READ_WRITE","type":"PERSISTENT-SSD"},
+ {"deviceName":"persistent-disk-1","index":1,"interface":"SCSI","mode":"READ_WRITE","type":"PERSISTENT-BALANCED"}]
+
+$ cat /etc/os-release
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+VERSION_ID="13"
+
+$ lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
+sda       32G disk
+|-sda1  31.9G part /
+|-sda14    3M part
+`-sda15  124M part /boot/efi
+sdb      250G disk /opt1
+
+$ nvidia-smi --query-gpu=name,compute_cap,memory.total,driver_version --format=csv
+name, compute_cap, memory.total [MiB], driver_version
+Tesla T4, 7.5, 15360 MiB, 615.71.09
+
+$ nproc
+2
+$ free -m   (total column)
+Mem: 7436

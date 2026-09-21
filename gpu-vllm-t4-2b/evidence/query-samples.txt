@@ -1,0 +1,35 @@
+Queries against the running QAT server. MEASURED 2026-09-21, vLLM 0.29.0,
+model google/gemma-4-E2B-it-qat-w4a16-ct.
+
+$ ~/bin/vllm-t4 query          # wraps `make query`, /v1/chat/completions
+{
+    "id": "chatcmpl-a8386f6ff3cb0bad",
+    "model": "google/gemma-4-E2B-it-qat-w4a16-ct",
+    "choices": [{"index": 0, "message": {"role": "assistant",
+      "content": "A TPU, or Tensor Processing Unit, is a specialized type of integrated circuit designed to significantly accelerate the mathematical operations central to training and running machine learning models, particularly those involving matrix multiplications."},
+      "finish_reason": "stop", "stop_reason": 106}],
+    "system_fingerprint": "vllm-0.29.0-9a66a08c",
+    "usage": {"prompt_tokens": 18, "total_tokens": 56, "completion_tokens": 38}
+}
+real    0m0.879s
+
+$ curl -fsS http://127.0.0.1:8000/v1/models
+{"object":"list","data":[{"id":"google/gemma-4-E2B-it-qat-w4a16-ct","object":"model",
+ "owned_by":"vllm","root":"google/gemma-4-E2B-it-qat-w4a16-ct","max_model_len":16384}]}
+
+$ curl -fsS .../v1/chat/completions -d '{"...","content":"Name the four inner planets, comma separated."}, "temperature":0,"max_tokens":64}'
+Mercury, Venus, Earth, Mars
+usage: {'prompt_tokens': 18, 'total_tokens': 26, 'completion_tokens': 8}
+
+$ curl -N .../v1/chat/completions -d '{... "content":"Count from 1 to 5.", "stream":true}'
+chunks: 16
+data: {"id":"chatcmpl-985a4c02b4a24fd6","object":"chat.completion.chunk","model":"google/gemma-4-E2B-it-qat-w4a16-ct","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+data: {"id":"chatcmpl-985a4c02b4a24fd6","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"1"},"finish_reason":null}]}
+...
+data: [DONE]
+assembled: 1, 2, 3, 4, 5
+
+$ curl -fsS http://127.0.0.1:8000/metrics | grep -E '^vllm:(num_requests_running|prompt_tokens_total|generation_tokens_total)'
+vllm:num_requests_running{engine="0",model_name="google/gemma-4-E2B-it-qat-w4a16-ct"} 0.0
+vllm:prompt_tokens_total{engine="0",model_name="google/gemma-4-E2B-it-qat-w4a16-ct"} 53.0
+vllm:generation_tokens_total{engine="0",model_name="google/gemma-4-E2B-it-qat-w4a16-ct"} 49.0

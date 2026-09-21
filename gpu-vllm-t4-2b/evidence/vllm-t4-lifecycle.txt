@@ -1,0 +1,66 @@
+A full vllm-t4 stop/start/query cycle on the QAT build. MEASURED 2026-09-21,
+captured verbatim from the terminal. Server was idle (health checks only) before
+the stop.
+
+$ date -u; ~/bin/vllm-t4 stop
+2026-09-21T17:01:24Z
+✅ Sent SIGTERM to vLLM (pid 14977). VRAM is released on exit.
+
+The T4 stays attached and the VM stays billed — stopping the server is not releasing capacity here.
+
+real    0m1.605s
+
+$ nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader   # ~13s later
+0 MiB, 15360 MiB
+
+$ date -u; ~/bin/vllm-t4 start
+2026-09-21T17:01:37Z
+vllm-t4: swap already on: /opt1/swapfile (16777212 KB)
+vllm-t4: Turing clamp confirmed
+vllm-t4: starting google/gemma-4-E2B-it-qat-w4a16-ct on 127.0.0.1:8000
+vllm-t4: pid 17215, log /home/xbill_glitnir_com/gemma4-dev/gpu-vllm-t4-2b/run/vllm.log
+vllm-t4: waiting up to 1800s for http://127.0.0.1:8000/health
+     0s  VRAM 0 MiB, 0 %
+    15s  VRAM 0 MiB, 0 %
+    30s  VRAM 0 MiB, 0 %
+    45s  VRAM 0 MiB, 0 %
+    60s  VRAM 0 MiB, 0 %
+    75s  VRAM 0 MiB, 0 %
+    90s  VRAM 1093 MiB, 10 %
+   105s  VRAM 9005 MiB, 10 %
+   121s  VRAM 9005 MiB, 0 %
+   136s  VRAM 9005 MiB, 1 %
+   151s  VRAM 9005 MiB, 2 %
+   166s  VRAM 9301 MiB, 0 %
+   181s  VRAM 8403 MiB, 0 %
+   196s  VRAM 8403 MiB, 0 %
+   211s  VRAM 8403 MiB, 0 %
+   226s  VRAM 8651 MiB, 0 %
+   241s  VRAM 13371 MiB, 0 %
+   256s  VRAM 13371 MiB, 0 %
+   271s  VRAM 13371 MiB, 0 %
+   286s  VRAM 13371 MiB, 0 %
+   301s  VRAM 13371 MiB, 0 %
+   316s  VRAM 13371 MiB, 0 %
+   331s  VRAM 13371 MiB, 0 %
+   347s  VRAM 13371 MiB, 0 %
+vllm-t4: healthy after 362s -- http://127.0.0.1:8000
+✅ Serving at http://127.0.0.1:8000 (pid 17215).
+
+VRAM 13371 MiB, 15360 MiB, 0 %
+
+real    6m15.598s
+2026-09-21T17:07:53Z
+
+Engine lines written by that same start (run/vllm.log, pid 17215 / EngineCore 17310):
+
+(APIServer pid=17215) INFO 09-21 17:02:05 [api_utils.py:286] non-default args: {'host': '127.0.0.1', 'model': 'google/gemma-4-E2B-it-qat-w4a16-ct', 'dtype': 'float16', 'max_model_len': 16384, 'gpu_memory_utilization': 0.9, 'max_num_seqs': 8}
+(APIServer pid=17215) WARNING 09-21 17:02:05 [model.py:2355] Casting torch.bfloat16 to torch.float16.
+(EngineCore pid=17310) INFO 09-21 17:03:19 [compressed_tensors_wNa16.py:137] Using MarlinLinearKernel for CompressedTensorsWNA16
+(EngineCore pid=17310) INFO 09-21 17:04:47 [model_runner.py:404] Model loading took 8.02 GiB memory and 88.981559 seconds
+(EngineCore pid=17310) INFO 09-21 17:05:41 [gpu_worker.py:625] Available KV cache memory: 4.66 GiB
+(EngineCore pid=17310) INFO 09-21 17:05:42 [kv_cache_utils.py:2032] GPU KV cache size: 519,681 tokens, Maximum concurrency for 16,384 tokens per request: 31.72x
+(EngineCore pid=17310) INFO 09-21 17:05:49 [core.py:361] init engine (profile, create kv cache, warmup model) took 61.77 s (compilation: 2.59 s)
+
+$ free -m | grep -i swap      # while serving
+Swap:          16383        3592       12791

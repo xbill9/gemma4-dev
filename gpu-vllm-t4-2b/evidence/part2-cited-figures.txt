@@ -1,0 +1,46 @@
+Figures cited in Part 2 that come from the rig's committed config or from earlier
+lines of the same run/vllm.log. Collected 2026-09-21.
+
+--- checkpoint sizes, from tpu.env (MEASURED from the Hub 2026-09-04) ---
+MODEL_SAFETENSORS_BYTES=8316306646     # QAT w4a16, 8.3 GB
+MODEL_BF16_BYTES=10246621918           # bf16 reference, 10.2 GB
+
+--- serving shape, from tpu.env ---
+DTYPE=float16
+KV_CACHE_DTYPE=auto
+TENSOR_PARALLEL_SIZE=1
+GPU_MEMORY_UTILIZATION=0.90
+MAX_MODEL_LEN=16384
+MAX_NUM_SEQS=8
+HOST=127.0.0.1
+PORT=8000
+PYTHON_BIN=/usr/bin/python3.13
+PYTHONUSERBASE=/opt1/pyuser
+PIP_CACHE_DIR=/opt1/pipcache
+TMPDIR=/opt1/tmp
+HOST_RAM_TOTAL_BYTES=7797587968        # 7.80 GB
+
+--- first start of this stack, cold torch.compile cache ---
+run/vllm.log:947
+(EngineCore pid=22798) INFO 09-18 16:06:26 [core.py:361] init engine (profile, create kv cache, warmup model) took 192.45 s (compilation: 112.77 s)
+
+Compare the 2026-09-21 start on a warm cache:
+(EngineCore pid=17310) INFO 09-21 17:05:49 [core.py:361] init engine (profile, create kv cache, warmup model) took 61.77 s (compilation: 2.59 s)
+
+--- VRAM released after SIGTERM ---
+$ ~/bin/vllm-t4 stop            # 17:01:24Z
+$ nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader   # 17:01:37Z
+0 MiB, 15360 MiB
+
+--- two interpreters ---
+$ python3 -c "import sys; print(sys.version.split()[0], sys.executable)"
+3.12.13 /home/xbill_glitnir_com/.pyenv/versions/3.12.13/bin/python3
+$ /usr/bin/python3.13 -c "import sys; print(sys.version.split()[0], sys.executable)"
+3.13.5 /usr/bin/python3.13
+
+--- installed model-side packages (2026-09-21, unchanged from the Part 1 run) ---
+torch        2.13.0+cu130
+transformers 5.17.0
+triton       3.7.1
+vllm         0.29.0
+system_fingerprint reported by the server: vllm-0.29.0-9a66a08c
