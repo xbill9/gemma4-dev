@@ -1,0 +1,14 @@
+More Gemma 4 on small GPUs. A Tesla T4 is a 2018 card with no bf16 datapath.
+Does the 4-bit QAT build decode faster than bf16 on it?
+
+A step by step deployment of Gemma 4 E2B with vLLM on a single Tesla T4 attached to a Compute Engine VM, and a measured comparison of the QAT w4a16 checkpoint against the bf16 reference on the same card.
+
+What is in it:
+
+- 72.31 tok/s per stream for QAT against 40.44 for bf16 at 512-token prompts, 1.79x
+- 215.91 tok/s total at 8 streams for QAT against 164.62, 1.31x
+- About 15-16 tok/s for both builds at 4096-token prompts, where prompt processing sets the rate
+- 519,568 KV tokens for QAT against 315,974 for bf16; neither pool binds at eight sequences
+
+dev.to \(Google Developer Experts\): https://dev.to/gde/gemma-4-on-a-tesla-t4-qat-weights-decode-179x-faster-than-bf16-2fi4
+Medium: https://xbill999.medium.com/gemma-4-qat-on-a-tesla-t4-4682b77cd0fb
