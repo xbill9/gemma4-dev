@@ -3,7 +3,7 @@ title: "Gemma 4 on a Tesla T4, Part 2: The Minimum GCE VM and a Script to Drive 
 published: false
 description: "Building the smallest Compute Engine VM that serves Gemma 4 E2B on one Tesla T4, installing the driver and vLLM after boot, and a walkthrough of every option in the shell script that starts, checks and queries the server."
 tags: gemma, vllm, gcp, cuda
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/devto-t4-vm-cover.c9eca330.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/devto-t4-vm-cover.d8450353.jpg
 ---
 
 *This article provides a step by step deployment guide for **Gemma 4 E2B** to a **Tesla T4** hosted GPU enabled system. A suite of Python MCP tools is built to simplify management of the vLLM hosted deployment. Part 1 measured which checkpoint the card runs fastest; this part builds the machine underneath it, installs the stack after first boot, and walks through `vllm-t4`, the shell script that owns the host state the MCP tools do not.*
