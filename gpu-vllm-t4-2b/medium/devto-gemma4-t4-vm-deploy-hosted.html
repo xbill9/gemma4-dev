@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 on a Tesla T4, Part 2: The Minimum GCE VM and a Script to Drive It</title>
+  <meta name="description" content="Building the smallest Compute Engine VM that serves Gemma 4 E2B on one Tesla T4, installing the driver and vLLM after boot, and a walkthrough of every option in the shell script that starts, checks and queries the server." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-t4-vm-cover.25debff5.jpg" alt="Gemma 4 on a Tesla T4, Part 2: The Minimum GCE VM and a Script to Drive It" /></figure>
+<p><em>This article provides a step by step deployment guide for
+<strong>Gemma 4 E2B</strong> to a <strong>Tesla T4</strong> hosted GPU
+enabled system. A suite of Python MCP tools is built to simplify
+management of the vLLM hosted deployment. Part 1 measured which
+checkpoint the card runs fastest; this part builds the machine
+underneath it, installs the stack after first boot, and walks through
+<code>vllm-t4</code>, the shell script that owns the host state the MCP
+tools do not.</em></p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b">github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b</a></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-vm-deploy-table-1.png"
+alt="Table: Host, GPU, Image, Disks" /></p>
+<hr />
+<h4 id="where-do-i-start">Where Do I Start?</h4>
+<p>Part 1 began with the GPU already working. This part begins with a
+Google Cloud project and nothing in it.</p>
+<p>The work splits in two. Everything before first boot is a single
+<code>gcloud</code> command whose choices are GPU choices: which zone
+sells a T4, what a GPU does to the maintenance policy, and how much disk
+to attach given where the checkpoints land. Everything after first boot
+is software on a Debian image that ships no NVIDIA driver at all.</p>
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Google Cloud project with billing enabled and the Compute Engine
+API turned on</li>
+<li>GPU quota in the region you intend to use — T4 GPU quota in that
+region starts at zero on a new project</li>
+<li><code>gcloud</code> authenticated locally</li>
+<li>A Hugging Face account, for the Gemma checkpoints</li>
+</ul>
+<h4 id="what-the-machine-is">What the Machine Is</h4>
+<p>Read from the instance metadata server and the guest OS on the
+running VM:</p>
+<pre><code>machine-type: n1-standard-2
+zone:         us-west2-b
+image:        projects/debian-cloud/global/images/debian-13-trixie-v20260609
+scheduling:   {&quot;automaticRestart&quot;:&quot;TRUE&quot;,&quot;onHostMaintenance&quot;:&quot;TERMINATE&quot;,&quot;preemptible&quot;:&quot;FALSE&quot;}
+disks:        [{&quot;deviceName&quot;:&quot;debian13&quot;,&quot;type&quot;:&quot;PERSISTENT-SSD&quot;},
+               {&quot;deviceName&quot;:&quot;persistent-disk-1&quot;,&quot;type&quot;:&quot;PERSISTENT-BALANCED&quot;}]
+Tesla T4, 7.5, 15360 MiB, 615.71.09
+nproc: 2
+MemTotal: 7436 MiB</code></pre>
+<p>On Compute Engine the T4 attaches to the N1 machine family, so the
+host shape is an N1 choice. This one is the smallest N1 that has been
+used for this work. Two vCPU costs startup time, and 7.8 GB of RAM is
+the number that decides the swapfile section below.</p>
+<h4 id="creating-the-vm">Creating the VM</h4>
+<p>The command below is reconstructed from the running VM's own metadata
+— machine type, zone, image, scheduling policy and both disk types are
+read back from the instance, and the accelerator from
+<code>nvidia-smi</code>. Re-running the create call was out of scope for
+this article.</p>
+<pre class="bash"><code>gcloud compute instances create gemma4-t4 \
+  --zone=us-west2-b \
+  --machine-type=n1-standard-2 \
+  --accelerator=type=nvidia-tesla-t4,count=1 \
+  --maintenance-policy=TERMINATE \
+  --restart-on-failure \
+  --image-project=debian-cloud \
+  --image-family=debian-13 \
+  --boot-disk-size=32GB \
+  --boot-disk-type=pd-ssd \
+  --create-disk=name=gemma4-t4-data,size=250GB,type=pd-balanced,auto-delete=no</code></pre>
+<p>Three flags in there are about the GPU.</p>
+<h4 id="the-maintenance-policy-is-forced">The Maintenance Policy Is
+Forced</h4>
+<p><code>--maintenance-policy=TERMINATE</code> is required on any
+instance with an attached GPU. Compute Engine live-migrates ordinary VMs
+during host maintenance and cannot migrate one with a GPU, so the API
+rejects the default <code>MIGRATE</code> policy. The metadata confirms
+what the instance ended up with:</p>
+<pre><code>{&quot;automaticRestart&quot;:&quot;TRUE&quot;,&quot;onHostMaintenance&quot;:&quot;TERMINATE&quot;,&quot;preemptible&quot;:&quot;FALSE&quot;}</code></pre>
+<p>Pairing it with <code>--restart-on-failure</code> means maintenance
+stops the VM and brings it back. The server process does not come back
+with it, and neither does the swapfile — there is a reboot checklist at
+the end of this article for that reason.</p>
+<h4 id="two-disks-because-the-checkpoints-do-not-fit-on-one">Two Disks,
+Because the Checkpoints Do Not Fit on One</h4>
+<p>The boot disk is 32 GB and the model cache goes on a second 250 GB
+disk mounted at <code>/opt1</code>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-vm-deploy-diagram-1.png"
+alt="diagram" /></p>
+<p>A bf16 E2B checkpoint is 10.2 GB and the QAT build is 8.3 GB, so both
+together are most of a 32 GB root disk before pip has unpacked a CUDA
+torch wheel. Splitting them keeps the root disk for the OS and puts
+every multi-gigabyte write on the larger, cheaper volume.
+<code>~/.cache</code> is a symlink to <code>/opt1/cache</code>, so
+Hugging Face downloads land there without any environment variable.</p>
+<p>The data disk is mounted from <code>/etc/fstab</code> and survives a
+reboot:</p>
+<pre><code>UUID=8bd96fe8-e301-41d9-8ccc-8123ce89c4a8 /opt1 ext4 discard,defaults,nofail 0 2</code></pre>
+<h4 id="measure-disk-per-path-never-once">Measure Disk Per Path, Never
+Once</h4>
+<pre><code>Mounted on    1B-blocks        Avail
+/           33570021376   8450138112
+/tmp         3898789888   3897544704
+/opt1      263086084096 200857059328</code></pre>
+<p>Three filesystems, and the two multi-gigabyte writes an install makes
+land on different ones. <code>/tmp</code> is its own 3.9 GB filesystem,
+which is where pip unpacks wheels, and a CUDA torch plus its NVIDIA
+runtime dependencies do not fit in it. A single <code>df /</code>
+reports the wrong answer for all three writes.</p>
+<h4 id="after-boot-the-driver">After Boot: the Driver</h4>
+<p>The Debian 13 image carries no NVIDIA driver. <code>nvidia-smi</code>
+does not exist on a fresh boot. The driver comes from NVIDIA's own CUDA
+repository for Debian 13:</p>
+<pre><code>/etc/apt/sources.list.d/cuda-debian13-x86_64.list:
+deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/ /
+sudo apt-get install -y linux-headers-$(uname -r)
+wget https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt-get update
+sudo apt-get install -y nvidia-driver</code></pre>
+<p>What that pulls in:</p>
+<pre><code>linux-headers-7.1.8+deb13-cloud-amd64   7.1.8-1~bpo13+1
+nvidia-driver                           615.71.09-2
+nvidia-driver-cuda                      615.71.09-2
+nvidia-kernel-open-dkms                 615.71.09-2
+nvidia-kernel-support                   615.71.09-2</code></pre>
+<p>The kernel module is the open variant and DKMS compiles it against
+the running kernel, so the matching <code>linux-headers</code> package
+has to be installed first. The running kernel here is
+<code>7.1.8+deb13-cloud-amd64</code> and its headers come from
+backports, so the headers install gets its own line ahead of the
+driver.</p>
+<p>Reboot, then check:</p>
+<pre><code>$ nvidia-smi --query-gpu=name,compute_cap,memory.total,driver_version --format=csv
+name, compute_cap, memory.total [MiB], driver_version
+Tesla T4, 7.5, 15360 MiB, 615.71.09</code></pre>
+<p>Compute capability 7.5 is Turing, and it is the number that governs
+everything in Part 1: no bfloat16 datapath, no fp8, and a 64 KiB
+shared-memory ceiling per block that the Triton attention kernel has to
+be clamped to fit.</p>
+<h4 id="the-swapfile-is-part-of-the-deploy">The Swapfile Is Part of the
+Deploy</h4>
+<p>7.8 GB of RAM, and the VM ships with no swap. vLLM is killed by the
+kernel while staging E2B weights without some, which reads as a crash
+with no traceback.</p>
+<pre class="bash"><code>sudo fallocate -l 16G /opt1/swapfile
+sudo chmod 600 /opt1/swapfile
+sudo mkswap /opt1/swapfile
+sudo swapon /opt1/swapfile</code></pre>
+<p>The swapfile lives on the data disk, so the file itself persists.
+<code>/etc/fstab</code> has no swap line, so a reboot leaves the file in
+place and disabled. While serving the QAT build, 3592 MiB of the 16 GB
+is in use.</p>
+<h4 id="python-and-where-packages-land">Python, and Where Packages
+Land</h4>
+<p>There are two interpreters on this host and the default is the one
+with no room:</p>
+<pre><code>python3             -&gt; pyenv 3.12.13, site-packages on /        8.45 GB free
+/usr/bin/python3.13 -&gt; user site at /opt1/pyuser            200.86 GB free</code></pre>
+<p>The MCP server runs under <code>python3</code>. vLLM runs under
+<code>/usr/bin/python3.13</code> with
+<code>PYTHONUSERBASE=/opt1/pyuser</code>, which puts its packages on the
+large disk. A relocated user site is the same interpreter's own site
+directory on a different filesystem, so site-packages stays system-wide
+and no virtualenv is involved.</p>
+<h4 id="installing-vllm">Installing vLLM</h4>
+<p>Both redirections below are load-bearing on this host — one for where
+packages land, one for where pip unpacks them:</p>
+<pre class="bash"><code>PYTHONUSERBASE=/opt1/pyuser PIP_CACHE_DIR=/opt1/pipcache TMPDIR=/opt1/tmp \
+  /usr/bin/python3.13 -m pip install --user --break-system-packages -U \
+  --upgrade-strategy eager \
+  --extra-index-url https://download.pytorch.org/whl/cu130 vllm</code></pre>
+<p>vLLM pins torch to an exact version, so this moves torch with it.
+Installing torch with <code>--no-deps</code> skips cuDNN and the NVIDIA
+runtime wheels, and <code>import torch</code> then fails on
+<code>libcudnn.so.9</code>.</p>
+<pre><code>torch        2.13.0+cu130
+transformers 5.17.0
+triton       3.7.1
+vllm         0.29.0</code></pre>
+<p>The published cu130 wheels carry <code>sm_75</code>, so Turing needs
+no source build. <code>make arch</code> asks the interpreter for the
+list instead of reading the directory.</p>
+<h4 id="the-turing-clamp">The Turing Clamp</h4>
+<p>Gemma 4 mixes two attention widths — 256 in its sliding-window
+layers, 512 in its global layers — and vLLM forces its Triton backend
+for that mix. At width 512 the kernel asks for more shared memory than a
+Turing block allows. <code>make patch</code> clamps the tile sizes in
+the installed vLLM:</p>
+<pre><code>✅ **Patched**, in the site-packages this host&#39;s `python3` imports.
+ 
+__FILE__/opt1/pyuser/lib/python3.13/site-packages/vllm/v1/attention/ops/triton_unified_attention.py
+CLAMP PRESENT
+OCCURRENCES 1</code></pre>
+<p>Reinstalling or upgrading vLLM reverts it, because the patch edits a
+file in site-packages and pip replaces that file. Re-run
+<code>make verify-patch</code> after any vLLM change.</p>
+<h4 id="enter-vllm-t4">Enter <code>vllm-t4</code></h4>
+<p>At this point the host is ready and the remaining job is running the
+server. The rig's <code>tpu.env</code> holds every serving value, and
+the MCP tools cover capacity, architecture and patching. Three things
+are neither rig config nor MCP concerns: the swapfile, launching a
+process that outlives the shell, and waiting for the endpoint to
+answer.</p>
+<p><code>~/bin/vllm-t4</code> owns those three. Every serving value it
+passes to vLLM is read out of the rig's <code>tpu.env</code> at call
+time and none is spelled in the script:</p>
+<pre class="bash"><code>rigval() {
+  sed -n &quot;s/^$1=//p&quot; &quot;$rig/tpu.env&quot; | tail -1
+}</code></pre>
+<p><code>tpu.env</code> is a dotenv file whose comments are prose, so
+sourcing it would both fail as shell and drag <code>TMPDIR</code> and
+<code>PYTHONUSERBASE</code> into the calling shell. Reading one key at a
+time keeps the file authoritative without importing it.</p>
+<h4 id="why-the-script-launches-with-nohup">Why the Script Launches with
+<code>nohup</code></h4>
+<p><code>make serve</code> runs
+<code>python3 -c "asyncio.run(server.start_vllm_server())"</code>.
+asyncio terminates the child subprocess when that short-lived
+interpreter exits, so the engine is gone about a second after launch,
+having written nothing to the log. The Part 1 sweep was started under
+the long-lived MCP server process, where the parent stays alive.</p>
+<p><code>vllm-t4 start</code> launches with <code>nohup</code> and
+<code>disown</code> from bash, and writes the same
+<code>run/vllm.pid</code> and <code>run/vllm.log</code> that the rig's
+own status and stop tools read, so the script and the MCP tools agree
+about what is running.</p>
+<h4 id="the-options">The Options</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-vm-deploy-table-2.png"
+alt="Table: Command, What it does" /></p>
+<p>Four environment variables override the defaults:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-vm-deploy-table-3.png"
+alt="Table: Variable, Default, Use" /></p>
+<h4 id="start-runs-three-guards-before-it-launches"><code>start</code>
+Runs Three Guards Before It Launches</h4>
+<p>Each guard costs less than the failure it prevents.</p>
+<p><strong>Swap</strong>, because the engine is killed during weight
+loading without it and the kernel log is the only place that says so.
+<code>ensure_swap</code> creates the file if it is absent, enables it if
+it exists, and reports when it is already on.</p>
+<p><strong>The clamp</strong>, because an unpatched engine spends
+minutes loading and then dies with an out-of-resources error that gets
+attributed to configuration. The check matches the verifier's positive
+string and refuses on anything else:</p>
+<pre class="bash"><code>case $out in
+  *&#39;✅ **Patched**&#39;*) echo &quot;$prog: Turing clamp confirmed&quot; ;;
+  *) echo &quot;$out&quot; &gt;&amp;2
+     die &quot;the Turing clamp is not confirmed -- run &#39;make -C $rig patch&#39;&quot; ;;
+esac</code></pre>
+<p>A verifier that cannot import vLLM at all answers neither way, so a
+whitelist of known-bad strings would admit every unknown-bad one.
+Matching the single good answer fails closed.</p>
+<p><strong>The config</strong>, because an empty value from
+<code>tpu.env</code> becomes an empty CLI argument. Every key is checked
+for a value and <code>PYTHON_BIN</code> for executability before
+anything launches.</p>
+<h4 id="a-full-start">A Full Start</h4>
+<pre><code>$ vllm-t4 start
+vllm-t4: swap already on: /opt1/swapfile (16777212 KB)
+vllm-t4: Turing clamp confirmed
+vllm-t4: starting google/gemma-4-E2B-it-qat-w4a16-ct on 127.0.0.1:8000
+vllm-t4: pid 17215, log /home/xbill_glitnir_com/gemma4-dev/gpu-vllm-t4-2b/run/vllm.log
+vllm-t4: waiting up to 1800s for http://127.0.0.1:8000/health
+     0s  VRAM 0 MiB, 0 %
+    75s  VRAM 0 MiB, 0 %
+    90s  VRAM 1093 MiB, 10 %
+   105s  VRAM 9005 MiB, 10 %
+   166s  VRAM 9301 MiB, 0 %
+   181s  VRAM 8403 MiB, 0 %
+   241s  VRAM 13371 MiB, 0 %
+   347s  VRAM 13371 MiB, 0 %
+vllm-t4: healthy after 362s -- http://127.0.0.1:8000
+✅ Serving at http://127.0.0.1:8000 (pid 17215).
+ 
+VRAM 13371 MiB, 15360 MiB, 0 %</code></pre>
+<p>VRAM is printed beside the clock because for the first minutes a
+compiling engine and a dead one look identical from outside, and claimed
+device memory is what tells them apart. The shape of that column is the
+startup: nothing for 75 seconds while Python imports and the weights are
+read off disk, 9005 MiB once the weights are resident, a dip to 8403
+while the engine profiles, then 13371 when the KV cache is
+allocated.</p>
+<h4 id="what-the-engine-allocated">What the Engine Allocated</h4>
+<p>The same start, in <code>run/vllm.log</code>:</p>
+<pre><code>non-default args: {&#39;host&#39;: &#39;127.0.0.1&#39;, &#39;model&#39;: &#39;google/gemma-4-E2B-it-qat-w4a16-ct&#39;, &#39;dtype&#39;: &#39;float16&#39;, &#39;max_model_len&#39;: 16384, &#39;gpu_memory_utilization&#39;: 0.9, &#39;max_num_seqs&#39;: 8}
+Casting torch.bfloat16 to torch.float16.
+Using MarlinLinearKernel for CompressedTensorsWNA16
+Model loading took 8.02 GiB memory and 88.981559 seconds
+Available KV cache memory: 4.66 GiB
+GPU KV cache size: 519,681 tokens, Maximum concurrency for 16,384 tokens per request: 31.72x
+init engine (profile, create kv cache, warmup model) took 61.77 s (compilation: 2.59 s)</code></pre>
+<p><code>Casting torch.bfloat16 to torch.float16</code> is the
+checkpoint's stored dtype meeting <code>--dtype float16</code> from
+<code>tpu.env</code>. Turing has no bfloat16 datapath, so PyTorch would
+upconvert regardless; setting the flag makes the conversion a decision
+with a record.</p>
+<p>Compilation took 2.59 s here against 112.77 s on the first start of
+this stack, because <code>torch.compile</code> caches its artifacts
+under <code>~/.cache</code> and that cache is warm. A first start on a
+fresh VM pays the full compile, and on 2 vCPU it is the largest single
+item in the wall clock.</p>
+<h4 id="status-and-query"><code>status</code> and
+<code>query</code></h4>
+<pre><code>$ vllm-t4 status
+✅ Serving at http://127.0.0.1:8000 (pid 17215).
+ 
+VRAM 13371 MiB, 15360 MiB, 0 %
+$ vllm-t4 query
+{
+    &quot;model&quot;: &quot;google/gemma-4-E2B-it-qat-w4a16-ct&quot;,
+    &quot;choices&quot;: [{&quot;message&quot;: {&quot;role&quot;: &quot;assistant&quot;,
+      &quot;content&quot;: &quot;A TPU, or Tensor Processing Unit, is a specialized type of integrated circuit designed to significantly accelerate the mathematical operations central to training and running machine learning models, particularly those involving matrix multiplications.&quot;},
+      &quot;finish_reason&quot;: &quot;stop&quot;}],
+    &quot;system_fingerprint&quot;: &quot;vllm-0.29.0-9a66a08c&quot;,
+    &quot;usage&quot;: {&quot;prompt_tokens&quot;: 18, &quot;total_tokens&quot;: 56, &quot;completion_tokens&quot;: 38}
+}</code></pre>
+<p>That target posts to <code>/v1/chat/completions</code>. Raw
+<code>/v1/completions</code> returns an empty string on an
+instruction-tuned checkpoint, so an empty result there means the wrong
+endpoint was called.</p>
+<h4 id="querying-it-directly">Querying It Directly</h4>
+<p>The server is the standard OpenAI-compatible one, on
+<code>127.0.0.1:8000</code>:</p>
+<pre><code>$ curl -fsS http://127.0.0.1:8000/v1/models
+{&quot;object&quot;:&quot;list&quot;,&quot;data&quot;:[{&quot;id&quot;:&quot;google/gemma-4-E2B-it-qat-w4a16-ct&quot;,&quot;object&quot;:&quot;model&quot;,
+ &quot;owned_by&quot;:&quot;vllm&quot;,&quot;root&quot;:&quot;google/gemma-4-E2B-it-qat-w4a16-ct&quot;,&quot;max_model_len&quot;:16384}]}
+curl -fsS http://127.0.0.1:8000/v1/chat/completions \
+  -H &#39;Content-Type: application/json&#39; \
+  -d &#39;{&quot;model&quot;:&quot;google/gemma-4-E2B-it-qat-w4a16-ct&quot;,
+       &quot;messages&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;Name the four inner planets, comma separated.&quot;}],
+       &quot;temperature&quot;:0,&quot;max_tokens&quot;:64}&#39;
+Mercury, Venus, Earth, Mars
+usage: {&#39;prompt_tokens&#39;: 18, &#39;total_tokens&#39;: 26, &#39;completion_tokens&#39;: 8}</code></pre>
+<p>Streaming works the same way, with <code>"stream": true</code>:</p>
+<pre><code>chunks: 16
+data: {&quot;object&quot;:&quot;chat.completion.chunk&quot;,&quot;choices&quot;:[{&quot;delta&quot;:{&quot;role&quot;:&quot;assistant&quot;,&quot;content&quot;:&quot;&quot;}}]}
+data: {&quot;object&quot;:&quot;chat.completion.chunk&quot;,&quot;choices&quot;:[{&quot;delta&quot;:{&quot;content&quot;:&quot;1&quot;}}]}
+...
+data: [DONE]
+ 
+assembled: 1, 2, 3, 4, 5</code></pre>
+<p>Prometheus metrics are on <code>/metrics</code>, which is the route
+to per-request counters without a benchmark tool:</p>
+<pre><code>vllm:num_requests_running{engine=&quot;0&quot;,model_name=&quot;google/gemma-4-E2B-it-qat-w4a16-ct&quot;} 0.0
+vllm:prompt_tokens_total{...} 53.0
+vllm:generation_tokens_total{...} 49.0</code></pre>
+<p>The model id in every request body has to match what
+<code>/v1/models</code> reports, which is <code>MODEL_NAME</code> from
+<code>tpu.env</code>. Serving the bf16 build for an A/B means overriding
+<code>MODEL_NAME</code> and <code>MODEL_SAFETENSORS_BYTES</code> in the
+environment, and the id in the request body changes with it.</p>
+<h4 id="what-each-subcommand-refuses">What Each Subcommand Refuses</h4>
+<pre><code>$ vllm-t4 start                                  # one is already running
+vllm-t4: already running (pid 14977) -- &#39;vllm-t4 status&#39;, or &#39;vllm-t4 stop&#39; first   [exit 1]
+ 
+$ vllm-t4 bogus
+usage: vllm-t4 [start|stop|status|query|log|swap] [nowait]                          [exit 2]
+ 
+$ vllm-t4 swap                                   # already enabled
+vllm-t4: swap already on: /opt1/swapfile (16777212 KB)                              [exit 0]
+ 
+$ VLLM_T4_RIG=/nonexistent vllm-t4 status
+vllm-t4: rig not found: /nonexistent (set VLLM_T4_RIG)                              [exit 1]</code></pre>
+<p>If the engine dies during the wait, the script prints the last 20 log
+lines and points at the kernel log, because a memory kill leaves no
+traceback in vLLM's own output:</p>
+<pre class="bash"><code>if [ -z &quot;`running_pid`&quot; ] ; then
+  echo &quot;$prog: the engine died during startup; last 20 log lines:&quot; &gt;&amp;2
+  tail -20 &quot;$rig/run/vllm.log&quot; &gt;&amp;2
+  echo &quot;$prog: if there is no traceback, check &#39;dmesg -T | grep -i oom&#39;&quot; &gt;&amp;2</code></pre>
+<h4 id="stopping">Stopping</h4>
+<pre><code>$ vllm-t4 stop
+✅ Sent SIGTERM to vLLM (pid 14977). VRAM is released on exit.
+ 
+The T4 stays attached and the VM stays billed — stopping the server is not releasing capacity here.</code></pre>
+<p>VRAM returns to <code>0 MiB, 15360 MiB</code> within seconds. Swap is
+left enabled, since it costs nothing idle and the next start needs
+it.</p>
+<p>The VM and its attached T4 bill by the hour whether vLLM runs or not.
+<code>gcloud compute instances stop gemma4-t4 --zone us-west2-b</code>
+stops the instance charge and keeps both disks, which keep billing at
+the much lower storage rate. Deleting the instance with
+<code>auto-delete=no</code> on the data disk leaves the 250 GB of
+checkpoints for the next VM.</p>
+<h4 id="after-a-reboot">After a Reboot</h4>
+<p>Three things come back on their own and one does not.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b/medium/img/devto-gemma4-t4-vm-deploy-table-4.png"
+alt="Table: Survives a reboot" /></p>
+<p><code>vllm-t4 start</code> re-enables swap every time, so the
+checklist after a reboot is one command. Adding a swap line to
+<code>/etc/fstab</code> makes it survive on its own.</p>
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to build the smallest Compute Engine VM
+that serves Gemma 4 E2B on one Tesla T4, deploy the stack after first
+boot, and document the script that runs it. The key to the solution was
+keeping the rig's <code>tpu.env</code> authoritative for every serving
+value and giving the script only the three things that are host state:
+the swapfile, a detached launch, and waiting for the endpoint. The
+measured results were:</p>
+<ul>
+<li>🟢 <strong>362 s</strong> from <code>vllm-t4 start</code> to a
+healthy endpoint on a warm compile cache, <strong>13371 MiB</strong> of
+15360 claimed</li>
+<li>🟢 <strong>8.02 GiB</strong> of weights and <strong>4.66
+GiB</strong> of KV cache, giving <strong>519,681</strong> tokens and
+31.72x concurrency at 16,384 tokens per request</li>
+<li>🟢 One <code>gcloud</code> command, one apt repository for the
+driver, one pip install, one patch</li>
+<li>⚠️ <code>--maintenance-policy=TERMINATE</code> is required for an
+attached GPU, and stops the VM during host maintenance</li>
+<li>⚠️ 7.8 GB of host RAM needs a <strong>16 GB</strong> swapfile, and
+the <code>swapon</code> does not survive a reboot</li>
+<li>❌ A single <code>df</code> reports the wrong free space for all
+three writes the install makes</li>
+</ul>
+<p>One Tesla T4 on one <code>n1-standard-2</code> VM in
+<code>us-west2-b</code>, Debian 13, vLLM 0.29.0 on torch 2.13.0+cu130,
+driver 615.71.09. The start timing is a single run on a warm
+<code>torch.compile</code> cache; a first start on a fresh VM pays the
+full compilation, which was 112.77 s on this host. The
+<code>gcloud compute instances create</code> command is reconstructed
+from the running instance's metadata and was not re-executed. Throughput
+figures for the two checkpoints are in Part 1.</p>
+<p>The strategy for using MCP for Tesla T4 deployment and benchmarking
+was validated with an incremental step by step approach.</p>
+</body>
+</html>
