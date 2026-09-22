@@ -437,6 +437,15 @@ so composing it with a learned-weight RMSNorm first reweights the channels the r
 which experts fire. **Measured cost of getting this wrong: 0.36 relative error, with router parity tests
 and expert parity tests both still green.** Only end-to-end comparison caught it.
 
+**Small differences compound down this block rather than washing out.** Peano AI's Axon reports the
+same structure from the training side on CUDA: the 26B's sampler-vs-trainer log-prob gap holds near
+0.010 against ~0.005 for dense models, and routing replay, a different training backend, and swapping
+vLLM's fused expert kernel for a plain per-expert loop all leave it where it is. Their account is the
+architecture — two parallel branches summed into a chain of RMSNorms with large weights carry a
+rounding difference forward layer by layer. **Those two numbers are a gap between two CUDA training
+engines and stay theirs**; what carries here is the mechanism, the same one the 0.36 above came out
+of. Source: <https://peano-labs.ai/blog/axon> (2026-06-15).
+
 In the router tail, the per-expert scale is applied **after** renormalization, so the final top-k weights
 do *not* sum to 1. "Fixing" that changes the model.
 
