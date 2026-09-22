@@ -3,7 +3,7 @@ title: "A 4 GB Laptop GPU vs a 6-Core CPU on Gemma 4, Re-Measured in ABBA Order:
 published: false
 description: "Gemma 4 E2B q4_0 served by llama.cpp on one laptop, CPU-only and on a GTX 1650 Ti, rebuilt on CUDA 13.4 and re-measured in CPU, GPU, GPU, CPU order with a temperature gate. The card takes decode by 4.14x, and run order moves the answer by about 2%."
 tags: gemma, llamacpp, cuda, benchmarking
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/devto-cover.71110e1f.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/devto-cover.78380332.jpg
 ---
 
 This article provides a step by step guide to measuring a laptop GPU against the CPU in the same chassis for serving Gemma 4 E2B through llama.cpp, with both builds on a fresh Debian sid toolchain and the passes run in ABBA order so heat cannot pick the winner. A suite of Python MCP tools is built to simplify management of the llama.cpp hosted deployment.
