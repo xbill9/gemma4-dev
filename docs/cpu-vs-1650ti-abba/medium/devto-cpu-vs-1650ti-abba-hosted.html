@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>A 4 GB Laptop GPU vs a 6-Core CPU on Gemma 4, Re-Measured in ABBA Order: 4.1x</title>
+  <meta name="description" content="Gemma 4 E2B q4_0 served by llama.cpp on one laptop, CPU-only and on a GTX 1650 Ti, rebuilt on CUDA 13.4 and re-measured in CPU, GPU, GPU, CPU order with a temperature gate. The card takes decode by 4.14x, and run order moves the answer by about 2%." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/medium/img/devto-cover.71110e1f.jpg" alt="A 4 GB Laptop GPU vs a 6-Core CPU on Gemma 4, Re-Measured in ABBA Order: 4.1x" /></figure>
+<p>This article provides a step by step guide to measuring a laptop GPU
+against the CPU in the same chassis for serving Gemma 4 E2B through
+llama.cpp, with both builds on a fresh Debian sid toolchain and the
+passes run in ABBA order so heat cannot pick the winner. A suite of
+Python MCP tools is built to simplify management of the llama.cpp hosted
+deployment.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p>The GTX 1650 Ti decodes <strong>4.14x</strong> faster than the
+i7-10750H it shares a chassis with, prefills <strong>3.42x</strong>
+faster and finishes requests <strong>3.62x</strong> faster end to end.
+Running the two devices in one order and then the other moves that
+decode ratio from 4.09x to 4.17x, so a single-order benchmark on this
+laptop is off by about 2%.</p>
+<hr />
+<h4 id="what-is-being-measured">What Is Being Measured?</h4>
+<p>The same 3.35 GB quantization-aware GGUF,
+<code>google/gemma-4-E2B-it-qat-q4_0-gguf</code>, served by
+<code>llama-server</code> twice on one laptop: once on the CPU, once on
+the GPU. Both builds come from one llama.cpp commit and the two command
+lines differ by one flag.</p>
+<p>An earlier run of this comparison is published as <a
+href="https://dev.to/gde/a-4-gb-laptop-gpu-beats-a-12-core-cpu-by-43x-on-gemma-4-4150">A
+4 GB Laptop GPU Beats a 6-Core CPU by 4.3x on Gemma 4</a>. This one
+re-measures it after the laptop moved to Debian sid, with three changes:
+a newer llama.cpp commit built on gcc 16.2 and CUDA 13.4, thread flags
+set for this CPU's real core count, and a run order that cancels thermal
+drift.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA GPU with a CUDA driver — here a GTX 1650 Ti with Max-Q
+Design, driver 615.71.09</li>
+<li>The CUDA toolkit — <code>nvcc</code> 13.4 here</li>
+<li><code>cmake</code> and a host compiler CUDA accepts — gcc 16.2.0
+here</li>
+<li>Python 3.10 or newer, the system <code>python3</code>, no
+virtualenv</li>
+<li>The repository cloned, with
+<code>local-llamacpp-1650ti-2b-q4_0/</code> and
+<code>local-llamacpp-cpu-2b-q4_0/</code> side by side</li>
+<li>Claude Code, or any MCP client that speaks stdio</li>
+</ul>
+<hr />
+<h4 id="the-laptop">The Laptop</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/medium/img/devto-cpu-vs-1650ti-abba-table-1.png"
+alt="Table: Machine, CPU, GPU, OS" /></p>
+<p>The CPU and the Max-Q card sit under one cooling system, which is why
+the run order below matters.</p>
+<hr />
+<h4 id="step-1--check-the-toolchain-still-supports-the-card">Step 1 —
+Check the Toolchain Still Supports the Card</h4>
+<p>A distribution upgrade can move the compiler past what CUDA accepts,
+and a CUDA upgrade can drop old GPUs. Both were close here.</p>
+<pre><code>$ nvidia-smi --query-gpu=name,compute_cap,memory.total,driver_version --format=csv
+name, compute_cap, memory.total [MiB], driver_version
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 7.5, 4096 MiB, 615.71.09
+ 
+$ nvcc --list-gpu-arch
+compute_75
+compute_80
+compute_86
+...</code></pre>
+<p>The card is compute capability 7.5, and <code>compute_75</code> is
+the first entry CUDA 13.4 lists. This laptop's GPU is the oldest
+architecture the current toolkit still builds for.</p>
+<pre><code>$ gcc --version
+gcc (Debian 16.2.0-3) 16.2.0
+ 
+$ grep -n &#39;later than 16&#39; /usr/local/cuda/include/crt/host_config.h
+137:#error -- unsupported GNU version! gcc versions later than 16 are not supported! ...</code></pre>
+<p>CUDA 13.4 accepts gcc up to 16, and sid ships 16.2.</p>
+<hr />
+<h4 id="step-2--build-both-devices-from-one-commit">Step 2 — Build Both
+Devices From One Commit</h4>
+<p>Each rig's Makefile carries its own <code>build</code> target. The
+GPU build targets only this card's architecture, sm_75; the CPU build
+turns every GPU backend off.</p>
+<pre><code># local-llamacpp-1650ti-2b-q4_0
+cmake -S ~/llama.cpp -B ~/llama.cpp/build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75 -DGGML_NATIVE=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build ~/llama.cpp/build --config Release -j6 --target llama-server llama-bench
+ 
+# local-llamacpp-cpu-2b-q4_0
+cmake -S ~/llama.cpp -B ~/llama.cpp/build-cpu -DGGML_CUDA=OFF -DGGML_VULKAN=OFF -DGGML_NATIVE=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build ~/llama.cpp/build-cpu --config Release -j6 --target llama-server llama-bench</code></pre>
+<p>Both binaries report the same commit and compiler:</p>
+<pre><code>$ ~/llama.cpp/build/bin/llama-server --version
+version: 0.4.1-dev (build 318, commit f95b0d9)
+built with GNU 16.2.0 for Linux x86_64
+ 
+$ ~/llama.cpp/build-cpu/bin/llama-server --version
+version: 0.4.1-dev (build 318, commit f95b0d9)
+built with GNU 16.2.0 for Linux x86_64</code></pre>
+<p>And only one of them can see the card:</p>
+<pre><code>$ ~/llama.cpp/build/bin/llama-server --list-devices
+Available devices:
+  CUDA0: NVIDIA GeForce GTX 1650 Ti with Max-Q Design (3732 MiB, 3671 MiB free)
+ 
+$ CUDA_VISIBLE_DEVICES= ~/llama.cpp/build-cpu/bin/llama-server --list-devices
+Available devices:
+  (none)</code></pre>
+<hr />
+<h4 id="mag_right-tip-always-give-the-cuda-build-a-job-count">🔎 Tip:
+Always Give the CUDA Build a Job Count</h4>
+<p><code>cmake --build -j</code> with no number starts every CUDA source
+file at once. llama.cpp has about 188 of them, each <code>nvcc</code>
+forks <code>cicc</code> and <code>cudafe++</code>, and a 15 GiB laptop
+runs out of memory. At <code>-j6</code> the full CUDA build peaked at
+4.0 GiB and never touched swap, so the limit costs nothing. Both
+Makefiles pass <code>-j$(BUILD_JOBS)</code> with a default of 6.</p>
+<p>After a compiler or CUDA upgrade, delete the build directory before
+configuring. A stale <code>CMakeCache.txt</code> keeps the old compiler,
+and <code>/usr/local/cuda</code> is a symlink, so the cached path looks
+current.</p>
+<hr />
+<h4 id="step-3--serve-one-device-at-a-time-on-the-same-port">Step 3 —
+Serve One Device at a Time on the Same Port</h4>
+<p>Both devices serve on <code>127.0.0.1:8080</code>, so the endpoint,
+the prompts and the benchmark script stay fixed while the device changes
+underneath. The flags match except for <code>-ngl</code>, the number of
+layers offloaded to the GPU:</p>
+<pre><code>llama-server -m gemma-4-E2B_q4_0-it.gguf --host 127.0.0.1 --port 8080 \
+  -ngl {0|99} -c 8192 -ctk f16 -ctv f16 -fa 1 -t 6 -tb 12 --parallel 1 --metrics</code></pre>
+<p><code>-t 6 -tb 12</code> matches the CPU's six physical cores and
+twelve threads, and both devices get it. GPU decode barely responds to
+thread count, so matching them costs the GPU nothing and removes one
+difference between the two runs.</p>
+<p>For the GPU side there is a small wrapper,
+<code>llamacpp-1650ti</code>, that reads these values out of the rig's
+<code>tpu.env</code>, starts the server in the background and checks
+which device answered:</p>
+<pre><code>$ llamacpp-1650ti start
+llamacpp-1650ti: starting /home/xbill/models/gemma-4-E2B-it-qat-q4_0/gemma-4-E2B_q4_0-it.gguf on 127.0.0.1:8080 (-ngl 99)
+llamacpp-1650ti: pid 88166, log /home/xbill/gemma4-dev/local-llamacpp-1650ti-2b-q4_0/run/llama-server.log
+llamacpp-1650ti: waiting up to 180s for http://127.0.0.1:8080/health
+     0s  VRAM 3 MiB, 0 %
+llamacpp-1650ti: healthy after 2s -- http://127.0.0.1:8080
+llamacpp-1650ti: device=gpu · pid=88166 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server
+ 
+$ llamacpp-1650ti stop
+llamacpp-1650ti: sent SIGTERM to pid 88166; VRAM is released on exit</code></pre>
+<p>The wrapper refuses to start if anything already holds the port, and
+refuses to stop the CPU build if that is what holds it.</p>
+<hr />
+<h4 id="step-4--read-the-device-off-the-running-process">Step 4 — Read
+the Device Off the Running Process</h4>
+<p>Both devices answer the same URL with the same JSON, so the HTTP
+response cannot say which one produced it. The rigs'
+<code>attest.py</code> reads it from <code>/proc</code> instead:
+<code>/proc/&lt;pid&gt;/exe</code> for the binary,
+<code>/proc/&lt;pid&gt;/maps</code> for the GPU libraries it has loaded,
+<code>/proc/&lt;pid&gt;/cmdline</code> for the real <code>-ngl</code>.
+The benchmark script refuses to start if the answer is the wrong device,
+and writes it at the top of every log:</p>
+<pre><code>arm: device=cpu · pid=72478 · -ngl 0 · /home/xbill/llama.cpp/build-cpu/bin/llama-server
+arm: device=gpu · pid=74308 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server</code></pre>
+<p><code>maps</code> is used because llama.cpp loads its CUDA backend at
+runtime, where <code>ldd</code> does not see it. Each report also
+records the SHA-256 of the executable that ran:
+<code>9c88c7821fcc11a6…</code> for the CPU build and
+<code>9f2a8b0b6ed5365d…</code> for the GPU build, the same on both
+passes of each.</p>
+<p>The MCP servers expose the same check as a tool, so an agent that
+starts a server can confirm what it started before it measures
+anything.</p>
+<hr />
+<h4 id="step-5--run-in-abba-order-with-a-temperature-gate">Step 5 — Run
+in ABBA Order With a Temperature Gate</h4>
+<p>Each device gets two passes, in the order CPU, GPU, GPU, CPU. Each
+device then has one early pass and one late pass, so a slow drift in the
+laptop's temperature over the session affects both equally. Before every
+pass the script waits at least 120 seconds and until the CPU package is
+at or below 50 °C and the GPU at or below 45 °C.</p>
+<pre><code>13:20:12 pkg=38C gpu=36C throttle=35105 START cpu pass1
+13:27:57 pkg=85C gpu=52C throttle=44709 END cpu pass1 rc=0
+13:30:00 pkg=45C gpu=40C throttle=44730 START gpu pass1
+13:32:12 pkg=79C gpu=56C throttle=45150 END gpu pass1 rc=0
+13:34:15 pkg=42C gpu=39C throttle=45150 START gpu pass2
+13:36:26 pkg=78C gpu=55C throttle=48034 END gpu pass2 rc=0
+13:38:29 pkg=41C gpu=39C throttle=48060 START cpu pass2
+13:46:31 pkg=82C gpu=53C throttle=67346 END cpu pass2 rc=0</code></pre>
+<p><code>throttle</code> is the CPU package's cumulative
+thermal-throttle counter. CPU pass 1 added 9,604 events, the two GPU
+passes 420 and 2,879, and CPU pass 2 added 19,279. A CPU pass takes
+about eight minutes and a GPU pass about two.</p>
+<p>Each pass is the same sweep: four prompt lengths by two output
+lengths, three repeats per cell, one request at a time.</p>
+<pre><code>python3 sweep.py --base http://127.0.0.1:8080/v1 --out &lt;run&gt;/passN --rig &lt;rig&gt; --expect-device &lt;cpu|gpu&gt;</code></pre>
+<hr />
+<h4 id="the-result">The Result</h4>
+<p>Each figure is the mean of the two passes' per-cell medians. Decode
+is the token rate measured off the response stream; TTFT is time to
+first token.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/medium/img/devto-cpu-vs-1650ti-abba-table-2.png"
+alt="Table: in tok, out tok, CPU decode, GPU decode, GPU lead, CPU TTFT ms, GPU TTFT ms, GPU lead" /></p>
+<p>Medians over the eight cells: decode <strong>4.14x</strong>, prefill
+<strong>3.42x</strong>, end to end <strong>3.62x</strong>.</p>
+<p>Decode stays nearly flat on both devices across a 21x range of prompt
+length (94 to 1959 tokens), from 18.31 down to 16.14 tok/s on the CPU
+and from 71.89 down to 68.22 on the GPU, while TTFT grows in proportion
+to the prompt on both. Decode reads the model once per token and is
+limited by memory bandwidth; prefill does arithmetic over the whole
+prompt. The GPU wins both, by different margins, and the prefill margin
+grows with the prompt from 2.84x to 3.56x.</p>
+<hr />
+<h4 id="is-the-difference-bigger-than-the-noise">Is the Difference
+Bigger Than the Noise?</h4>
+<p>By an order of magnitude. The decode ratio stays between 3.93x and
+4.30x in every cell. The noise is the drift between a device's two
+passes:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/medium/img/devto-cpu-vs-1650ti-abba-table-3.png"
+alt="Table: decode drift, pass 1 to pass 2, worst cell" /></p>
+<p>Within a pass, the three repeats of a cell spread by at most 1.14% on
+the GPU. On the CPU they spread by at most 2.69% in pass 1 and
+<strong>14.05%</strong> in pass 2, which had twice the throttle events.
+CPU time to first token also rose in pass 2, by up to 7.4% at the
+longest prompt, while the GPU's moved by at most 0.9%.</p>
+<p>All of the measurable noise in this comparison comes from the CPU,
+and it tracks heat.</p>
+<hr />
+<h4 id="what-is-run-order-worth">What Is Run Order Worth?</h4>
+<p>Each ordering can be read on its own. CPU pass 1 against GPU pass 1
+is the CPU-first design; GPU pass 2 against CPU pass 2 is GPU-first.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/medium/img/devto-cpu-vs-1650ti-abba-table-4.png"
+alt="Table: order, decode ratio, prefill ratio" /></p>
+<p>Running the CPU first understates the GPU's lead, because the CPU
+pass runs while the laptop is still cool and the GPU pass inherits its
+heat. On this laptop the effect is about 2% of the ratio. ABBA order
+removes it for the cost of one extra pass per device.</p>
+<hr />
+<h4 id="mag_right-tip-count-tokens-not-stream-chunks">🔎 Tip: Count
+Tokens, Not Stream Chunks</h4>
+<p>llama.cpp can put more than one token in a streamed chunk, so a
+decode rate computed from chunk timing undercounts. Recomputed as
+completion tokens over the measured decode time, the rates read
+16.77-20.27 tok/s on the CPU and 69.87-79.58 on the GPU, and the median
+ratio stays at <strong>4.14x</strong>. Both devices run the same server
+code, so the undercount cancels in the ratio. It does not cancel when
+comparing either absolute figure against a different server.</p>
+<hr />
+<h4 id="mag_right-tip-confirm-the-prompt-cache-stayed-cold">🔎 Tip:
+Confirm the Prompt Cache Stayed Cold</h4>
+<p><code>llama-server</code> reuses the key/value cache for a prompt
+prefix it has seen, which makes time to first token look faster than
+prefill really is. Each prompt starts with a unique prefix, and
+<code>--metrics</code> exposes a counter that confirms it:</p>
+<pre><code>cpu pass1: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0
+cpu pass2: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0
+gpu pass1: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0
+gpu pass2: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0</code></pre>
+<p>None of the 28,553 prompt tokens in any pass came from the cache.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/cpu-vs-1650ti-abba/medium/img/devto-cpu-vs-1650ti-abba-table-5.png"
+alt="Table: GTX 1650 Ti, i7-10750H" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>The GPU, for any interactive use of this model on this laptop. It is
+about four times faster on every prompt length measured, it is steadier,
+and it heats the shared package far less than the CPU does for the same
+work.</p>
+<p>The CPU build is still worth keeping: it serves the same model at
+16-18 tok/s when the card is busy or absent. It is also the device to
+benchmark with the most care, because its numbers move with the laptop's
+temperature.</p>
+<hr />
+<h4 id="how-does-this-compare-with-the-earlier-run">How Does This
+Compare With the Earlier Run?</h4>
+<p>The earlier run measured 4.27x decode and 3.63x prefill. Three things
+changed at once — the llama.cpp commit (<code>c6824a9</code> to
+<code>f95b0d9</code>), the thread flags (<code>-t 4 -tb 8</code> to
+<code>-t 6 -tb 12</code>) and the run order — so the difference between
+the two results cannot be assigned to any one of them. The more-threads
+explanation fits the direction, since CPU time to first token fell and
+the prefill ratio narrowed with it, but this run does not isolate
+it.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to re-measure a 4 GB laptop GPU against
+the 6-core CPU in the same chassis for serving Gemma 4 E2B, after a
+toolchain upgrade and with thermal drift controlled. The key to the
+solution was ABBA ordering with a temperature gate, identical flags on
+both devices apart from <code>-ngl</code>, and reading the serving
+device from <code>/proc</code> on every pass. The results were:</p>
+<ul>
+<li>🟢 GPU decode is <strong>4.14x</strong> the CPU, 3.93x to 4.30x
+across every cell</li>
+<li>🟢 GPU prefill is <strong>3.42x</strong>, growing with prompt
+length; end to end is <strong>3.62x</strong></li>
+<li>🟢 The GTX 1650 Ti still builds and runs on CUDA 13.4 with gcc 16.2,
+as the oldest architecture that toolkit supports</li>
+<li>⚠️ Run order is worth about 2% of the ratio here: 4.09x CPU-first
+against 4.17x GPU-first</li>
+<li>⚠️ The CPU carries all of the measurable noise, up to 9.3% between
+passes and 14% within one, and it follows the throttle count</li>
+<li>❌ The earlier 4.27x and this 4.14x cannot be compared directly,
+because commit, threads and order all changed together</li>
+</ul>
+<p>Scope: one laptop, one GGUF, llama.cpp <code>f95b0d9</code> built
+twice with gcc 16.2 and CUDA 13.4, eight paired cells, two passes per
+device in ABBA order, three repeats per cell per pass, one request at a
+time, prompt cache verified cold, page cache warm throughout.</p>
+<p>The strategy for using MCP for local accelerator comparison was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Repository: <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></li>
+<li>GPU rig: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0</a></li>
+<li>CPU rig: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-cpu-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-cpu-2b-q4_0</a></li>
+<li>Run report: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-22-paired-sweep-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-22-paired-sweep-1650ti/REPORT.md</a></li>
+<li>Earlier run: <a
+href="https://dev.to/gde/a-4-gb-laptop-gpu-beats-a-12-core-cpu-by-43x-on-gemma-4-4150">A
+4 GB Laptop GPU Beats a 6-Core CPU by 4.3x on Gemma 4</a></li>
+<li>Model: <a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf">https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf</a></li>
+<li>llama.cpp: <a
+href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+</ul>
+</body>
+</html>

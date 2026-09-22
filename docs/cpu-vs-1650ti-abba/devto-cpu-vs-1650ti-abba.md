@@ -201,7 +201,7 @@ python3 sweep.py --base http://127.0.0.1:8080/v1 --out <run>/passN --rig <rig> -
 
 Each figure is the mean of the two passes' per-cell medians. Decode is the token rate measured off the response stream; TTFT is time to first token.
 
-| in tok | out tok | CPU decode | GPU decode | 🥇 | CPU TTFT ms | GPU TTFT ms | 🥇 |
+| in tok | out tok | CPU decode | GPU decode | GPU lead | CPU TTFT ms | GPU TTFT ms | GPU lead |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 94 | 32 | 18.31 | 71.89 | **3.93x** | 1084 | 381 | **2.84x** |
 | 94 | 128 | 17.96 | 71.57 | **3.98x** | 1171 | 385 | **3.04x** |
