@@ -12,7 +12,7 @@ a single completion. Thread and affinity levers swept with `llama-bench`
 | --- | --- |
 | Platform | `local` — no control plane; the hardware is in this machine |
 | Runtime | `llamacpp` — one process, one GGUF named on the command line |
-| Hardware | `cpu` — no accelerator; i7-1360P, AVX2 + AVX-VNNI, 15 GiB RAM |
+| Hardware | `cpu` — no accelerator; i7-10750H, 6C/12T, AVX2 (no AVX-VNNI), 15 GiB RAM |
 | Model | `2b` — `google/gemma-4-E2B-it` |
 | Encoding | `q4_0` — the QAT GGUF export |
 

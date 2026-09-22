@@ -10,21 +10,31 @@ imported across a rig boundary. Read this file before changing anything.
 GPU, no control plane, no cloud. One process, one GGUF file named on the command
 line.
 
-**STATUS 2026-09-16: serving, and benchmarked against the GPU arm.** llama.cpp is
-built CPU-only at `~/llama.cpp/build-cpu` (commit `82324fc50`, recorded as
-`LLAMA_CPP_COMMIT`), the GGUF is at `MODEL_PATH`, and `llama-server` came up on the
-`tpu.env` defaults and answered correctly. One datapoint: prompt 25 tok, completion
-328 tok, **24.8 tok/s end-to-end** at the guessed `-t 4`/`-tb 8`. That is a smoke
-test, not a measurement. The thread and affinity levers **have** since been swept
-(`benchmarks/runs/2026-09-16-thread-sweep-cpu`, 18 cells, `llama-bench`), which
-kept both `tpu.env` thread values and found CPU affinity to be the real lever at
-1.61x on prefill. `sweep.py` has now run: `benchmarks/runs/2026-09-16-paired-sweep-cpu`,
-8/8 cells, the CPU arm of the first controlled A/B here. **Decode is 15.66-17.61
-tok/s and flat across a 21x range of prompt length** (bandwidth-bound per token),
-while TTFT is linear in it — 1.1 s at 94 tokens to 23.9 s at 1959. The GPU arm is
-4.27x on decode, 3.63x on prefill, 3.81x end-to-end. Nothing was pinned, so the
-CPU prefill here is not its best: affinity is worth 1.61x on this die, which makes
-that 3.63x an UPPER bound on the device gap.
+**STATUS 2026-09-22: serving on `f95b0d9`. HOST HARDWARE CORRECTED, SWEEP
+QUARANTINED, NO VALID ABSOLUTE NUMBERS.** llama.cpp is built CPU-only at
+`~/llama.cpp/build-cpu`, rebuilt from clean on 2026-09-22 after the host moved to
+Debian sid (gcc 16.2, CUDA 13.4); both arms are on `f95b0d9`, 100 commits on from
+the `c6824a9` they were paired at. Verified: this arm lists **no devices**, the
+GPU arm lists `CUDA0`.
+
+**The CPU in this rig's own documentation was not the CPU in this machine.** It
+claimed an i7-1360P, 12 cores / 16 threads, hybrid 4 P + 8 E. It is an
+**i7-10750H, 6 cores / 12 threads, homogeneous** — see the Host table. That
+invalidates the interpretation of the 18-cell thread/affinity sweep, whose
+headline (E-core stragglers, a 1.61x affinity swing) describes a die that is not
+here; the run is kept and quarantined. `THREADS`/`THREADS_BATCH` are re-derived to
+`6`/`12` and spot-checked, not swept.
+
+`benchmarks/runs/2026-09-16-paired-sweep-cpu` (8/8 cells, the CPU arm of the first
+controlled A/B here) still stands as a **paired ratio** — decode flat at
+15.66-17.61 tok/s across a 21x range of prompt length, TTFT linear in it, 1.1 s at
+94 tokens to 23.9 s at 1959, with the GPU arm 4.27x on decode and 3.63x on
+prefill. The ratio is what survives; its **absolute** CPU figures carry the same
+thermal problem as everything else here, and the old note that affinity made 3.63x
+an "upper bound" is withdrawn with the 1.61x it rested on.
+
+**Nothing measured in this rig came off the binary now installed.** Re-run before
+quoting any figure.
 
 ## This rig is one arm of a control
 
@@ -81,9 +91,12 @@ trusting `-ngl 0` alone.
 
 ### Running the pair
 
-Order effects are real on this host and are **not** yet controlled for: an
-i7-1360P and a Max-Q card share one thermal envelope, so the CPU arm saturating
-12 cores leaves the package hot and downclocked for whatever runs next. Page
+Order effects are real on this host and are **not** yet controlled for — and as
+of 2026-09-22 they are known to be *larger than any lever measured here*. A
+6-core i7-10750H and a Max-Q card share one thermal envelope, so the CPU arm
+saturating all 12 threads leaves the package hot and downclocked for whatever runs
+next. Measured: 28,271 package throttle events, 74 °C before a benchmark and 92 °C
+after, and an identical config re-run cold moved **19% on decode**. Page
 cache is the same kind of problem from the other side — this arm reads the Q4_0
 body every token across a 3.35 GB mmap, while the GPU arm loads to VRAM once.
 Neither is measured. Until they are: fix an order, cool down between arms, keep
@@ -92,7 +105,9 @@ rather than assuming it did not matter. A-B-B-A detects the drift if you can
 afford four runs.
 
 Do not start an arm while anything else is loading the machine. A model load was
-lost to an OOM on 2026-09-16 because a 12-way CUDA build was running beside it.
+lost to an OOM on 2026-09-16 because a 12-way CUDA build was running beside it,
+and the CUDA build OOMed again on 2026-09-22 for a related reason — see
+"Building llama.cpp here" below.
 
 ### `start_model_server` could not leave a server running (fixed 2026-09-16)
 
@@ -138,64 +153,117 @@ number, so none of the three guards is a `tpu.env` value:
 `make build` makes a `GGML_CUDA=OFF` build in its own `build-cpu/` directory so it
 cannot be confused with a GPU build in the same checkout.
 
-## Host — MEASURED-STATIC 2026-09-15
+## Building llama.cpp here
+
+**`-j` WITHOUT A NUMBER IS WHAT OOMs THIS MACHINE.** `cmake --build … -j` with no
+value passes an unbounded `-j` to make, which will start **all 188 CUDA
+translation units at once**; each `nvcc` forks `cicc` and `cudafe++`, and 15 GiB
+of RAM does not survive it. That is what killed the build on 2026-09-22 — the
+`dmesg` victims are `cicc`, not the linker — and it is the same shape as the
+2026-09-16 model-load OOM. Both Makefiles now pass an explicit `-j`; do not
+"simplify" it back. MEASURED 2026-09-22: the full CUDA rebuild at `-j6` peaks at
+**4.0 GiB and never touches swap**, so bounding it is not a tradeoff.
+
+Swap was raised to 47 GiB the same day (15.7 G partition + 32 G `/swapfile`,
+in `/etc/fstab`). It is headroom, **not the fix** — at `-j6` none of it is used.
+
+**Toolchain, 2026-09-22 (Debian sid / forky, kernel 7.2.6):** gcc **16.2.0**,
+CUDA **13.4**. Two things to know before touching either:
+
+- **CUDA 13.4's host-compiler ceiling is gcc 16** (`crt/host_config.h`: "later
+  than 16 are not supported"). sid is inside it by exactly one version. The next
+  gcc will need `-allow-unsupported-compiler` or a pinned `gcc-14`, which is
+  installed.
+- **`sm_75` is now the LOWEST arch CUDA ships.** `nvcc --list-gpu-arch` starts at
+  `compute_75`, and the 1650 Ti is 7.5 — right on the floor. The next major CUDA
+  is the one to expect to strand this card.
+
+**Reconfigure from clean after a toolchain change.** Both build directories' stale
+`CMakeCache.txt` still recorded gcc 14 and CUDA 13.3; `/usr/local/cuda` is a
+symlink, so the cached path looked current while the detected compiler behind it
+was not. Both arms were wiped and re-configured rather than rebuilt in place.
+
+## Host — RE-MEASURED 2026-09-22
 
 | | |
 | :--- | :--- |
-| CPU | 13th Gen Intel Core i7-1360P, 12 cores / 16 threads |
-| Topology | hybrid: 4 P-cores with SMT (logical 0-7), 8 E-cores (logical 8-15) |
-| SIMD | `avx avx2 avx_vnni` — **no AVX-512** |
-| RAM | 15 GiB total, ~8 GiB available when checked |
-| GPU | **GTX 1650 Ti, 4096 MiB, driver 615.71.09** — present, and the other arm |
+| Machine | Lenovo **Yoga 9 15IMH5** (DMI 82DE) |
+| CPU | Intel Core **i7-10750H** (Comet Lake), **6 cores / 12 threads** |
+| Topology | **homogeneous, no P/E split.** SMT siblings pair `(0,6) (1,7) … (5,11)` |
+| SIMD | `avx avx2` — **no AVX-512 and no `avx_vnni`** |
+| RAM | 15 GiB total, ~13 GiB available when checked |
+| Swap | 15.7 G partition + 32 G `/swapfile` = **47 GiB** (added 2026-09-22) |
+| GPU | **GTX 1650 Ti Max-Q, 4096 MiB, driver 615.71.09** — present, and the other arm |
+| Thermals | throttles hard: 28,271 package throttle events, 74 → 92 °C under load |
 
 The `cpu_status` tool re-reads all of this from `/proc` and `/sys`.
 
-**The GPU row was wrong until 2026-09-16** — it read "none (`/dev/nvidia*`
-absent)". `/dev/nvidia0` is there and `nvidia-smi` reports the card. That error
-pointed the wrong way: it made the CPU-only guards look like belt-and-braces on a
-machine with no GPU to hit, when they are in fact the only thing keeping this arm
-honest. They do work — `start_model_server` refuses the GPU build, verified.
+**Every CPU row above was wrong until 2026-09-22.** The table read "i7-1360P, 12
+cores / 16 threads, hybrid 4 P + 8 E at logical 0-15, `avx_vnni`". The kernel says
+a homogeneous 6-core i7-10750H with 12 logical CPUs and no VNNI;
+`/sys/devices/cpu_core` and `/sys/devices/cpu_atom` **do not exist here**, and that
+absence is the P/E test. DMI confirms a Yoga 9 15IMH5, which is an i7-10750H
+machine — no 1360P laptop ships a GTX 1650 Ti Max-Q, so the two rows never fitted
+each other.
 
-`local-pytorch-cpu-2b/CLAUDE.md` says this machine has 6 physical cores and six SMT
-siblings. `lscpu` and `/sys/devices/cpu_{core,atom}` disagree (12 cores, only the
-4 P-cores have SMT). Trust the kernel, and do not size threads from that sentence.
+**This is the second time this table pointed the wrong way, and the expensive
+one.** The GPU row was wrong until 2026-09-16 — it read "none (`/dev/nvidia*`
+absent)", which made the CPU-only guards look like belt-and-braces on a machine
+with no GPU to hit, when they are the only thing keeping this arm honest. They do
+work — `start_model_server` refuses the GPU build, verified. The CPU rows were
+worse: a whole sweep was interpreted through a die that is not here.
 
-## Nothing tuned on the GPU transfers
+**`local-pytorch-cpu-2b/CLAUDE.md` was right all along** and this file overruled
+it. It says 6 physical cores and six SMT siblings; that is exactly what `lscpu`
+reports. The instruction here used to be "trust the kernel" while quoting numbers
+that were not the kernel's. Trust the kernel — and check that you actually read
+it, rather than a sibling's inherited copy.
 
-Every lever the 1650ti sibling measured was measured against a CUDA device. Two
-have since been measured here and are marked inline below; **`KV q8_0` and `-fa 1`
-remain UNMEASURED on this host.** The sweep also found a lever the sibling never
-had — CPU affinity — which matters more than either.
+## Nothing tuned on the GPU transfers — and nothing swept here survived either
 
-- **Threads are NOT the main lever — MEASURED 2026-09-16, this file predicted the
-  opposite.** Decode spans only 22.97-25.58 t/s across `-t` 4/8/12/16,
-  non-monotonic, best cell 0.9% over the `-t 4` default and inside the error bars.
-  Decode is memory-bandwidth bound and more cores add no bandwidth, so threads are
-  nearly as much of a no-op as on the GPU sibling — for a different reason.
-  `THREADS=4` and `THREADS_BATCH=8` both survive the sweep: 4 is within noise of
-  the best decode cell, and 8 **pinned to the P-core logical threads** is the
-  fastest prefill cell at 139.77 t/s, vindicating the `tpu.env` rationale.
-  Run: `benchmarks/runs/2026-09-16-thread-sweep-cpu/`.
-- **CPU affinity is the real lever, and nothing here sets it.** Prefill spans
-  86.61-139.77 t/s — a **1.61x swing** decided by *which* cores run it, not how
-  many threads. **E-cores are stragglers**: 4 P-cores alone prefill at 135.52, and
-  adding all 8 E-cores DROPS that to 116.77 (-13.8% for 8 extra cores), because
-  llama.cpp splits work evenly and every barrier waits on the slowest thread.
-  E-cores alone are 86.61 pp / 19.17 tg. SMT, by contrast, is neutral for prefill
-  (+3.1%, error bars overlap, same 4 physical cores) and costs decode 5.6%.
-  **A mask must never become a `tpu.env` key.** `0x55` is a fact about this die,
-  not a setting — it means "one thread per P-core" only on a host with 4 SMT
-  P-cores at logical 0-7. Elsewhere it silently pins to the wrong cores. Derive it
-  from sysfs the way `cpu_status` already does: the prefill set is
-  `/sys/devices/cpu_core/cpus` (absent ⇒ homogeneous ⇒ online CPUs), the decode set
-  is the lowest of each distinct `thread_siblings_list` within it, mask is
-  `sum(1 << cpu)`. On this host that derives `0xFF` and `0x55`, the two masks
-  measured, and it degrades correctly when there is no hybrid split and no SMT.
-  `THREADS`/`THREADS_BATCH` share the defect in milder form: 4 and 8 are the sizes
-  of those two derived sets, frozen as integers. `server.py` passes no affinity
-  flags, still gated on evidence rather than design — **engine-level only**
-  (`llama-bench`, no HTTP path), and the prefill win is invisible to a short
-  prompt, so it is unconfirmed end-to-end.
+Every lever the 1650ti sibling measured was measured against a CUDA device.
+**`KV q8_0` and `-fa 1` remain UNMEASURED on this host.** The two that were
+briefly believed measured here were interpreted through the wrong CPU and are
+quarantined; what replaces them is weaker, and honestly so.
+
+- **The 2026-09-16 thread/affinity sweep is QUARANTINED (2026-09-22).** Its 18
+  cells describe a 4 P-core + 8 E-core die. This host is a homogeneous 6-core
+  i7-10750H. The run's own `results/topology.json` records 16 online CPUs,
+  `hybrid: true`, 4 perf cores and an `0xFF00` "E-cores only" mask; its
+  `topology.py`, re-run here, emits 12 CPUs, `hybrid: 0`, 6 cores and an **empty**
+  efficiency set — that cell cannot exist on this machine. Everything downstream
+  goes with it: "E-cores are stragglers", the **1.61x affinity swing**, and the
+  claim that `THREADS=4`/`THREADS_BATCH=8` were vindicated. `0x55` on this die is
+  cpus 0,2,4,6 — and cpu6 is the SMT **sibling** of cpu0, so it pins to 3 physical
+  cores with one doubled. Run kept, not deleted:
+  `benchmarks/runs/2026-09-16-thread-sweep-cpu/` with a quarantine header.
+- **Threads: direction only, and the direction is the ordinary one.** Spot-check
+  2026-09-22 (llama-bench, f95b0d9, pp512/tg128, r=2, one invocation so the cells
+  share a thermal state): prefill 78.74 → 89.32 → 93.42 t/s at `-t` 4/6/12, decode
+  17.72 → 17.53 → 15.54. Prefill scales with threads (+18.6%), decode does not and
+  SMT costs it (-12.3% at 12). That is the expected bandwidth-bound decode story,
+  and it is why `THREADS=6` (physical cores) and `THREADS_BATCH=12` (logical) are
+  now the derived values. It is **not** a sweep.
+- **Affinity is now an open question, not the answer.** `-t 6 -C 0x3F` measured
+  pp512 94.32 against 89.32 unpinned — then the *same cell* re-run cold measured
+  83.98. See the thermal bullet; the drift is bigger than the effect.
+- **THE REAL FINDING OF 2026-09-22: this host cannot support absolute numbers as
+  it stands.** It logs **28,271 package throttle events**, sits at 74 °C before a
+  benchmark and 92 °C after, and an identical config re-run moved **19% on decode**
+  (tg128 17.70 → 14.29). Run-to-run drift exceeds every lever anyone has tried to
+  measure here. `CLAUDE.md` already warned that order effects "are real on this
+  host and are **not** yet controlled for" — that warning is now the headline, not
+  a caveat. Before any number from this rig is quoted: fixed cell order, cooldown
+  to a stated temperature between cells, interleaved A-B-B-A, and the thermal log
+  recorded in the report.
+- **The derivation rule survives; every mask in it was wrong.** A hex mask is a
+  fact about one die, never a `tpu.env` key — that part was always right, and is
+  exactly why the frozen `0xFF`/`0x55` did damage. From sysfs, as `cpu_status`
+  already does: prefill set is `/sys/devices/cpu_core/cpus` (absent ⇒ homogeneous
+  ⇒ online CPUs), decode set is the lowest of each distinct
+  `thread_siblings_list` within it, mask is `sum(1 << cpu)`. On **this** host that
+  derives `0xFFF` and `0x3F`. `server.py` still passes no affinity flags.
+
 - **KV `q8_0` was a 12% decode loss on CUDA.** Whether AVX2 dequant costs the same
   is open. `f16` is kept because the KV is ~60 MiB and memory is not scarce.
 - **`-fa 1` was +4.8% on CUDA.** Unknown on CPU. Every cell of the 2026-09-16

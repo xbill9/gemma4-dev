@@ -13,6 +13,12 @@ SKILL_NAME ?= $(notdir $(CURDIR))-management
 LLAMA_CPP_REPO ?= https://github.com/ggml-org/llama.cpp
 MODEL_DIR = $(dir $(MODEL_PATH))
 
+# NEVER pass a bare `-j`. `cmake --build -j` with no value hands make an UNBOUNDED
+# job count, which starts every translation unit at once and OOMs this 15 GiB host
+# — that is what killed the CUDA build on 2026-09-22 (dmesg victims: cicc). This
+# is a CPU-only build, so nproc is a safe default; override with BUILD_JOBS=N.
+BUILD_JOBS ?= $(shell nproc)
+
 .PHONY: all help install build download test lint clean serve stop status metrics query info bench-validate
 
 all: help
@@ -40,13 +46,16 @@ install:
 	python3 -m pip install -r requirements.txt
 
 # A separate build directory from any GPU build, so the two cannot be confused.
-# GGML_NATIVE=ON targets this host's AVX2/AVX-VNNI; the binary is not portable.
+# GGML_NATIVE=ON targets this host's AVX2; the binary is not portable. (It does NOT
+# target AVX-VNNI: this host is an i7-10750H and has none — corrected 2026-09-22.)
+# After a toolchain change, DELETE build-cpu first: a stale CMakeCache.txt keeps the
+# old compiler, and /usr/local/cuda being a symlink hides that from the cached path.
 # cmake is pip-installable into the system python3 if it is missing.
 build:
 	@command -v cmake >/dev/null || { echo "cmake not found; install with: pip install cmake"; exit 1; }
 	@test -d $(LLAMA_CPP_DIR) || git clone $(LLAMA_CPP_REPO) $(LLAMA_CPP_DIR)
 	cmake -S $(LLAMA_CPP_DIR) -B $(LLAMA_CPP_DIR)/build-cpu -DGGML_CUDA=OFF -DGGML_VULKAN=OFF -DGGML_NATIVE=ON -DCMAKE_BUILD_TYPE=Release
-	cmake --build $(LLAMA_CPP_DIR)/build-cpu --config Release -j --target llama-server llama-bench
+	cmake --build $(LLAMA_CPP_DIR)/build-cpu --config Release -j$(BUILD_JOBS) --target llama-server llama-bench
 	@echo "built at commit $$(git -C $(LLAMA_CPP_DIR) rev-parse --short HEAD) — record it as LLAMA_CPP_COMMIT in tpu.env"
 
 # This repo is PUBLIC, unlike most Google checkpoints: on 2026-09-16 `hf download`

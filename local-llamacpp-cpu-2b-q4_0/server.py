@@ -24,9 +24,17 @@ alternately so that the device is the only thing that differs. Nothing in an HTT
 response says which arm answered, so the arm is read off the running process --
 see attest.py, which every status and query path here goes through.
 
-STATUS 2026-09-16: SERVING. One smoke test (328 tokens, 24.8 tok/s end-to-end)
-and an 18-cell llama-bench thread sweep. No serving benchmark yet: sweep.py has
-never run here and benchmarks/reports/ is empty.
+STATUS 2026-09-22: SERVING on llama.cpp f95b0d9, rebuilt from clean after the host
+moved to Debian sid (gcc 16.2, CUDA 13.4). This arm lists no compute devices; the
+GPU arm lists CUDA0.
+
+THE HOST CPU WAS MISIDENTIFIED UNTIL 2026-09-22. This rig documented an i7-1360P
+with a hybrid 4P+8E topology; the machine is a homogeneous 6-core/12-thread
+i7-10750H with no avx_vnni. The 18-cell thread/affinity sweep was interpreted
+through that wrong die and is quarantined -- THREADS/THREADS_BATCH are now derived
+from real topology (6/12) and spot-checked, not swept. The host also throttles hard
+enough that an identical config re-run cold moved 19% on decode, so no absolute
+figure from this rig is quotable without a cooldown protocol.
 """
 
 import asyncio
@@ -64,8 +72,11 @@ ENDPOINT = os.environ.get("ENDPOINT", f"http://{HOST}:{PORT}")
 CONTEXT_SIZE = os.environ.get("CONTEXT_SIZE", "8192")
 KV_CACHE_TYPE = os.environ.get("KV_CACHE_TYPE", "f16")
 FLASH_ATTENTION = os.environ.get("FLASH_ATTENTION", "1")
-THREADS = os.environ.get("THREADS", "4")
-THREADS_BATCH = os.environ.get("THREADS_BATCH", "8")
+# 6 = physical cores, 12 = logical, on this host's i7-10750H. These mirror tpu.env,
+# which is the source of truth; they were 4/8, derived from a 4P+8E die this
+# machine is not. Keep them agreeing with tpu.env.
+THREADS = os.environ.get("THREADS", "6")
+THREADS_BATCH = os.environ.get("THREADS_BATCH", "12")
 PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
 METRICS = os.environ.get("METRICS", "0")
 
@@ -205,11 +216,14 @@ async def cpu_status() -> str:
         f"- **SIMD:** {' '.join(facts['simd']) or 'none reported'}",
         f"- **RAM:** {facts['mem_available_gib']:.2f} GiB available of {facts['mem_total_gib']:.2f} GiB",
         f"- **Threads configured:** decode `-t {THREADS}`, prefill `-tb {THREADS_BATCH}` "
-        f"(SWEPT 2026-09-16, 18 cells — both survive, but thread count is a WEAK lever: "
-        f"decode spans only 22.97-25.58 t/s over -t 4/8/12/16)",
-        "- **CPU affinity:** not set, and it is the LARGEST measured lever — prefill "
-        "spans 86.61-139.77 t/s (1.61x) by which cores run it. E-cores are stragglers: "
-        "4 P-cores prefill at 135.52, adding all 8 E-cores DROPS it to 116.77.",
+        f"(DERIVED from this host's topology — physical cores for decode, logical for "
+        f"prefill — and spot-checked 2026-09-22, NOT swept)",
+        "- **CPU affinity:** not set. The 2026-09-16 sweep that called it the largest "
+        "lever is QUARANTINED: it described a 4P+8E die this machine is not. Whether "
+        "pinning helps here is open.",
+        "- **Measurement health:** this host throttles hard, and an identical config "
+        "re-run cold moved 19% on decode. Run-to-run drift exceeds every lever measured "
+        "so far — no absolute t/s from this rig is quotable without a cooldown protocol.",
     ]
     if not any(f.startswith("avx512") for f in facts["simd"]):
         body += ["", "⚠️  No AVX-512. llama.cpp takes its AVX2 kernels here; do not compare "

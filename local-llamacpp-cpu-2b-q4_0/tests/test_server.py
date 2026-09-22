@@ -146,6 +146,13 @@ class TestCpuStatus(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(server._parse_cpulist(""), [])
 
     async def test_reports_hybrid_topology_and_missing_avx512(self):
+        """SYNTHETIC hybrid host — NOT this machine.
+
+        This fixture is a 4P+8E die kept only to exercise the hybrid branch of
+        cpu_status. Until 2026-09-22 this rig's docs mistook a fixture like it for
+        the real host; see test_this_host_is_homogeneous_and_has_no_vnni for what
+        is actually here.
+        """
         files = {
             "/proc/cpuinfo": "model name\t: 13th Gen Intel(R) Core(TM) i7-1360P\nflags\t\t: fpu sse2 avx avx2 avx_vnni\n",
             "/proc/meminfo": "MemTotal:       16000000 kB\nMemAvailable:    8000000 kB\n",
@@ -158,6 +165,26 @@ class TestCpuStatus(unittest.IsolatedAsyncioTestCase):
         self.assertIn("i7-1360P", out)
         self.assertIn("8 P-core threads, 8 E-core threads", out)
         self.assertIn("avx2", out)
+        self.assertIn("No AVX-512", out)
+
+    async def test_this_host_is_homogeneous_and_has_no_vnni(self):
+        """The REAL shape of this machine, RE-MEASURED 2026-09-22.
+
+        Lenovo Yoga 9 15IMH5, i7-10750H: 6 physical cores, 12 logical, no P/E
+        split and no avx_vnni. The absence of /sys/devices/cpu_{core,atom} IS the
+        P/E test, so this fixture omits them deliberately. Guards the regression
+        where the rig documented a hybrid 1360P it does not have.
+        """
+        files = {
+            "/proc/cpuinfo": "model name\t: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz\nflags\t\t: fpu sse2 avx avx2\n",
+            "/proc/meminfo": "MemTotal:       15000000 kB\nMemAvailable:   13000000 kB\n",
+        }
+        with patch.object(server, "_read_text", side_effect=lambda p: files.get(p, "")):
+            out = await server.cpu_status()
+        self.assertIn("i7-10750H", out)
+        self.assertNotIn("Hybrid", out)
+        self.assertNotIn("E-core", out)
+        self.assertNotIn("avx_vnni", out)
         self.assertIn("No AVX-512", out)
 
     async def test_non_hybrid_host_omits_topology_line(self):

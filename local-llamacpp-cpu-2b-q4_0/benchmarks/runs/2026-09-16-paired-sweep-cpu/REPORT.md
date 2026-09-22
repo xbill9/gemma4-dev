@@ -1,3 +1,27 @@
+> ## ⚠️ HOST FIELD CORRECTED 2026-09-22 — RATIOS STAND, ABSOLUTES DO NOT
+>
+> **This run is NOT withdrawn.** It remains the CPU arm of the first controlled
+> A/B here, and its paired **ratios** (GPU 4.27x decode, 3.63x prefill, 3.81x
+> end-to-end) are unaffected: both arms ran on this same machine, alternately,
+> with the device as the only difference.
+>
+> Two corrections to what is written below:
+>
+> 1. **The host is not an i7-1360P.** It is a homogeneous 6-core / 12-thread
+>    **i7-10750H** (Lenovo Yoga 9 15IMH5). Any `host` string in this run or in the
+>    generated report JSON naming a 1360P, 16 threads, or P/E cores is wrong. The
+>    device under test was still this machine's CPU, so the pairing holds.
+> 2. **The "3.63x is an upper bound because nothing was pinned" note is
+>    withdrawn.** It rested on the 1.61x affinity swing from
+>    `2026-09-16-thread-sweep-cpu`, which is quarantined — that number was measured
+>    through a die this machine is not.
+>
+> **The absolute CPU figures carry a caveat the run did not know about:** this host
+> throttles hard (28,271 package throttle events; 74 °C before a benchmark, 92 °C
+> after), and on 2026-09-22 an identical config re-run cold moved **19% on decode**.
+> Nothing here controlled for thermal state. The ratios survive because the arms
+> were interleaved; the absolutes should be re-measured with a cooldown protocol.
+
 # 2026-09-16 — paired CPU/GPU sweep, Gemma 4 E2B q4_0
 
 **The first controlled A/B in this family.** One GGUF, one llama.cpp commit, one

@@ -10,8 +10,22 @@ include tpu.env
 export
 
 SKILL_NAME ?= $(notdir $(CURDIR))-management
+LLAMA_CPP_REPO ?= https://github.com/ggml-org/llama.cpp
 
-.PHONY: all help install test lint clean serve stop status metrics query info bench-validate
+# The card is sm_75 (Turing, GTX 1650 Ti). Build for exactly that: this binary is
+# not portable and is not meant to be. FORCE_MMQ stays OFF -- see tpu.env for the
+# build-mmq experiment.
+CUDA_ARCH ?= 75
+
+# NEVER pass a bare `-j`. `cmake --build -j` with no value hands make an UNBOUNDED
+# job count; llama.cpp has ~188 CUDA translation units and each nvcc forks cicc and
+# cudafe++, so an unbounded CUDA build reliably OOMs this 15 GiB host. That is what
+# happened on 2026-09-22 (dmesg victims: cicc). 6 is deliberately BELOW nproc for
+# that reason -- MEASURED the same day, a full CUDA rebuild at -j6 peaks at 4.0 GiB
+# and never touches swap, in 10m09. Override with BUILD_JOBS=N if you know better.
+BUILD_JOBS ?= 6
+
+.PHONY: all help install build test lint clean serve stop status metrics query info bench-validate
 
 all: help
 
@@ -20,6 +34,7 @@ help:
 	@echo " local-llamacpp-1650ti-2b-q4_0 — GTX 1650 Ti, Gemma 4 E2B q4_0"
 	@echo "========================================================="
 	@echo "  make install       - pip install -r requirements.txt (system python3)"
+	@echo "  make build         - build llama.cpp with CUDA (sm_$(CUDA_ARCH), -j$(BUILD_JOBS))"
 	@echo "  make info          - resident-vs-lazy split, read off the artifact"
 	@echo "  make serve         - run llama-server in the foreground"
 	@echo "  make status        - is it up?"
@@ -35,6 +50,24 @@ help:
 
 install:
 	python3 -m pip install -r requirements.txt
+
+# Until 2026-09-22 this rig had NO build target and its only record of these flags
+# was the CMakeCache.txt of whatever was last built -- which is not a record, it is
+# an artifact. They live here now.
+#
+# Separate build directory from the CPU arm's build-cpu/ so the two cannot be
+# confused; the CPU arm refuses a binary with a GPU backend beside it.
+#
+# After a toolchain change, DELETE the build dir first: a stale CMakeCache.txt keeps
+# the old compiler, and /usr/local/cuda being a symlink hides that from the cached
+# path. Both arms were reconfigured from clean on 2026-09-22 for exactly that.
+build:
+	@command -v cmake >/dev/null || { echo "cmake not found; install with: pip install cmake"; exit 1; }
+	@command -v nvcc >/dev/null || { echo "nvcc not found; CUDA toolkit missing"; exit 1; }
+	@test -d $(LLAMA_CPP_DIR) || git clone $(LLAMA_CPP_REPO) $(LLAMA_CPP_DIR)
+	cmake -S $(LLAMA_CPP_DIR) -B $(LLAMA_CPP_DIR)/build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=$(CUDA_ARCH) -DGGML_NATIVE=ON -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(LLAMA_CPP_DIR)/build --config Release -j$(BUILD_JOBS) --target llama-server llama-bench
+	@echo "built at commit $$(git -C $(LLAMA_CPP_DIR) rev-parse --short HEAD) — record it as LLAMA_CPP_COMMIT in tpu.env"
 
 info:
 	python3 inspect_gguf.py
