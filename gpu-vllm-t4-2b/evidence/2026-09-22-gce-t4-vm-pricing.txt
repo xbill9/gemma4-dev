@@ -1,0 +1,23 @@
+# Compute Engine list prices for the gpu-vllm-t4-2b VM, us-west2 (Los Angeles), USD
+# Source: Cloud Billing Catalog API, GET https://cloudbilling.googleapis.com/v1/services/6F81-5844-456A/skus?currencyCode=USD
+# Fetched: 2026-09-22. OnDemand usage type, single-region SKUs only. The five matching SKU records follow verbatim.
+# VM shape (from devto-gemma4-t4-vm-deploy.md, read from instance metadata): n1-standard-2 (2 vCPU, 7.5 GiB),
+# 1x nvidia-tesla-t4, 32 GB pd-ssd boot, 250 GB pd-balanced data, us-west2-b, not preemptible.
+
+{"category": {"resourceFamily": "Storage", "resourceGroup": "SSD", "serviceDisplayName": "Compute Engine", "usageType": "OnDemand"}, "description": "SSD backed PD Capacity in Los Angeles", "effectiveTime": "2026-09-22T07:00:00Z", "pricingExpression": {"baseUnit": "By.s", "baseUnitConversionFactor": 2783138807808000.0, "baseUnitDescription": "byte second", "displayQuantity": 1, "tieredRates": [{"startUsageAmount": 0, "unitPrice": {"currencyCode": "USD", "nanos": 204000000, "units": "0"}}], "usageUnit": "GiBy.mo", "usageUnitDescription": "gibibyte month"}, "serviceRegions": ["us-west2"], "skuId": "0589-AA00-68BD"}
+{"category": {"resourceFamily": "Compute", "resourceGroup": "N1Standard", "serviceDisplayName": "Compute Engine", "usageType": "OnDemand"}, "description": "N1 Predefined Instance Ram running in Los Angeles", "effectiveTime": "2026-09-22T07:00:00Z", "pricingExpression": {"baseUnit": "By.s", "baseUnitConversionFactor": 3865470566400, "baseUnitDescription": "byte second", "displayQuantity": 1, "tieredRates": [{"startUsageAmount": 0, "unitPrice": {"currencyCode": "USD", "nanos": 5089000, "units": "0"}}], "usageUnit": "GiBy.h", "usageUnitDescription": "gibibyte hour"}, "serviceRegions": ["us-west2"], "skuId": "3500-0487-459B"}
+{"category": {"resourceFamily": "Compute", "resourceGroup": "GPU", "serviceDisplayName": "Compute Engine", "usageType": "OnDemand"}, "description": "Nvidia Tesla T4 GPU running in Los Angeles", "effectiveTime": "2026-09-22T07:00:00Z", "pricingExpression": {"baseUnit": "s", "baseUnitConversionFactor": 3600, "baseUnitDescription": "second", "displayQuantity": 1, "tieredRates": [{"startUsageAmount": 0, "unitPrice": {"currencyCode": "USD", "nanos": 410000000, "units": "0"}}], "usageUnit": "h", "usageUnitDescription": "hour"}, "serviceRegions": ["us-west2"], "skuId": "8313-8197-C744"}
+{"category": {"resourceFamily": "Compute", "resourceGroup": "N1Standard", "serviceDisplayName": "Compute Engine", "usageType": "OnDemand"}, "description": "N1 Predefined Instance Core running in Los Angeles", "effectiveTime": "2026-09-22T07:00:00Z", "pricingExpression": {"baseUnit": "s", "baseUnitConversionFactor": 3600, "baseUnitDescription": "second", "displayQuantity": 1, "tieredRates": [{"startUsageAmount": 0, "unitPrice": {"currencyCode": "USD", "nanos": 37970000, "units": "0"}}], "usageUnit": "h", "usageUnitDescription": "hour"}, "serviceRegions": ["us-west2"], "skuId": "ADC5-CFA0-B149"}
+{"category": {"resourceFamily": "Storage", "resourceGroup": "SSD", "serviceDisplayName": "Compute Engine", "usageType": "OnDemand"}, "description": "Balanced PD Capacity in Los Angeles", "effectiveTime": "2026-09-22T07:00:00Z", "pricingExpression": {"baseUnit": "By.s", "baseUnitConversionFactor": 2783138807808000.0, "baseUnitDescription": "byte second", "displayQuantity": 1, "tieredRates": [{"startUsageAmount": 0, "unitPrice": {"currencyCode": "USD", "nanos": 120000000, "units": "0"}}], "usageUnit": "GiBy.mo", "usageUnitDescription": "gibibyte month"}, "serviceRegions": ["us-west2"], "skuId": "DF86-0465-7120"}
+
+# ARITHMETIC, not measured: monthly cost at list price, 730 h/month (Google's billing month).
+# Excludes sustained-use discounts, spot pricing, network egress and any static IP charge.
+gpu                  1 x 0.410000 h        =   299.30 USD/month
+vcpu                 2 x 0.037970 h        =    55.44 USD/month
+ram_gib            7.5 x 0.005089 GiBy.h   =    27.86 USD/month
+pd_ssd_gb           32 x 0.204000 GiBy.mo  =     6.53 USD/month
+pd_balanced_gb     250 x 0.120000 GiBy.mo  =    30.00 USD/month
+running 24/7      419.13 USD/month
+stopped            36.53 USD/month (disks only)
+compute/hour      0.5241 USD/h (GPU + vCPU + RAM)
+gpu share           71.4 % of the running total
