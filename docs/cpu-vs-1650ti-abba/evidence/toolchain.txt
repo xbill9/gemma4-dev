@@ -1,0 +1,96 @@
+Toolchain and host facts for docs/cpu-vs-1650ti-abba/, captured 2026-09-22 on the laptop that ran both arms. Verbatim command output; this file is the citation.
+
+$ nvcc --version
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2026 NVIDIA Corporation
+Built on Tue_Sep_01_08:45:21_PDT_2026
+Cuda compilation tools, release 13.4, V13.4.92
+Build cuda_13.4.r13.4/compiler.38855100_0
+
+$ gcc --version
+gcc (Debian 16.2.0-3) 16.2.0
+Copyright (C) 2026 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+$ nvidia-smi --query-gpu=name,compute_cap,memory.total,driver_version --format=csv
+name, compute_cap, memory.total [MiB], driver_version
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 7.5, 4096 MiB, 615.71.09
+
+$ nvcc --list-gpu-arch
+compute_75
+compute_80
+compute_86
+compute_87
+compute_88
+compute_89
+compute_90
+compute_100
+compute_110
+compute_103
+compute_120
+compute_121
+compute_107
+
+$ /home/xbill/llama.cpp/build/bin/llama-server --version
+0.00.000.324 I srv  llama_server: initializing ...
+version: 0.4.1-dev (build 318, commit f95b0d9)
+built with GNU 16.2.0 for Linux x86_64
+
+$ /home/xbill/llama.cpp/build-cpu/bin/llama-server --version
+0.00.000.259 I srv  llama_server: initializing ...
+version: 0.4.1-dev (build 318, commit f95b0d9)
+built with GNU 16.2.0 for Linux x86_64
+
+$ /home/xbill/llama.cpp/build/bin/llama-server --list-devices
+Available devices:
+  CUDA0: NVIDIA GeForce GTX 1650 Ti with Max-Q Design (3732 MiB, 3671 MiB free)
+0.00.000.275 I srv  llama_server: initializing ...
+
+$ env CUDA_VISIBLE_DEVICES= /home/xbill/llama.cpp/build-cpu/bin/llama-server --list-devices
+Available devices:
+  (none)
+0.00.000.295 I srv  llama_server: initializing ...
+
+$ grep -m1 PRETTY_NAME /etc/os-release
+PRETTY_NAME="Debian GNU/Linux forky/sid"
+
+$ uname -r
+7.2.6+deb14-amd64
+
+$ lscpu
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           39 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  12
+On-line CPU(s) list:                     0-11
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
+CPU family:                              6
+Model:                                   165
+Thread(s) per core:                      2
+Core(s) per socket:                      6
+Socket(s):                               1
+Stepping:                                2
+Microcode version:                       0x100
+CPU(s) scaling MHz:                      71%
+CPU max MHz:                             5000.0000
+CPU min MHz:                             800.0000
+BogoMIPS:                                5199.98
+Virtualization:                          VT-x
+L1d cache:                               192 KiB (6 instances)
+L1i cache:                               192 KiB (6 instances)
+L2 cache:                                1.5 MiB (6 instances)
+L3 cache:                                12 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-11
+
+$ grep -n 'later than 16' /usr/local/cuda/include/crt/host_config.h
+137:#error -- unsupported GNU version! gcc versions later than 16 are not supported! The nvcc flag '-allow-unsupported-c
+
+$ grep -E '^llamacpp:prompt_tokens(_cached)?_total' <each pass>/metrics.prom
+local-llamacpp-cpu-2b-q4_0/benchmarks/runs/2026-09-22-paired-sweep-cpu/pass1/metrics.prom: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0 
+local-llamacpp-cpu-2b-q4_0/benchmarks/runs/2026-09-22-paired-sweep-cpu/pass2/metrics.prom: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0 
+local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-22-paired-sweep-1650ti/pass1/metrics.prom: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0 
+local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-22-paired-sweep-1650ti/pass2/metrics.prom: llamacpp:prompt_tokens_total 28553 llamacpp:prompt_tokens_cached_total 0 

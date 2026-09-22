@@ -1,0 +1,26 @@
+The build target of local-llamacpp-1650ti-2b-q4_0/Makefile as committed; its comments record the 2026-09-22 build measurement. Verbatim.
+
+# NEVER pass a bare `-j`. `cmake --build -j` with no value hands make an UNBOUNDED
+# job count; llama.cpp has ~188 CUDA translation units and each nvcc forks cicc and
+# cudafe++, so an unbounded CUDA build reliably OOMs this 15 GiB host. That is what
+# happened on 2026-09-22 (dmesg victims: cicc). 6 is deliberately BELOW nproc for
+# that reason -- MEASURED the same day, a full CUDA rebuild at -j6 peaks at 4.0 GiB
+# and never touches swap, in 10m09. Override with BUILD_JOBS=N if you know better.
+BUILD_JOBS ?= 6
+build:
+	@command -v cmake >/dev/null || { echo "cmake not found; install with: pip install cmake"; exit 1; }
+	@command -v nvcc >/dev/null || { echo "nvcc not found; CUDA toolkit missing"; exit 1; }
+	@test -d $(LLAMA_CPP_DIR) || git clone $(LLAMA_CPP_REPO) $(LLAMA_CPP_DIR)
+	cmake -S $(LLAMA_CPP_DIR) -B $(LLAMA_CPP_DIR)/build -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=$(CUDA_ARCH) -DGGML_NATIVE=ON -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(LLAMA_CPP_DIR)/build --config Release -j$(BUILD_JOBS) --target llama-server llama-bench
+	@echo "built at commit $$(git -C $(LLAMA_CPP_DIR) rev-parse --short HEAD) — record it as LLAMA_CPP_COMMIT in tpu.env"
+
+
+--- local-llamacpp-cpu-2b-q4_0/Makefile build target:
+build:
+	@command -v cmake >/dev/null || { echo "cmake not found; install with: pip install cmake"; exit 1; }
+	@test -d $(LLAMA_CPP_DIR) || git clone $(LLAMA_CPP_REPO) $(LLAMA_CPP_DIR)
+	cmake -S $(LLAMA_CPP_DIR) -B $(LLAMA_CPP_DIR)/build-cpu -DGGML_CUDA=OFF -DGGML_VULKAN=OFF -DGGML_NATIVE=ON -DCMAKE_BUILD_TYPE=Release
+	cmake --build $(LLAMA_CPP_DIR)/build-cpu --config Release -j$(BUILD_JOBS) --target llama-server llama-bench
+	@echo "built at commit $$(git -C $(LLAMA_CPP_DIR) rev-parse --short HEAD) — record it as LLAMA_CPP_COMMIT in tpu.env"
+

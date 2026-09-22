@@ -56,8 +56,8 @@ Pass-to-pass drift:
 
 Within-cell spread over 3 repeats: GPU ≤1.14% on both passes; CPU ≤2.69% on pass
 1 but up to **14.05%** on pass 2, the pass with twice the throttle events. CPU
-TTFT also rose 3-7% on pass 2 at the two long contexts (e.g. 1959/32: 22289 →
-23948 ms), while GPU TTFT moved ≤0.3%.
+TTFT also rose on pass 2, by up to 7.4% (1959/32: 22289 → 23948 ms) and by 4.6-5.0%
+at 998 tokens, while GPU TTFT moved by at most 0.9%.
 
 **What the order effect is worth, now measured instead of asserted:** a single
 CPU-then-GPU pair (the 2026-09-16 design) reads 4.09x decode / 3.38x prefill; the
