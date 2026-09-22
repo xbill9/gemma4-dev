@@ -213,11 +213,25 @@ with no GPU to hit, when they are the only thing keeping this arm honest. They d
 work — `start_model_server` refuses the GPU build, verified. The CPU rows were
 worse: a whole sweep was interpreted through a die that is not here.
 
-**`local-pytorch-cpu-2b/CLAUDE.md` was right all along** and this file overruled
-it. It says 6 physical cores and six SMT siblings; that is exactly what `lscpu`
-reports. The instruction here used to be "trust the kernel" while quoting numbers
-that were not the kernel's. Trust the kernel — and check that you actually read
-it, rather than a sibling's inherited copy.
+**Where the wrong CPU came from — established 2026-09-22.** It is not invented.
+`local-jax-cpu-2b`'s host block records "i7-1360P, 16 logical cores", `MemTotal`
+14,682,148 kB and **btrfs on `/dev/vdb`**. `/dev/vdb` is a *virtio* disk: that rig
+was measured **inside a VM**, and its numbers are probably correct for where they
+were taken. They are not correct here — this box is bare metal
+(`systemd-detect-virt: none`), nvme + ext4, `MemTotal` 16,035,492 kB. The facts
+crossed a rig boundary and were never re-measured. That is precisely what the
+root rule — *"the rigs are siblings, not layers; read the rig you are in"* —
+exists to stop, and it cost a sweep.
+
+It also means the quarantined sweep's `topology.json` (16 CPUs, hybrid, 4 P-cores)
+is probably a faithful record of **that VM**, not a corrupt file. It is the label
+that is wrong, not the measurement.
+
+**`local-pytorch-cpu-2b/CLAUDE.md` was right about this host all along** and this
+file overruled it. It says 6 physical cores and six SMT siblings; that is exactly
+what `lscpu` reports here. The instruction here used to be "trust the kernel"
+while quoting numbers that were not the kernel's. Trust the kernel — and check
+you actually read it, rather than a sibling's inherited copy.
 
 ## Nothing tuned on the GPU transfers — and nothing swept here survived either
 

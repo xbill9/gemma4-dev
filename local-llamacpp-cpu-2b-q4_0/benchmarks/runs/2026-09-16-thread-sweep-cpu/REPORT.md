@@ -27,8 +27,18 @@
 > on 2026-09-22. The absolute t/s are not reproducible here in any case — this
 > host throttles hard, and an identical config re-run cold moved **19% on decode**.
 >
+> **Where the host description came from (established 2026-09-22):**
+> `local-jax-cpu-2b`'s host block records the same i7-1360P with 16 logical CPUs,
+> alongside `MemTotal` 14,682,148 kB and **btrfs on `/dev/vdb`** — a *virtio* disk,
+> i.e. a VM. This machine is bare metal (`systemd-detect-virt: none`), nvme + ext4,
+> `MemTotal` 16,035,492 kB. So this run's `topology.json` is most likely a faithful
+> record of **that VM**, not a corrupt file: the label is wrong, not the
+> measurement. Whether these cells were taken there or here is not established, and
+> that is the point — nothing in the run records which host it ran on.
+>
 > **To replace this run:** re-derive masks with `topology.py` on the real host,
-> build on `f95b0d9`, and use a cooldown protocol with interleaved cell order.
+> build on `f95b0d9`, use a cooldown protocol with interleaved cell order, and
+> record the host identity in the run itself so this is never ambiguous again.
 
 # 2026-09-16 — thread and affinity lever sweep, CPU only
 
