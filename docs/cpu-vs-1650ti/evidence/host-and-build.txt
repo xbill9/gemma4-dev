@@ -22,11 +22,33 @@ $ nvidia-smi --query-compute-apps=pid,used_memory --format=csv   # GPU arm servi
 pid, used_gpu_memory [MiB]
 125068, 1598 MiB
 
-CPU: 13th Gen Intel(R) Core(TM) i7-1360P, 12 cores / 16 threads.
-Hybrid: 4 P-cores with SMT at logical 0-7, 8 E-cores at logical 8-15.
-SIMD: avx avx2 avx_vnni. No AVX-512 of any kind. 15 GiB RAM.
-(Read from /proc/cpuinfo, /proc/meminfo and /sys/devices/cpu_{core,atom}/cpus
-by the rig's cpu_status tool; recorded in local-llamacpp-cpu-2b-q4_0/tpu.env.)
+CPU: Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz, 6 cores / 12 threads.
+Homogeneous Comet Lake - NO P/E split. SMT siblings pair (0,6) (1,7) ... (5,11).
+SIMD: avx avx2. No AVX-512 and no avx_vnni. 15 GiB RAM (MemTotal 16,035,492 kB).
+Machine: Lenovo Yoga 9 15IMH5 (DMI 82DE), bare metal (systemd-detect-virt: none).
+
+CORRECTED 2026-09-22. This block previously read "i7-1360P, 12 cores / 16 threads,
+hybrid 4 P-cores at logical 0-7, 8 E-cores at 8-15, avx_vnni", and claimed to have
+been read from /proc and /sys by the rig's cpu_status tool. It was not: those
+values came from local-llamacpp-cpu-2b-q4_0/tpu.env, which had inherited them from
+local-jax-cpu-2b - a rig whose host is a VM (btrfs on /dev/vdb, MemTotal
+14,682,148 kB). The values above ARE read from the live machine:
+
+$ lscpu | grep -E 'Model name|^CPU\(s\)|Core\(s\)|Thread'
+Model name:      Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
+CPU(s):          12
+Thread(s) per core: 2
+Core(s) per socket: 6
+
+$ ls -d /sys/devices/cpu_core /sys/devices/cpu_atom
+ls: cannot access '/sys/devices/cpu_core': No such file or directory
+ls: cannot access '/sys/devices/cpu_atom': No such file or directory
+(their ABSENCE is the hybrid test - this part has no P/E split)
+
+The paired CPU-vs-GPU ratios in this bundle are unaffected: both arms ran on this
+same machine, alternately, with a 120 s cooldown. What the error did invalidate is
+the separate thread/affinity sweep, which is quarantined - see
+thread-sweep-affinity-REPORT.md in this directory.
 
 CPU arm resident anonymous memory with the model loaded:
 $ grep RssAnon /proc/<pid>/status

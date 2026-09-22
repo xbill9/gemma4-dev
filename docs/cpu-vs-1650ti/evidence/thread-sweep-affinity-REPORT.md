@@ -1,3 +1,45 @@
+> ## ⛔ QUARANTINED 2026-09-22 — MEASURED THROUGH THE WRONG CPU
+>
+> **This run's host description is not this machine, and its headline conclusions
+> do not survive that.** Kept as a record, not as evidence. Do not cite it.
+>
+> The report claims an i7-1360P with 4 P-cores + 8 E-cores. The host is a
+> **homogeneous 6-core / 12-thread i7-10750H** (Lenovo Yoga 9 15IMH5, DMI 82DE) —
+> `lscpu`, `/proc/cpuinfo` and DMI all agree, and `/sys/devices/cpu_core` and
+> `/sys/devices/cpu_atom` **do not exist here**, which is the P/E test.
+>
+> The run's own `results/topology.json` records 16 online CPUs, `hybrid: true`,
+> 4 perf cores and an `0xFF00` "E-cores only" mask. Its own `topology.py`, re-run
+> on this host on 2026-09-22, emits 12 CPUs, `hybrid: 0`, 6 physical cores and an
+> **empty** efficiency set — the `0xFF00` cell cannot exist on this machine.
+>
+> **What this invalidates:**
+> - "E-cores are stragglers" — there are no E-cores here.
+> - The **1.61x affinity swing**, and affinity being "the largest measured lever".
+> - The claim that `THREADS=4` / `THREADS_BATCH=8` were vindicated. They were the
+>   set sizes of the wrong die; the same rule gives **6 and 12** here.
+> - The mask labels. `0x55` on this die is cpus 0,2,4,6 — and cpu6 is the SMT
+>   **sibling** of cpu0, so it pins to 3 physical cores with one doubled, not to
+>   "one thread per P-core".
+>
+> **What may still be true:** the cells are real `llama-bench` output and the
+> *relative* shape (prefill scales with threads, decode does not) was reproduced
+> on 2026-09-22. The absolute t/s are not reproducible here in any case — this
+> host throttles hard, and an identical config re-run cold moved **19% on decode**.
+>
+> **Where the host description came from (established 2026-09-22):**
+> `local-jax-cpu-2b`'s host block records the same i7-1360P with 16 logical CPUs,
+> alongside `MemTotal` 14,682,148 kB and **btrfs on `/dev/vdb`** — a *virtio* disk,
+> i.e. a VM. This machine is bare metal (`systemd-detect-virt: none`), nvme + ext4,
+> `MemTotal` 16,035,492 kB. So this run's `topology.json` is most likely a faithful
+> record of **that VM**, not a corrupt file: the label is wrong, not the
+> measurement. Whether these cells were taken there or here is not established, and
+> that is the point — nothing in the run records which host it ran on.
+>
+> **To replace this run:** re-derive masks with `topology.py` on the real host,
+> build on `f95b0d9`, use a cooldown protocol with interleaved cell order, and
+> record the host identity in the run itself so this is never ambiguous again.
+
 # 2026-09-16 — thread and affinity lever sweep, CPU only
 
 **Rig:** `local-llamacpp-cpu-2b-q4_0` · **Instrument:** `llama-bench` ·

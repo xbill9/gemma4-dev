@@ -11,7 +11,7 @@
     "chips": 1,
     "machine_type": "local workstation",
     "host": {
-      "notes": "12 cores / 16 threads, hybrid: 4 SMT P-cores (logical 0-7) + 8 E-cores (8-15). avx2 + avx_vnni, NO AVX-512. 15 GiB RAM. No CPU affinity was set for this run, which a prior llama-bench sweep found to be a 1.61x prefill lever."
+      "notes": "6 cores / 12 threads, homogeneous Comet Lake - NO P/E split; SMT siblings pair (0,6)...(5,11). avx2, NO avx_vnni, NO AVX-512. 15 GiB RAM. Lenovo Yoga 9 15IMH5, bare metal. No CPU affinity was set for this run; what that costs is unresolved - the prior llama-bench sweep that put it at 1.61x via E-core stragglers described a hybrid die this machine does not have, and is quarantined. CORRECTED 2026-09-22 (was: 12 cores / 16 threads, hybrid 4P+8E, avx_vnni)."
     }
   },
   "model": {

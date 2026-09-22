@@ -1,3 +1,20 @@
+> ## ⚠️ HOST CPU CORRECTED 2026-09-22 — RATIOS STAND
+>
+> **Not withdrawn.** This is the GPU arm of the first controlled A/B here and its
+> paired ratios are unaffected: both arms ran on the same machine, alternately,
+> with a fixed 120 s cooldown, and the device under test here is the GPU, which
+> was always identified correctly.
+>
+> The **CPU** side of the comparison was mislabelled. Anything below naming an
+> i7-1360P, 12 cores / 16 threads, or P/E cores is wrong: the machine is a
+> homogeneous 6-core / 12-thread **i7-10750H** (Lenovo Yoga 9 15IMH5). The wrong
+> chip was inherited from `local-jax-cpu-2b`, whose host is a VM.
+>
+> Also withdrawn: any note that the prefill ratio is an "upper bound because the
+> CPU arm was unpinned". That rested on a 1.61x affinity figure from
+> `2026-09-16-thread-sweep-cpu`, which described a hybrid die this machine does
+> not have and is quarantined.
+
 # 2026-09-16 — paired CPU/GPU sweep, Gemma 4 E2B q4_0
 
 **The first controlled A/B in this family.** One GGUF, one llama.cpp commit, one
@@ -57,10 +74,13 @@ CPU arm exe `61432a48569c1acf`, GPU arm exe `a1b368b993e5efbc`.
 
 Read a 4x as real and a 5% as nothing.
 
-- **Order and thermals.** CPU arm ran first and saturated 12 cores; an i7-1360P
-  and a Max-Q card share one thermal envelope, so the GPU arm started on a warm
-  package. A fixed 120 s cooldown separated them — sized, not measured. Order
-  effects would, if anything, understate the GPU arm here.
+- **Order and thermals.** CPU arm ran first and saturated every thread; the
+  i7-10750H and a Max-Q card share one thermal envelope, so the GPU arm started on
+  a warm package. A fixed 120 s cooldown separated them — sized, not measured.
+  Order effects would, if anything, understate the GPU arm here. Later measurement
+  (2026-09-22) found this host throttles hard enough that an identical CPU config
+  re-run cold moved 19% on decode; the ratio survives because the arms were
+  interleaved.
 - **Page cache.** The GGUF was hot for both arms (the CPU arm had just read it).
   Not a dropped-cache measurement; it says nothing about cold-start cost, and the
   lazy-PLE claim remains untested on this host.

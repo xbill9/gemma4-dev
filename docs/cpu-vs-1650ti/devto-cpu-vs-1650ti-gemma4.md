@@ -1,5 +1,5 @@
 ---
-title: "A 4 GB Laptop GPU Beats a 12-Core CPU by 4.3x on Gemma 4"
+title: "A 4 GB Laptop GPU Beats a 6-Core CPU by 4.3x on Gemma 4"
 published: false
 description: "Serving Gemma 4 E2B q4_0 through llama.cpp on one laptop, twice: CPU-only and on a 2021-era 4 GB GTX 1650 Ti. Same GGUF, same binary, same prompts, one flag apart. The card takes decode by 4.3x, and needs only 1598 MiB to do it."
 tags: machinelearning, gpu, benchmarking, python
@@ -15,14 +15,14 @@ The repository is at https://github.com/xbill9/gemma4-dev
 
 ## What Is Being Compared?
 
-One machine, a 13th Gen Intel Core i7-1360P laptop with a GTX 1650 Ti (Max-Q)
-in it. Two arms:
+One machine, a Lenovo Yoga 9 15IMH5 laptop — Intel Core i7-10750H with a GTX
+1650 Ti (Max-Q) in the same chassis. Two arms:
 
 | | CPU arm | GPU arm |
 | --- | --- | --- |
-| Device | i7-1360P, 12 cores / 16 threads | GTX 1650 Ti Max-Q, 4096 MiB |
-| Topology | 4 SMT P-cores (0-7) + 8 E-cores (8-15) | TU117, compute capability 7.5, **no tensor cores** |
-| SIMD / math | `avx2`, `avx_vnni`, **no AVX-512** | CUDA |
+| Device | i7-10750H, 6 cores / 12 threads | GTX 1650 Ti Max-Q, 4096 MiB |
+| Topology | homogeneous, 6 cores + SMT (no P/E split) | TU117, compute capability 7.5, **no tensor cores** |
+| SIMD / math | `avx2`, **no AVX-VNNI, no AVX-512** | CUDA |
 | llama.cpp | `c6824a9`, `GGML_CUDA=OFF` build | `c6824a9`, CUDA build |
 | Flag that differs | `-ngl 0` | `-ngl 99` |
 
@@ -114,10 +114,14 @@ and checked rather than assumed:
 | --- | --- |
 | Engine | one llama.cpp commit, `c6824a9`, built twice — CPU build and CUDA build |
 | Binary identity | the SHA-256 of each running executable is recorded in its report |
-| Flags | identical apart from `-ngl`, including `-t 4 -tb 8` on both arms |
+| Flags | identical apart from `-ngl` — including `-t 4 -tb 8`, the same on both arms |
 | Prompts | one harness, byte-identical in both rigs, with device-neutral filler |
 | Prompt lengths | every paired cell matched exactly — 94, 516, 998 and 1959 tokens |
 | Endpoint | the same `127.0.0.1:8080`, one arm running at a time |
+
+(`-t 4 -tb 8` were the thread values in force at the time. They have since been
+re-derived to `-t 6 -tb 12` for this CPU's real topology; because both arms used
+the same values, the paired comparison is unaffected.)
 
 That last row is the one worth dwelling on. Both arms serve the same
 model on the same port, so an HTTP response says nothing about which device
@@ -137,32 +141,36 @@ hides the device from the process entirely rather than trusting `-ngl 0`.
 
 Read the 4x as real and anything under about 7% as nothing.
 
-- **Order and thermals.** The CPU arm ran first and saturated 12 cores. An
-  i7-1360P and a Max-Q card share one thermal envelope, so the GPU arm started on
-  a warm package. The 120 second cooldown was sized, not measured. If this biases
-  anything it understates the GPU arm.
+- **Order and thermals.** The CPU arm ran first and saturated every thread. The
+  i7-10750H and the Max-Q card share one thermal envelope, so the GPU arm started
+  on a warm package. The 120 second cooldown was sized, not measured. If this
+  biases anything it understates the GPU arm. This machine throttles harder than
+  that caveat implies: it logs tens of thousands of package throttle events, and a
+  later check found an identical CPU config re-run cold moving **19% on decode**.
+  That is why nothing under about 20% on a CPU absolute should be read as real
+  here — the 4x ratio survives only because the arms were interleaved.
 - **Page cache.** The GGUF was hot for both arms. This says nothing about cold
   start, and the lazy-embedding claim above is inferred from the source and the
   resident-memory figures rather than from a dropped-cache experiment.
-- **CPU affinity.** Nothing was pinned. A separate `llama-bench` sweep on this
-  die found affinity worth **1.61x on prefill**, because llama.cpp splits work
-  evenly and every barrier waits on the slowest thread, so adding the eight
-  E-cores to the four P-cores makes prefill *slower*. The CPU arm here is
-  therefore not at its best, and **3.63x is an upper bound on the prefill gap**.
-  Decode is unaffected — thread count is a weak lever there — so the 4.27x
-  stands.
+- **CPU affinity.** Nothing was pinned, and how much that costs is **open**. An
+  earlier `llama-bench` sweep appeared to show affinity worth 1.61x on prefill via
+  E-core stragglers — that sweep was later found to describe a hybrid P/E die this
+  machine does not have, and has been withdrawn. On the real homogeneous 6-core
+  part a spot-check could not separate pinning from thermal drift. So no upper
+  bound on the prefill gap is claimed here.
 - **Concurrency.** Single stream throughout, `--parallel 1`.
 
 ## Summary
 
 The goal of this article was to measure what a 4 GB laptop GPU is worth against a
-modern 12-core CPU for serving a small quantized model. The key to the solution
+6-core mobile CPU for serving a small quantized model. The key to the solution
 was a single-variable comparison: one llama.cpp commit, one prompt set, one flag
 apart, with the serving device read from `/proc` at run time and recorded beside
 every number. The results were:
 
 - GPU decode is **4.27x** the CPU arm, 4.04x to 4.34x across every cell
-- GPU prefill is **3.63x**, an upper bound, since the CPU arm was left unpinned
+- GPU prefill is **3.63x**, with the CPU arm left unpinned (what pinning is worth
+  on this part is unresolved — see caveats)
 - End-to-end is **3.81x**
 - Decode is flat in context on both arms; TTFT is linear in it on both
 - The model needs **1598 MiB** of the card, because 58% of the file is a lazily

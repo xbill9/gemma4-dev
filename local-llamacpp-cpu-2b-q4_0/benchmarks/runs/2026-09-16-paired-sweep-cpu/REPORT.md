@@ -81,10 +81,13 @@ CPU arm exe `61432a48569c1acf`, GPU arm exe `a1b368b993e5efbc`.
 
 Read a 4x as real and a 5% as nothing.
 
-- **Order and thermals.** CPU arm ran first and saturated 12 cores; an i7-1360P
-  and a Max-Q card share one thermal envelope, so the GPU arm started on a warm
-  package. A fixed 120 s cooldown separated them — sized, not measured. Order
-  effects would, if anything, understate the GPU arm here.
+- **Order and thermals.** CPU arm ran first and saturated every thread; the
+  i7-10750H and a Max-Q card share one thermal envelope, so the GPU arm started on
+  a warm package. A fixed 120 s cooldown separated them — sized, not measured.
+  Order effects would, if anything, understate the GPU arm here. Later measurement
+  (2026-09-22) found this host throttles hard enough that an identical config
+  re-run cold moved 19% on decode, so treat CPU absolutes as ±20%; the ratio
+  survives because the arms were interleaved.
 - **Page cache.** The GGUF was hot for both arms (the CPU arm had just read it).
   Not a dropped-cache measurement; it says nothing about cold-start cost, and the
   lazy-PLE claim remains untested on this host.
