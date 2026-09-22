@@ -10,20 +10,29 @@ mostly does **not** hold here. Read this file before changing anything.
 `google/gemma-4-E2B-it-qat-q4_0-gguf` off one **GTX 1650 Ti (Max-Q)** in the
 machine under the desk. One process, one GGUF file named on the command line.
 
-**STATUS 2026-09-22: built on `f95b0d9`, NOTHING MEASURED ON THIS BINARY.**
+**STATUS 2026-09-22: serving on `f95b0d9`, re-measured as one arm of an ABBA pair.**
 llama.cpp was rebuilt from clean on 2026-09-22 after the host moved to Debian sid
 (gcc 16.2, CUDA 13.4) — see "Building llama.cpp here" below. Both arms are on
 `f95b0d9`, 100 commits on from the `c6824a9` they were paired at. Verified:
 `llama-server --list-devices` shows `CUDA0` (3732 MiB), and the CPU arm shows no
-devices. **No token has been timed on this build.**
+devices.
 
-The newest run is `benchmarks/runs/2026-09-16-paired-sweep-1650ti`, the GPU arm of
+**NEWEST: `benchmarks/runs/2026-09-22-paired-sweep-1650ti`**, the re-run on
+`f95b0d9` in ABBA order (CPU, GPU, GPU, CPU) with a temperature-gated cooldown
+before every pass and identical flags except `-ngl` (`-t 6 -tb 12` on both).
+32/32 cells: GPU **4.14x** decode, **3.42x** prefill, **3.62x** end-to-end. The
+order effect is now measured rather than listed — a one-order pair misstates the
+ratio by ~1-2% — and the CPU arm is the noisy one: pass-to-pass decode drift up to
+-9.3% and 14% within-cell spread on its hotter pass, against ≤1.3% for the GPU.
+Not comparable to 2026-09-16: commit, threads and protocol all changed at once.
+
+The previous run is `benchmarks/runs/2026-09-16-paired-sweep-1650ti`, the GPU arm of
 the first controlled A/B here, measured at `c6824a9`: 8/8 cells, decode
 67.61-71.22 tok/s, **4.27x the CPU arm on decode and 3.63x on prefill**. Those
 **ratios** stand (the arms were interleaved on one box); the absolutes carry the
 host's thermal caveat recorded in the CPU twin's `CLAUDE.md`. The three older runs
 are at `95ef7fc` and are not pairable with anything newer. **Nothing on record is
-pairable with a run made on `f95b0d9`** — re-run both arms for that.
+pairable with a run made on `f95b0d9`** except 2026-09-22, which re-ran both arms.
 
 ## This rig is one arm of a control
 
@@ -62,8 +71,10 @@ for that, and do not difference an old run against a new CPU one.
 ### The pin moved again on 2026-09-22: `c6824a9` → `f95b0d9`
 
 The host moved to Debian sid and both arms were rebuilt together, because the pin
-is the control's whole point — one arm on a new commit is a new confound. **Every
-run in this rig now predates its own binary**, the paired sweep included.
+is the control's whole point — one arm on a new commit is a new confound. Only
+`2026-09-22-paired-sweep-1650ti` was measured on this binary; every older run predates it.
+`THREADS`/`THREADS_BATCH` moved 4/8 → 6/12 the same day to match the CPU twin's
+re-derived values, so `make serve` in both arms still differs only in `-ngl`.
 
 ### `start_model_server` could not leave a server running (fixed 2026-09-16)
 

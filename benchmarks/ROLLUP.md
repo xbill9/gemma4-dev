@@ -42,6 +42,8 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-09-18-vllm-sweep-mi300x-bf16ctl` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.3.1.dev85+gdee37d89… | 2-D (2ctx × 3conc) | 11,810 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
 | `2026-09-18-vllm-sweep-mi300x-v0191-bf16` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.19.1.dev3+rocm7.13.… | 2-D (2ctx × 3conc) | 10,009 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
 | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.19.1.dev3+rocm7.13.… | 2-D (2ctx × 3conc) | 6,579 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
+| `2026-09-22-paired-sweep-1650ti` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 60 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
+| `2026-09-22-paired-sweep-cpu` | google/gemma-4-E2B-it-qat-q4_0-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 16 | — | 1.1 | ok | local-llamacpp-cpu-2b-q4_0 |
 
 ## Sweep run directories
 
@@ -107,8 +109,10 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-08-conc-shortprompt-1650ti` | 6 | 2 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-16-paired-sweep-1650ti` | 4 | 1 | 0 | yes | **no** |
+| local-llamacpp-1650ti-2b-q4_0 | `2026-09-22-paired-sweep-1650ti` | 10 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes | **no** |
+| local-llamacpp-cpu-2b-q4_0 | `2026-09-22-paired-sweep-cpu` | 10 | 0 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
 | local-pytorch-cpu-2b | `2026-09-04-first-light-pytorch-cpu` | 2 | 1 | 0 | yes | **no** |
@@ -188,8 +192,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-2b | 7 | 8 |
 | gpu-vllm-t4-2b | 0 | 1 |
 | local-jax-cpu-2b | 0 | 1 |
-| local-llamacpp-1650ti-2b-q4_0 | 4 | 4 |
-| local-llamacpp-cpu-2b-q4_0 | 1 | 2 |
+| local-llamacpp-1650ti-2b-q4_0 | 5 | 5 |
+| local-llamacpp-cpu-2b-q4_0 | 2 | 3 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
 | local-pytorch-cpu-2b | 0 | 1 |
 | local-vllm-cpu-2b | 0 | 0 |

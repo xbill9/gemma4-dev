@@ -25,6 +25,15 @@ headline (E-core stragglers, a 1.61x affinity swing) describes a die that is not
 here; the run is kept and quarantined. `THREADS`/`THREADS_BATCH` are re-derived to
 `6`/`12` and spot-checked, not swept.
 
+**NEWEST: `benchmarks/runs/2026-09-22-paired-sweep-cpu`**, the re-run on
+`f95b0d9` in ABBA order (CPU, GPU, GPU, CPU) with a temperature-gated cooldown
+before every pass and identical flags except `-ngl` (`-t 6 -tb 12` on both).
+32/32 cells: GPU **4.14x** decode, **3.42x** prefill, **3.62x** end-to-end. The
+order effect is now measured rather than listed — a one-order pair misstates the
+ratio by ~1-2% — and the CPU arm is the noisy one: pass-to-pass decode drift up to
+-9.3% and 14% within-cell spread on its hotter pass, against ≤1.3% for the GPU.
+Not comparable to 2026-09-16: commit, threads and protocol all changed at once.
+
 `benchmarks/runs/2026-09-16-paired-sweep-cpu` (8/8 cells, the CPU arm of the first
 controlled A/B here) still stands as a **paired ratio** — decode flat at
 15.66-17.61 tok/s across a 21x range of prompt length, TTFT linear in it, 1.1 s at

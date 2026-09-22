@@ -10,6 +10,7 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
 | `2026-09-16-paired-sweep-cpu.json` | google/gemma-4-E2B-it-qat-q4_0-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | ok | — |
+| `2026-09-22-paired-sweep-cpu.json` | google/gemma-4-E2B-it-qat-q4_0-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | ok | — |
 
 ## Run directories in this rig
 
@@ -17,3 +18,4 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 |---|---:|---:|---:|---|
 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes |
 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes |
+| `2026-09-22-paired-sweep-cpu` | 10 | 0 | 0 | yes |
