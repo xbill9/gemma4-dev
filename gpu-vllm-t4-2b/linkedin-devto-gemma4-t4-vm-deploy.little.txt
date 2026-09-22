@@ -1,0 +1,13 @@
+Gemma 4 on a Tesla T4, Part 2: The Minimum GCE VM and a Script to Drive It
+
+Building the smallest Compute Engine VM that serves Gemma 4 E2B on one Tesla T4, installing the driver and vLLM after boot, and a walkthrough of every option in the shell script that starts, checks and queries the server.
+
+What is in it:
+
+- 🟢 362 s from vllm-t4 start to a healthy endpoint on a warm compile cache, 13371 MiB of 15360 claimed
+- 🟢 8.02 GiB of weights and 4.66 GiB of KV cache, giving 519,681 tokens and 31.72x concurrency at 16,384 tokens per request
+- 🟢 One gcloud command, one apt repository for the driver, one pip install, one patch
+- ⚠️ --maintenance-policy=TERMINATE is required for an attached GPU, and stops the VM during host maintenance
+
+dev.to \(Google Developer Experts\): https://dev.to/gde/gemma-4-on-a-tesla-t4-part-2-the-minimum-gce-vm-and-a-script-to-drive-it-3gk1
+Medium: https://medium.com/\@xbill999/gemma-4-on-a-tesla-t4-part-2-the-minimum-gce-vm-and-a-script-to-drive-it-d0a14c6cd2c1
