@@ -62,8 +62,8 @@ TTFT also rose 3-7% on pass 2 at the two long contexts (e.g. 1959/32: 22289 →
 **What the order effect is worth, now measured instead of asserted:** a single
 CPU-then-GPU pair (the 2026-09-16 design) reads 4.09x decode / 3.38x prefill; the
 GPU-then-CPU pair reads 4.17x / 3.47x. So a one-order run misstates the ratio by
-~1-2%. That is real but small — the 2026-09-16 warning that order could swing it
-was right in direction and much larger than the effect turned out to be.
+~1-2%. The 2026-09-16 report was right about the direction — running the CPU arm
+first understates the GPU's lead — but the effect is far smaller than its caveat implied.
 
 **The CPU arm is the noisy one, and its noise is thermal.** The GPU arm barely
 heats the package (420 throttle events in a pass), the CPU arm saturates it.
@@ -80,8 +80,9 @@ heats the package (420 throttle events in a pass), the CPU arm saturates it.
 | order / thermals | ABBA, temperature-gated cooldown before every pass |
 | arm identity | attested from `/proc` on every pass: CPU exe `9c88c7821fcc11a6`, GPU exe `9f2a8b0b6ed5365d` |
 
-**`-t 6 -tb 12` on the GPU arm is an override.** This rig's `tpu.env` still says
-`THREADS=4`, `THREADS_BATCH=8`; the CPU arm's were re-derived to 6/12 from the
+**`-t 6 -tb 12` on the GPU arm was an override at run time.** The GPU rig's
+`tpu.env` said `THREADS=4`, `THREADS_BATCH=8` (moved to 6/12 right after this run,
+so `make serve` in both arms again differs only in `-ngl`); the CPU arm's were re-derived to 6/12 from the
 real topology on 2026-09-22, and the control requires the flags to match. GPU
 decode was measured insensitive to threads on 2026-09-03 (73.75 / 73.08 / 72.97
 at 4/6/8).
@@ -105,13 +106,14 @@ but that is a hypothesis, not a finding of this run.
 
 ## Reproduce
 
-`paired.sh` (the driver) and `analyze.py` (the pairing) are in this directory. For each arm it runs, `make serve` in the arm's rig
-(the GPU arm with `THREADS=6 THREADS_BATCH=12` on the command line), wait for
+`paired.sh` (the driver) and `analyze.py` (the pairing) are in this directory.
+For each arm the driver runs `make serve` in the arm's rig
+(the GPU arm with `THREADS=6 THREADS_BATCH=12` on the command line), waits for
 `/health`, then
 
 ```bash
 python3 sweep.py --base http://127.0.0.1:8080/v1 --out <run>/passN --rig <rig> --expect-device <cpu|gpu>
 ```
 
-then stop the server and wait out the gate. Default contexts (64, 512, 1024,
+then stops the server and waits out the gate. Default contexts (64, 512, 1024,
 2048), outputs (32, 128), 3 repeats.
