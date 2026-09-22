@@ -10,12 +10,20 @@ mostly does **not** hold here. Read this file before changing anything.
 `google/gemma-4-E2B-it-qat-q4_0-gguf` off one **GTX 1650 Ti (Max-Q)** in the
 machine under the desk. One process, one GGUF file named on the command line.
 
-**STATUS 2026-09-16: serving, four runs on record.** llama.cpp is now built at
-`c6824a9` — see the control section below for why the commit moved. The newest run
-is `benchmarks/runs/2026-09-16-paired-sweep-1650ti`, the GPU arm of the first
-controlled A/B here: 8/8 cells, decode 67.61-71.22 tok/s, **4.27x the CPU arm on
-decode and 3.63x on prefill**. The three older runs predate the rebuild and are
-not pairable with it.
+**STATUS 2026-09-22: built on `f95b0d9`, NOTHING MEASURED ON THIS BINARY.**
+llama.cpp was rebuilt from clean on 2026-09-22 after the host moved to Debian sid
+(gcc 16.2, CUDA 13.4) — see "Building llama.cpp here" below. Both arms are on
+`f95b0d9`, 100 commits on from the `c6824a9` they were paired at. Verified:
+`llama-server --list-devices` shows `CUDA0` (3732 MiB), and the CPU arm shows no
+devices. **No token has been timed on this build.**
+
+The newest run is `benchmarks/runs/2026-09-16-paired-sweep-1650ti`, the GPU arm of
+the first controlled A/B here, measured at `c6824a9`: 8/8 cells, decode
+67.61-71.22 tok/s, **4.27x the CPU arm on decode and 3.63x on prefill**. Those
+**ratios** stand (the arms were interleaved on one box); the absolutes carry the
+host's thermal caveat recorded in the CPU twin's `CLAUDE.md`. The three older runs
+are at `95ef7fc` and are not pairable with anything newer. **Nothing on record is
+pairable with a run made on `f95b0d9`** — re-run both arms for that.
 
 ## This rig is one arm of a control
 
@@ -45,11 +53,17 @@ arm, `query_model` refuses, and `sweep.py` aborts before measuring
 | `THREADS_BATCH=8`, so `-tb` is passed | this rig had no such key and the CPU twin passed `-tb 8`, so the arms differed by a prefill-thread flag too. Prefill runs on the card here so the effect should be small — a control does not get to assume which of its differences are harmless. **UNMEASURED here.** |
 | `sweep.py` FILLER is device-neutral | each arm's filler described its own hardware, so one `--contexts 512` built two prompts that tokenized to different lengths. `sweep.py` is now byte-identical in both arms. |
 
-**The three runs in `benchmarks/runs/` predate all of this.** They were measured
+**The three older runs in `benchmarks/runs/` predate all of this.** They were measured
 at `95ef7fc`, without `-tb`, with the old GPU-specific filler. They remain this
 rig's own record and are still valid as that. They are **not** the GPU arm of a
 paired comparison against anything measured after 2026-09-16 — re-run this arm
 for that, and do not difference an old run against a new CPU one.
+
+### The pin moved again on 2026-09-22: `c6824a9` → `f95b0d9`
+
+The host moved to Debian sid and both arms were rebuilt together, because the pin
+is the control's whole point — one arm on a new commit is a new confound. **Every
+run in this rig now predates its own binary**, the paired sweep included.
 
 ### `start_model_server` could not leave a server running (fixed 2026-09-16)
 
@@ -64,6 +78,42 @@ That is very likely the real reason "no pid file" is documented here as the
 NORMAL case: the only path that writes one could not leave a server behind. The
 spawn is now `subprocess.Popen`, which merely warns when collected with a live
 child. Still no shell — the rule is against `shell=True`, not against the module.
+
+## Building llama.cpp here
+
+`make build` is the record of the build flags — until 2026-09-22 there was no such
+target, and the only record was the `CMakeCache.txt` of whatever had last been
+built. It configures `GGML_CUDA=ON`, `CMAKE_CUDA_ARCHITECTURES=75`,
+`GGML_NATIVE=ON`, Release, `FORCE_MMQ` off, in `~/llama.cpp/build/` (the CPU arm
+builds into `build-cpu/` so the two cannot be confused), and builds only
+`llama-server` and `llama-bench`.
+
+**`-j` WITHOUT A NUMBER IS WHAT OOMs THIS MACHINE.** `cmake --build … -j` with no
+value starts all ~188 CUDA translation units at once; each `nvcc` forks `cicc` and
+`cudafe++`, and 15 GiB of RAM does not survive it. That killed the 2026-09-22
+build (`dmesg` victims: `cicc`). `BUILD_JOBS` defaults to 6. MEASURED 2026-09-22:
+the full rebuild at `-j6` peaks at **4.0 GiB, never touches swap, 10m09**. Do not
+"simplify" it back to a bare `-j`.
+
+**Toolchain, 2026-09-22 (Debian sid / forky, kernel 7.2.6):** gcc **16.2.0**,
+CUDA **13.4** (`V13.4.92`), driver **615.71.09** (unchanged). Two things are on a
+knife edge, and both are this card's problem more than the CPU arm's:
+
+- **`sm_75` is now the LOWEST arch CUDA ships.** `nvcc --list-gpu-arch` starts at
+  `compute_75`, and the 1650 Ti is 7.5 — right on the floor. **The next major CUDA
+  is the one to expect to strand this card.** Do not upgrade the toolkit past a
+  major version without checking that list first; keep 13.x installed if it goes.
+- **CUDA 13.4's host-compiler ceiling is gcc 16** (`crt/host_config.h`: "gcc
+  versions later than 16 are not supported"). sid is inside it by exactly one
+  version. The next gcc needs `-allow-unsupported-compiler` or the pinned
+  `gcc-14`, which is installed.
+
+**Reconfigure from clean after a toolchain change.** The stale `CMakeCache.txt`
+still named gcc 14 and CUDA 13.3; `/usr/local/cuda` is a symlink, so the cached
+path looked current while the compiler behind it was not. Delete `build/` first.
+
+The published articles in `docs/` say `nvcc` 13.3 and `95ef7fc`. That is correct —
+it is what they measured — and they are not to be "updated" to this toolchain.
 
 ## It is the first `local` rig, and that is most of what is different
 

@@ -21,8 +21,8 @@ src/models/gemma4.cpp and served by GET_ROWS out of the mmap. Full offload fits 
 N_GPU_LAYERS or passing --no-mmap; the second one breaks the mechanism outright.
 See CLAUDE.md.
 
-STATUS 2026-09-03: NOTHING HAS BEEN SERVED. llama.cpp is built at 95ef7fc and the
-model file is on disk; no token has been generated through this server.
+STATUS 2026-09-22: serving since 2026-09-03. llama.cpp is rebuilt at f95b0d9
+(Debian sid, gcc 16.2, CUDA 13.4); tpu.env's LLAMA_CPP_COMMIT is authoritative.
 """
 
 import asyncio

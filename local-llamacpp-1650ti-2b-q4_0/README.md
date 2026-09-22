@@ -8,6 +8,10 @@ GTX 1650 Ti (Max-Q)** in the machine under the desk.
 277.61 tok/s aggregate at 64-way concurrency, ~355 t/s prefill throughout, in 1618 MiB of a
 4096 MiB card.** Full write-up in `benchmarks/runs/2026-09-03-first-light-1650ti/REPORT.md`.
 
+**Rebuilt 2026-09-22** on llama.cpp `f95b0d9` under Debian sid — gcc 16.2, CUDA 13.4 — and not
+yet re-measured; every number here came off an older binary. CUDA 13.4 ships `sm_75` as its
+lowest arch, so the next major CUDA is expected to drop this card. See `CLAUDE.md`.
+
 | | |
 | --- | --- |
 | Platform | `local` — no control plane; the card is in this machine |
@@ -23,6 +27,7 @@ slot 1 of [`NAMING.md`](../NAMING.md) for it on 2026-09-03.
 
 ```bash
 make install     # pip install -r requirements.txt into the system python3
+make build       # llama.cpp with CUDA for sm_75, -j6 (a bare -j OOMs this host)
 make info        # resident-vs-lazy memory split, read off the artifact
 make serve       # llama-server in the foreground; Ctrl-C is a full teardown
 make status      # is it up?
@@ -87,7 +92,7 @@ different silicon — which is why the hardware slot is `1650ti` and not
 tpu.env            source of truth — model, hardware, endpoint, serving flags
 server.py          MCP server (`MCPServer`): GPU/model info, start/stop, status, query
 inspect_gguf.py    re-derives the resident-vs-lazy split from the artifact
-Makefile           serve / status / query / info / test / lint
+Makefile           build / serve / status / query / info / test / lint
 tests/             offline unittest suite (11 tests)
 benchmarks/        schema + README synced from the monorepo root; runs/ is empty
 ```
