@@ -1,0 +1,220 @@
+"""Read every labelled example through one arm and record the label distributions.
+
+    # DiffusionGemma, one denoise step over the seeded canvas, 4 noise draws
+    python3 run_eval.py --arm diffusion --upstream http://127.0.0.1:8000 \
+        --model google/diffusiongemma-26B-A4B-it --run RUN
+
+    # Gemma 4 26B read left to right: next-token logprobs at the same slot
+    python3 run_eval.py --arm autoregressive --upstream http://127.0.0.1:8001 \
+        --model google/gemma-4-26B-A4B-it --run RUN
+
+Both arms use vLLM PR #57250's structured_server.py (vendored at the merge
+commit) for everything but the read itself: the system prompt, the answer
+template, the single-token label check, the label token ids, and
+`slot_distribution`, which turns returned logprobs into label probabilities,
+label mass and entropy. What differs is only how the answer slot is read:
+
+  diffusion       the proxy's own `one_read`: the canvas holds the template with
+                  a random vocabulary token in the slot, one denoise step,
+                  read-only, logprobs at the slot. Repeated with the proxy's
+                  seed schedule, so read 0 is a single read and reads 0..3 are
+                  what `samples: "auto"` averages when it escalates.
+  autoregressive  the identical token prefix (chat prompt, empty thought block,
+                  "id: ") sent as a completion for one token, logprobs at that
+                  next position. Deterministic, so one read.
+
+Results land in results/RUN/<arm>-<task>.jsonl, one line per example. A rerun
+skips ids already written, so an interrupted run resumes.
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+import types
+import zlib
+from concurrent.futures import ThreadPoolExecutor
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "vendor"))
+
+import structured_server as ss  # noqa: E402
+from tasks import TASKS  # noqa: E402
+
+SEED_STRIDE = 7919  # structured_server.read_many's schedule: seed + k * 7919
+
+
+def example_seed(ex_id):
+    return zlib.crc32(ex_id.encode())
+
+
+def setup(task_name):
+    task = TASKS[task_name]
+    schema = ss.parse_schema({"questions": [task["question"]], "samples": 1})
+    template, slots = ss.template_for(schema, ss.SCAFFOLD, "")
+    q = schema["questions"][0]
+    names = [c[0] for c in q["choices"]]
+    return schema, template, slots, q, names
+
+
+def state_text(ex):
+    return json.dumps({"text": ex["text"]})
+
+
+def diffusion_record(schema, template, slots, sys_text, ex, reads):
+    state = state_text(ex)
+    seed = example_seed(ex["id"])
+    out = []
+    t0 = time.time()
+    first, _ = ss.one_read(schema, template, slots, sys_text, state, seed)
+    first_ms = (time.time() - t0) * 1e3
+    out.append(first[0])
+    extra_ms = None
+    if reads > 1:
+        # the proxy's escalation fires the remaining reads in parallel
+        t1 = time.time()
+        with ThreadPoolExecutor(reads - 1) as pool:
+            rest = list(
+                pool.map(
+                    lambda k: ss.one_read(
+                        schema, template, slots, sys_text, state, seed + k * SEED_STRIDE
+                    )[0][0],
+                    range(1, reads),
+                )
+            )
+        extra_ms = (time.time() - t1) * 1e3
+        out += rest
+    return out, {"first_ms": first_ms, "extra_ms": extra_ms}
+
+
+def ar_prompt(sys_text, ex, template, slot):
+    return ss.chat_prompt_ids(sys_text, state_text(ex)) + template[: slot["pos"]]
+
+
+def autoregressive_record(template, slots, sys_text, ex):
+    slot = slots[0]
+    body = {
+        "model": ss.ARGS.model,
+        "prompt": ar_prompt(sys_text, ex, template, slot),
+        "max_tokens": 1,
+        "temperature": 0.0,
+        "logprobs": ss.TOPK,
+        "logprob_token_ids": ss.label_id_union(slots),
+        "return_tokens_as_token_ids": True,
+    }
+    t0 = time.time()
+    d = ss.upstream_completions(body)
+    ms = (time.time() - t0) * 1e3
+    row = d["choices"][0]["logprobs"]["top_logprobs"][0]
+    top = {int(k.split(":")[1]): v for k, v in row.items()}
+    return [ss.slot_distribution(top, slot["label_ids"])], {
+        "first_ms": ms,
+        "extra_ms": None,
+    }
+
+
+def check_prefix(model):
+    """The autoregressive prompt is DiffusionGemma's chat prompt plus the
+    canvas template up to the slot. Gemma 4's own chat template must render the
+    same tokens (it writes the empty thought block itself), or the two arms
+    would not be reading the same prefix."""
+    from transformers import AutoTokenizer
+
+    tok = AutoTokenizer.from_pretrained(model)
+    for name in TASKS:
+        schema, template, slots, _, _ = setup(name)
+        sys_text = ss.system_text(schema)
+        ex = {"text": "check"}
+        mine = ss.chat_prompt_ids(sys_text, state_text(ex)) + template[: slots[0]["pos"]]
+        own = tok.apply_chat_template(
+            [{"role": "system", "content": sys_text}, {"role": "user", "content": state_text(ex)}],
+            tokenize=True,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+        own = list(own["input_ids"] if hasattr(own, "keys") else own)
+        own += template[len(ss.SCAFFOLD) : slots[0]["pos"]]
+        if [int(t) for t in own] != mine:
+            raise SystemExit(f"{name}: {model}'s chat template renders a different prefix")
+
+
+def returned(dist, label_ids):
+    """How many label ids came back with a real logprob. A label missing from
+    the response is scored at slot_distribution's floor, which is a guess."""
+    top = dist.pop("_top", None)
+    return None if top is None else sum(i in top for i in label_ids)
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--arm", choices=["diffusion", "autoregressive"], required=True)
+    ap.add_argument("--upstream", required=True)
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--tokenizer", default="google/diffusiongemma-26B-A4B-it")
+    ap.add_argument("--run", required=True, help="results/<run>/")
+    ap.add_argument("--tasks", nargs="*", default=list(TASKS))
+    ap.add_argument("--reads", type=int, default=4, help="diffusion noise draws")
+    ap.add_argument("--concurrency", type=int, default=8)
+    ap.add_argument("--limit", type=int, default=0, help="first N examples only")
+    args = ap.parse_args()
+
+    from transformers import AutoTokenizer
+
+    ss.ARGS = types.SimpleNamespace(model=args.model, upstream=args.upstream)
+    ss.init_tokenizer(AutoTokenizer.from_pretrained(args.tokenizer))
+    # keep the raw returned logprobs beside each distribution, so the record can
+    # say whether every label came back or was scored at the floor
+    orig = ss.slot_distribution
+    ss.slot_distribution = lambda top, label_ids: orig(top, label_ids) | {"_top": top}
+    if args.arm == "autoregressive":
+        check_prefix(args.model)
+
+    outdir = os.path.join(HERE, "results", args.run)
+    os.makedirs(outdir, exist_ok=True)
+    for name in args.tasks:
+        schema, template, slots, q, names = setup(name)
+        sys_text = ss.system_text(schema)
+        with open(os.path.join(HERE, "data", f"{name}.jsonl")) as f:
+            examples = [json.loads(line) for line in f]
+        if args.limit:
+            examples = examples[: args.limit]
+        path = os.path.join(outdir, f"{args.arm}-{name}.jsonl")
+        done = set()
+        if os.path.exists(path):
+            with open(path) as f:
+                done = {json.loads(line)["id"] for line in f}
+        todo = [ex for ex in examples if ex["id"] not in done]
+
+        def one(ex):
+            if args.arm == "diffusion":
+                reads, lat = diffusion_record(schema, template, slots, sys_text, ex, args.reads)
+            else:
+                reads, lat = autoregressive_record(template, slots, sys_text, ex)
+            for r in reads:
+                r["labels_returned"] = returned(r, slots[0]["label_ids"])
+            return {
+                "id": ex["id"],
+                "task": name,
+                "arm": args.arm,
+                "model": args.model,
+                "gold": ex["gold"],
+                "names": names,
+                "labels": q["labels"],
+                "reads": reads,
+                "latency": lat,
+            }
+
+        t0 = time.time()
+        with open(path, "a") as f, ThreadPoolExecutor(args.concurrency) as pool:
+            for i, rec in enumerate(pool.map(one, todo), 1):
+                f.write(json.dumps(rec) + "\n")
+                f.flush()
+                if i % 50 == 0 or i == len(todo):
+                    print(f"{args.arm} {name}: {i}/{len(todo)} ({time.time() - t0:.0f}s)", flush=True)
+        if not todo:
+            print(f"{args.arm} {name}: already complete ({len(done)})")
+
+
+if __name__ == "__main__":
+    main()
