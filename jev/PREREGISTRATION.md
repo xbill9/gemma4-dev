@@ -1,0 +1,44 @@
+# Pre-registration: Gemma 4 26B read by label logits vs DiffusionGemma one-step reads
+
+Committed before any model call. Everything below is fixed for run `2026-09-23-l4-awq`; a change after the first call is reported as a deviation, with the reason.
+
+## Question
+
+How accurate and how well calibrated are the label probabilities of Gemma 4 26B-A4B read by next-token label logits, and of DiffusionGemma 26B-A4B read by one denoise step (vLLM PR #57250), on human-labelled public data, and how many labels does a single fitted temperature need to calibrate them?
+
+## Models and serving
+
+- Plain arm: `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`
+- Diffusion arm: `cyankiwi/diffusiongemma-26B-A4B-it-AWQ-INT4`
+- Both: compressed-tensors, 4-bit weights, group size 32, symmetric, same quantizer, same layers kept in bf16 (about 17.2 GB each)
+- Server: `vllm/vllm-openai:nightly-e9757321527ca1ecd514c07c1418dd2c53da3d19` (22 commits after the PR #57250 merge commit `1b3b88ec`)
+- One flag set for both arms: `--attention-backend TRITON_ATTN --gpu-memory-utilization 0.92 --max-model-len 2048 --max-num-seqs 16 --max-logprobs 32 --enforce-eager --enable-prefix-caching`; diffusion adds `--diffusion-config '{"canvas_length": 64}'`
+- Hardware: one AWS EC2 G6 instance, one NVIDIA L4, us-east-1; configuration in `aws/user-data.sh`
+
+## Data
+
+`data/*.jsonl` as committed: 300 examples each of sst2 (validation), ag_news (test), dair-ai/emotion (test) and tweet_eval irony (test), stratified with seed 20260923 by `build_eval_set.py`. Labels are the datasets' own.
+
+## Reads
+
+- Prompt, answer template, label tokens and `slot_distribution` from the PR's `structured_server.py`, vendored at `1b3b88ec`, identical for both arms; `run_eval.py` checks the prefix before any call
+- Plain arm: one completion token, label logprobs requested with `logprob_token_ids`
+- Diffusion arm: one read-only denoise step over the seeded canvas, 4 noise draws per example with the proxy's seed schedule
+- Option-order check: the three choice tasks re-run with options listed in reverse order (`--variant reversed`), both arms
+
+## Outcomes, computed by `score.py`
+
+Primary:
+1. Accuracy per task and arm
+2. Expected calibration error (15 equal-width bins, top-answer confidence) per task and arm, at temperature 1
+3. Calibration after fitting one temperature (log-loss grid 0.25–7.9) on N = 0, 25, 50, 100, 150 labels from a fixed half, scored on the other half (seed 20260923)
+
+Secondary: Brier score, log loss, AUROC of confidence for correctness, share of probability on the allowed labels, the escalation rule at the proxy's 0.1 entropy threshold, spread across diffusion noise draws, share of answers that change under reversed option order, latency.
+
+Readouts: `ar` (plain arm), `dg1` (diffusion, one draw), `dg4` (mean of four draws), `dgauto` (the proxy's automatic rule).
+
+## Comparisons, stated in advance
+
+- Plain against diffusion on the same items, paired, with 95% ranges from 2,000 resamples
+- No Jev call is made. Published Jev figures on other items are context only and are labelled as such
+- All results are published, including any where either arm does worse, with per-item outputs committed under `results/`

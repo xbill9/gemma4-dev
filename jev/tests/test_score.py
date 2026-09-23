@@ -73,6 +73,27 @@ class Metrics(unittest.TestCase):
         pt, lo, hi = score.paired_diff(res, res, score.acc_stat)
         self.assertEqual((pt, lo, hi), (0.0, 0.0, 0.0))
 
+    def test_temper_identity_and_sharpen(self):
+        self.assertEqual([round(x, 6) for x in score.temper([0.7, 0.3], 1.0)], [0.7, 0.3])
+        sharp = score.temper([0.7, 0.3], 0.5)
+        self.assertGreater(sharp[0], 0.7)
+
+    def test_fit_temperature_softens_overconfidence(self):
+        # 0.99 confident but right only 60% of the time: the best fit is > 1
+        probs = [[0.99, 0.01]] * 10
+        gold = [0] * 6 + [1] * 4
+        self.assertGreater(score.fit_temperature(probs, gold), 1.0)
+
+    def test_flip_rate(self):
+        base = {"a": rec([[0.9, 0.1]]), "b": rec([[0.2, 0.8]])}
+        var = {"a": rec([[0.1, 0.9]], names=("b", "a")), "b": rec([[0.8, 0.2]], names=("b", "a"))}
+        # a: base picks "a", variant picks "a" (index 1 of reversed names) -> same
+        # b: base picks "b", variant picks "b" -> same
+        self.assertEqual(score.flip_rate(base, var, "ar")["flips"], 0)
+        # a variant that keeps the same letter while the names are reversed flips both
+        flipped = {"a": rec([[0.9, 0.1]], names=("b", "a")), "b": rec([[0.2, 0.8]], names=("b", "a"))}
+        self.assertEqual(score.flip_rate(base, flipped, "ar")["flips"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

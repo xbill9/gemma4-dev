@@ -49,9 +49,16 @@ def example_seed(ex_id):
     return zlib.crc32(ex_id.encode())
 
 
-def setup(task_name):
+def setup(task_name, variant="none"):
+    """variant "reversed" lists a choice question's options in reverse order, so
+    each option gets a different letter; comparing predicted option names with
+    the unreversed run measures sensitivity to option order. Yes/no questions
+    have no order to reverse and are left unchanged."""
     task = TASKS[task_name]
-    schema = ss.parse_schema({"questions": [task["question"]], "samples": 1})
+    question = dict(task["question"])
+    if variant == "reversed" and question["type"] == "choice":
+        question["options"] = list(reversed(question["options"]))
+    schema = ss.parse_schema({"questions": [question], "samples": 1})
     template, slots = ss.template_for(schema, ss.SCAFFOLD, "")
     q = schema["questions"][0]
     names = [c[0] for c in q["choices"]]
@@ -157,6 +164,7 @@ def main():
     ap.add_argument("--reads", type=int, default=4, help="diffusion noise draws")
     ap.add_argument("--concurrency", type=int, default=8)
     ap.add_argument("--limit", type=int, default=0, help="first N examples only")
+    ap.add_argument("--variant", choices=["none", "reversed"], default="none")
     args = ap.parse_args()
 
     from transformers import AutoTokenizer
@@ -173,13 +181,16 @@ def main():
     outdir = os.path.join(HERE, "results", args.run)
     os.makedirs(outdir, exist_ok=True)
     for name in args.tasks:
-        schema, template, slots, q, names = setup(name)
+        if args.variant == "reversed" and TASKS[name]["question"]["type"] != "choice":
+            continue
+        schema, template, slots, q, names = setup(name, args.variant)
         sys_text = ss.system_text(schema)
         with open(os.path.join(HERE, "data", f"{name}.jsonl")) as f:
             examples = [json.loads(line) for line in f]
         if args.limit:
             examples = examples[: args.limit]
-        path = os.path.join(outdir, f"{args.arm}-{name}.jsonl")
+        suffix = "" if args.variant == "none" else f"--{args.variant}"
+        path = os.path.join(outdir, f"{args.arm}-{name}{suffix}.jsonl")
         done = set()
         if os.path.exists(path):
             with open(path) as f:
@@ -197,6 +208,7 @@ def main():
                 "id": ex["id"],
                 "task": name,
                 "arm": args.arm,
+                "variant": args.variant,
                 "model": args.model,
                 "gold": ex["gold"],
                 "names": names,

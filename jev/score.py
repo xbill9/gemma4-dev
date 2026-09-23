@@ -227,6 +227,61 @@ def latency(records, kind):
 
 
 # ---------------------------------------------------------------------------
+# Calibration against labels used for tuning, and option-order sensitivity.
+# ---------------------------------------------------------------------------
+
+CURVE_NS = (0, 25, 50, 100, 150)
+T_GRID = [round(0.25 * 1.05 ** i, 4) for i in range(0, 72)]  # 0.25 .. ~7.9
+
+
+def temper(p, t):
+    """Rescale a label distribution by temperature t: p_i^(1/t), renormalised."""
+    w = [max(x, 1e-12) ** (1.0 / t) for x in p]
+    z = sum(w)
+    return [x / z for x in w]
+
+
+def fit_temperature(probs, gold_idx):
+    """The grid temperature with the lowest log loss on the given examples."""
+    return min(T_GRID, key=lambda t: nll([temper(p, t) for p in probs], gold_idx))
+
+
+def label_curve(records, kind, seed=20260923):
+    """Split the examples once with a fixed seed: a fitting pool and a held-out
+    half. For each N, fit one temperature on the first N of the pool (N = 0 is
+    no fitting) and score the held-out half."""
+    _, correct, _, probs, gold = score(records, kind)
+    idx = list(range(len(records)))
+    random.Random(seed).shuffle(idx)
+    half = len(idx) // 2
+    pool, held = idx[:half], idx[half:]
+    out = []
+    for n in CURVE_NS:
+        if n > len(pool):
+            continue
+        t = 1.0 if n == 0 else fit_temperature([probs[i] for i in pool[:n]], [gold[i] for i in pool[:n]])
+        hp = [temper(probs[i], t) for i in held]
+        hg = [gold[i] for i in held]
+        conf = [max(p) for p in hp]
+        corr = [max(range(len(p)), key=lambda k: p[k]) == g for p, g in zip(hp, hg)]
+        out.append({"n_labels": n, "temperature": t, "ece": ece(conf, corr), "nll": nll(hp, hg), "brier": brier(hp, hg), "n_heldout": len(held)})
+    return out
+
+
+def predicted_name(rec, kind):
+    p = readout(rec, kind)[0]
+    return rec["names"][max(range(len(p)), key=lambda i: p[i])]
+
+
+def flip_rate(base, variant, kind):
+    """Share of examples whose predicted option name changes when the options
+    are listed in reverse order."""
+    ids = sorted(set(base) & set(variant))
+    flips = sum(predicted_name(base[i], kind) != predicted_name(variant[i], kind) for i in ids)
+    return {"n": len(ids), "flips": flips, "rate": flips / len(ids) if ids else None}
+
+
+# ---------------------------------------------------------------------------
 
 
 def load(path):
@@ -246,7 +301,7 @@ def main():
     args = ap.parse_args()
     rundir = os.path.join(HERE, "results", args.run)
     tasks = sorted(
-        {f.split("-", 1)[1][:-6] for f in os.listdir(rundir) if f.endswith(".jsonl")}
+        {f.split("-", 1)[1][:-6] for f in os.listdir(rundir) if f.endswith(".jsonl") and "--" not in f}
     )
     summary = {}
     md = [f"# Jev-style reads: DiffusionGemma vs Gemma 4 26B — run `{args.run}`", ""]
@@ -300,6 +355,22 @@ def main():
                 f"low spread predicts correct with AUROC {fmt(sp['auroc_low_spread_vs_correct'])}; "
                 f"{fmt(sp['wrong_with_spread_under_0.02'], True)} of wrong answers had spread under 0.02"
             )
+        rows["label_curve"] = {k: label_curve(r, k) for k, r in (("ar", ar_recs), ("dg1", dg_recs), ("dg4", dg_recs))}
+        md += ["", "Calibration on the held-out half after fitting one temperature on N labels:", "",
+               "| N labels | ar T | ar ECE | dg1 T | dg1 ECE | dg4 T | dg4 ECE |", "|---|---|---|---|---|---|---|"]
+        for j, pt in enumerate(rows["label_curve"]["ar"]):
+            c = [rows["label_curve"][k][j] for k in ("ar", "dg1", "dg4")]
+            md.append(f"| {pt['n_labels']} | " + " | ".join(f"{x['temperature']:.2f} | {x['ece']:.3f}" for x in c) + " |")
+        flips = {}
+        for arm, kind in (("autoregressive", "ar"), ("diffusion", "dg1")):
+            vpath = os.path.join(rundir, f"{arm}-{task}--reversed.jsonl")
+            if os.path.exists(vpath):
+                flips[kind] = flip_rate(load(paths[arm]), load(vpath), kind)
+        if flips:
+            rows["option_order_flips"] = flips
+            md.append("")
+            md.append("Options listed in reverse order: " + "; ".join(
+                f"{k} changed {v['flips']} of {v['n']} answers ({fmt(v['rate'], True)})" for k, v in flips.items()))
         for kind in ("ar", "dg1"):
             s = rows[kind]
             if s["all_labels_returned"] is not None and s["all_labels_returned"] < 1:
