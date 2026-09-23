@@ -92,11 +92,7 @@ aws ec2 run-instances --region us-east-1 --image-id <gpu-dlami> --instance-type 
 i-0c5b14e913b4c1019	g6.xlarge	us-east-1a
 ```
 
----
-
-#### 🔎 Tip: A g6.xlarge Loads a 17 GB Checkpoint With a Swapfile
-
-`g6.2xlarge` had no capacity in any us-east-1 zone at launch time, and `g6.xlarge` did. It has the same L4 with 16 GB of host memory, so `user-data.sh` adds a 16 GB swapfile on hosts under 30 GB. Both checkpoints loaded with the swapfile in place.
+A `g6.xlarge` has the same L4 as the larger sizes with 16 GB of host memory, so `user-data.sh` adds a 16 GB swapfile on hosts under 30 GB; both 17 GB checkpoints loaded with it in place.
 
 ---
 
@@ -240,7 +236,7 @@ That is the pre-registered single split. One split of 150 held-out examples move
 | DAIR Emotion | 0.392 | 0.089 (0.047–0.161) | 0.266 | 0.111 (0.062–0.155) |
 | tweet_eval irony | 0.099 | 0.060 (0.035–0.130) | 0.054 | 0.066 (0.031–0.116) |
 
-Means over 20 splits, with the range in brackets. With no labels, DiffusionGemma is better calibrated on emotion and irony. With 50, plain Gemma's mean is at or below DiffusionGemma's on all four tasks, and the ranges overlap throughout.
+The pre-registered analysis is the single split above; these means over 20 splits, with the range in brackets, were added to show how much one split moves it. With no labels, DiffusionGemma is better calibrated on emotion and irony. With 50, plain Gemma's mean is at or below DiffusionGemma's on all four tasks, and the ranges overlap throughout.
 
 ---
 
@@ -299,7 +295,7 @@ python3 run_eval.py --arm diffusion --upstream http://localhost:8000 --model $DI
 | irony | 61 | 61 | 121 | 122 | 312 |
 ```
 
-Times are in milliseconds. A plain Gemma 26B decision takes 61 ms on one L4. One DiffusionGemma read takes about twice that, and the automatic rule's four reads about five times, which is the path it takes on nearly every call.
+Times are in milliseconds. A plain Gemma 26B decision takes 61 ms on one L4 for these prompts, which run 105 to 299 tokens with a median of 132; longer inputs such as full tickets or logs take longer. One DiffusionGemma read takes about twice that, and the automatic rule's four reads about five times, which is the path it takes on nearly every call.
 
 ---
 
@@ -318,7 +314,7 @@ Label 50 real decisions from the task, fit on them, and set any act-or-escalate 
 
 #### What About the Smaller Gemma 4 Models?
 
-The label read works with any Gemma 4. DiffusionGemma ships only at 26B-A4B, so the smaller models get the plain arm alone, run in bf16 on the same L4 with the same flags. Their chat templates end at the model turn without the empty thought block the 26B template adds, so their prompt follows their own template. These two arms were added after the first run and are exploratory.
+The label read works with any Gemma 4. DiffusionGemma ships only at 26B-A4B, so the smaller models get the plain arm alone, run in bf16 on the same L4 with the same flags. Their chat templates end at the model turn without the empty thought block the 26B template adds, so their prompt follows their own template. These two arms were added after the first run and are exploratory. The 26B column is 4-bit and the others bf16, so the gaps mix model size with precision. All three read letter labels (A to F) with the meanings listed in the prompt, the format of the PR's proxy; smaller models may do better with the label words as the answers themselves.
 
 | Task | 26B, 4-bit | E4B, bf16 | E2B, bf16 |
 |---|---|---|---|
@@ -329,7 +325,7 @@ The label read works with any Gemma 4. DiffusionGemma ships only at 26B-A4B, so 
 
 E4B is within 1 to 5 points of the 26B, needs a smaller correction (fitted temperature 1.89 to 3.77 at 50 labels, against 4.65 to 7.05), and reaches similar calibration once corrected: 0.042, 0.071, 0.089 and 0.081 against the 26B's 0.039, 0.066, 0.089 and 0.060. It changed more answers when the options were reversed on AG News, 35 of 300 against 14.
 
-E2B answered "world" on 277 of 300 AG News examples, and on 263 when the options were listed in reverse order, so it picks by the option's name and its topic accuracy sits near the 25% majority rate. Its fitted temperatures reach the top of the pre-registered search range, 7.33 to 7.99.
+E2B answered "world" on 277 of 300 AG News examples, and on 263 when the options were listed in reverse order, so the same option wins whatever its position, and its topic accuracy sits near the 25% majority rate. Its fitted temperatures reach 7.99, the top of the pre-registered search range, so its corrected calibration figures understate what a wider search would reach.
 
 ---
 
