@@ -36,12 +36,12 @@ This run answers both on the same GPU, the same prompts, the same label tokens a
 The models, image, serving flags, data, metrics and comparisons are written down and committed before any model call. The file is `PREREGISTRATION.md`.
 
 ```shell
-git show -s --oneline 606f033 4d7585c
+git show -s --oneline 3c67f62 d94471d
 ```
 
 ```plaintext
-4d7585c jev: run 2026-09-23-l4-awq — Gemma 4 26B label logits vs DiffusionGemma one-step reads, both AWQ 4-bit on one EC2 L4; per-item outputs, summary, host evidence
-606f033 jev: pre-registration for the L4 AWQ run; option-order variant, label-count calibration curve, EC2 user-data
+3c67f62 jev: pre-registration for the L4 AWQ run; option-order variant, label-count calibration curve, EC2 user-data
+d94471d jev: run 2026-09-23-l4-awq — Gemma 4 26B label logits vs DiffusionGemma one-step reads, both AWQ 4-bit on one EC2 L4; per-item outputs, summary, host evidence
 ```
 
 The pre-registration commits to publishing every result, including any where either arm does worse.

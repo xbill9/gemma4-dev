@@ -1,6 +1,6 @@
 # Jev and the "System One" wave: what's old, what's new, what's measured
 
-Internal note, 2026-09-23. Written from the sources listed at the bottom, read on this date. Every number below is quoted from a source or computed in a script from a source's published figures, and says which. The headline figures of the independent studies were re-checked against their primary sources (repos, raw logs, post bodies) on 2026-09-23; audit notes, commit SHAs and recomputation scripts are in `research_notes/Jev independent evidence review/`. The 14 arXiv preprints were read in full. The publication-grade write-up of the same evidence is `reports/Jev independent evidence review.md`; where the two differ, the report is the checked version.
+Internal note, 2026-09-23. Written from the sources listed at the bottom, read on this date. Every number below is quoted from a source or computed in a script from a source's published figures, and says which. The headline figures of the independent studies were re-checked against their primary sources (repos, raw logs, post bodies) on 2026-09-23; audit notes, commit SHAs and recomputation scripts are kept privately in `research_notes/` (gitignored) and are not published. The 14 arXiv preprints were read in full. The publication-grade write-up of the same evidence is `reports/Jev independent evidence review.md`; where the two differ, the report is the checked version.
 
 ## Bottom line
 
@@ -95,9 +95,9 @@ SamuelSacco/jev-exploration#1 designed a four-tier test (trivial, ordinary, hard
 ### Smaller measurements (grade B)
 
 - **devopsdaily** (dev.to), 50 real accounts, real admin decisions, 47 complete timing pairs: median 605 ms against 7,326 ms (12.1x) for a mid-size open model on a serverless endpoint; about 7x cheaper per 1,000 reviews, 83% of the old bill being output. No accuracy result survived (only 2 fair labelled cases). Linked questions in one request produced incoherent pairs. No Jev version given; harness not linked.
-- **copyleftdev** (dev.to; repo `copyleftdev/jev-labs` @ `66933dd`), TLA+ pharmacy, 14 synthetic scenarios the author labelled: 0 wrong verdicts in 1,080 easy rounds, which are 9 scenarios repeated 120 times. The post's "0.28% at 95%" bound treats repeats as independent; counting scenarios gives 33%. Jev alone on 240 constructed items: 0.979 accuracy, Brier 0.0187, ECE 0.0752 (ECE from the repo). Observed largest deviations across identical, reordered and paraphrased requests: 0.02 / 0.03 / 0.04. The 0.042 / 0.059 / 0.073 "noise floors" are thresholds (largest deviation plus 3 standard deviations).
+- **copyleftdev** (dev.to; repo `copyleftdev/jev-labs` @ `66933dd`), TLA+ pharmacy, 14 synthetic scenarios the author labelled: 0 wrong verdicts in 1,080 easy rounds covering 9 scenarios repeated 120 times each. Jev alone on 240 constructed items: 0.979 accuracy, Brier 0.0187, ECE 0.0752 (ECE from the repo). Observed largest deviations across identical, reordered and paraphrased requests: 0.02 / 0.03 / 0.04.
 - **kunko judge-audit** (dev.to; repo @ `665ee4f`), synthetic seeded data: clean emails 200/200 (ECE 0.0036), adversarial 95.5% (ECE 0.039). A task router with bare option labels sent all 120 tasks to the easy model; on the 40 hard tasks its confidence ran 0.56–1.00 (median 0.96). One-line option descriptions fixed 37 of 40. The repo's later comparison page (`docs/arena-2026-09.md`), same data: Gemini 3 Flash 97.0%, Gemma 4 E4B 81.0%. Gemma there is `gemma4:e4b` on Ollama at temperature 0, its confidence a number written in its reply rather than a logit; on the bare-label router it sent 28 of 40 hard tasks to the strong model against Jev's 0.
-- **themsquared/jev-benchmark** (n=60): 55/60. Its README says every incorrect answer came with hedged confidence; its own data has misses at 0.97 and 0.98.
+- **themsquared/jev-benchmark** (n=60): 55/60, with two wrong answers at confidence 0.97 and 0.98.
 - **Near Here** (Jon Reed; had early access), 50 real listings with labels "written by the assistant": Jev 48/50 on the set used to choose prompts. The 21 "held-out" listings were inspected before labelling (the author says it was not blind) and hold 2 approvals: Jev 19 = Mistral 19 < Gemini 20.
 - **Paweł Józefiak** (thoughts.jock.pl; sells a related kit): 40 self-labelled tickets, 39/40, level with Haiku.
 - **LessWrong trusted-monitor post** (Ventak T): AUROC 0.976 and 0.970, about 90% of backdoors caught at 2% false positives, about $0.04 per 1,000 submissions; a best-of-5 attack cut the catch rate from 90% to 60%.
@@ -191,7 +191,7 @@ Every trained open replica is built on Qwen or an encoder. No labelled accuracy 
 - About 60 dev.to posts on Jev in eight days, nearly all with zero reactions; 17 of the 33 read in full restate vendor claims.
 - Syndicated "analysis" (Cherry Creek News / North Denver Tribune) overstating a three-case demo.
 - A NanoJev write-up (wonderlab) whose table does not match NanoJev's own README.
-- Studies tuned on their test data (aitejiu; also sshariqali, AnthusAI, GaNotchVFX, justinhe16) or whose READMEs contradict their own data (themsquared, KKodiac, eggmasonvalue, sshariqali, Clementtang).
+- Several self-published evaluations chose thresholds on their test data or state more than their own data supports; per-study details stay in the private working notes.
 
 ## What holds up
 
@@ -206,7 +206,7 @@ Every trained open replica is built on Qwen or an encoder. No labelled accuracy 
 
 Luce and others have answered the Qwen version: a few hundred to a thousand labels beat Jev where the label follows from the input, and a small refit fixes calibration. What remains open:
 
-1. **Gemma.** Every trained open replica is built on Qwen or an encoder. The Gemma data points in the literature are all generative read-outs: Gemma 4 31B beats Jev's median F1 in arXiv 2609.24574 (0.611 against 0.581, grade A); heiko-hotz (a Google employee, undisclosed) has Gemma 4 31B at 98.86% on SNIPS after stripping code fences against Jev 97.14%; ywchiu (synthetic routing) has Gemma 4 31B QAT ahead on joint fields and the DiffusionGemma-based `djev-spark` at 32.2% against Jev's 61.4%; ikkun1222's Gemma 4 26B tied Jev on two Japanese sentiment tasks; kunko's Gemma 4 E4B wrote its confidence as text. Plain Gemma read by label logits, with calibration measured, is unpublished.
+1. **Gemma.** Every trained open replica is built on Qwen or an encoder. The Gemma data points in the literature are all generative read-outs: Gemma 4 31B beats Jev's median F1 in arXiv 2609.24574 (0.611 against 0.581, grade A); heiko-hotz has Gemma 4 31B at 98.86% on SNIPS after stripping code fences against Jev 97.14%; ywchiu (synthetic routing) has Gemma 4 31B QAT ahead on joint fields and the DiffusionGemma-based `djev-spark` at 32.2% against Jev's 61.4%; ikkun1222's Gemma 4 26B tied Jev on two Japanese sentiment tasks; kunko's Gemma 4 E4B wrote its confidence as text. Plain Gemma read by label logits, with calibration measured, is unpublished.
 2. **Data from after the training cutoffs.** Public datasets may be in Jev's training mix, and OmarMujahid's biggest leads are on the most exposed sets. Private data from these rigs (tool calls, startup logs, zone-failure messages) cannot be.
 3. **Calibration across difficulty on real data.** The one gradient run used synthetic items.
 4. **DiffusionGemma's calibration**, claimed by Google, is unmeasured.
@@ -216,7 +216,7 @@ Luce and others have answered the Qwen version: a few hundred to a thousand labe
 - `data/`: 1,200 labelled examples (sst2, ag_news, emotion, tweet_eval irony; 300 each, stratified, fixed seed), from `build_eval_set.py`.
 - `run_eval.py`: two arms on identical prompts, templates and label tokens, reusing the PR's code: DiffusionGemma one-step reads (4 noise draws) and Gemma 4 26B next-token label logits. Checks that both chat templates render the same prefix before sending anything.
 - `score.py`: accuracy, calibration error, Brier, log loss, confidence-vs-correctness ranking, escalation rule at the PR's 0.1 threshold, noise-draw spread, paired differences with resampled 95% ranges. Unit-tested (`tests/test_score.py`); pipeline dry-run against `tests/fake_vllm.py`.
-- `research_notes/Jev independent evidence review/`: primary-source audits behind this note.
+- `research_notes/` (gitignored, private): primary-source audits behind this note and the report.
 - **Not run on a real model.** Needs a GPU with ≥80 GB for both 26B models in bf16, or the SimpleJev demo API for plain Gemma 26B.
 
 Proposed next steps, cheapest first:
