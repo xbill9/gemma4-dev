@@ -36,7 +36,7 @@ This run answers both on the same GPU, the same prompts, the same label tokens a
 The models, image, serving flags, data, metrics and comparisons are written down and committed before any model call. The file is `PREREGISTRATION.md`.
 
 ```shell
-git log --oneline -- jev/PREREGISTRATION.md jev/results/2026-09-23-l4-awq | tail -2
+git show -s --oneline 606f033 4d7585c
 ```
 
 ```plaintext
@@ -255,6 +255,8 @@ Half of it lands outside the allowed labels. The median share on the allowed lab
 | DAIR Emotion | 1.000 | 0.392 |
 | tweet_eval irony | 1.000 | 0.593 |
 
+The latency run kept the five highest tokens returned at the answer slot. Where a token outside the allowed labels made those five, it was most often `<eos>`, the end-of-sequence token: in 40% of reads on sst2, 53% on AG News and 64% on DAIR Emotion. On irony it was most often ` the`, in 24% of reads. At the answer slot, DiffusionGemma gives much of its probability to the answer ending there.
+
 The proxy rescales the label probabilities to sum to one, so the answer reads as confident either way. `label_mass` is the field that shows it, and it is worth logging in any deployment.
 
 ---
@@ -281,16 +283,23 @@ For both models, by similar amounts. Listing the choice options in reverse order
 
 #### How Fast Is Each One?
 
-Median time per request, measured from a client over the internet to us-east-1, so it includes the network round trip:
+A second run timed both arms with the client on the instance itself, against `localhost`, one request at a time, over the first 100 examples of each task. Same image, flags and checkpoints, on a `g6.4xlarge`: the same L4 with a larger host, launched because no `g6.xlarge` was free.
 
-| Task | Plain Gemma | DiffusionGemma, one read | DiffusionGemma, automatic rule |
-|---|---|---|---|
-| sst2 | 189 ms | 275 ms | 563 ms |
-| AG News | 248 ms | 281 ms | 576 ms |
-| DAIR Emotion | 167 ms | 255 ms | 556 ms |
-| tweet_eval irony | 186 ms | 260 ms | 557 ms |
+```shell
+python3 run_eval.py --arm autoregressive --upstream http://localhost:8000 --model $PLAIN --run 2026-09-23-l4-latency --limit 100 --concurrency 1
+python3 run_eval.py --arm diffusion --upstream http://localhost:8000 --model $DIFF --run 2026-09-23-l4-latency --limit 100 --concurrency 1 --reads 4 --keep-top 5
+```
 
-With the automatic rule firing on nearly everything, DiffusionGemma pays for four reads on almost every call.
+```plaintext
+| Task | Plain, median | Plain, 90th pct | Diffusion one read, median | Diffusion one read, 90th pct | Diffusion 4 reads (first + 3 parallel), median |
+|---|---|---|---|---|---|
+| sst2 | 61 | 62 | 118 | 119 | 306 |
+| ag_news | 61 | 62 | 119 | 120 | 307 |
+| emotion | 61 | 62 | 119 | 120 | 308 |
+| irony | 61 | 61 | 121 | 122 | 312 |
+```
+
+Times are in milliseconds. A plain Gemma 26B decision takes 61 ms on one L4. One DiffusionGemma read takes about twice that, and the automatic rule's four reads about five times, which is the path it takes on nearly every call.
 
 ---
 
@@ -307,6 +316,23 @@ Label 50 real decisions from the task, fit on them, and set any act-or-escalate 
 
 ---
 
+#### What About the Smaller Gemma 4 Models?
+
+The label read works with any Gemma 4. DiffusionGemma ships only at 26B-A4B, so the smaller models get the plain arm alone, run in bf16 on the same L4 with the same flags. Their chat templates end at the model turn without the empty thought block the 26B template adds, so their prompt follows their own template. These two arms were added after the first run and are exploratory.
+
+| Task | 26B, 4-bit | E4B, bf16 | E2B, bf16 |
+|---|---|---|---|
+| sst2 | 🥇 95.0% | 94.3% | 88.7% |
+| AG News | 🥇 86.7% | 83.7% | 30.3% |
+| DAIR Emotion | 🥇 58.3% | 54.0% | 53.3% |
+| tweet_eval irony | 🥇 89.7% | 84.3% | 72.7% |
+
+E4B is within 1 to 5 points of the 26B, needs a smaller correction (fitted temperature 1.89 to 3.77 at 50 labels, against 4.65 to 7.05), and reaches similar calibration once corrected: 0.042, 0.071, 0.089 and 0.081 against the 26B's 0.039, 0.066, 0.089 and 0.060. It changed more answers when the options were reversed on AG News, 35 of 300 against 14.
+
+E2B answered "world" on 277 of 300 AG News examples, and on 263 when the options were listed in reverse order, so it picks by the option's name and its topic accuracy sits near the 25% majority rate. Its fitted temperatures reach the top of the pre-registered search range, 7.33 to 7.99.
+
+---
+
 #### Compare and Contrast
 
 | | Plain Gemma 4 26B, label read | DiffusionGemma 26B, one-step read |
@@ -315,7 +341,7 @@ Label 50 real decisions from the task, fit on them, and set any act-or-escalate 
 | Raw calibration | overconfident, fitted temperature 3.5 to 7.2 | 🥇 closer, fitted temperature 0.7 to 2.4 |
 | After 50 labels | level | level |
 | Probability on the allowed labels | 🥇 about 100% | 37% to 59% |
-| Median time per decision | 🥇 167 to 248 ms | 255 to 281 ms for one read, about 560 ms with the automatic rule |
+| Time per decision on the instance | 🥇 61 ms | 118 to 121 ms for one read, 306 to 312 ms with the automatic rule |
 | Option-order changes | 2.0% to 9.0% | 2.3% to 8.7% |
 | Serving | any vLLM | vLLM with PR #57250 |
 
@@ -327,6 +353,8 @@ For a Jev-style decision service on one L4, plain Gemma 4 26B read by its label 
 
 DiffusionGemma's lower raw calibration error is real on two of four tasks, and it matters when no labels exist at all. With 50 labels, the difference is gone.
 
+Where a smaller model has to do, Gemma 4 E4B in bf16 gives up 1 to 5 points against the 26B. E2B falls apart on four-way topic classification with this prompt.
+
 ---
 
 #### What Does a Decision Cost?
@@ -335,7 +363,9 @@ The run logs give a throughput. Plain Gemma answered 2,100 decisions in 51 secon
 
 At the `g6.xlarge` on-demand price of $0.8048 an hour, that is at most $5.43 per million decisions for plain Gemma and $31.72 for DiffusionGemma with four reads. TypeSafe prices Jev at $0.042 per million input tokens, which is $6.30 to $12.60 per million decisions at 150 to 300 input tokens each. The L4 is charged by the hour whether busy or idle, so its per-decision cost holds only at full load.
 
-The whole first run, from launch to termination in under 1.2 hours, cost at most $0.97 of instance time plus the prorated 100 GB volume. It ran on demand; G-family spot capacity in us-east-1 was unavailable at launch time.
+At 61 ms per decision one request at a time, one L4 answers about 16 plain decisions a second before any batching; the 41.2 a second above came from eight requests in flight.
+
+The first run, from launch to termination in under 1.2 hours, cost at most $0.97 of instance time. The second, on a `g6.4xlarge` at $1.3232 an hour for 1.19 hours, cost $1.57. Both exclude the prorated 100 GB volume. Both ran on demand; G-family spot capacity in us-east-1 was unavailable at launch time.
 
 ---
 
@@ -363,13 +393,17 @@ The goal of this article was to measure Gemma 4 26B as a Jev-style decision mode
 - 🟢 DiffusionGemma level on three tasks, 3.7 points behind on AG News
 - 🟢 DiffusionGemma's raw calibration error lower on emotion (0.261 against 0.386) and irony (0.043 against 0.098)
 - 🟢 One temperature fitted on 50 labels brings both to similar calibration
-- 🟢 One L4 for under 1.2 hours, at most $0.97 of instance time
+- 🟢 On the instance, one request at a time: 61 ms per plain decision, against 118 to 121 ms for one DiffusionGemma read and 306 to 312 ms for four
+- 🟢 At most $5.43 per million plain decisions on a `g6.xlarge` at full load
+- 🟢 Gemma 4 E4B in bf16 within 1 to 5 points of the 26B, with similar calibration after 50 labels
+- 🟢 Both runs together cost $2.54 of instance time
 - ⚠️ DiffusionGemma places 37% to 59% of its probability outside the allowed labels, and the proxy's rescaling hides it
 - ⚠️ The proxy's automatic re-read rule fired on 96% to 100% of examples, doubling DiffusionGemma's time per decision
 - ⚠️ Irony scores are high enough to suggest the public test set was in training data
 - ⚠️ Spread across DiffusionGemma's four reads missed 60.8% to 65.0% of wrong answers on three tasks
+- ❌ Gemma 4 E2B answered "world" on 277 of 300 AG News examples
 
-Scope: one EC2 `g6.xlarge` with one NVIDIA L4 in us-east-1, vLLM `0.29.1rc1.dev573+ge97573215`, both models 4-bit from the same quantizer, 300 examples per task, one run per arm, latency measured from one client over the internet. bf16 weights, other GPUs and Jev itself were outside this run; no Jev call was made. Code, pre-registration and every per-item output are in the repository. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
+Scope: one NVIDIA L4 in us-east-1 on two instances, a `g6.xlarge` for the accuracy run and a `g6.4xlarge` for the latency and small-model run, vLLM `0.29.1rc1.dev573+ge97573215`, the 26B models 4-bit from the same quantizer and E4B and E2B in bf16, 300 examples per task, one run per arm. Latency comes from 100 examples per task with the client on the instance; throughput comes from the first run's client on a home connection. The E4B and E2B arms and the 20-split calibration were added after the pre-registration and are labelled as such. bf16 weights, other GPUs and Jev itself were outside this run; no Jev call was made. Code, pre-registration and every per-item output are in the repository. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
 The strategy for using label probabilities to run Gemma 4 as a decision model was validated with an incremental step by step approach.
 

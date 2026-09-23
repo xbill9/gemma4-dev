@@ -7,6 +7,8 @@
 #   bash aws/launch_pass2.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."
+# Re-export short-lived credentials from the longer `aws login` session on every run.
+"$HOME/bin/save-aws-creds.sh" "$HOME/.aws/jev.aws_creds" >/dev/null || { echo "aws login session expired: run aws login --remote"; exit 1; }
 set -a; . "$HOME/.aws/jev.aws_creds"; set +a
 aws sts get-caller-identity --query Account --output text >/dev/null || { echo "credentials expired"; exit 1; }
 
