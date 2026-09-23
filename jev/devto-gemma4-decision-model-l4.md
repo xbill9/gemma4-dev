@@ -3,7 +3,7 @@ title: "Gemma 4 as a Jev-Style Decision Model: DiffusionGemma Starts Better Cali
 published: false
 description: "Plain Gemma 4 26B read by its label probabilities against DiffusionGemma's one-step read, both as community 4-bit (AWQ) builds on one EC2 L4, on 1,200 human-labelled examples. Pre-registered, with accuracy, calibration, calibration after fitting on 0 to 150 labels, option-order sensitivity, latency and cost."
 tags: gemma, aws, machinelearning, llm
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/devto-gemma4-l4-cover.f93b39b4.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/devto-gemma4-l4-banner.cb16905f.jpg
 ---
 
 This article provides a step by step guide to measuring Gemma 4 26B as a Jev-style decision model on an AWS EC2 L4 GPU, and compares a plain read of its label probabilities against DiffusionGemma's one-step read. The measurement was pre-registered, and every per-item output is committed.

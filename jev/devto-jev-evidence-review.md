@@ -3,7 +3,7 @@ title: "What the Independent Evidence Says About Jev, TypeSafe's System One Mode
 published: false
 description: "A review of every independent measurement of TypeSafe's Jev found in its first eight days: arXiv preprints, GitHub evaluations and blog benchmarks, each traced to its primary source. Accuracy, calibration, speed, cost, failure modes, the prior art, and what is still unmeasured for Gemma."
 tags: ai, machinelearning, llm, gemma
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/devto-jev-review-cover.446b3967.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/devto-jev-review-banner.2360df33.jpg
 ---
 
 This article provides a review of the independent evidence on TypeSafe's Jev, the open models built to replace it, and the prior art behind both, as of September 23, 2026. Every figure below is traced to a primary source, and re-scored from committed per-item outputs wherever the author published them. This is a snapshot eight days after launch, and the arXiv preprints it cites are days old and unrefereed.
