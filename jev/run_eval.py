@@ -95,8 +95,27 @@ def diffusion_record(schema, template, slots, sys_text, ex, reads):
     return out, {"first_ms": first_ms, "extra_ms": extra_ms}
 
 
+MODEL_TOK = None  # the served model's own tokenizer, set in main for the plain arm
+
+
+def own_template_ids(tok, sys_text, state):
+    out = tok.apply_chat_template(
+        [{"role": "system", "content": sys_text}, {"role": "user", "content": state}],
+        tokenize=True,
+        add_generation_prompt=True,
+        enable_thinking=False,
+    )
+    return [int(t) for t in (out["input_ids"] if hasattr(out, "keys") else out)]
+
+
 def ar_prompt(sys_text, ex, template, slot):
-    return ss.chat_prompt_ids(sys_text, state_text(ex)) + template[: slot["pos"]]
+    """The served model's own chat template, then the answer lead up to the
+    slot. For Gemma 4 26B the template already ends with the empty thought
+    block, which makes this the same token sequence as DiffusionGemma's prompt
+    plus the canvas template; check_prefix confirms that. Gemma 4 E2B and E4B
+    templates end at the model turn with no thought block, and get none."""
+    own = own_template_ids(MODEL_TOK, sys_text, state_text(ex))
+    return own + template[len(ss.SCAFFOLD): slot["pos"]]
 
 
 def autoregressive_record(template, slots, sys_text, ex):
@@ -122,28 +141,27 @@ def autoregressive_record(template, slots, sys_text, ex):
 
 
 def check_prefix(model):
-    """The autoregressive prompt is DiffusionGemma's chat prompt plus the
-    canvas template up to the slot. Gemma 4's own chat template must render the
-    same tokens (it writes the empty thought block itself), or the two arms
-    would not be reading the same prefix."""
+    """Loads the served model's tokenizer for ar_prompt, and checks it against
+    DiffusionGemma's prompt. The only difference allowed is the empty thought
+    block at the end of the chat template; anything else aborts the run."""
+    global MODEL_TOK
     from transformers import AutoTokenizer
 
-    tok = AutoTokenizer.from_pretrained(model)
+    MODEL_TOK = AutoTokenizer.from_pretrained(model)
+    notes = set()
     for name in TASKS:
         schema, template, slots, _, _ = setup(name)
         sys_text = ss.system_text(schema)
         ex = {"text": "check"}
-        mine = ss.chat_prompt_ids(sys_text, state_text(ex)) + template[: slots[0]["pos"]]
-        own = tok.apply_chat_template(
-            [{"role": "system", "content": sys_text}, {"role": "user", "content": state_text(ex)}],
-            tokenize=True,
-            add_generation_prompt=True,
-            enable_thinking=False,
-        )
-        own = list(own["input_ids"] if hasattr(own, "keys") else own)
-        own += template[len(ss.SCAFFOLD) : slots[0]["pos"]]
-        if [int(t) for t in own] != mine:
+        dg = ss.chat_prompt_ids(sys_text, state_text(ex)) + template[: slots[0]["pos"]]
+        mine = ar_prompt(sys_text, ex, template, slots[0])
+        if mine == dg:
+            notes.add("identical to the DiffusionGemma prompt")
+        elif mine == dg[: len(dg) - len(template[: slots[0]["pos"]])] + template[len(ss.SCAFFOLD): slots[0]["pos"]]:
+            notes.add("DiffusionGemma prompt without the empty thought block (the model's own template has none)")
+        else:
             raise SystemExit(f"{name}: {model}'s chat template renders a different prefix")
+    print(f"prompt check for {model}: " + "; ".join(sorted(notes)), flush=True)
 
 
 def returned(dist, label_ids, keep_top=0):
