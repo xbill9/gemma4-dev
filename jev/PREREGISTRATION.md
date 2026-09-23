@@ -42,3 +42,12 @@ Readouts: `ar` (plain arm), `dg1` (diffusion, one draw), `dg4` (mean of four dra
 - Plain against diffusion on the same items, paired, with 95% ranges from 2,000 resamples
 - No Jev call is made. Published Jev figures on other items are context only and are labelled as such
 - All results are published, including any where either arm does worse, with per-item outputs committed under `results/`
+
+## Addendum, 2026-09-23, before run `2026-09-23-l4-latency`
+
+Committed after the first run and before any call in this one. It adds to the design above and changes nothing in it.
+
+- **Latency pass.** Both 26B arms at client concurrency 1, first 100 examples of each task (400 per arm), same image, flags and checkpoints. Plain arm: one read. Diffusion arm: four reads with the proxy's schedule, so `first_ms` is one read and `first_ms + extra_ms` is the automatic rule's path when it re-reads. The client runs on the EC2 instance itself, against `localhost:8000`, so no internet round trip is in the timing.
+- **Off-label tokens.** The diffusion arm stores the five highest returned tokens per read (`--keep-top 5`), to show where probability outside the allowed labels goes.
+- **Small models.** Plain arms for `google/gemma-4-E4B-it` and `google/gemma-4-E2B-it` in bf16 on the same L4 and flags, all 1,200 examples plus the reversed variant, scored with the same `score.py`. Exploratory: no hypothesis was stated for them in advance.
+- **Analysis added after the first run:** the label-count calibration fit repeated over 20 random splits, reported as mean and range beside the pre-registered single split.

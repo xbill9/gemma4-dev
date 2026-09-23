@@ -146,10 +146,14 @@ def check_prefix(model):
             raise SystemExit(f"{name}: {model}'s chat template renders a different prefix")
 
 
-def returned(dist, label_ids):
+def returned(dist, label_ids, keep_top=0):
     """How many label ids came back with a real logprob. A label missing from
-    the response is scored at slot_distribution's floor, which is a guess."""
+    the response is scored at slot_distribution's floor, which is a guess.
+    With keep_top, the highest-scoring returned tokens are kept as
+    [token_id, logprob] pairs, to show where probability off the labels goes."""
     top = dist.pop("_top", None)
+    if top is not None and keep_top:
+        dist["top"] = sorted(([int(k), v] for k, v in top.items()), key=lambda kv: -kv[1])[:keep_top]
     return None if top is None else sum(i in top for i in label_ids)
 
 
@@ -165,6 +169,7 @@ def main():
     ap.add_argument("--concurrency", type=int, default=8)
     ap.add_argument("--limit", type=int, default=0, help="first N examples only")
     ap.add_argument("--variant", choices=["none", "reversed"], default="none")
+    ap.add_argument("--keep-top", type=int, default=0, help="store the N highest returned tokens per read")
     args = ap.parse_args()
 
     from transformers import AutoTokenizer
@@ -203,7 +208,7 @@ def main():
             else:
                 reads, lat = autoregressive_record(template, slots, sys_text, ex)
             for r in reads:
-                r["labels_returned"] = returned(r, slots[0]["label_ids"])
+                r["labels_returned"] = returned(r, slots[0]["label_ids"], args.keep_top)
             return {
                 "id": ex["id"],
                 "task": name,

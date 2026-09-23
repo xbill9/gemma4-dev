@@ -268,6 +268,21 @@ def label_curve(records, kind, seed=20260923):
     return out
 
 
+def label_curve_multi(records, kind, splits=20, seed=20260923):
+    """label_curve repeated over `splits` random halvings; mean and range of
+    held-out ECE, Brier and log loss at each N. Added after the pre-registered
+    single split, to show how much one split moves the curve."""
+    runs = [label_curve(records, kind, seed=seed + k) for k in range(splits)]
+    out = []
+    for j, n in enumerate(pt["n_labels"] for pt in runs[0]):
+        row = {"n_labels": n, "splits": splits}
+        for m in ("ece", "brier", "nll", "temperature"):
+            vals = [r[j][m] for r in runs]
+            row[m] = {"mean": sum(vals) / len(vals), "min": min(vals), "max": max(vals)}
+        out.append(row)
+    return out
+
+
 def predicted_name(rec, kind):
     p = readout(rec, kind)[0]
     return rec["names"][max(range(len(p)), key=lambda i: p[i])]
@@ -361,6 +376,13 @@ def main():
         for j, pt in enumerate(rows["label_curve"]["ar"]):
             c = [rows["label_curve"][k][j] for k in ("ar", "dg1", "dg4")]
             md.append(f"| {pt['n_labels']} | " + " | ".join(f"{x['temperature']:.2f} | {x['ece']:.3f}" for x in c) + " |")
+        rows["label_curve_20_splits"] = {k: label_curve_multi(r, k) for k, r in (("ar", ar_recs), ("dg4", dg_recs))}
+        md += ["", "Added analysis (after the pre-registration): the same fit over 20 random splits, mean ECE with its range:", "",
+               "| N labels | ar ECE mean (range) | ar Brier | dg4 ECE mean (range) | dg4 Brier |", "|---|---|---|---|---|"]
+        for j, pt in enumerate(rows["label_curve_20_splits"]["ar"]):
+            q = rows["label_curve_20_splits"]["dg4"][j]
+            md.append(f"| {pt['n_labels']} | {pt['ece']['mean']:.3f} ({pt['ece']['min']:.3f}–{pt['ece']['max']:.3f}) | {pt['brier']['mean']:.3f} | "
+                      f"{q['ece']['mean']:.3f} ({q['ece']['min']:.3f}–{q['ece']['max']:.3f}) | {q['brier']['mean']:.3f} |")
         flips = {}
         for arm, kind in (("autoregressive", "ar"), ("diffusion", "dg1")):
             vpath = os.path.join(rundir, f"{arm}-{task}--reversed.jsonl")

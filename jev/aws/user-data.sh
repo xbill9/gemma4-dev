@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cloud-init for the jev evaluation instance (EC2 G6, one NVIDIA L4).
 # Pulls a vLLM nightly that contains PR #57250 and serves one model at a time
-# on :8000. Switch models with: /opt/jev/serve.sh <ar|diffusion>
+# on :8000. Switch models with: /opt/jev/serve.sh <ar|diffusion|e4b|e2b>
 set -euxo pipefail
 systemctl enable --now docker
 # Hosts under 30 GiB of RAM get a 16 GB swapfile for the 17 GB checkpoint load.
@@ -22,9 +22,11 @@ cat >/opt/jev/serve.sh <<'SCRIPT'
 # 32 logprobs). Only the model and the diffusion canvas differ.
 set -euo pipefail
 IMAGE=vllm/vllm-openai:nightly-e9757321527ca1ecd514c07c1418dd2c53da3d19
-case "${1:?ar|diffusion}" in
+case "${1:?ar|diffusion|e4b|e2b}" in
   ar)        MODEL=cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit;          EXTRA=() ;;
   diffusion) MODEL=cyankiwi/diffusiongemma-26B-A4B-it-AWQ-INT4;   EXTRA=(--diffusion-config '{"canvas_length": 64}') ;;
+  e4b)       MODEL=google/gemma-4-E4B-it;                         EXTRA=(--dtype bfloat16) ;;
+  e2b)       MODEL=google/gemma-4-E2B-it;                         EXTRA=(--dtype bfloat16) ;;
   *) echo "unknown arm $1" >&2; exit 2 ;;
 esac
 set +x

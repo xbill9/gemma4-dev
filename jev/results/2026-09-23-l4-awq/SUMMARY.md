@@ -27,6 +27,16 @@ Calibration on the held-out half after fitting one temperature on N labels:
 | 100 | 5.96 | 0.064 | 1.76 | 0.054 | 1.76 | 0.061 |
 | 150 | 6.26 | 0.060 | 1.85 | 0.064 | 1.76 | 0.061 |
 
+Added analysis (after the pre-registration): the same fit over 20 random splits, mean ECE with its range:
+
+| N labels | ar ECE mean (range) | ar Brier | dg4 ECE mean (range) | dg4 Brier |
+|---|---|---|---|---|
+| 0 | 0.130 (0.103–0.158) | 0.256 | 0.121 (0.107–0.158) | 0.275 |
+| 25 | 0.081 (0.030–0.135) | 0.218 | 0.087 (0.043–0.156) | 0.259 |
+| 50 | 0.066 (0.037–0.132) | 0.216 | 0.085 (0.060–0.138) | 0.257 |
+| 100 | 0.063 (0.035–0.113) | 0.215 | 0.079 (0.035–0.110) | 0.256 |
+| 150 | 0.061 (0.041–0.083) | 0.214 | 0.069 (0.032–0.106) | 0.256 |
+
 Options listed in reverse order: ar changed 14 of 300 answers (4.7%); dg1 changed 21 of 300 answers (7.0%)
 
 ## emotion (n=300)
@@ -53,6 +63,16 @@ Calibration on the held-out half after fitting one temperature on N labels:
 | 50 | 7.24 | 0.102 | 2.48 | 0.122 | 2.36 | 0.115 |
 | 100 | 6.57 | 0.122 | 2.25 | 0.145 | 2.14 | 0.125 |
 | 150 | 6.57 | 0.122 | 2.36 | 0.105 | 2.36 | 0.115 |
+
+Added analysis (after the pre-registration): the same fit over 20 random splits, mean ECE with its range:
+
+| N labels | ar ECE mean (range) | ar Brier | dg4 ECE mean (range) | dg4 Brier |
+|---|---|---|---|---|
+| 0 | 0.392 (0.324–0.447) | 0.788 | 0.266 (0.214–0.315) | 0.662 |
+| 25 | 0.104 (0.054–0.213) | 0.580 | 0.120 (0.068–0.206) | 0.581 |
+| 50 | 0.089 (0.047–0.161) | 0.574 | 0.111 (0.062–0.155) | 0.575 |
+| 100 | 0.089 (0.047–0.146) | 0.574 | 0.108 (0.071–0.137) | 0.574 |
+| 150 | 0.093 (0.043–0.141) | 0.573 | 0.108 (0.062–0.137) | 0.574 |
 
 Options listed in reverse order: ar changed 27 of 300 answers (9.0%); dg1 changed 26 of 300 answers (8.7%)
 
@@ -81,6 +101,16 @@ Calibration on the held-out half after fitting one temperature on N labels:
 | 100 | 4.90 | 0.033 | 1.38 | 0.053 | 1.19 | 0.029 |
 | 150 | 4.90 | 0.033 | 1.25 | 0.053 | 1.08 | 0.050 |
 
+Added analysis (after the pre-registration): the same fit over 20 random splits, mean ECE with its range:
+
+| N labels | ar ECE mean (range) | ar Brier | dg4 ECE mean (range) | dg4 Brier |
+|---|---|---|---|---|
+| 0 | 0.099 (0.063–0.144) | 0.195 | 0.054 (0.034–0.073) | 0.149 |
+| 25 | 0.072 (0.032–0.148) | 0.165 | 0.074 (0.041–0.138) | 0.157 |
+| 50 | 0.060 (0.035–0.130) | 0.158 | 0.066 (0.031–0.116) | 0.152 |
+| 100 | 0.060 (0.022–0.106) | 0.157 | 0.061 (0.029–0.092) | 0.150 |
+| 150 | 0.055 (0.021–0.086) | 0.155 | 0.062 (0.034–0.090) | 0.149 |
+
 ## sst2 (n=300)
 
 | readout | accuracy | ECE | Brier | AUROC conf→correct | median label mass | escalated | acc kept / escalated | median ms |
@@ -105,5 +135,15 @@ Calibration on the held-out half after fitting one temperature on N labels:
 | 50 | 5.15 | 0.029 | 1.52 | 0.014 | 1.52 | 0.025 |
 | 100 | 5.15 | 0.029 | 1.68 | 0.016 | 1.60 | 0.026 |
 | 150 | 4.90 | 0.028 | 1.52 | 0.014 | 1.45 | 0.029 |
+
+Added analysis (after the pre-registration): the same fit over 20 random splits, mean ECE with its range:
+
+| N labels | ar ECE mean (range) | ar Brier | dg4 ECE mean (range) | dg4 Brier |
+|---|---|---|---|---|
+| 0 | 0.048 (0.032–0.068) | 0.094 | 0.050 (0.024–0.071) | 0.104 |
+| 25 | 0.044 (0.010–0.067) | 0.084 | 0.052 (0.030–0.081) | 0.106 |
+| 50 | 0.039 (0.021–0.061) | 0.080 | 0.042 (0.025–0.081) | 0.101 |
+| 100 | 0.039 (0.020–0.061) | 0.079 | 0.043 (0.023–0.075) | 0.099 |
+| 150 | 0.035 (0.019–0.059) | 0.079 | 0.043 (0.026–0.069) | 0.099 |
 
 Options listed in reverse order: ar changed 6 of 300 answers (2.0%); dg1 changed 7 of 300 answers (2.3%)
