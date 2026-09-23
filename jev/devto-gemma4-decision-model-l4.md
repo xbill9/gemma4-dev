@@ -1,7 +1,7 @@
 ---
 title: "Gemma 4 as a Jev-Style Decision Model: DiffusionGemma Starts Better Calibrated, 50 Labels Close the Gap"
 published: false
-description: "Plain Gemma 4 26B read by its label probabilities against DiffusionGemma's one-step read, both 4-bit on one EC2 L4, on 1,200 human-labelled examples. Pre-registered, with accuracy, calibration, calibration after fitting on 0 to 150 labels, option-order sensitivity, latency and cost."
+description: "Plain Gemma 4 26B read by its label probabilities against DiffusionGemma's one-step read, both as community 4-bit (AWQ) builds on one EC2 L4, on 1,200 human-labelled examples. Pre-registered, with accuracy, calibration, calibration after fitting on 0 to 150 labels, option-order sensitivity, latency and cost."
 tags: gemma, aws, machinelearning, llm
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/devto-gemma4-l4-cover.f93b39b4.jpg
 ---
@@ -18,7 +18,7 @@ A Jev-style decision model answers a typed question with a probability for each 
 
 A companion review of the independent evidence on Jev found two open questions for Gemma. Plain Gemma read this way had no published accuracy or calibration result. DiffusionGemma, read through vLLM PR #57250, had been described as well calibrated with no measurement behind it.
 
-This run answers both on the same GPU, the same prompts, the same label tokens and the same scoring code.
+This run answers both on the same GPU, the same prompts, the same label tokens and the same scoring code, using community 4-bit (AWQ) builds of both models. Google's reference checkpoints are bf16, and results at bf16 may differ.
 
 ---
 
@@ -96,7 +96,7 @@ i-0c5b14e913b4c1019	g6.xlarge	us-east-1a
 
 #### 🔎 Tip: A g6.xlarge Loads a 17 GB Checkpoint With a Swapfile
 
-`g6.2xlarge` had no capacity in any us-east-1 zone at launch time, and `g6.xlarge` did. It has the same L4 with 16 GB of host memory, so `user-data.sh` adds a 16 GB swapfile on hosts under 30 GB. Both checkpoints loaded with it.
+`g6.2xlarge` had no capacity in any us-east-1 zone at launch time, and `g6.xlarge` did. It has the same L4 with 16 GB of host memory, so `user-data.sh` adds a 16 GB swapfile on hosts under 30 GB. Both checkpoints loaded with the swapfile in place.
 
 ---
 
@@ -127,7 +127,7 @@ vllm 0.29.1rc1.dev573+ge97573215 torch 2.13.0+cu130
 
 #### Step 5 — Check the Read Before the Full Run
 
-Both arms use the prompt, answer template, label tokens and probability code from the PR's own `structured_server.py`. `run_eval.py` confirms both chat templates render the identical prefix before it sends anything. A five-example run shows what one record holds.
+Both arms use the prompt, answer template, label tokens and probability code from the PR's own `structured_server.py`. `run_eval.py` confirms both chat templates render the identical prefix before it sends anything. A five-example run shows what one record holds (truncated below).
 
 ```shell
 python3 run_eval.py --arm autoregressive --upstream http://<host>:8000 \
@@ -197,7 +197,7 @@ Level on three tasks, plain ahead on AG News.
 | DAIR Emotion | 35.0% | 58.3% | 🥇 60.3% | +2.0 (−1.0 to +5.0) |
 | tweet_eval irony | 60.3% | 🥇 89.7% | 87.3% | −2.3 (−5.7 to +1.0) |
 
-Only the AG News difference excludes zero. The irony scores are high for that test set, which fits the public data having been in training; treat both irony figures with that in mind.
+Only the AG News difference excludes zero. All four test sets are public and may have been in either model's training data; the irony scores are high enough for that test set to make it likely there.
 
 ---
 
@@ -231,7 +231,16 @@ Each task's examples split once into a fitting half and a held-out half. One tem
 | DAIR Emotion | 0.440 | 0.102 | 0.311 | 0.115 |
 | tweet_eval irony | 0.088 | 0.042 | 0.055 | 0.054 |
 
-After 50 labels the two are within 0.004 on sst2 and AG News, and plain Gemma is 0.013 and 0.012 lower on emotion and irony, gaps small for 150 held-out examples. Going to 100 or 150 labels moves ECE by up to about 0.025 in either direction.
+That is the pre-registered single split. One split of 150 held-out examples moves ECE by several hundredths, so the same fit was repeated over 20 random splits, an analysis added after the run:
+
+| Task | Plain, 0 labels | Plain, 50 labels | Diffusion, 0 labels | Diffusion, 50 labels |
+|---|---|---|---|---|
+| sst2 | 0.048 | 0.039 (0.021–0.061) | 0.050 | 0.042 (0.025–0.081) |
+| AG News | 0.130 | 0.066 (0.037–0.132) | 0.121 | 0.085 (0.060–0.138) |
+| DAIR Emotion | 0.392 | 0.089 (0.047–0.161) | 0.266 | 0.111 (0.062–0.155) |
+| tweet_eval irony | 0.099 | 0.060 (0.035–0.130) | 0.054 | 0.066 (0.031–0.116) |
+
+Means over 20 splits, with the range in brackets. With no labels, DiffusionGemma is better calibrated on emotion and irony. With 50, plain Gemma's mean is at or below DiffusionGemma's on all four tasks, and the ranges overlap throughout.
 
 ---
 
@@ -320,13 +329,19 @@ DiffusionGemma's lower raw calibration error is real on two of four tasks, and i
 
 ---
 
-#### What Did It Cost?
+#### What Does a Decision Cost?
 
-One `g6.xlarge` on demand at $0.8048 an hour, from launch to termination in under 1.2 hours: at most $0.97, plus the prorated 100 GB volume.
+The run logs give a throughput. Plain Gemma answered 2,100 decisions in 51 seconds, 41.2 a second, at client concurrency 8. DiffusionGemma, reading each example four times, answered 2,100 in 298 seconds, 7.0 a second, at concurrency 4. The client was on a home connection, so these are lower bounds on what the L4 serves.
+
+At the `g6.xlarge` on-demand price of $0.8048 an hour, that is at most $5.43 per million decisions for plain Gemma and $31.72 for DiffusionGemma with four reads. TypeSafe prices Jev at $0.042 per million input tokens, which is $6.30 to $12.60 per million decisions at 150 to 300 input tokens each. The L4 is charged by the hour whether busy or idle, so its per-decision cost holds only at full load.
+
+The whole first run, from launch to termination in under 1.2 hours, cost at most $0.97 of instance time plus the prorated 100 GB volume. It ran on demand; G-family spot capacity in us-east-1 was unavailable at launch time.
 
 ---
 
 #### Teardown
+
+Every command on the instance went through AWS Systems Manager, so no SSH port was ever open, and port 8000 was open to one address.
 
 ```shell
 aws ec2 terminate-instances --region us-east-1 --instance-ids i-0c5b14e913b4c1019
@@ -352,7 +367,7 @@ The goal of this article was to measure Gemma 4 26B as a Jev-style decision mode
 - ⚠️ DiffusionGemma places 37% to 59% of its probability outside the allowed labels, and the proxy's rescaling hides it
 - ⚠️ The proxy's automatic re-read rule fired on 96% to 100% of examples, doubling DiffusionGemma's time per decision
 - ⚠️ Irony scores are high enough to suggest the public test set was in training data
-- ❌ Spread across DiffusionGemma's four reads missed 60.8% to 65.0% of wrong answers on three tasks
+- ⚠️ Spread across DiffusionGemma's four reads missed 60.8% to 65.0% of wrong answers on three tasks
 
 Scope: one EC2 `g6.xlarge` with one NVIDIA L4 in us-east-1, vLLM `0.29.1rc1.dev573+ge97573215`, both models 4-bit from the same quantizer, 300 examples per task, one run per arm, latency measured from one client over the internet. bf16 weights, other GPUs and Jev itself were outside this run; no Jev call was made. Code, pre-registration and every per-item output are in the repository. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 

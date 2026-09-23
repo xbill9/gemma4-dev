@@ -1,0 +1,14 @@
++ nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
+NVIDIA L4, 595.91.07, 23034 MiB
++ docker inspect --format 'image: {{.Config.Image}} digest: {{.Image}}' vllm
+image: vllm/vllm-openai:nightly-e9757321527ca1ecd514c07c1418dd2c53da3d19 digest: sha256:f75fec992c293dd41042745f8aa71bfdf12b188b6a01e0baf075e4bca5d297e5
++ docker exec vllm python3 -c 'import vllm,torch;print('\''vllm'\'',vllm.__version__,'\''torch'\'',torch.__version__)'
+Error response from daemon: container 31a0690decd35eeab64a00a93614f59b9004471ff7320c23be62baa5cb22a29d is not running
+++ curl -s -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60'
++ TOKEN=<redacted>
+++ curl -s -H 'X-aws-ec2-metadata-token: <redacted>' http://169.254.169.254/latest/meta-data/instance-type
++ echo 'instance-type: g6.4xlarge'
+instance-type: g6.4xlarge
+++ curl -s -H 'X-aws-ec2-metadata-token: <redacted>' http://169.254.169.254/latest/meta-data/placement/availability-zone
++ echo 'az: us-east-1d'
+az: us-east-1d
