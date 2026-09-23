@@ -18,7 +18,7 @@ The GTX 1650 Ti decodes **4.14x** faster than the i7-10750H it shares a chassis 
 
 The same 3.35 GB quantization-aware GGUF, `google/gemma-4-E2B-it-qat-q4_0-gguf`, served by `llama-server` twice on one laptop: once on the CPU, once on the GPU. Both builds come from one llama.cpp commit and the two command lines differ by one flag.
 
-An earlier run of this comparison is published as [A 4 GB Laptop GPU Beats a 6-Core CPU by 4.3x on Gemma 4](https://dev.to/gde/a-4-gb-laptop-gpu-beats-a-12-core-cpu-by-43x-on-gemma-4-4150). This one re-measures it after the laptop moved to Debian sid, with three changes: a newer llama.cpp commit built on gcc 16.2 and CUDA 13.4, thread flags set for this CPU's real core count, and a run order that cancels thermal drift.
+An earlier run of this comparison is published as [A 4 GB Laptop GPU Beats a 12-Core CPU by 4.3x on Gemma 4](https://dev.to/gde/a-4-gb-laptop-gpu-beats-a-12-core-cpu-by-43x-on-gemma-4-4150). This one re-measures it after the laptop moved to Debian sid, with three changes: a newer llama.cpp commit built on gcc 16.2 and CUDA 13.4, thread flags set for this CPU's real core count, and a run order that cancels thermal drift.
 
 ---
 
@@ -317,6 +317,6 @@ The strategy for using MCP for local accelerator comparison was validated with a
 - GPU rig: https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0
 - CPU rig: https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-cpu-2b-q4_0
 - Run report: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-22-paired-sweep-1650ti/REPORT.md
-- Earlier run: [A 4 GB Laptop GPU Beats a 6-Core CPU by 4.3x on Gemma 4](https://dev.to/gde/a-4-gb-laptop-gpu-beats-a-12-core-cpu-by-43x-on-gemma-4-4150)
+- Earlier run: [A 4 GB Laptop GPU Beats a 12-Core CPU by 4.3x on Gemma 4](https://dev.to/gde/a-4-gb-laptop-gpu-beats-a-12-core-cpu-by-43x-on-gemma-4-4150)
 - Model: https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf
 - llama.cpp: https://github.com/ggml-org/llama.cpp
