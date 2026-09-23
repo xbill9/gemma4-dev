@@ -52,3 +52,12 @@ Committed after the first run and before any call in this one. It adds to the de
 - **Small models.** Plain arms for `google/gemma-4-E4B-it` and `google/gemma-4-E2B-it` in bf16 on the same L4 and flags, all 1,200 examples plus the reversed variant, scored with the same `score.py`. Exploratory: no hypothesis was stated for them in advance.
 - **Analysis added after the first run:** the label-count calibration fit repeated over 20 random splits, reported as mean and range beside the pre-registered single split.
 - **Deviation, recorded before the E4B/E2B arms ran:** the plain arm's prompt is built from the served model's own chat template followed by the answer lead. For Gemma 4 26B this is token-for-token the prompt used in both runs (`run_eval.py` checks it). Gemma 4 E4B and E2B chat templates end at the model turn with no empty thought block, so their prompt has none; the first attempt, which required the 26B prefix, refused to run them.
+
+## Addendum, 2026-09-23, before run `2026-09-24-l4-suite`
+
+Committed before any call in this run.
+
+- **Data.** Bespoke Labs' 13-subset public suite, 3,880 human-labelled records, rebuilt on the instance from the public sources with Nimble's converters at commit `0e67403` and the ids in its committed manifests (`nimble_suite/build.sh`). All 13 `dataset_sha256` values must match Nimble's manifests; a mismatch is reported and that subset is excluded.
+- **Arms.** Plain Gemma 4 26B (`cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit`), DiffusionGemma (`cyankiwi/diffusiongemma-26B-A4B-it-AWQ-INT4`, 4 reads) and Gemma 4 E4B bf16, with the image, flags and read method of the earlier runs; each record's Jev request is parsed by the PR proxy's own `jev_schema`.
+- **Outcomes** (`nimble_suite/score_suite.py`), with Bespoke Labs' definitions so they sit beside its published Jev 1.13.0 and Nimble-9B figures on the same records: accuracy, ECE over 10 equal-width bins, multiclass Brier, per subset and pooled by question type; plus ECE after one temperature fitted on 50 labels, mean of 20 splits.
+- **Comparison with Jev** uses Bespoke Labs' published per-subset aggregates, from one Jev run through its API. No Jev call is made here.
