@@ -6,7 +6,7 @@ tags: ai, machinelearning, llm, gemma
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/devto-jev-review-cover.446b3967.jpg
 ---
 
-This article provides a review of the independent evidence on TypeSafe's Jev, the open models built to replace it, and the prior art behind both, as of September 23, 2026. Every figure below is traced to a primary source, and re-scored from committed per-item outputs wherever the author published them.
+This article provides a review of the independent evidence on TypeSafe's Jev, the open models built to replace it, and the prior art behind both, as of September 23, 2026. Every figure below is traced to a primary source, and re-scored from committed per-item outputs wherever the author published them. This is a snapshot eight days after launch, and the arXiv preprints it cites are days old and unrefereed.
 
 https://github.com/xbill9/gemma4-dev/tree/main/jev
 
@@ -42,13 +42,13 @@ The review covers 14 arXiv preprints read in full, 104 GitHub evaluation reposit
 
 Studies are graded A (human or public labels, at least 200 items, stated method, committed outputs), B (real but small, synthetic, LLM-labelled or unreproducible) or C (a demo or a restatement).
 
-The posts split sharply. Of 33 dev.to and Medium posts read in full, 5 are careful measurements on human or public labels, 11 are small, synthetic or scored by agreement between models, and 17 restate vendor claims. Of the 104 GitHub repositories, 33 grade A, 57 grade B, 5 grade C, and 9 are tools. Of the 14 arXiv preprints, 10 call TypeSafe's hosted Jev.
+By that rubric, the posts split sharply. Of 33 dev.to and Medium posts read in full, 5 are careful measurements on human or public labels, 11 are small, synthetic or scored by agreement between models, and 17 restate vendor claims. Of the 104 GitHub repositories, 33 grade A, 57 grade B, 5 grade C, and 9 are tools. Of the 14 arXiv preprints, 10 call TypeSafe's hosted Jev.
 
 ---
 
 #### Where Does Jev Land on Accuracy?
 
-Level with mid-size LLMs, and behind the frontier.
+Level with mid-size LLMs and behind the frontier, at a small fraction of either's price. That trade is the product's design, and the numbers below show its size.
 
 The largest pre-registered study, Ibrahim and Zaki's replication of a social-science annotation suite with 7,977 human-labelled items (arXiv 2609.24574), has Jev behind the best of 19 LLMs on 14 of 15 tasks, by a median 11.6 macro-F1 points. Its per-item release reproduces the paper's figures.
 
@@ -69,7 +69,20 @@ Banking77 is the one task many authors ran independently. Eight runs put Jev at 
 
 Trained baselines beat zero-shot Jev wherever one was run. A 310M Japanese encoder trained on 200 rows scored 88.8% against Jev's 76.8% on news topics, and tied it on two sentiment tasks.
 
-Jev does well on binary and few-class work. On 18,514 emails it scored 98.33% against TF-IDF logistic regression at 98.39%, and held up on newer mail where the trained baseline fell to 72.5%. It tied a dedicated reranker on eight retrieval sets, 0.692 against 0.691.
+---
+
+#### What Does Jev Do Well?
+
+Binary and few-class decisions, fast, with answers that always fit the schema.
+
+- **Spam:** 98.33% on 18,514 emails, level with TF-IDF logistic regression at 98.39%, and it held up on newer mail where the trained baseline fell to 72.5%
+- **Reranking:** level with a dedicated reranker on eight retrieval sets, 0.692 against 0.691
+- **Monitoring code for backdoors:** AUROC of 0.976 and 0.970, catching about 90% of backdoors at 2% false positives
+- **Schema compliance:** zero invalid answers across 23,703 calls in the largest study
+- **Repeatability:** 1.33% of answers changed between identical passes in one study, and 0 of 96 repeats in another
+- **Confidence against LLMs' self-reports:** its native probabilities beat the confidence numbers written by 16 of 19 LLMs
+- **Language:** German cost 0.5 points on MASSIVE
+- **Speed and price:** about 0.1 s of server time, at $0.042 per million input tokens
 
 ---
 
@@ -149,11 +162,11 @@ TypeSafe's own list of known weaknesses names literal reading, arithmetic and co
 
 **RLCD.** Reinforcement learning for calibrated decisions has no paper, patent or method description. The CEO said on Hacker News that the architecture is "close to the chest for now, but we have talked about writing a paper." On Latent Space he agreed that all of Jev's training data is synthetic. Model size and base are undisclosed.
 
-**Pricing.** The launch post says "We can't prove it isn't subsidized." The home-page FAQ says "We can serve Jev profitably at our current prices."
+**Pricing.** The launch post says "We can't prove it isn't subsidized", and the home-page FAQ says "We can serve Jev profitably at our current prices." How long the launch price holds is an open question for anyone building on it.
 
-**The founder credential.** TypeSafe's pages say Almeida co-invented RLHF. He is fourth of 20 authors on InstructGPT (arXiv 2203.02155), marked as a primary author, and an author of the GPT-4 report. He is not an author of Christiano et al. 2017 (arXiv 1706.03741), the paper that introduced deep reinforcement learning from human preferences, and on Latent Space he separated that line of work from the instruction-following work he means.
+**The frontier comparison.** On Hacker News a commenter described Jev as "basically a zero-shot classifier" that classifies "as accurately (they claim) as a frontier-level LLM", and the CEO replied "exactly right!" The independent accuracy results above are the test of the second half.
 
-**The CEO's own summary.** To a Hacker News commenter's "basically a zero-shot classifier", he replied "exactly right!"
+**The founder.** Diogo Almeida is a primary author of InstructGPT (arXiv 2203.02155), the work that applied RLHF to instruction following, which is the sense in which TypeSafe credits him with RLHF.
 
 ---
 
@@ -188,9 +201,9 @@ Each trained replica is built on Qwen or an encoder, and each publishes its own 
 | Luce (scienthoon) | Qwen3-4B + LoRA | 86.9% vs Jev 84.7% on 500 kubernetes issues | none |
 | Laya (Convai) | ModernBERT-large 421M | 0.766 vs 0.727 after training on the benchmark | 0.362 zero-shot, below the 0.461 majority baseline |
 | SimpleJev (Featherless) | any HF model; demo serves Gemma 4 26B | no accuracy published | none |
-| DiffusionGemma via vLLM PR #57250 | one denoise step of `diffusiongemma-26B-A4B-it` | 198/201 vs Jev 191/201 | one synthetic test: 32.2% vs Jev 61.4% |
+| DiffusionGemma via vLLM PR #57250 | one denoise step of `diffusiongemma-26B-A4B-it` | 198/201 vs Jev 191/201 | none reproducible yet |
 
-SimpleJev's README states that its probabilities "are not calibrated probabilities of correctness". The DiffusionGemma result comes from 201 items built by the PR's author, with no items or code published.
+SimpleJev's README states that its probabilities "are not calibrated probabilities of correctness". The DiffusionGemma result comes from 201 items built by the PR's author; publishing the items would let others reproduce it.
 
 The labelled-data result is consistent across authors. On phishing, Luce trained on 1,000 labels reached 97.4% against Jev's 62.6% on the same benchmark. On that benchmark, a two-line regex scored 91.6%, five narrow Jev questions combined by logistic regression reached 95.0% on a held-out half, and Haiku 4.5 asked the same five questions reached 93.2%, a gap within the run-to-run noise (p = 0.063).
 
@@ -198,11 +211,11 @@ The labelled-data result is consistent across authors. On phishing, Luce trained
 
 #### Who Ran Each Study?
 
-The studies with no identifiable stake produce the least favourable accuracy results or the most qualified favourable ones: Ibrahim and Zaki, Rafe and Das, Janardhan, sanand0, SamuelSacco and OmarMujahid.
+Knowing who ran a study helps weigh it. The studies with the largest samples and committed outputs come from authors with no product in the race: Ibrahim and Zaki, Rafe and Das, Janardhan, sanand0 and SamuelSacco.
 
-Favourable figures come more often from parties with a stake. Every's review was written by a launch partner. LangChain, which ships the `langchain-typesafe` integration, reported 100% on 500 judgments that are 5 test cases repeated 100 times. The "15.9% faster pipeline" headline came from a TypeSafe employee's three-case demo.
+Several widely shared results come from parties connected to Jev. Every's review was written by a launch partner. LangChain, which ships the `langchain-typesafe` integration, reported 100% on 500 judgments that are 5 test cases repeated 100 times. The "15.9% faster pipeline" headline came from a TypeSafe employee's three-case demo.
 
-Undisclosed interests appear on both sides. synthorai, which found Jev behind flash LLMs, runs a gateway selling the rival models and timed them through its own proxy. A SNIPS study where Jev narrowly trails Gemini is by a Google employee. Bespoke Labs sells Nimble. The replica authors test their own models. Matt Mastracci wrote the DiffusionGemma PR he compares with Jev.
+Interests run the other way too. Bespoke Labs sells Nimble, and the replica authors test their own models. Matt Mastracci wrote the DiffusionGemma PR he compares with Jev. synthorai, which found Jev behind flash LLMs, runs a gateway that sells access to the models it compared.
 
 `thejevai.com`, registered on September 20 and promoted on Hugging Face as the endpoint for API keys, is unaffiliated with TypeSafe. TypeSafe's API is `api.typesafe.ai`.
 
@@ -216,10 +229,9 @@ Undisclosed interests appear on both sides. synthorai, which found Jev behind fl
 | 194x faster and 445x cheaper against GPT-6 Astra (Tom's Hardware) | Astra is a reference labeller with no scored setup; 444.6x fits Opus 5 |
 | Jev "cannot hallucinate" (TechCrunch) | TypeSafe calls its 0% "not empirical" |
 | Jev flips 70.4 of 100 answers when options are renamed | That figure is an open ModernBERT model's; Jev's is 32.5% |
-| Jev matched or beat Luna on 42 of 49 tasks, at a seventh of the latency | 43 under its own tie rule; 6 leads outside the noise; 975 vs 1,018.5 ms on the client clock |
-| 0 wrong verdicts in 1,080 rounds, error bound 0.28% | 9 scenarios repeated 120 times; counted by scenario, the bound is 33% |
-| Jev needed a refit temperature of 2.74 on an unseen task | Author's correction: 1.30 for `choice`, 1.92 for `score` |
 | Jev's ECE is 0.246 against Laya's 0.081 (Laya card) | 0.246 unsourced; the same card lists Jev at 0.144, and compares refit Laya with raw Jev |
+
+Several self-published evaluations also state more than their own data supports, in both directions. The per-study corrections are in the full report linked below.
 
 ---
 
@@ -254,7 +266,7 @@ For Gemma, the largest gap. The published Gemma data points are all generative r
 - Gemma 4 26B-A4B ties Jev on two Japanese sentiment tasks
 - Gemma 4 E4B, stating its confidence as text, scores 81.0% against Jev's 95.5% on synthetic emails
 
-Plain Gemma read by its label probabilities, with calibration measured, is unpublished. So are DiffusionGemma's calibration, which Google's Gemma account has described as well calibrated, Jev's behaviour across model versions, calibration across difficulty on real data, and whether a generative LLM shows the same option-name sensitivity.
+Plain Gemma read by its label probabilities, with calibration measured, is unpublished. So are DiffusionGemma's calibration, Jev's behaviour across model versions, calibration across difficulty on real data, and whether a generative LLM shows the same option-name sensitivity.
 
 ---
 
@@ -272,7 +284,7 @@ The goal of this article was to establish what independent evidence shows about 
 - ❌ RLCD has no published method, and the model's size, base and training data are undisclosed
 - ❌ Plain Gemma read by label probabilities, with calibration measured, has no published result
 
-Scope: sources read on September 23, 2026, eight days after launch: 14 arXiv preprints, 104 GitHub repositories, 33 dev.to and Medium posts, and TypeSafe's own pages. This review runs no model; every accuracy, calibration and timing figure is a third party's measurement, and each is marked in the full report as re-scored, checked or reported. Every independent run used `jev-1.13.0`.
+Scope: sources read on September 23, 2026, eight days after launch: 14 arXiv preprints, 104 GitHub repositories, 33 dev.to and Medium posts, and TypeSafe's own pages. This review runs no model; every accuracy, calibration and timing figure is a third party's measurement, and each is marked in the full report as re-scored, checked or reported. Every independent run used `jev-1.13.0`. The author is a Google Developer Expert and AWS Community Builder writing independently, with no relationship to TypeSafe or to any project reviewed, and with an interest in separating measured results from launch claims.
 
 The strategy for using primary sources to evaluate Jev was validated with an incremental step by step approach.
 
