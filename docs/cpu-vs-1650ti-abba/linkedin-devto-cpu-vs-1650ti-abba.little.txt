@@ -1,0 +1,13 @@
+A 4 GB Laptop GPU vs a 6-Core CPU on Gemma 4, Re-Measured in ABBA Order: 4.1x
+
+Gemma 4 E2B q4\_0 served by llama.cpp on one laptop, CPU-only and on a GTX 1650 Ti, rebuilt on CUDA 13.4 and re-measured in CPU, GPU, GPU, CPU order with a temperature gate. The card takes decode by 4.14x, and run order moves the answer by about 2%.
+
+What is in it:
+
+- 🟢 GPU decode is 4.14x the CPU, 3.93x to 4.30x across every cell
+- 🟢 GPU prefill is 3.42x, growing with prompt length; end to end is 3.62x
+- 🟢 The GTX 1650 Ti still builds and runs on CUDA 13.4 with gcc 16.2, as the oldest architecture that toolkit supports
+- ⚠️ Run order is worth about 2% of the ratio here: 4.09x CPU-first against 4.17x GPU-first
+
+dev.to \(Google Developer Experts\): https://dev.to/gde/a-4-gb-laptop-gpu-vs-a-6-core-cpu-on-gemma-4-re-measured-in-abba-order-41x-5g56
+Medium: https://xbill999.medium.com/a-4-gb-laptop-gpu-vs-a-6-core-cpu-on-gemma-4-re-measured-in-abba-order-4-1x-154e3acdea76
