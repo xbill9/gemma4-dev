@@ -1,0 +1,23 @@
+Not missing the JEV hype train 🚂 — this stop is a TPU.
+
+Jev-style decisions on one TPU v6e chip: Gemma 4 read by its label probabilities with vLLM, checked against the same read on an NVIDIA L4 and against Jev 1.13.0's published results.
+
+🟢 One v6e chip serves Gemma 4 E2B, E4B and 12B at bf16 and a 26B-A4B fp8 build
+🟢 Same checkpoints, same answers on the TPU and the L4: 1,186 and 1,193 of 1,200
+🟢 The 26B decides in 27 to 33 ms on the TPU against 61 ms on the L4
+❌ No 31B checkpoint loads today: the w4a16 and 4-bit builds fail on the JAX path, and the fp8 build is 30.98 GiB
+⚠️ On demand, the TPU costs more per decision than the L4 or Jev; 12B is the size to pick
+
+Dev.to is here:
+https://dev.to/gde/running-a-jev-style-decision-model-on-one-tpu-v6e-what-fits-what-it-costs-and-what-changes-from-1j0g
+
+Medium is here:
+https://xbill999.medium.com/running-a-jev-style-decision-model-on-one-tpu-v6e-what-fits-what-it-costs-and-what-changes-from-203f4420fd31
+
+Linked In is here:
+https://www.linkedin.com/feed/update/urn:li:activity:7508932794224386048/
+
+Repo is here:
+https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu
+
+#JEV #Gemma #TPU #GoogleCloud #vLLM
