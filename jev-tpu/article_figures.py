@@ -96,6 +96,13 @@ def main():
     out.append(f"- Top-32 bound vs floor, largest change over all arms and tasks: raw ECE {max(b[0] for b in bound):.3f}, ECE after 50 labels {max(b[1] for b in bound):.3f}")
     ret = {arm: (min(v["all_labels_returned"] for v in sweep[arm].values()), max(v["all_labels_returned"] for v in sweep[arm].values())) for arm in ARMS}
     out.append("- Share of reads with every label in the top 32, lowest and highest task: " + ", ".join(f"{a} {100 * lo:.1f}%–{100 * hi:.1f}%" for a, (lo, hi) in ret.items()))
+    # TPU v6e-1 against the L4 run in ../jev, 26B-A4B only (the one size timed on both).
+    out.append("")
+    lat_l4 = [int(m) for m in re.findall(r"\| \w+ \| (\d+) \| \d+ \| \d+ \| \d+ \| \d+ \|", open(os.path.join(JEV, "2026-09-23-l4-latency", "LATENCY.md")).read())]
+    lat_tpu = [v["latency"]["median_ms"] for v in sweep["26b-fp8"].values()]
+    out.append(f"- 26B median ms per decision, one at a time on the host: L4 {min(lat_l4)}-{max(lat_l4)}, v6e-1 {min(lat_tpu):.0f}-{max(lat_tpu):.0f}; L4 / v6e-1 = {min(lat_l4) / max(lat_tpu):.1f} to {max(lat_l4) / min(lat_tpu):.1f} times")
+    g6 = float(re.search(r"g6.xlarge ([\d.]+)", open(os.path.join(JEV, "2026-09-23-l4-awq", "evidence", "pricing.txt")).read()).group(1))
+    out.append(f"- Hourly price: g6.xlarge ${g6:.4f} on demand; v6e-1 ${RATE['on-demand']:.2f} on demand ({RATE['on-demand'] / g6:.1f} times), ${RATE['flex-start']:.2f} flex-start ({RATE['flex-start'] / g6:.1f} times)")
     print("\n".join(out))
 
 
