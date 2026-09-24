@@ -119,7 +119,13 @@ def main():
         records = [json.loads(line) for line in open(path)]
         if args.limit:
             records = records[: args.limit]
+        # One file per arm and subset: a second model in the same run would resume
+        # the first model's file and skip every record, so each model needs its own run.
         out_path = os.path.join(outdir, f"{args.arm}-{sub}.jsonl")
+        if os.path.exists(out_path):
+            first = json.loads(open(out_path).readline() or "{}")
+            if first and first.get("model") != args.model:
+                raise SystemExit(f"{out_path} holds {first.get('model')}; use a separate --run for {args.model}")
         done = set()
         if os.path.exists(out_path):
             done = {json.loads(line)["id"] for line in open(out_path)}
