@@ -1,0 +1,55 @@
+[jev-run 2026-09-24T14:21:40Z] suite: 13 of 13 subsets match
+[jev-run 2026-09-24T14:21:40Z] start 2026-09-24-v6e1 on europe-west4-a, image vllm/vllm-tpu@sha256:19a1a0526476f902eb83e1057f3d8938f35b457dd7716a30e9ab4f7bee90d507
+[jev-run 2026-09-24T14:21:40Z] serving google/gemma-4-E2B-it 
+READY google/gemma-4-E2B-it after 361s
+[jev-run 2026-09-24T14:27:51Z] READY google/gemma-4-E2B-it after 361s
+prompt check for google/gemma-4-E2B-it: DiffusionGemma prompt without the empty thought block (the model's own template has none)
+Traceback (most recent call last):
+  File "/work/run_eval.py", line 255, in <module>
+    main()
+  File "/work/run_eval.py", line 245, in main
+    for i, rec in enumerate(pool.map(one, todo), 1):
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 619, in result_iterator
+    yield _result_or_cancel(fs.pop())
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 317, in _result_or_cancel
+    return fut.result(timeout)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/usr/local/lib/python3.12/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/run_eval.py", line 227, in one
+    reads, lat = autoregressive_record(template, slots, sys_text, ex)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/run_eval.py", line 133, in autoregressive_record
+    d = ss.upstream_completions(body)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/work/vendor/structured_server.py", line 442, in upstream_completions
+    return json.load(urllib.request.urlopen(req, timeout=timeout))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/urllib/request.py", line 215, in urlopen
+    return opener.open(url, data, timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/urllib/request.py", line 521, in open
+    response = meth(req, response)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/urllib/request.py", line 630, in http_response
+    response = self.parent.error(
+               ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/urllib/request.py", line 559, in error
+    return self._call_chain(*args)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/urllib/request.py", line 492, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/urllib/request.py", line 639, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 500: Internal Server Error
+[jev-run 2026-09-24T14:28:09Z] e2b smoke: bad 0
+[jev-run 2026-09-24T14:28:24Z] E2B did not serve or read; stopping before the other arms
