@@ -266,7 +266,7 @@ For Gemma, the largest gap. The published Gemma data points are all generative r
 - Gemma 4 26B-A4B ties Jev on two Japanese sentiment tasks
 - Gemma 4 E4B, stating its confidence as text, scores 81.0% against Jev's 95.5% on synthetic emails
 
-Plain Gemma read by its label probabilities, and DiffusionGemma's calibration, are measured in a companion article, on one EC2 L4 against the same four public tasks. Still unpublished: Jev's behaviour across model versions, calibration across difficulty on real data, and whether a generative LLM shows the same option-name sensitivity.
+Plain Gemma read by its label probabilities, and DiffusionGemma's calibration, are measured in a companion article, on one EC2 L4 against the same four public tasks and on Bespoke Labs' 13-subset public suite beside its published Jev results. Still unpublished: Jev's behaviour across model versions, calibration across difficulty on real data, and whether a generative LLM shows the same option-name sensitivity.
 
 ---
 
