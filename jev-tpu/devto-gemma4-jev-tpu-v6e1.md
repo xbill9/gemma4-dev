@@ -3,7 +3,7 @@ title: "Running a Jev-Style Decision Model on One TPU v6e: What Fits, What It Co
 published: false
 description: "Gemma 4 E2B, E4B, 12B and a 26B-A4B fp8 build read by their label probabilities with vLLM on one TPU v6e chip, checked against the same read on an NVIDIA L4 and against Jev 1.13.0's published results. What fits one chip, how to read labels when vLLM on TPU returns only the top 32 log-probabilities, speed, cost, and why no 31B loads today."
 tags: gemma, googlecloud, machinelearning, llm
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/devto-jev-tpu-v6e1-banner.afe3a2e3.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/devto-jev-tpu-v6e1-cover.6a93fef0.jpg
 ---
 
 This article provides a step by step guide to running a Jev-style decision model on one Google Cloud TPU v6e chip with Gemma 4 and vLLM, and compares it with the same read on one NVIDIA L4 GPU. The measurement was pre-registered, and every per-item output is committed.
