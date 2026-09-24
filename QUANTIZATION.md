@@ -151,6 +151,12 @@ That list is actively misleading read on its own.
 | AWQ | `layers/vllm/quantization/awq.py` | no — torch path only |
 | GGUF / q4_0 | absent from `QUANTIZATION_METHODS` — **and not a TPU-only gap**, see below | no |
 
+**Measured 2026-09-24 on one v6e chip** (`vllm/vllm-tpu@sha256:19a1a052…`, vLLM `0.29.1rc1.dev468+g0b7f11a1e`, `jev-tpu/RESULTS.md`):
+
+- **The fp8 w8a8 row serves a 26B-A4B on one chip.** `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic` (26.67 GiB on disk) booted in 616 s at `--max-model-len 2048 --max-num-seqs 16` and read the 3,880-record public suite at 76.0%, level with the 26B AWQ 4-bit build on an L4 (75.3%). It is the first 26B served by vLLM on one v6e chip in this monorepo. The 31B fp8 builds (30.98 GiB) exceed the ~28.7 GiB cap and were not tried.
+- **The w4a16 row is still dead on this build.** `google/gemma-4-31B-it-qat-w4a16-ct` and `cyankiwi/gemma-4-31B-it-AWQ-4bit` — the cyankiwi "AWQ" exports are stored as compressed-tensors w4a16 — both fail in 120 s with `NotImplementedError: compressed-tensors scheme for layer 'model.language_model.layers.0.self_attn.q_proj' is not yet supported in the JAX path`.
+- **Per-request `logprob_token_ids` is not implemented.** `tpu_inference` gathers only the top-k log-probabilities (`compute_and_gather_logprobs(..., max_logprobs)`); a completions request carrying `logprob_token_ids` returns HTTP 500 `list index out of range`, while token-id prompts and `logprobs` up to `--max-logprobs` work. Read label probabilities out of the top k.
+
 The JAX compressed-tensors dispatcher handles `_is_fp8_w8a8`, then falls off the end:
 
 ```python
