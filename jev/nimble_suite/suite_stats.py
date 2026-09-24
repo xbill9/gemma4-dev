@@ -109,6 +109,40 @@ def main():
     worst = min(gaps, key=gaps.get)
     out["largest_choice_gap"] = {"subset": worst, "jev": pub[worst]["jev_acc"], "plain": measured[f"{plain} ar"][worst]["acc"]}
     md += ["", f"Largest multiple-choice gap, plain Gemma against Jev: {worst}, Jev {100 * pub[worst]['jev_acc']:.1f}% against {100 * measured[f'{plain} ar'][worst]['acc']:.1f}%"]
+    # Added for the article's review pass: Nimble by type, Jev minus each arm with an
+    # unpaired 95% range (Jev's per-record rows are unpublished), Brier, per-subset counts.
+    arm_key = {m: f"{m} {readout[m]}" for m in recs}
+    md += ["", "Published Nimble-9B accuracy, pooled: " + ", ".join(
+        f"{g} {100 * sum(round(pub[s]['nimble_acc'] * pub[s]['n']) for s in pub if g == 'all' or pub[s]['type'] == g) / sum(pub[s]['n'] for s in pub if g == 'all' or pub[s]['type'] == g):.1f}%"
+        for g in GROUPS)]
+    md += ["", "Jev minus arm, points, unpaired 95% range:"]
+    out["jev_minus"] = {}
+    for g in GROUPS:
+        row = out["accuracy"][g]
+        n = row["n"]
+        pj = row["jev"][0]
+        cells = []
+        for m in recs:
+            pm = row[m][0]
+            se = math.sqrt(pj * (1 - pj) / n + pm * (1 - pm) / n)
+            d = pj - pm
+            out["jev_minus"].setdefault(g, {})[m] = [d, d - 1.959964 * se, d + 1.959964 * se]
+            cells.append(f"{m} {100 * d:+.1f} ({100 * (d - 1.959964 * se):+.1f} to {100 * (d + 1.959964 * se):+.1f})")
+        md.append(f"- {g}: " + "; ".join(cells))
+    md += ["", "Brier, median over 13 subsets (published Jev " + f"{statistics.median(pub[s]['jev_brier'] for s in pub):.3f}, Nimble {statistics.median(pub[s]['nimble_brier'] for s in pub):.3f}):"]
+    for m in recs:
+        a_ = measured[arm_key[m]]
+        md.append(f"- {m}: {statistics.median(a_[s]['brier'] for s in pub):.3f}, below Jev on {sum(a_[s]['brier'] < pub[s]['jev_brier'] for s in pub)} of 13")
+    pa, da = measured[arm_key[plain]], measured[arm_key[diff]]
+    md += ["", f"DiffusionGemma raw ECE below plain on {sum(da[s]['ece'] < pa[s]['ece'] for s in pub)} of 13; after 50 labels on {sum(da[s]['ece_fit50'] < pa[s]['ece_fit50'] for s in pub)} of 13"]
+    above = {s: pa[s]["ece_fit50"] - pub[s]["jev_ece"] for s in pub if pa[s]["ece_fit50"] > pub[s]["jev_ece"]}
+    md.append(f"Plain after 50 labels above Jev as shipped on {len(above)} of 13, by up to {max(above.values()):.3f}")
+    for g in ("noul", "choice"):
+        md.append(f"{g} subsets, Jev minus plain, points: " + ", ".join(f"{s} {100 * (pub[s]['jev_acc'] - pa[s]['acc']):+.1f}" for s in sorted(pub) if pub[s]["type"] == g))
+    md.append("choice subsets, Jev minus plain, records: " + ", ".join(f"{s} {round(pub[s]['jev_acc'] * pub[s]['n']) - round(pa[s]['acc'] * pa[s]['n'])}" for s in sorted(pub) if pub[s]["type"] == "choice"))
+    ea = measured[arm_key["gemma-4-E4B-it"]]
+    ed = {s: 100 * (pa[s]["acc"] - ea[s]["acc"]) for s in pub}
+    md.append(f"26B minus E4B per subset, points: from {min(ed.values()):+.1f} ({min(ed, key=ed.get)}) to {max(ed.values()):+.1f} ({max(ed, key=ed.get)})")
     target = os.path.join(HERE, "results", args.run[0])
     json.dump(out, open(os.path.join(target, "stats.json"), "w"), indent=1)
     open(os.path.join(target, "STATS.md"), "w").write("\n".join(md) + "\n")
