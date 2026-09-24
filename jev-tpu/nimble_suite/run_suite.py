@@ -67,6 +67,13 @@ def read_ar(schema, template, slots, sys_text, state):
         "logprob_token_ids": ss.label_id_union(slots),
         "return_tokens_as_token_ids": True,
     }
+    # TPU vLLM (tpu_inference) returns only the top-k logprobs and has no per-request
+    # logprob_token_ids (PREREGISTRATION.md, deviation 2): with JEV_TOPK set, ask for the
+    # top K instead and read the labels out of it; a label outside the K gets the proxy's floor.
+    if os.environ.get("JEV_TOPK"):
+        body.pop("logprob_token_ids", None)
+        body["logprobs"] = int(os.environ["JEV_TOPK"])
+
     t0 = time.time()
     d = ss.upstream_completions(body)
     ms = (time.time() - t0) * 1e3

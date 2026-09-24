@@ -11,7 +11,7 @@ W=/opt/jev-tpu; L=/opt/jev-tpu-logs; mkdir -p $L
 LOG=$L/run.log
 log() { echo "[jev-run $(date -u +%FT%TZ)] $*" | tee -a $LOG > /dev/console; }
 sync_up() { gcloud storage rsync -r -q $W/results "$DST/results" >/dev/null 2>&1; gcloud storage rsync -r -q $L "$DST/logs" >/dev/null 2>&1; }
-cx() { docker exec -w /work vllm "$@"; }
+cx() { docker exec -e JEV_TOPK=32 -w /work vllm "$@"; }
 
 # Suite, copied in and re-checked against Nimble's manifests.
 mkdir -p /opt/suite && gcloud storage cp -q "gs://$BUCKET/jev-tpu/inputs/suite.tgz" /opt/suite/ && tar xzf /opt/suite/suite.tgz -C /opt/suite
@@ -32,18 +32,27 @@ full_run() {
   local model=$1 tag=$2 run="$PREFIX-$2"
   cx pip install -q pybase64 >/dev/null 2>&1
   cx python3 -c "import vllm,sys;print('vllm',vllm.__version__)" > $L/$tag.version.txt 2>&1
-  # One raw request, kept verbatim: does this server honour logprob_token_ids and token-id prompts?
-  curl -s localhost:8000/v1/completions -H 'Content-Type: application/json' -d "{\"model\":\"$model\",\"prompt\":[2,106,1645,108],\"max_tokens\":1,\"temperature\":0,\"logprobs\":5,\"logprob_token_ids\":[236776,236799,236780],\"return_tokens_as_token_ids\":true}" > $L/$tag.raw-probe.json 2>&1
+  # Raw requests, kept verbatim: which request shapes does this server answer?
+  local i=0
+  for body in '"prompt":"The capital of France is","max_tokens":1,"temperature":0,"logprobs":5' \
+              '"prompt":[2,106,1645,108],"max_tokens":1,"temperature":0,"logprobs":5,"return_tokens_as_token_ids":true' \
+              '"prompt":[2,106,1645,108],"max_tokens":1,"temperature":0,"logprobs":32,"return_tokens_as_token_ids":true' \
+              '"prompt":[2,106,1645,108],"max_tokens":1,"temperature":0,"logprobs":5,"logprob_token_ids":[236776,236799,236780],"return_tokens_as_token_ids":true'; do
+    i=$((i+1)); echo "== probe $i: {$body}" >> $L/$tag.raw-probe.txt
+    curl -s localhost:8000/v1/completions -H 'Content-Type: application/json' -d "{\"model\":\"$model\",$body}" | head -c 3000 >> $L/$tag.raw-probe.txt; echo >> $L/$tag.raw-probe.txt
+  done
   cx python3 run_eval.py --arm autoregressive --upstream http://localhost:8000 --model "$model" --run "$run-smoke" --limit 5 --concurrency 2 >> $LOG 2>&1
   local ok
   ok=$(python3 - "$W/results/$run-smoke" <<'PY'
 import glob, json, sys
 rs = [json.loads(l) for f in glob.glob(sys.argv[1] + "/*.jsonl") for l in open(f)]
-print("ok" if rs and all(r["labels_returned"] == len(r["labels"]) for r in rs) else f"bad {len(rs)}")
+ret = [r["reads"][0]["labels_returned"] for r in rs if "reads" in r]
+print(("ok" if rs and all(x >= 1 for x in ret) else "bad") + f" {len(rs)} records, labels returned {ret}")
 PY
 )
   log "$tag smoke: $ok"
-  [ "$ok" = ok ] || { sync_up; return 1; }
+  docker logs vllm 2>&1 | tail -200 > $L/$tag.after-smoke.log
+  [ "${ok%% *}" = ok ] || { sync_up; return 1; }
   local t0=$(date +%s)
   cx python3 run_eval.py --arm autoregressive --upstream http://localhost:8000 --model "$model" --run "$run" --concurrency 8 >> $LOG 2>&1
   log "$tag four tasks: $(( $(date +%s) - t0 ))s for $(cat $W/results/$run/*.jsonl | wc -l) decisions at concurrency 8"
