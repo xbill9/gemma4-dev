@@ -1,0 +1,17 @@
+Jev-style decisions on a TPU: one v6e chip runs Gemma 4 up to 26B, gives the same answers as a GPU, and decides about twice as fast.
+
+Gemma 4 E2B, E4B, 12B and a 26B-A4B fp8 build read by their label probabilities with vLLM on one TPU v6e chip, checked against the same read on an NVIDIA L4 and against Jev 1.13.0's published results. What fits one chip, how to read labels when vLLM on TPU returns only the top 32 log-probabilities, speed, cost, and why no 31B loads today.
+
+What is in it:
+
+- 🟢 One v6e chip serves Gemma 4 E2B, E4B and 12B at bf16 and a 26B-A4B fp8 build
+- ❌ No 31B checkpoint loads: the w4a16 and 4-bit builds fail on the JAX path, and the fp8 build is 30.98 GiB
+- 🟢 The same checkpoints give the same answers on the TPU and the L4: 1,186 and 1,193 of 1,200
+- 🟢 The 26B decides in 27 to 33 ms on the TPU against 61 ms on the L4
+
+dev.to (Google Developer Experts): https://dev.to/gde/running-a-jev-style-decision-model-on-one-tpu-v6e-what-fits-what-it-costs-and-what-changes-from-1j0g
+Medium: https://xbill999.medium.com/running-a-jev-style-decision-model-on-one-tpu-v6e-what-fits-what-it-costs-and-what-changes-from-203f4420fd31
+Companion article: https://dev.to/gde/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-15k6
+Source: https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu
+
+#JEV #Gemma #TPU #GoogleCloud #vLLM
