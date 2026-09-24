@@ -18,7 +18,7 @@ https://github.com/xbill9/gemma4-dev/tree/main/jev
 
 A Jev-style decision model answers a typed question with a probability for each allowed option, in one forward pass, with no generated text. TypeSafe's Jev does this as a hosted service. Any open model can do it: end the prompt where the answer starts, read the scores of the allowed label tokens, and apply a softmax over those.
 
-A companion review of the independent evidence on Jev found two open questions for Gemma. Plain Gemma read this way had no published accuracy or calibration result. DiffusionGemma, read through vLLM PR #57250, had been described by Google's Gemma account on September 18 as "yielding well-calibrated decision distributions", with no published measurement behind it.
+A [companion review of the independent evidence on Jev](https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln) found two open questions for Gemma. Plain Gemma read this way had no published accuracy or calibration result. DiffusionGemma, read through vLLM PR #57250, had been described by Google's Gemma account on September 18 as "yielding well-calibrated decision distributions", with no published measurement behind it.
 
 This run answers both on the same GPU, the same prompts, the same label tokens and the same scoring code, using community 4-bit (AWQ) builds of both models. A third run puts both, and Gemma 4 E4B, on the public suite where Bespoke Labs has published results for Jev, so the Gemma numbers sit beside Jev's on identical records.
 
@@ -450,6 +450,7 @@ The strategy for using label probabilities to run Gemma 4 as a decision model wa
 #### References
 
 - Code, pre-registration and per-item results: https://github.com/xbill9/gemma4-dev/tree/main/jev
+- Companion review of the independent evidence on Jev: https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln
 - vLLM PR #57250, DiffusionGemma structured reads: https://github.com/vllm-project/vllm/pull/57250
 - Plain checkpoint: https://huggingface.co/cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit
 - Diffusion checkpoint: https://huggingface.co/cyankiwi/diffusiongemma-26B-A4B-it-AWQ-INT4

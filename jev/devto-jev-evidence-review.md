@@ -276,7 +276,7 @@ The strategy for using primary sources to evaluate Jev was validated with an inc
 #### References
 
 - Full evidence review with every source: https://github.com/xbill9/gemma4-dev/blob/main/jev/reports/Jev%20independent%20evidence%20review.md
-- Companion measurement article: https://github.com/xbill9/gemma4-dev/blob/main/jev/devto-gemma4-decision-model-l4.md
+- Companion measurement article: https://dev.to/gde/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-15k6
 - TypeSafe launch post: https://typesafe.ai/blog/introducing-system-one-models-and-jev
 - TypeSafe models and pricing: https://docs.typesafe.ai/models
 - TypeSafe evals: https://evals.typesafe.ai/
