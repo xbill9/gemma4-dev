@@ -27,6 +27,48 @@ def main():
         costs = ", ".join(f"${v / 3600 / rate * 1e6:.2f} per million decisions {k}" for k, v in RATE.items())
         out.append(f"- {arm}: {n} decisions in {t} s at concurrency 8 = {rate:.1f} a second ({costs}); suite {s.group(2)} records in {s.group(1)} s = {int(s.group(2)) / int(s.group(1)):.1f} a second")
 
+    # Throughput from the requests themselves: eight in flight, so decisions a second is
+    # 8 / mean request time. The wall-clock figures above include the client's start-up.
+    out.append("")
+    for arm in ARMS:
+        ms = [json.loads(line)["latency"]["first_ms"] for t in ("sst2", "ag_news", "emotion", "irony")
+              for line in open(os.path.join(R, f"{PREFIX}-{arm}", f"autoregressive-{t}.jsonl"))]
+        rate = 8000 / (sum(ms) / len(ms))
+        costs = ", ".join(f"${v / 3600 / rate * 1e6:.2f} per million {k}" for k, v in RATE.items())
+        out.append(f"- {arm}: mean request {sum(ms) / len(ms):.1f} ms at eight in flight = about {rate:.0f} decisions a second ({costs})")
+
+    # Label mass and non-label top tokens, per arm and task.
+    out.append("")
+    for arm in ARMS:
+        cells = []
+        for t in ("sst2", "ag_news", "emotion", "irony"):
+            rs = [json.loads(line)["reads"][0] for line in open(os.path.join(R, f"{PREFIX}-{arm}", f"autoregressive-{t}.jsonl"))]
+            lm = sorted(r["label_mass"] for r in rs)
+            cells.append(f"{t} median label mass {100 * lm[len(lm) // 2]:.1f}%, top token a label on {sum(r['argmax_is_label'] for r in rs)} of {len(rs)}")
+        out.append(f"- {arm}: " + "; ".join(cells))
+
+    # Suite records keep no labels_returned. Two or more labels sharing one probability below
+    # 1e-8 is the fallback value's signature, so this counts a lower bound of records using it.
+    out.append("")
+    for arm in ARMS:
+        d = os.path.join(R, f"{PREFIX}-{arm}-suite")
+        n = fb = uni = 0
+        per = {}
+        for f in sorted(x for x in os.listdir(d) if x.endswith(".jsonl")):
+            for line in open(os.path.join(d, f)):
+                r = json.loads(line)
+                p = r["reads"][0]["probs"]
+                n += 1
+                low = [x for x in p if x < 1e-8]
+                hit = len(low) >= 2 and max(low) - min(low) < 1e-15
+                fb += hit
+                uni += len(set(round(x, 12) for x in p)) == 1
+                per.setdefault(r["subset"], [0, 0])
+                per[r["subset"]][0] += hit
+                per[r["subset"]][1] += 1
+        top = sorted(per.items(), key=lambda kv: -kv[1][0] / kv[1][1])[:3]
+        out.append(f"- {arm} suite: at least {fb} of {n} records ({100 * fb / n:.1f}%) used the fallback value; uniform probabilities on {uni}; most affected: " + ", ".join(f"{k} {v[0]} of {v[1]}" for k, v in top))
+
     sweep = json.load(open(os.path.join(R, f"{PREFIX}-SWEEP.json")))
     small = open(os.path.join(JEV, "SMALL-MODELS.md")).read()
     l4 = {}
