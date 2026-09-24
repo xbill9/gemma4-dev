@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Plain Gemma 4 26B vs Jev on One EC2 L4: 2.1 Points Behind Overall, Level on Yes/No, 4.5 Behind on Multiple Choice</title>
+  <meta name="description" content="Plain Gemma 4 26B read by its label probabilities against DiffusionGemma&#x27;s one-step read, both as community 4-bit (AWQ) builds on one EC2 L4, on 1,200 labelled examples and on the 3,880-record public suite where Jev 1.13.0 has published results. Pre-registered, with accuracy, calibration, calibration after 0 to 150 labels, latency and cost." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to measuring Gemma 4 26B
+as a Jev-style decision model on an AWS EC2 L4 GPU, and compares a plain
+read of its label probabilities against DiffusionGemma's one-step read
+and against Jev's published results. The measurement was pre-registered,
+and every per-item output is committed.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-l4-banner.cb16905f.jpg" alt="Plain Gemma 4 26B vs Jev on One EC2 L4: 2.1 Points Behind Overall, Level on Yes/No, 4.5 Behind on Multiple Choice" /></figure>
+<p>On Bespoke Labs' 3,880-record public suite, plain Gemma 4 26B trails
+Jev 1.13.0 by 2.1 points overall, shows no measurable difference on
+yes/no questions, and trails by 4.5 points on multiple choice. Jev is
+better calibrated out of the box, and one temperature fitted on 50
+labels brings Gemma's median calibration error within 0.01 of Jev's.
+Against DiffusionGemma, the plain read is level on accuracy, worse
+calibrated before fitting and similar after, and 1.9 to 5.1 times faster
+per decision.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/jev">https://github.com/xbill9/gemma4-dev/tree/main/jev</a></p>
+<hr />
+<h4 id="why-measure-this">Why Measure This?</h4>
+<p>A Jev-style decision model answers a typed question with a
+probability for each allowed option, in one forward pass, with no
+generated text. TypeSafe's Jev does this as a hosted service. Any open
+model can do it: end the prompt where the answer starts, read the scores
+of the allowed label tokens, and apply a softmax over those.</p>
+<p>A <a
+href="https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln">companion
+review of the independent evidence on Jev</a> found two open questions
+for Gemma. Plain Gemma read this way had no published accuracy or
+calibration result. DiffusionGemma, read through vLLM PR #57250, had
+been described by Google's Gemma account on September 18 as "yielding
+well-calibrated decision distributions", with no published measurement
+behind it.</p>
+<p>This run answers both on the same GPU, the same prompts, the same
+label tokens and the same scoring code, using community 4-bit (AWQ)
+builds of both models. A third run puts both, and Gemma 4 E4B, on the
+public suite where Bespoke Labs has published results for Jev, so the
+Gemma numbers sit beside Jev's on identical records.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An AWS account with quota for one G-family instance, and the AWS CLI
+logged in</li>
+<li>A security group, subnet and instance profile with
+<code>AmazonSSMManagedInstanceCore</code> for remote commands</li>
+<li>Python 3 with <code>transformers</code> and <code>pybase64</code>
+for the client side</li>
+<li>The repository cloned:
+<code>git clone https://github.com/xbill9/gemma4-dev</code> and
+<code>cd gemma4-dev/jev</code></li>
+</ul>
+<hr />
+<h4 id="step-1--pre-register-the-measurement">Step 1 — Pre-Register the
+Measurement</h4>
+<p>The models, image, serving flags, data, metrics and comparisons are
+written down and committed before any model call. The file is
+<code>PREREGISTRATION.md</code>.</p>
+<pre class="shell"><code>git show -s --oneline 3c67f62 d94471d a5cda09 894323e adf0c16
+3c67f62 jev: pre-registration for the L4 AWQ run; option-order variant, label-count calibration curve, EC2 user-data
+d94471d jev: run 2026-09-23-l4-awq — Gemma 4 26B label logits vs DiffusionGemma one-step reads, both AWQ 4-bit on one EC2 L4; per-item outputs, summary, host evidence
+a5cda09 jev: pre-registration addendum (latency pass on-instance, off-label tokens, E2B/E4B bf16 arms); 20-split calibration analysis; archived run log and throughput arithmetic
+894323e jev: plain arm builds its prompt from the served model&#39;s own chat template (26B unchanged, checked); E4B/E2B deviation recorded
+adf0c16 jev: Bespoke Labs public-suite run — rebuild with checksum checks, runner via the proxy&#39;s Jev parser, scorer matched to Nimble&#39;s definitions, instance driver, generic launcher; pre-registration addendum</code></pre>
+<p>The latency and small-model runs were added in one pre-registration
+addendum after the first run, and the public-suite run in another; each
+was committed before its own first call, and each deviation from the
+plan is recorded there. The pre-registration commits to publishing every
+result, including any where either arm does worse.</p>
+<hr />
+<h4 id="step-2--pick-a-matched-pair-of-checkpoints">Step 2 — Pick a
+Matched Pair of Checkpoints</h4>
+<p>An NVIDIA L4 has 24 GB of memory, so both 26B models run at 4 bits.
+Both checkpoints come from the same uploader and apply the same
+quantization settings to both models, so what differs is the model and
+how it is read.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-1.png"
+alt="Table: Plain arm, Diffusion arm" /></p>
+<p>Both arms share one set of serving flags.</p>
+<hr />
+<h4 id="step-3--launch-one-l4-on-ec2">Step 3 — Launch One L4 on EC2</h4>
+<p>The security group opens port 8000 to one address only.</p>
+<pre class="shell"><code>aws ec2 create-security-group --region us-east-1 --group-name jev-eval-sg \
+  --description &quot;jev eval: vLLM 8000 from one IP&quot; --vpc-id &lt;vpc-id&gt; --query GroupId --output text
+aws ec2 authorize-security-group-ingress --region us-east-1 --group-id &lt;sg-id&gt; \
+  --protocol tcp --port 8000 --cidr &lt;your-ip&gt;/32</code></pre>
+<p>The instance boots the regional GPU Deep Learning AMI and runs
+<code>aws/user-data.sh</code>, which pulls a vLLM nightly that contains
+PR #57250 and serves one model at a time.</p>
+<pre class="shell"><code>aws ec2 run-instances --region us-east-1 --image-id &lt;gpu-dlami&gt; --instance-type g6.xlarge \
+  --subnet-id &lt;subnet-id&gt; --security-group-ids &lt;sg-id&gt; \
+  --iam-instance-profile Name=&lt;profile&gt; --user-data file://aws/user-data.sh \
+  --block-device-mappings &#39;DeviceName=/dev/sda1,Ebs={VolumeSize=100,VolumeType=gp3,DeleteOnTermination=true}&#39; \
+  --tag-specifications &#39;ResourceType=instance,Tags=[{Key=Name,Value=jev-eval},{Key=ManagedBy,Value=jev}]&#39;
+i-0c5b14e913b4c1019 g6.xlarge   us-east-1a</code></pre>
+<p>A <code>g6.xlarge</code> has the same L4 as the larger sizes with 16
+GB of host memory, so <code>user-data.sh</code> adds a 16 GB swapfile on
+hosts under 30 GB; both 17 GB checkpoints loaded with it in place.</p>
+<hr />
+<h4 id="step-4--serve-the-plain-arm">Step 4 — Serve the Plain Arm</h4>
+<p>One flag set serves both arms: Triton attention, eager mode, prefix
+caching, 2048-token context, 16 sequences and 32 logprobs. The diffusion
+arm adds a 64-token canvas.</p>
+<pre class="shell"><code>/opt/jev/serve.sh ar</code></pre>
+<p>The client waits on <code>/v1/models</code> until the model
+answers.</p>
+<pre class="plaintext"><code>READY after ~480s
+[&#39;cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit&#39;]</code></pre>
+<p>That covers the image pull, the 17 GB download and the load. The host
+record from the instance:</p>
+<pre class="plaintext"><code>NVIDIA L4, 595.91.07, 23034 MiB
+image: vllm/vllm-openai:nightly-e9757321527ca1ecd514c07c1418dd2c53da3d19 digest: sha256:f75fec992c293dd41042745f8aa71bfdf12b188b6a01e0baf075e4bca5d297e5
+vllm 0.29.1rc1.dev573+ge97573215 torch 2.13.0+cu130</code></pre>
+<hr />
+<h4 id="step-5--check-the-read-before-the-full-run">Step 5 — Check the
+Read Before the Full Run</h4>
+<p>Both arms use the prompt, answer template, label tokens and
+probability code from the PR's own <code>structured_server.py</code>.
+<code>run_eval.py</code> confirms both chat templates render the
+identical prefix before it sends anything. A five-example run checks the
+path end to end.</p>
+<pre class="shell"><code>python3 run_eval.py --arm autoregressive --upstream http://&lt;host&gt;:8000 \
+  --model cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit --run smoke --limit 5 --concurrency 2
+autoregressive sst2: 5/5 (5s)
+autoregressive ag_news: 5/5 (1s)
+autoregressive emotion: 5/5 (0s)
+autoregressive irony: 5/5 (0s)</code></pre>
+<p>Each record stores the label probabilities,
+<code>labels_returned</code>, which confirms every label came back with
+a real probability, and <code>label_mass</code>, the share of the
+model's probability that landed on the allowed labels.</p>
+<hr />
+<h4 id="step-6--run-both-arms">Step 6 — Run Both Arms</h4>
+<p>The data is 300 labelled examples each from sst2, AG News, DAIR
+Emotion and tweet_eval irony, stratified with a fixed seed. sst2 and
+irony carry annotators' labels, AG News its source's news categories,
+and DAIR Emotion labels taken from the hashtags on each tweet. Each arm
+runs once as written, and the three choice tasks run once more with
+their options listed in reverse order.</p>
+<pre class="shell"><code>python3 run_eval.py --arm autoregressive --upstream $U --model $PLAIN --run 2026-09-23-l4-awq --concurrency 8
+python3 run_eval.py --arm autoregressive --upstream $U --model $PLAIN --run 2026-09-23-l4-awq --concurrency 8 --variant reversed
+/opt/jev/serve.sh diffusion
+python3 run_eval.py --arm diffusion --upstream $U --model $DIFF --run 2026-09-23-l4-awq --concurrency 4
+python3 run_eval.py --arm diffusion --upstream $U --model $DIFF --run 2026-09-23-l4-awq --concurrency 4 --variant reversed
+wc -l results/2026-09-23-l4-awq/diffusion-*.jsonl
+    300 results/2026-09-23-l4-awq/diffusion-ag_news.jsonl
+    300 results/2026-09-23-l4-awq/diffusion-ag_news--reversed.jsonl
+    300 results/2026-09-23-l4-awq/diffusion-emotion.jsonl
+    300 results/2026-09-23-l4-awq/diffusion-emotion--reversed.jsonl
+    300 results/2026-09-23-l4-awq/diffusion-irony.jsonl
+    300 results/2026-09-23-l4-awq/diffusion-sst2.jsonl
+    300 results/2026-09-23-l4-awq/diffusion-sst2--reversed.jsonl
+   2100 total</code></pre>
+<p>The diffusion arm reads each example four times with different noise
+in the answer slots, as the PR's proxy does. The DiffusionGemma server
+came up in about 300 seconds with the image already pulled.</p>
+<hr />
+<h4 id="step-7--score-it">Step 7 — Score It</h4>
+<pre class="shell"><code>python3 score.py --run 2026-09-23-l4-awq</code></pre>
+<p><code>score.py</code> writes <code>SUMMARY.md</code> and
+<code>summary.json</code> beside the records. Every figure below comes
+from those two files. Readouts: <code>plain</code> is one read of plain
+Gemma. <code>diffusion</code> is the proxy's automatic readout, the mean
+of four DiffusionGemma reads on the 96% to 100% of examples where its
+rule re-reads and one read on the rest; the label-count tables use the
+four-read mean throughout.</p>
+<hr />
+<h4 id="how-accurate-is-each-one">How Accurate Is Each One?</h4>
+<p>Level on three tasks, plain ahead on AG News.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-2.png"
+alt="Table: Task, Always-majority, Plain Gemma, DiffusionGemma, Difference (95% range)" /></p>
+<p>Throughout, level means the 95% range of the difference includes
+zero, and 🥇 in an accuracy table marks a lead whose range excludes it;
+in Compare and Contrast 🥇 marks the better value. Only the AG News
+difference excludes zero.</p>
+<hr />
+<h4 id="are-the-raw-probabilities-calibrated">Are the Raw Probabilities
+Calibrated?</h4>
+<p>DiffusionGemma's are closer. Plain Gemma's are strongly
+overconfident.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-3.png"
+alt="Table: Task, Plain Gemma ECE, DiffusionGemma ECE, Difference (95% range)" /></p>
+<p>ECE is expected calibration error over 15 bins: the gap between how
+confident a model says it is and how often it is right. DiffusionGemma
+is better calibrated on emotion and irony, and level on the other
+two.</p>
+<p>The fitted temperatures show the size of the gap. On the
+pre-registered single split, one temperature that best fits the labels
+was 3.48 to 7.24 for plain Gemma once 25 or more labels were used, and
+0.73 to 2.36 for DiffusionGemma. A temperature above 1 means the model's
+probabilities are too extreme.</p>
+<hr />
+<h4 id="what-do-50-labels-buy">What Do 50 Labels Buy?</h4>
+<p>Most of the correction for plain Gemma; a smaller gain for
+DiffusionGemma, and none on irony.</p>
+<p>Each task's examples split into a fitting half and a held-out half.
+One temperature is fitted on the first N labels of the fitting half and
+scored on the held-out half. On the pre-registered single split, 50
+labels took plain Gemma from 0.040, 0.139, 0.440 and 0.088 to 0.029,
+0.064, 0.102 and 0.042 on sst2, AG News, DAIR Emotion and irony, and
+DiffusionGemma from 0.047, 0.132, 0.311 and 0.055 to 0.025, 0.061, 0.115
+and 0.054.</p>
+<p>One split of 150 held-out examples moves ECE by several hundredths,
+so the same fit was repeated over 20 random splits, an analysis added
+after the run. Means, with the lowest and highest split in brackets:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-4.png"
+alt="Table: Task, Plain, 0 labels, Plain, 50 labels, Diffusion, 0 labels, Diffusion, 50 labels" /></p>
+<p>With no labels, DiffusionGemma is better calibrated on emotion and
+irony. With 50, plain Gemma's mean is at or below DiffusionGemma's on
+all four tasks, and the split-to-split ranges overlap throughout.</p>
+<hr />
+<h4 id="what-does-diffusiongemmas-read-do">What Does DiffusionGemma's
+Read Do?</h4>
+<p>About half of its probability lands outside the allowed labels. The
+median share on the allowed labels per task:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-5.png"
+alt="Table: Task, Plain Gemma, DiffusionGemma" /></p>
+<p>At the answer slot the server returns the allowed labels plus the
+single most likely token. In the latency run that token was
+<code>&lt;eos&gt;</code>, the end-of-sequence token, in 40% of reads on
+sst2, 53% on AG News and 64% on DAIR Emotion, and <code> the</code> in
+24% of reads on irony. The proxy rescales the label probabilities to sum
+to one, so the answer reads as confident either way;
+<code>label_mass</code> is the field that shows it, and it is worth
+logging in any deployment.</p>
+<p>The proxy re-reads when the answer slot's entropy is above 0.1. It
+computes that entropy from the returned tokens' full-vocabulary
+probabilities without rescaling them, so a label holding half the
+probability on its own already scores 0.35. It re-read 100% of sst2 and
+AG News examples, 99.0% of DAIR Emotion and 96.3% of irony.</p>
+<p>The re-reads barely change the answer: one read and the mean of four
+are within 0.6 points of accuracy on every task (93.3% and 93.3% on
+sst2, 83.3% and 83.0% on AG News, 60.7% and 60.3% on DAIR Emotion, 86.7%
+and 87.3% on irony). How much the four reads disagree separates right
+from wrong well on sst2 and irony, AUROC 0.891 and 0.873, and weakly on
+AG News and DAIR Emotion, 0.685 and 0.635.</p>
+<hr />
+<h4 id="does-option-order-change-the-answer">Does Option Order Change
+the Answer?</h4>
+<p>For both models, by similar amounts. Listing the choice options in
+reverse order changed:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-6.png"
+alt="Table: Task, Plain Gemma, DiffusionGemma" /></p>
+<hr />
+<h4 id="how-fast-is-each-one">How Fast Is Each One?</h4>
+<p>A second run timed both arms with the client on the instance itself,
+against <code>localhost</code>, one request at a time, over the first
+100 examples of each task. Same image, flags and checkpoints, on a
+<code>g6.4xlarge</code>: the same L4 with a larger host.</p>
+<pre class="shell"><code>python3 run_eval.py --arm autoregressive --upstream http://localhost:8000 --model $PLAIN --run 2026-09-23-l4-latency --limit 100 --concurrency 1
+python3 run_eval.py --arm diffusion --upstream http://localhost:8000 --model $DIFF --run 2026-09-23-l4-latency --limit 100 --concurrency 1 --reads 4 --keep-top 5
+| Task | Plain, median | Plain, 90th pct | Diffusion one read, median | Diffusion one read, 90th pct | Diffusion 4 reads (first + 3 parallel), median |
+|---|---|---|---|---|---|
+| sst2 | 61 | 62 | 118 | 119 | 306 |
+| ag_news | 61 | 62 | 119 | 120 | 307 |
+| emotion | 61 | 62 | 119 | 120 | 308 |
+| irony | 61 | 61 | 121 | 122 | 312 |</code></pre>
+<p>Times are in milliseconds. A plain Gemma 26B decision takes 61 ms on
+one L4 for these prompts, which run 105 to 299 tokens with a median of
+132; longer inputs such as full tickets or logs take longer. One
+DiffusionGemma read takes 1.9 to 2.0 times as long, and the automatic
+rule's four reads 5.0 to 5.1 times, which is the path it takes on nearly
+every call. At 61 ms one request at a time, one L4 answers about 16
+plain decisions a second before any batching.</p>
+<hr />
+<h4
+id="mag_right-tip-fit-one-temperature-before-you-trust-a-threshold">🔎
+Tip: Fit One Temperature Before You Trust a Threshold</h4>
+<p>Both models give usable probabilities after one fitted temperature.
+<code>score.py</code> does it with a grid search on log loss:</p>
+<pre class="python"><code>def fit_temperature(probs, gold_idx):
+    return min(T_GRID, key=lambda t: nll([temper(p, t) for p in probs], gold_idx))</code></pre>
+<p>Label 50 real decisions from the task, fit on them, and set any
+act-or-escalate threshold on the rescaled probabilities. Plain Gemma
+needs the larger correction, and both reach similar calibration once it
+is applied.</p>
+<hr />
+<h4 id="what-about-the-smaller-gemma-4-models">What About the Smaller
+Gemma 4 Models?</h4>
+<p>The label read works with any Gemma 4. DiffusionGemma ships only at
+26B-A4B, so the smaller models get the plain arm alone, run in bf16 on
+the same L4 with the same flags. Their chat templates end at the model
+turn without the empty thought block the 26B template adds, so their
+prompt follows their own template. These two arms were added in a
+pre-registration addendum after the first run, and are exploratory. The
+26B column is 4-bit and the others bf16, so the gaps mix model size with
+precision. All three read letter labels (A to F) with the meanings
+listed in the prompt, the format of the PR's proxy; smaller models may
+do better with the label words as the answers themselves.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-7.png"
+alt="Table: Task, 26B, 4-bit, E4B, bf16, E2B, bf16" /></p>
+<p>E4B is 0.7 to 5.4 points behind the 26B, needs a smaller correction
+(fitted temperature 1.89 to 3.77 at 50 labels, against 4.65 to 7.05,
+both means over 20 splits), and reaches similar calibration once
+corrected: 0.042, 0.071, 0.089 and 0.081 against the 26B's 0.039, 0.066,
+0.089 and 0.060. It changed more answers when the options were reversed
+on AG News, 35 of 300 against 14.</p>
+<p>E2B answered "world" on 277 of 300 AG News examples, and on 263 when
+the options were listed in reverse order, so the same option wins
+whatever its position, and its topic accuracy sits near the 25% majority
+rate. Its fitted temperatures reach 7.99, the top of the pre-registered
+search range, so its corrected calibration figures understate what a
+wider search would reach.</p>
+<hr />
+<h4 id="how-does-it-compare-with-jev">How Does It Compare With Jev?</h4>
+<p>Bespoke Labs, which makes the open Nimble-9B decision model, ran Jev
+1.13.0 through its API on a 13-subset public suite and published the
+results per subset, with the converters and record ids. The suite holds
+3,880 human-labelled records: yes/no questions from BoolQ, PAWS, SQuAD
+2.0, Civil Comments and Aegis 2.0; multiple choice from MultiNLI,
+PubMedQA, VitaminC and MASSIVE intents in English and German; and
+five-level ratings from HelpSteer2 and SummEval.</p>
+<p>A third run, on a <code>g6.xlarge</code> with the same image and
+flags, rebuilt the suite from the public sources and read it with all
+three Gemma arms. All 13 rebuilt subsets matched the published
+checksums, so the Gemma figures and Bespoke Labs' Jev figures come from
+the same records.</p>
+<p>Each record is a Jev request, which the PR's proxy converts with its
+own Jev parser, so the Gemma arms see the same prompt format as the
+first run: yes/no questions answered with the word yes or no,
+multiple-choice options lettered A, B, C with the answer read as a
+letter, and rating levels numbered from 1. Gemma was read in that format
+as published, with no prompt tuning, while Jev takes the request in its
+own format; a different prompt could move the multiple-choice gap in
+either direction. Scoring uses Bespoke Labs' definitions, and
+<code>tests/test_suite_scoring.py</code> checks it against Bespoke Labs'
+own code.</p>
+<pre class="shell"><code>bash nimble_suite/build.sh &lt;workdir&gt;
+python3 nimble_suite/run_suite.py --arm autoregressive --upstream http://localhost:8000 \
+  --model $PLAIN --records &lt;workdir&gt;/public --run 2026-09-24-l4-suite
+python3 nimble_suite/suite_stats.py --run 2026-09-24-l4-suite --run 2026-09-24-l4-suite-e4b</code></pre>
+<p>Accuracy pooled over records, with the 95% range in brackets:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-8.png"
+alt="Table: Questions, Records, Jev 1.13.0, published, Nimble-9B, published, Plain Gemma 26B, DiffusionGemma 26B, Gemma 4 E4B" /></p>
+<p>Jev leads plain Gemma by 2.1 points over all records (95% range 0.2
+to 4.0) and by 4.5 on multiple choice (2.0 to 7.1). Jev's per-record
+answers are unpublished, so these ranges compare two independent
+proportions: pairing would narrow them, and records that share a passage
+or article widen them, most of all for ratings. The overall gap's range
+starts at 0.2 points, so it is the least secure of the three; the
+multiple-choice gap is the firm one. PubMedQA and VitaminC each account
+for 33 of the 84 records behind it, and PubMedQA has the largest
+single-subset gap, 77.2% against 64.0%.</p>
+<p>On yes/no questions pooled, plain Gemma shows no measurable
+difference from Jev, 84.8% against 84.6%, a difference anywhere from 2.8
+points ahead to 2.5 behind. Within them Jev is ahead on BoolQ by 5.7
+points and plain Gemma on Civil Comments and SQuAD 2.0 by 6.0 and 6.4;
+PAWS, 5.2 points to Jev, is within its range.</p>
+<p>On ratings DiffusionGemma leads both Jev, by 7.6 points (2.1 to
+13.1), and plain Gemma, on exact-level accuracy; Bespoke Labs advises
+reading that beside the error of the probability-weighted level, which
+this article does not report. Plain Gemma and DiffusionGemma are level
+over all 3,880 records: 187 right only for plain, 211 right only for
+DiffusionGemma, exact McNemar p = 0.25. On ratings DiffusionGemma was
+right alone on 97 records against 51, p = 0.0002, and the whole gap
+comes from SummEval, whose 384 records come from 24 news articles.
+Records from one article move together, so that p-value overstates the
+evidence.</p>
+<p>Bespoke Labs' open Nimble-9B scores 75.9% over all records, level
+with the two 26B reads. Gemma 4 E4B trails the 26B by 2.0 points over
+the whole suite, with single subsets ranging from 9.6 points ahead to
+8.0 behind, and trails Jev by 4.1 (2.2 to 6.0).</p>
+<p>Median calibration error over the 13 subsets, with Bespoke Labs' 10
+bins:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-9.png"
+alt="Table: ECE as shipped, ECE after 50 labels, Brier as shipped" /></p>
+<p>As shipped, Jev has a lower calibration error than plain Gemma on all
+13 subsets, than DiffusionGemma on 11 and than E4B on 12. Brier score,
+which rewards accuracy and calibration together, favours Jev too: plain
+Gemma and E4B beat it on 2 of 13 subsets, DiffusionGemma on 4.
+DiffusionGemma's raw calibration error is lower than plain Gemma's on
+all 13, and its median share on the allowed labels was 66.5% per read on
+this suite.</p>
+<p>After one temperature per subset, fitted on 50 labels from that
+subset, the Gemma medians sit 0.003 to 0.009 above Jev's as-shipped
+median. Per subset, fitted plain Gemma is still above Jev on 8 of 13, by
+up to 0.049, and the Gemma arms are at or below Jev on 4 to 6. The
+fitted figures are scored on the held-out half of each subset, 72 to 300
+records, and ECE reads higher on fewer records, which works against the
+Gemma columns. Jev's figures are as shipped, and a temperature fitted on
+Jev's own output could lower them as well.</p>
+<p>Matt Mastracci, who wrote vLLM PR #57250, compared DiffusionGemma
+with Jev on 201 hand-built items on September 17, and Google's Gemma
+account shared the thread the next day. DiffusionGemma answered 198
+correctly and Jev 191; he called the two "roughly tied" and
+DiffusionGemma "the winner, I think." Seven of Jev's ten errors fell in
+one set, 89 words drawn from five sentences, and the items, code and
+per-item outputs are unpublished. On the public records DiffusionGemma
+is 1.4 points behind Jev, anywhere from 0.4 ahead to 3.3 behind, so both
+measurements find the two close overall; by question type they part,
+level on yes/no, 5.5 points behind on multiple choice (3.0 to 8.1) and
+7.6 ahead on ratings. Plain Gemma 26B, read the same way without the
+diffusion step, lands within 0.6 points of DiffusionGemma over the suite
+(p = 0.25), so this suite shows no accuracy gain from the diffusion
+step.</p>
+<p>His timings show the same cost for the re-reads: 1.9 to 4.6 times one
+read on his eight sets, against 2.6 times here. One read beat Jev's API
+on seven of his eight sets and the automatic re-reads lost on all eight;
+his single reads were timed warm and the re-reads cold, which
+exaggerates that second gap.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev/medium-l4/img/devto-gemma4-decision-model-l4-table-10.png"
+alt="Table: Jev 1.13.0, published, Plain Gemma 4 26B, label read, DiffusionGemma 26B, one-step read" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>Between the two Gemma 4 26B reads, for a Jev-style decision service
+on one L4: plain Gemma read by its label probabilities, plus one
+temperature fitted on about 50 labels. It is at least as accurate on the
+four tasks and level with DiffusionGemma over the public suite, faster,
+and places all of its probability on the answers you allowed.</p>
+<p>DiffusionGemma's lower raw calibration error has a range excluding
+zero on two of four tasks and holds on all 13 public-suite subsets, and
+it matters when no labels exist at all. With 50 labels the difference is
+no longer detectable on the four tasks, and on the suite the two split 8
+to 5, a count within chance (sign test p = 0.58). On five-level ratings
+DiffusionGemma scored higher than both Jev and plain Gemma, on few
+source articles; a rating task is the one place to try both.</p>
+<p>Against Jev, on the same public records: plain Gemma 4 26B trails Jev
+by 2.1 points overall, shows no measurable difference on yes/no
+questions pooled, and trails it by 4.5 points on multiple choice. Its
+median calibration error comes within 0.01 of Jev's as-shipped median
+once one temperature per subset is fitted on 50 labels from that subset;
+per subset it stays higher on 8 of 13. Jev is the better calibrated with
+no labels at all.</p>
+<p>Where a smaller model has to do, Gemma 4 E4B in bf16 gives up 0.7 to
+5.4 points against the 26B on the four tasks and 2.0 points over the
+public suite. E2B falls apart on four-way topic classification with this
+prompt.</p>
+<hr />
+<h4 id="what-does-a-decision-cost">What Does a Decision Cost?</h4>
+<p>The run logs give a throughput. Plain Gemma answered 2,100 decisions
+in 51 seconds, 41.2 a second, at client concurrency 8. DiffusionGemma,
+reading each example four times, answered 2,100 in 298 seconds, 7.0 a
+second, at concurrency 4. The client was on a home connection, so these
+are lower bounds on what the L4 serves.</p>
+<p>At the <code>g6.xlarge</code> on-demand price of $0.8048 an hour,
+that is at most $5.43 per million decisions for plain Gemma and $31.72
+for DiffusionGemma with four reads, which ran at half the concurrency,
+so its figure is the looser bound. TypeSafe prices Jev at $0.042 per
+million input tokens, which is $5.54 per million decisions at this run's
+median of 132 input tokens and $12.56 at the longest, 299: about the
+same as the L4 at full load. The L4 is charged by the hour whether busy
+or idle, so its per-decision cost holds only at full load. The public
+suite's longer prompts would raise both the L4's cost and Jev's.</p>
+<p>The first run, from launch to termination in under 1.2 hours, cost at
+most $0.97 of instance time. The second, on a <code>g6.4xlarge</code> at
+$1.3232 an hour for 1.19 hours, cost $1.57. The public-suite run, on a
+<code>g6.xlarge</code> for 0.82 hours, cost $0.66, including rebuilding
+the suite and reading 11,640 records across three models. All three,
+$3.20 together, exclude the prorated 100 GB volume. All ran on demand;
+G-family spot capacity in us-east-1 was unavailable at launch time.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<p>Every command on the instance went through AWS Systems Manager, so no
+SSH port was ever open, and port 8000 was open to one address.</p>
+<pre class="shell"><code>aws ec2 terminate-instances --region us-east-1 --instance-ids i-0c5b14e913b4c1019
+shutting-down</code></pre>
+<p>Then delete the security group, and confirm that nothing tagged
+<code>ManagedBy=jev</code> remains.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to measure Gemma 4 26B as a Jev-style
+decision model, read two ways, for accuracy and calibration on labelled
+data, and to set it beside Jev's published results on a public suite.
+The key to the solution was a matched pair of 4-bit checkpoints on one
+EC2 L4, identical prompts and label tokens, and a measurement
+pre-registered before any call. The results were:</p>
+<ul>
+<li>⚠️ On Bespoke Labs' 3,880-record public suite, plain Gemma 4 26B
+trails Jev 1.13.0 by 2.1 points overall (range 0.2 to 4.0) and 4.5 on
+multiple choice (2.0 to 7.1)</li>
+<li>🟢 No measurable difference from Jev on yes/no questions pooled,
+84.8% against 84.6%</li>
+<li>⚠️ Jev is the best calibrated with no labels: median ECE 0.071
+against 0.114 to 0.180 for the Gemma arms</li>
+<li>🟢 One temperature fitted on 50 labels brings the Gemma medians to
+0.074 to 0.080; per subset plain Gemma stays above Jev on 8 of 13</li>
+<li>⚠️ DiffusionGemma 1.4 points behind Jev over the suite (0.4 ahead to
+3.3 behind): 5.5 behind on multiple choice, 7.6 ahead on ratings;
+Mastracci's hand-built items had it 198 against 191, both close
+overall</li>
+<li>🟢 Plain Gemma and DiffusionGemma level on accuracy: plain ahead
+only on AG News of the four tasks, 75.3% against 75.9% over the suite, p
+= 0.25</li>
+<li>🟢 DiffusionGemma better calibrated as shipped, on emotion and irony
+and on all 13 suite subsets; after 50 labels the difference is no longer
+detectable</li>
+<li>⚠️ DiffusionGemma places only 37% to 59% of its probability on the
+allowed labels, and the proxy's rescaling hides it</li>
+<li>⚠️ The automatic re-read rule fires on 96% to 100% of examples,
+costs 2.6 times one read, and moves accuracy by at most 0.6 points</li>
+<li>🟢 61 ms per plain decision on the instance, and at most $5.43 per
+million at full load, level with Jev's $5.54 at this run's prompt
+length</li>
+<li>🟢 Gemma 4 E4B in bf16 0.7 to 5.4 points behind the 26B on the four
+tasks and 2.0 over the suite</li>
+<li>❌ Gemma 4 E2B answered "world" on 277 of 300 AG News examples</li>
+</ul>
+<p>Scope: one NVIDIA L4 in us-east-1 on three instances, a
+<code>g6.xlarge</code> for the accuracy run, a <code>g6.4xlarge</code>
+for the latency and small-model run and a <code>g6.xlarge</code> for the
+public suite, vLLM <code>0.29.1rc1.dev573+ge97573215</code>, the 26B
+models 4-bit from the same uploader with the same quantization settings
+and E4B and E2B in bf16, 300 examples per task plus the 3,880-record
+public suite, one run per arm. Google's reference checkpoints are bf16,
+and 4-bit quantization may affect a diffusion model differently from an
+autoregressive one, so results at bf16 may differ for either arm.
+Latency comes from 100 examples per task with the client on the
+instance; throughput comes from the first run's client on a home
+connection. The latency, E4B and E2B arms were added in a
+pre-registration addendum after the first run, and E4B and E2B are
+exploratory; the 20-split calibration and the public suite's ranges,
+paired test, medians and per-subset counts were added after their runs,
+and the per-subset and pooled suite figures are the pre-registered ones.
+The suite's E4B arm ran under its own run name,
+<code>2026-09-24-l4-suite-e4b</code>, with the same instance, image,
+flags and records. All four test sets and all 13 suite datasets were
+published before Gemma 4 and may be in its training data, and the high
+irony scores may indicate it there; whether they are in Jev's is
+unknown. No Jev call was made: the Jev and Nimble-9B figures are Bespoke
+Labs' published results on the same records, from one run of Jev 1.13.0
+by a company that publishes a competing model, counting an invalid Jev
+response as wrong, with Jev's probabilities rounded to two decimals by
+its API. Code, pre-registration and every per-item output are in the
+repository. Parts of the analysis and writing were done with AI
+assistance (Claude); every figure comes from the committed output
+files.</p>
+<p>The strategy for using label probabilities to run Gemma 4 as a
+decision model was validated with an incremental step by step
+approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Code, pre-registration and per-item results: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/jev">https://github.com/xbill9/gemma4-dev/tree/main/jev</a></li>
+<li>Companion review of the independent evidence on Jev: <a
+href="https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln">https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln</a></li>
+<li>vLLM PR #57250, DiffusionGemma structured reads: <a
+href="https://github.com/vllm-project/vllm/pull/57250">https://github.com/vllm-project/vllm/pull/57250</a></li>
+<li>Plain checkpoint: <a
+href="https://huggingface.co/cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit">https://huggingface.co/cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit</a></li>
+<li>Diffusion checkpoint: <a
+href="https://huggingface.co/cyankiwi/diffusiongemma-26B-A4B-it-AWQ-INT4">https://huggingface.co/cyankiwi/diffusiongemma-26B-A4B-it-AWQ-INT4</a></li>
+<li>DiffusionGemma model card: <a
+href="https://huggingface.co/google/diffusiongemma-26B-A4B-it">https://huggingface.co/google/diffusiongemma-26B-A4B-it</a></li>
+<li>Google's Gemma account on DiffusionGemma's calibration: <a
+href="https://x.com/googlegemma/status/2101069861598482817">https://x.com/googlegemma/status/2101069861598482817</a></li>
+<li>Matt Mastracci, Jev against DiffusionGemma on hand-built items: <a
+href="https://x.com/mmastrac/status/2100626193943052784">https://x.com/mmastrac/status/2100626193943052784</a></li>
+<li>Guo et al., On Calibration of Modern Neural Networks: <a
+href="https://arxiv.org/abs/1706.04599">https://arxiv.org/abs/1706.04599</a></li>
+<li>Amazon EC2 G6 instances: <a
+href="https://aws.amazon.com/ec2/instance-types/g6/">https://aws.amazon.com/ec2/instance-types/g6/</a></li>
+<li>TypeSafe Jev: <a
+href="https://docs.typesafe.ai/concepts/system-one">https://docs.typesafe.ai/concepts/system-one</a></li>
+<li>Bespoke Labs, Nimble public-suite results for Jev 1.13.0 and
+Nimble-9B: <a
+href="https://github.com/bespokelabsai/nimble/blob/0e67403/docs/PUBLIC_BENCHMARKS.md">https://github.com/bespokelabsai/nimble/blob/0e67403/docs/PUBLIC_BENCHMARKS.md</a></li>
+</ul>
+</body>
+</html>
