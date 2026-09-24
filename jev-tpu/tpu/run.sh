@@ -32,6 +32,8 @@ full_run() {
   local model=$1 tag=$2 run="$PREFIX-$2"
   cx pip install -q pybase64 >/dev/null 2>&1
   cx python3 -c "import vllm,sys;print('vllm',vllm.__version__)" > $L/$tag.version.txt 2>&1
+  # One raw request, kept verbatim: does this server honour logprob_token_ids and token-id prompts?
+  curl -s localhost:8000/v1/completions -H 'Content-Type: application/json' -d "{\"model\":\"$model\",\"prompt\":[2,106,1645,108],\"max_tokens\":1,\"temperature\":0,\"logprobs\":5,\"logprob_token_ids\":[236776,236799,236780],\"return_tokens_as_token_ids\":true}" > $L/$tag.raw-probe.json 2>&1
   cx python3 run_eval.py --arm autoregressive --upstream http://localhost:8000 --model "$model" --run "$run-smoke" --limit 5 --concurrency 2 >> $LOG 2>&1
   local ok
   ok=$(python3 - "$W/results/$run-smoke" <<'PY'
@@ -66,7 +68,7 @@ try_model() {  # try_model <model> <tag> [extra flags]; 0 if it served and ran
 }
 
 log "start $PREFIX on $(curl -s -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/zone | awk -F/ '{print $NF}'), image $(docker inspect --format '{{index .RepoDigests 0}}' vllm/vllm-tpu:nightly)"
-try_model google/gemma-4-E2B-it e2b
+try_model google/gemma-4-E2B-it e2b || { log "E2B did not serve or read; stopping before the other arms"; sync_up; gcloud compute instances delete "$(hostname)" --zone "$(curl -s -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/zone | awk -F/ '{print $NF}')" --quiet; exit 1; }
 try_model google/gemma-4-E4B-it e4b
 try_model google/gemma-4-12B-it 12b
 try_model RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic 26b-fp8 || try_model cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit 26b-awq

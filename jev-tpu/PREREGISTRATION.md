@@ -53,3 +53,7 @@ The 31B fp8 builds (30.98 GiB) exceed the chip's usable HBM and are not tried. A
 - Every result is published, including arms that fail to serve and any size that does worse.
 - Cost cap: 6 hours of flex-start v6e-1 time. The VM deletes itself when the run ends and carries `--max-run-duration` as a backstop.
 - Deviations are recorded here with a date before the affected results are scored.
+
+## Deviations
+
+- **2026-09-24, before any read:** provisioning is on-demand, not flex-start. A flex-start request in europe-west4-a waited 30 minutes without capacity, and a spot VM in us-east1-d was preempted twelve minutes after it came up, before any model had served. Nothing else changes; the cost cap stays at 6 hours of instance time.
