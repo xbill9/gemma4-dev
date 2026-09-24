@@ -1,0 +1,17 @@
+Jev launched as a new kind of decision model. Plain Gemma 4 26B, read the same way on one EC2 L4, lands 2.1 points behind it overall.
+
+Plain Gemma 4 26B read by its label probabilities against DiffusionGemma's one-step read, both as community 4-bit (AWQ) builds on one EC2 L4, on 1,200 labelled examples and on the 3,880-record public suite where Jev 1.13.0 has published results. Pre-registered, with accuracy, calibration, calibration after 0 to 150 labels, latency and cost.
+
+What is in it:
+
+- ⚠️ On Bespoke Labs' 3,880-record public suite, plain Gemma 4 26B trails Jev 1.13.0 by 2.1 points overall (range 0.2 to 4.0) and 4.5 on multiple choice (2.0 to 7.1)
+- 🟢 No measurable difference from Jev on yes/no questions pooled, 84.8% against 84.6%
+- ⚠️ Jev is the best calibrated with no labels: median ECE 0.071 against 0.114 to 0.180 for the Gemma arms
+- 🟢 One temperature fitted on 50 labels brings the Gemma medians to 0.074 to 0.080; per subset plain Gemma stays above Jev on 8 of 13
+
+dev.to (Google Developer Experts): https://dev.to/gde/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-15k6
+dev.to (AWS Community Builders): https://dev.to/aws-builders/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-3ao6
+AWS Builder Center: https://builder.aws.com/content/3JkrPxcim9nZXKHhk5abE3gP2Py/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-multiple-choice
+Medium: https://medium.com/@xbill999/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-2-1-6a2567415b64
+Companion article: https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln
+Source: https://github.com/xbill9/gemma4-dev/tree/main/jev
