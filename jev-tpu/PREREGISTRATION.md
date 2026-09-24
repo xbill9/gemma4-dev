@@ -38,7 +38,7 @@ The 31B fp8 builds (30.98 GiB) exceed the chip's usable HBM and are not tried. A
 
 - The plain read of `../jev`: the served model's own chat template, then the proxy's answer lead, one completion token, label log-probabilities via `logprob_token_ids`; the proxy's single-token labels and rescaling.
 - Four tasks, 300 examples each (sst2, AG News, DAIR Emotion, tweet_eval irony, seed 20260923), plus the three choice tasks with options reversed.
-- Bespoke Labs' 13-subset public suite, 3,880 records, rebuilt on the VM with Nimble's converters at `0e67403`; all 13 `dataset_sha256` values must match, and a mismatched subset is excluded.
+- Bespoke Labs' 13-subset public suite, 3,880 records, built with Nimble's converters at `0e67403` (the build used for `../jev`), copied to the VM, and checked there against all 13 `dataset_sha256` values; a mismatched subset is excluded.
 - Latency: the first 100 examples of each task, concurrency 1, client on the VM.
 
 ## Outcomes
