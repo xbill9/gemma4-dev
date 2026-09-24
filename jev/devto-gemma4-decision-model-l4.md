@@ -395,6 +395,16 @@ The Wilson ranges, the paired test, the medians over subsets and the per-subset 
 
 ---
 
+#### How Does This Fit the Earlier DiffusionGemma Result?
+
+Matt Mastracci, who wrote vLLM PR #57250, compared DiffusionGemma with Jev on 201 hand-built items on September 17, and Google's Gemma account shared the thread the next day. DiffusionGemma answered 198 correctly and Jev 191. He called the two "roughly tied" and DiffusionGemma "the winner, I think." Seven of Jev's ten errors fell in one set, 89 words drawn from five sentences. The items, code and per-item outputs are unpublished.
+
+On the 3,880 public records the two are also close overall: DiffusionGemma is 1.4 points behind Jev, with a 95% range from 0.4 ahead to 3.3 behind. By question type they part: level on yes/no, 5.5 points behind on multiple choice (3.0 to 8.1), and 7.6 ahead on ratings (2.1 to 13.1). Plain Gemma 26B, read by its label probabilities, lands within 0.6 points of DiffusionGemma over the suite (p = 0.25), so on this evidence the label read carries the result, and plain Gemma gets it too.
+
+His timing agrees with this article's. On a local DGX Spark against Jev's API, one DiffusionGemma read was faster than Jev on seven of his eight sets, and with the automatic re-reads on it was slower on all eight.
+
+---
+
 #### Compare and Contrast
 
 | | Plain Gemma 4 26B, label read | DiffusionGemma 26B, one-step read |
@@ -467,6 +477,7 @@ The goal of this article was to measure Gemma 4 26B as a Jev-style decision mode
 - 🟢 Plain Gemma and DiffusionGemma level over the whole suite, 75.3% and 75.9%, p = 0.25
 - 🟢 After 50 labels per subset, median calibration error 0.074 to 0.080 for the Gemma arms against Jev's 0.071 as shipped; per subset plain Gemma stays above Jev on 8 of 13
 - 🟢 All three runs cost $3.20 of instance time
+- 🟢 DiffusionGemma level with Jev over the public suite, 1.4 points behind with a range that includes a tie, as in Matt Mastracci's 198 against 191 on hand-built items
 - ⚠️ Jev leads plain Gemma by 2.1 points overall and 4.5 on multiple choice, the latter mostly on PubMedQA and VitaminC
 - ⚠️ Jev is the best calibrated with no labels: median 0.071 against 0.114 to 0.180
 - ⚠️ DiffusionGemma places only 37% to 59% of its probability on the allowed labels, and the proxy's rescaling hides it
@@ -489,6 +500,7 @@ The strategy for using label probabilities to run Gemma 4 as a decision model wa
 - Diffusion checkpoint: https://huggingface.co/cyankiwi/diffusiongemma-26B-A4B-it-AWQ-INT4
 - DiffusionGemma model card: https://huggingface.co/google/diffusiongemma-26B-A4B-it
 - Google's Gemma account on DiffusionGemma's calibration: https://x.com/googlegemma/status/2101069861598482817
+- Matt Mastracci, Jev against DiffusionGemma on hand-built items: https://x.com/mmastrac/status/2100626193943052784
 - Guo et al., On Calibration of Modern Neural Networks: https://arxiv.org/abs/1706.04599
 - Amazon EC2 G6 instances: https://aws.amazon.com/ec2/instance-types/g6/
 - TypeSafe Jev: https://docs.typesafe.ai/concepts/system-one
