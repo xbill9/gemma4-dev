@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Running a Jev-Style Decision Model on One TPU v6e: What Fits, What It Costs, and What Changes From a GPU</title>
+  <meta name="description" content="Gemma 4 E2B, E4B, 12B and a 26B-A4B fp8 build read by their label probabilities with vLLM on one TPU v6e chip, checked against the same read on an NVIDIA L4 and against Jev 1.13.0&#x27;s published results. What fits one chip, how to read labels when vLLM on TPU returns only the top 32 log-probabilities, speed, cost, and why no 31B loads today." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to running a Jev-style
+decision model on one Google Cloud TPU v6e chip with Gemma 4 and vLLM,
+and compares it with the same read on one NVIDIA L4 GPU. The measurement
+was pre-registered, and every per-item output is committed.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/medium/img/devto-jev-tpu-v6e1-cover.6a93fef0.jpg" alt="Running a Jev-Style Decision Model on One TPU v6e: What Fits, What It Costs, and What Changes From a GPU" /></figure>
+<p>One v6e chip serves Gemma 4 E2B, E4B and 12B at bf16 and a 26B-A4B
+fp8 build; no 31B checkpoint loads. The same checkpoints give the same
+answers on the TPU and the L4, and the 26B decides in 27 to 33 ms
+against 61 ms on the L4. On demand, the TPU costs more per decision than
+the L4 or Jev; 12B is the size to pick.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu">https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu</a></p>
+<hr />
+<h4 id="why-measure-this">Why Measure This?</h4>
+<p>A Jev-style decision model answers a typed question with a
+probability for each allowed option: end the prompt where the answer
+starts, read the scores of the allowed label tokens, and apply a softmax
+over those. TypeSafe's Jev does this as a hosted service, and any open
+model can be read the same way.</p>
+<p>A <a
+href="https://dev.to/gde/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-15k6">companion
+article</a> measured this read on one NVIDIA L4 and set it beside Jev's
+published results. This one asks what changes on a TPU: which Gemma 4
+sizes fit one v6e chip, whether the read works the same way, and what
+the chip buys in speed and cost.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Google Cloud project with v6e quota in a region that offers
+<code>ct6e-standard-1t</code>, and the <code>gcloud</code> CLI logged
+in</li>
+<li>A Hugging Face token stored as the Secret Manager secret
+<code>hf-token</code>, readable by the Compute Engine default service
+account</li>
+<li>A Cloud Storage bucket for results, set as <code>BUCKET</code> in
+<code>tpu/run.sh</code> and <code>tpu/startup.sh</code></li>
+<li>The repository cloned:
+<code>git clone https://github.com/xbill9/gemma4-dev</code> and
+<code>cd gemma4-dev/jev-tpu</code></li>
+</ul>
+<hr />
+<h4 id="step-1--pre-register-the-measurement">Step 1 — Pre-Register the
+Measurement</h4>
+<p>The models, image, serving flags, data, metrics and the order of the
+quantized attempts are written down and committed before any model call,
+in <code>PREREGISTRATION.md</code>; each departure from it is recorded
+there with a date before the affected results are scored.</p>
+<pre class="shell"><code>git show -s --oneline e0cce69 4937fb8
+e0cce69 jev-tpu: sibling of jev for one TPU v6e chip — copied read, data, suite and scoring code (proxy byte-identical); pre-registration for E2B/E4B/12B bf16 and exploratory quantized 26B-A4B/31B probes
+4937fb8 jev-tpu: VM boot, serve and run drivers; pre-registration amended before any model call — suite built locally at 0e67403 (13/13 checksums) and re-checked on the VM</code></pre>
+<hr />
+<h4 id="step-2--pick-checkpoints-that-fit-one-chip">Step 2 — Pick
+Checkpoints That Fit One Chip</h4>
+<p>One v6e chip has 31.24 GiB of memory, of which vLLM uses up to 28.74
+GiB:</p>
+<pre class="plaintext"><code>Memory statistics | total_hbm_limit_gb=31.24GiB | total_hbm_limit_cap_gb=28.74GiB | total_hbm_used_gb=24.56GiB | total_hbm_avail_gb=4.19GiB</code></pre>
+<p>E2B, E4B and 12B fit at bf16. The 26B-A4B and 31B do not, so the
+pre-registration lists quantized builds to try in order:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/medium/img/devto-gemma4-jev-tpu-v6e1-table-1.png"
+alt="Table: Size, Checkpoint, Format, Size on disk" /></p>
+<p>The 31B fp8 builds are 30.98 GiB, over the chip's usable memory, and
+were not tried.</p>
+<hr />
+<h4 id="step-3--launch-one-v6e-chip">Step 3 — Launch One v6e Chip</h4>
+<p>The VM runs the whole measurement from its startup script, fetching
+the code and the suite from Cloud Storage, and deletes itself when the
+run ends.</p>
+<pre class="shell"><code>gcloud compute instances create jev-tpu-v6e1 --zone europe-west4-a \
+  --machine-type ct6e-standard-1t \
+  --image-family ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e --image-project ubuntu-os-accelerator-images \
+  --boot-disk-size 200GB --scopes cloud-platform --maintenance-policy TERMINATE \
+  --provisioning-model STANDARD --max-run-duration 6h --instance-termination-action DELETE \
+  --metadata jev-code=&lt;code-tarball&gt;,jev-run=2026-09-24-v6e1 --metadata-from-file startup-script=tpu/startup.sh
+NAME          ZONE            MACHINE_TYPE      PREEMPTIBLE  INTERNAL_IP    EXTERNAL_IP    STATUS
+jev-tpu-v6e1  europe-west4-a  ct6e-standard-1t               10.164.15.207  34.32.155.166  RUNNING</code></pre>
+<p><code>--scopes cloud-platform</code> lets the VM read the Hugging
+Face token from Secret Manager at boot, so the token never enters
+instance metadata.</p>
+<hr />
+<h4 id="step-4--serve-each-model">Step 4 — Serve Each Model</h4>
+<p><code>tpu/serve.sh</code> starts one model at a time with the same
+flags for every arm and waits for <code>/v1/models</code>. Abridged,
+with the token and volume options left out:</p>
+<pre class="shell"><code>docker run -d --name vllm --privileged --net=host --shm-size 10gb vllm/vllm-tpu:nightly \
+  vllm serve google/gemma-4-12B-it --tensor-parallel-size 1 --max-model-len 2048 --max-num-seqs 16 \
+  --max-logprobs 32 --generation-config vllm --limit-mm-per-prompt &#39;{&quot;image&quot;:0,&quot;audio&quot;:0}&#39; --enable-prefix-caching
+[jev-run 2026-09-24T14:42:48Z] READY google/gemma-4-E2B-it after 346s
+[jev-run 2026-09-24T14:51:34Z] READY google/gemma-4-E4B-it after 421s
+[jev-run 2026-09-24T15:02:01Z] READY google/gemma-4-12B-it after 512s
+[jev-run 2026-09-24T15:14:59Z] READY RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic after 616s</code></pre>
+<p>The image was
+<code>vllm/vllm-tpu@sha256:19a1a0526476f902eb83e1057f3d8938f35b457dd7716a30e9ab4f7bee90d507</code>,
+vLLM <code>0.29.1rc1.dev468+g0b7f11a1e</code>. On v6e it stores the KV
+cache in fp8 by default for every model:</p>
+<pre class="plaintext"><code>INFO 09-24 14:53:37 [tpu_platform.py:232] Automatically using fp8_e5m2 for FP8 KV cache on TPU v6e.</code></pre>
+<p>So "bf16" below describes the weights. The L4 run kept the default
+16-bit KV cache.</p>
+<hr />
+<h4 id="step-5--read-the-labels-out-of-the-top-32">Step 5 — Read the
+Labels Out of the Top 32</h4>
+<p>On a GPU, the read asks vLLM for the log-probabilities of the label
+tokens by id. vLLM's TPU backend returns only the top-k
+log-probabilities, and a request for specific token ids fails. Four
+request shapes are sent before each model's reads, and the answers are
+kept:</p>
+<pre class="plaintext"><code>== probe 3: {&quot;prompt&quot;:[2,106,1645,108],&quot;max_tokens&quot;:1,&quot;temperature&quot;:0,&quot;logprobs&quot;:32,&quot;return_tokens_as_token_ids&quot;:true}
+{&quot;id&quot;:&quot;cmpl-9ee6dc5f0461280b&quot;,&quot;object&quot;:&quot;text_completion&quot;, ...
+== probe 4: {&quot;prompt&quot;:[2,106,1645,108],&quot;max_tokens&quot;:1,&quot;temperature&quot;:0,&quot;logprobs&quot;:5,&quot;logprob_token_ids&quot;:[236776,236799,236780],&quot;return_tokens_as_token_ids&quot;:true}
+{&quot;error&quot;:{&quot;message&quot;:&quot;list index out of range&quot;,&quot;type&quot;:&quot;InternalServerError&quot;,&quot;param&quot;:null,&quot;code&quot;:500}}</code></pre>
+<p>So the read asks for the top 32 log-probabilities
+(<code>JEV_TOPK=32</code>) and takes the label tokens from them. A label
+inside the 32 gets its exact log-probability; a label outside gets the
+proxy's fallback value, the lowest returned log-probability minus 5, and
+every four-task record keeps how many labels came back.</p>
+<hr />
+<h4 id="step-6--run-and-score">Step 6 — Run and Score</h4>
+<p>Each model gets a five-example smoke read, the four tasks (300
+examples each from sst2, AG News, DAIR Emotion and tweet_eval irony),
+the three choice tasks with their options reversed, a latency pass at
+one request at a time, and Bespoke Labs' 3,880-record public suite,
+rebuilt with Nimble's converters and checked against all 13 published
+checksums on the VM.</p>
+<pre class="plaintext"><code>[jev-run 2026-09-24T14:36:51Z] suite: 13 of 13 subsets match
+[jev-run 2026-09-24T15:02:42Z] 12b four tasks: 23s for 1200 decisions at concurrency 8
+[jev-run 2026-09-24T15:04:25Z] 12b suite: 60s for 3880 records
+python3 sweep_score.py --prefix 2026-09-24-v6e1 --arms e2b e4b 12b 26b-fp8
+python3 nimble_suite/suite_sweep.py --prefix 2026-09-24-v6e1 --arms e2b e4b 12b 26b-fp8</code></pre>
+<p>Both write their tables into <code>results/</code>, and every figure
+below comes from those files and <code>article_figures.py</code>.</p>
+<hr />
+<h4 id="what-fits-and-loads-on-one-v6e-chip">What Fits and Loads on One
+v6e Chip?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/medium/img/devto-gemma4-jev-tpu-v6e1-table-2.png"
+alt="Table: Size, Checkpoint, Serves, Time to serve" /></p>
+<p>Both 31B builds stop with the same error:</p>
+<pre class="plaintext"><code>NotImplementedError: compressed-tensors scheme for layer &#39;model.language_model.layers.0.self_attn.q_proj&#39; is not yet supported in the JAX path.</code></pre>
+<p>Gemma 4 runs only on the JAX path of vLLM's TPU backend, which loads
+fp8 but no 4-bit format for a dense model. The one 31B format it loads
+is 30.98 GiB, over one chip's usable memory.</p>
+<hr />
+<h4 id="does-the-tpu-change-the-answers">Does the TPU Change the
+Answers?</h4>
+<p>No. E2B and E4B were also read on the L4, with the same checkpoints
+and prompts. The predicted label matched on 1,186 and 1,193 of 1,200
+examples, and accuracy per task differed by at most 1.0 and 0.4 points.
+The 26B-A4B fp8 build here and the 4-bit AWQ build on the L4 are
+different quantizations of the same model and differ by at most 1.3
+points per task and 0.7 points on the suite.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/medium/img/devto-gemma4-jev-tpu-v6e1-table-3.png"
+alt="Table: Task, Majority, E2B, E4B, 12B, 26B-A4B fp8" /></p>
+<p>Per-task calibration, option-order changes and 90th-percentile times
+are in <code>results/2026-09-24-v6e1-SWEEP.md</code>.</p>
+<hr />
+<h4 id="how-do-the-sizes-compare-with-jev">How Do the Sizes Compare With
+Jev?</h4>
+<p>The Jev comparison is the <a
+href="https://dev.to/gde/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-15k6">L4
+article's</a> subject, with its caveats in full. On the same 3,880
+public records:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/medium/img/devto-gemma4-jev-tpu-v6e1-table-4.png"
+alt="Table: Questions, Jev 1.13.0, published, 26B-A4B fp8, 12B, E4B, E2B" /></p>
+<p>Jev leads 12B by 1.1 points overall (95% range −0.8 to +3.0) and
+26B-A4B by 1.3 (−0.6 to +3.2), and on multiple choice by 4.7 and 3.2.
+The L4's 4-bit 26B scored 75.3%, 2.1 points behind with a range from 0.2
+to 4.0, so read the 26B as one to two points behind Jev on either
+platform. Jev's per-record answers are unpublished, so these ranges
+compare two independent proportions, and records that share a passage
+widen them. Gemma was read in the PR proxy's prompt format with no
+tuning; a different prompt could move the multiple-choice gap in either
+direction.</p>
+<hr />
+<h4 id="did-the-top-32-read-lose-anything">Did the Top-32 Read Lose
+Anything?</h4>
+<p>Not on accuracy. At least one label came back on every four-task
+read, so the predicted label is exact; only the probabilities of labels
+outside the 32 are approximate.</p>
+<p>On the four tasks, moving every missing label from the fallback value
+to the top-32 bound, the most probability it could have had, changes raw
+ECE by less than 0.001 and ECE after 50 labels by at most 0.005. That
+check was added after the run. The suite records do not keep how many
+labels came back, so the suite calibration figures have no such check;
+by a lower-bound count, at least 10.2% of 12B's suite records and 17.8%
+of 26B-A4B's used the fallback value.</p>
+<p>The share of probability on the allowed labels varies too. On irony,
+12B's most likely token was a label on 5 of 300 reads, with a median of
+3.1% of its probability on the two labels; 26B-A4B's was a label on 161
+of 300 AG News reads, with a median of 55.2%. The read rescales the
+labels to sum to one, so the answer reads as confident either way, and
+<code>label_mass</code> in every record shows it.</p>
+<hr />
+<h4 id="tpu-v6e-against-the-l4">TPU v6e Against the L4</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu/medium/img/devto-gemma4-jev-tpu-v6e1-table-5.png"
+alt="Table: One TPU v6e chip, One NVIDIA L4 (g6.xlarge)" /></p>
+<p>In this table 🥇 marks the better value. The 26B decides 1.8 to 2.2
+times faster on the TPU. The chip costs 3.7 times as much per hour on
+demand, or 1.7 times at the flex-start price of $1.35, a mode that had
+no capacity during this run. The L4's cost comes from its first run's
+throughput with the client on a home connection, so it is an upper
+bound; the TPU's comes from the request times at eight in flight.</p>
+<hr />
+<h4
+id="mag_right-tip-serve-the-same-checkpoint-on-both-platforms-first">🔎
+Tip: Serve the Same Checkpoint on Both Platforms First</h4>
+<p>Before comparing hardware, serve one checkpoint on both with the same
+prompts and compare predicted labels record by record. It checks the
+whole read, from chat template to label tokens; here the TPU's top-32
+read and the L4's exact read agreed on 1,186 and 1,193 of 1,200
+answers.</p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For a Jev-style decision service on a TPU, Gemma 4 12B at bf16 plus
+one temperature fitted on about 50 labels. It matches the 26B on the
+suite, 76.2% against 76.0%, though the 26B scores 6.3 points higher on
+irony; it reaches a median ECE of 0.070 after fitting, decides in 26 to
+27 ms, and needs no third-party quantized checkpoint. Check
+<code>label_mass</code> on your own task first: on irony, 12B put a
+median of 3.1% of its probability on the labels.</p>
+<p>Choose the TPU when time per decision matters or the rest of the
+stack is already on Google Cloud: it halves the 26B's time per decision
+against the L4. Choose the L4, or Jev itself, when cost per decision
+matters: on demand, 12B on one v6e chip costs $8.19 per million
+decisions, against Jev's $5.54 and at most $5.43 for the 26B on an
+L4.</p>
+<hr />
+<h4 id="what-does-it-cost">What Does It Cost?</h4>
+<p>Measured from the request times at eight in flight, one v6e chip
+answers about 274 decisions a second with E2B, 206 with E4B, 101 with
+12B and 80 with 26B-A4B. At the europe-west4 on-demand price of $2.97 an
+hour that is $3.01, $4.00, $8.19 and $10.37 per million decisions; at
+the flex-start price of $1.35, $1.37, $1.82, $3.72 and $4.71. TypeSafe
+prices Jev at $5.54 per million decisions at the L4 run's median prompt
+of 132 tokens. The chip is charged by the hour whether busy or idle, and
+eight requests in flight is below the 16 the server allows, so these
+figures hold only while the chip is kept at least this busy.</p>
+<p>The measured run took 48 minutes of on-demand time, $2.39, and all
+instance time for the measurement came to at most $3.25.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<p>The VM deletes itself when <code>tpu/run.sh</code> finishes, and
+<code>--max-run-duration 6h</code> with
+<code>--instance-termination-action DELETE</code> is the backstop.
+Confirm it is gone:</p>
+<pre class="shell"><code>gcloud compute instances describe jev-tpu-v6e1 --zone europe-west4-a
+ERROR: (gcloud.compute.instances.describe) Could not fetch resource:
+ - The resource &#39;projects/aisprint-491218/zones/europe-west4-a/instances/jev-tpu-v6e1&#39; was not found</code></pre>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to run a Jev-style decision model on one
+TPU v6e chip with Gemma 4 and find what changes from a GPU. The key to
+the solution was the same prompts, labels and scoring as the L4 run, a
+pre-registered design, and a label read taken from the top 32
+log-probabilities. The results were:</p>
+<ul>
+<li>🟢 One v6e chip serves Gemma 4 E2B, E4B and 12B at bf16 and a
+26B-A4B fp8 build</li>
+<li>❌ No 31B checkpoint loads: the w4a16 and 4-bit builds fail on the
+JAX path, and the fp8 build is 30.98 GiB</li>
+<li>🟢 The same checkpoints give the same answers on the TPU and the L4:
+1,186 and 1,193 of 1,200</li>
+<li>🟢 The 26B decides in 27 to 33 ms on the TPU against 61 ms on the
+L4</li>
+<li>⚠️ On demand, 26B costs $10.37 per million decisions on the TPU
+against at most $5.43 on the L4 and $5.54 for Jev</li>
+<li>⚠️ vLLM on TPU returns only the top-k log-probabilities; reading
+labels from the top 32 changes no answer, and changes four-task
+calibration by at most 0.005</li>
+<li>🟢 12B matches the 26B: 76.2% and 76.0% on the 3,880-record suite,
+against Jev's 77.3%</li>
+<li>🟢 After 50 labels, 12B and 26B-A4B reach a median ECE of 0.070,
+against Jev's 0.071 as shipped</li>
+<li>🟢 The whole measurement cost at most $3.25 of instance time</li>
+</ul>
+<p>Scope: one TPU v6e chip (<code>ct6e-standard-1t</code>, on demand) in
+europe-west4-a, vLLM <code>0.29.1rc1.dev468+g0b7f11a1e</code> at the
+image digest above, E2B, E4B and 12B with bf16 weights and 26B-A4B
+through RedHatAI's fp8 build, every model with vLLM's default fp8 KV
+cache on v6e, <code>--max-model-len 2048</code>, one run per model, 300
+examples per task plus the 3,880-record public suite, client on the VM.
+The top-32 read and on-demand capacity are dated deviations from the
+pre-registration, and the top-32 bound check, added after the run,
+covers the four tasks only. L4 figures come from the companion run on a
+<code>g6.xlarge</code> and <code>g6.4xlarge</code> in us-east-1, and the
+two platforms were timed with different clients. Every source dataset
+was published before Gemma 4 and may be in its training data. No Jev
+call was made: the Jev figures are Bespoke Labs' published results on
+the same records, from one run of Jev 1.13.0 by a company that sells a
+competing model, counting an invalid Jev response as wrong, with Jev's
+probabilities rounded to two decimals by its API. Parts of the analysis
+and writing were done with AI assistance (Claude); every figure comes
+from the committed output files.</p>
+<p>The strategy for running a Jev-style decision model on TPU with Gemma
+4 was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Code, pre-registration and per-item results: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu">https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu</a></li>
+<li>Companion L4 measurement: <a
+href="https://dev.to/gde/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-15k6">https://dev.to/gde/plain-gemma-4-26b-vs-jev-on-one-ec2-l4-21-points-behind-overall-level-on-yesno-45-behind-on-15k6</a></li>
+<li>Companion review of the independent evidence on Jev: <a
+href="https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln">https://dev.to/gde/jev-after-eight-days-of-independent-tests-level-with-mid-price-llms-behind-the-frontier-1kln</a></li>
+<li>vLLM TPU documentation: <a
+href="https://docs.vllm.ai/projects/tpu/en/latest/">https://docs.vllm.ai/projects/tpu/en/latest/</a></li>
+<li>tpu-inference: <a
+href="https://github.com/vllm-project/tpu-inference">https://github.com/vllm-project/tpu-inference</a></li>
+<li>26B-A4B fp8 checkpoint: <a
+href="https://huggingface.co/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic">https://huggingface.co/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic</a></li>
+<li>Gemma 4 12B: <a
+href="https://huggingface.co/google/gemma-4-12B-it">https://huggingface.co/google/gemma-4-12B-it</a></li>
+<li>Bespoke Labs, public-suite results for Jev 1.13.0: <a
+href="https://github.com/bespokelabsai/nimble/blob/0e67403/docs/PUBLIC_BENCHMARKS.md">https://github.com/bespokelabsai/nimble/blob/0e67403/docs/PUBLIC_BENCHMARKS.md</a></li>
+<li>Cloud TPU v6e: <a
+href="https://cloud.google.com/tpu/docs/v6e">https://cloud.google.com/tpu/docs/v6e</a></li>
+<li>Guo et al., On Calibration of Modern Neural Networks: <a
+href="https://arxiv.org/abs/1706.04599">https://arxiv.org/abs/1706.04599</a></li>
+</ul>
+</body>
+</html>
