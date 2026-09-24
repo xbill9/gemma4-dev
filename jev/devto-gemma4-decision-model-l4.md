@@ -16,7 +16,7 @@ https://github.com/xbill9/gemma4-dev/tree/main/jev
 
 A Jev-style decision model answers a typed question with a probability for each allowed option, in one forward pass, with no generated text. TypeSafe's Jev does this as a hosted service. Any open model can do it: end the prompt where the answer starts, read the scores of the allowed label tokens, and apply a softmax over those.
 
-A companion review of the independent evidence on Jev found two open questions for Gemma. Plain Gemma read this way had no published accuracy or calibration result. DiffusionGemma, read through vLLM PR #57250, had been described as well calibrated in a post from Google's Gemma account, with no measurement behind it.
+A companion review of the independent evidence on Jev found two open questions for Gemma. Plain Gemma read this way had no published accuracy or calibration result. DiffusionGemma, read through vLLM PR #57250, had been described by Google's Gemma account on September 18 as "yielding well-calibrated decision distributions", with no measurement behind it.
 
 This run answers both on the same GPU, the same prompts, the same label tokens and the same scoring code, using community 4-bit (AWQ) builds of both models. A third run puts both, and Gemma 4 E4B, on the public suite where Bespoke Labs has published results for Jev, so the Gemma numbers sit beside Jev's on identical records. Google's reference checkpoints are bf16, and results at bf16 may differ.
 
