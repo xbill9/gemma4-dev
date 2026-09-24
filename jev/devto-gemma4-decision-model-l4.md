@@ -401,7 +401,7 @@ Matt Mastracci, who wrote vLLM PR #57250, compared DiffusionGemma with Jev on 20
 
 On the 3,880 public records the two are also close overall: DiffusionGemma is 1.4 points behind Jev, with a 95% range from 0.4 ahead to 3.3 behind. By question type they part: level on yes/no, 5.5 points behind on multiple choice (3.0 to 8.1), and 7.6 ahead on ratings (2.1 to 13.1). Plain Gemma 26B, read by its label probabilities, lands within 0.6 points of DiffusionGemma over the suite (p = 0.25), so on this evidence the label read carries the result, and plain Gemma gets it too.
 
-His timing agrees with this article's. On a local DGX Spark against Jev's API, one DiffusionGemma read was faster than Jev on seven of his eight sets, and with the automatic re-reads on it was slower on all eight.
+His timing agrees with this article's. On a local DGX Spark against Jev's API, one DiffusionGemma read was faster than Jev on seven of his eight sets, and with the automatic re-reads on it was slower on all eight. His single reads were timed on a warm second pass and the re-reads on one cold pass, which widens that second gap.
 
 ---
 

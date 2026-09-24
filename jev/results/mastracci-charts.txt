@@ -1,0 +1,24 @@
+# Transcribed 2026-09-23 from Matt Mastracci's chart images, thread https://x.com/mmastrac/status/2100626193943052784 (posted 2026-09-17).
+# Images: pbs.twimg.com/media/HSbpIYIagAY_7EC (accuracy), pbs.twimg.com/media/HSbsDsoaMAASGqZ (task latency). Totals computed by script.
+
+Accuracy by eval set (dgemma / Jev / items)
+tickets 12 12 12
+code language 10 10 10
+human language, 10-way 10 10 10
+human language, 26-way 10 10 10
+unit comparison 10 10 12
+reviews, 20 scores in one state 20 19 20
+entity type, 42 words 38 38 38
+PII per word, 5 sentences 88 82 89
+totals: items 201, dgemma 198, Jev 191; Jev errors 10, of which 7 in PII per word; both perfect on 5 sets (80 items)
+
+Task latency, ms (dgemma one read, warm second pass / dgemma auto re-reads, single cold pass / Jev over the API incl. a 46 ms round trip)
+tickets 410 831 590
+code language 936 2470 1840
+human language, 10-way 917 2430 1700
+human language, 26-way 970 2710 1500
+unit comparison 1160 2960 2020
+reviews, 20 scores in one state 119 481 135
+entity type, 42 words 215 983 166
+PII per word, 5 sentences 641 1240 931
+counts: one read faster than Jev on 7 of 8 sets; auto slower than Jev on 8 of 8 sets
