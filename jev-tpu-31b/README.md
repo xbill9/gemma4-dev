@@ -1,6 +1,20 @@
 # jev-tpu-31b
 
-Exploration: a Jev-style label read of Gemma 4 31B on TPU v6e. Sibling of `../jev-tpu`, which read E2B, E4B, 12B and 26B-A4B on one v6e chip and could not serve any 31B. The read, data and scoring code here are copied from `../jev-tpu` unchanged; nothing has been run from this directory.
+Exploration: a Jev-style label read of Gemma 4 31B on TPU v6e. Sibling of `../jev-tpu`, which read E2B, E4B, 12B and 26B-A4B on one v6e chip and could not serve any 31B. The read, data and scoring code here are copied from `../jev-tpu`; `nimble_suite/run_suite.py` differs by one recorded field (`PREREGISTRATION.md`, deviations).
+
+## Status, 2026-09-25: every Gemma 4 size serves on one v6e chip
+
+With three patches to `tpu_inference`, Google's QAT W4A16 checkpoints serve in vLLM on one v6e chip at `vllm/vllm-tpu@sha256:19a1a052…`, 31B included. All three are upstream pull requests, none merged yet:
+
+| patch | pull request | needed for |
+|---|---|---|
+| KV-shared layers own no K/V parameters | vllm-project/tpu-inference#3299 (rebased) | E2B, E4B QAT exports |
+| JAX-path compressed-tensors W4A16 on `gmm_v2` | vllm-project/tpu-inference#3653 | every QAT W4A16 export |
+| `Gemma4UnifiedForConditionalGeneration` (12B) text-only on JAX | vllm-project/tpu-inference#3654 | 12B |
+
+Label read on the 3,880-record public suite, W4A16 against bf16 on the same records (`results/2026-09-25-w4a16-QUANT.md`, from `quant_compare.py`): E2B −2.8 points (95% range −4.0 to −1.6), E4B −1.6 (−2.5 to −0.9), 12B −1.0 (−1.7 to −0.3); 31B scores 77.6% and has no bf16 reference on one chip. Output tokens per second, 16 concurrent requests of 256 tokens: W4A16 runs 1.14x (E2B), 1.21x (E4B) and 1.41x (12B) faster than bf16, and 31B runs at 500. `PREREGISTRATION.md` defines the read and records its deviations; logs are in `results/*-evidence/`.
+
+The section below is the state before the patches, measured on the same image, and still describes the stock image.
 
 ## The issue: no 31B checkpoint both fits one v6e chip and loads in vLLM on TPU
 

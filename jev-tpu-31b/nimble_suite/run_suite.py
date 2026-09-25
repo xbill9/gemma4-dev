@@ -79,7 +79,11 @@ def read_ar(schema, template, slots, sys_text, state):
     ms = (time.time() - t0) * 1e3
     row = d["choices"][0]["logprobs"]["top_logprobs"][0]
     top = {int(k.split(":")[1]): v for k, v in row.items()}
-    return [ss.slot_distribution(top, slots[0]["label_ids"])], {"first_ms": ms, "extra_ms": None}
+    dist = ss.slot_distribution(top, slots[0]["label_ids"])
+    # As run_eval.py records for the tasks: how many labels came back with a real
+    # logprob; the rest were scored at the floor (top-K read, deviation 2).
+    dist["labels_returned"] = sum(i in top for i in slots[0]["label_ids"])
+    return [dist], {"first_ms": ms, "extra_ms": None}
 
 
 def read_dg(schema, template, slots, sys_text, state, seed, reads):
