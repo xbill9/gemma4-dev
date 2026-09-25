@@ -9,7 +9,10 @@ vary by generation and changes the value of everything below), `MODELS.md` for c
 each rig's `benchmarks/runs/` for what was measured where.
 
 Verified against vLLM `0.26.1rc1.dev125+ga7a204cc6` / `vllm/vllm-tpu:nightly`
-(`sha256:2a4a1f82…`) on 2026-08-07. The stack moves; re-check before trusting a negative.
+(`sha256:2a4a1f82…`) on 2026-08-07. The W4A16, 12B and KV-sharing findings were re-measured on
+2026-09-25 against `sha256:19a1a052…` (vLLM `0.29.1rc1.dev468+g0b7f11a1e`), with and without three
+unmerged upstream patches; the section "W4A16 on the JAX path" says which result needs which. The
+stack moves; re-check before trusting a negative.
 
 ## What the hardware allows before the software matters
 
@@ -105,6 +108,11 @@ then stop.
 per block against a 64 KiB ceiling. Same checkpoint, same code, completely different economics. Never
 assume a quantized path that pays on TPU will pay on a GPU rig.
 
+On TPU the fused path pays at decode. MEASURED 2026-09-25 on v6e: `gmm_v2` W4A16 serves 1.14–1.41x the
+output tokens/s of bf16 (E2B → 12B), where the unfused XLA path managed roughly 0.3–0.6x. The compute
+dtype is the same bf16 either way; the gain is the bytes read per decode step. Details and the kernel's
+limits in "W4A16 on the JAX path" below.
+
 ### 3. What actually binds as models grow is TRANSIENTS, not resident weights
 
 This is the axis most likely to be missed when planning a larger sibling, because the weight table in
@@ -141,11 +149,25 @@ with nothing under `models/vllm/`. Quant methods resolve through `layers/jax/qua
 in the torch path is unreachable **no matter what `tpu_platform.supported_quantization` advertises**.
 That list is actively misleading read on its own.
 
+> **Except 12B, which on the stock image never reaches the JAX path at all. MEASURED 2026-09-25.**
+> Gemma 4 12B ships as a different architecture: `google/gemma-4-12B-it` and its QAT builds declare
+> `Gemma4UnifiedForConditionalGeneration` (`model_type: gemma4_unified`), and tpu_inference registers
+> only `Gemma4ForConditionalGeneration` / `Gemma4ForCausalLM`. So 12B falls back to the vLLM PyTorch
+> path even at bf16 — the boot log says `Falling back to vLLM-native Pytorch definition` — and every
+> route in the table below is irrelevant to it. On that path its `-qat-w4a16-ct` build crashes at load
+> with `AttributeError: 'NoneType' object has no attribute 'num_bits'` (weight-only compressed-tensors
+> with `input_activations: null`,
+> [tpu-inference #3539](https://github.com/vllm-project/tpu-inference/issues/3539)). Its decoder is the
+> same as 31B's — identical `model.language_model.*` tensor names and layer structure; only the
+> multimodal front end differs (`model.vision_embedder.*` and `model.embed_audio.*` instead of a
+> `vision_tower`) — which is what lets
+> [#3654](https://github.com/vllm-project/tpu-inference/pull/3654) serve it text-only on the JAX path.
+
 | Route | Implemented in | Reachable for Gemma 4? |
 | :--- | :--- | :--- |
 | **qwix PTQ** — int8/int4/fp8, weight-only or W8A8 | `models/jax/utils/qwix/` | reachable, but **does not boot** — see below |
 | compressed-tensors fp8 w8a8 | `layers/jax/quantization/compressed_tensors.py` | yes (needs a pre-quantized ckpt) |
-| compressed-tensors **w4a16 / wNa16** | nowhere on the JAX path | **no — `NotImplementedError`** |
+| compressed-tensors **w4a16 / wNa16** | nowhere on the JAX path in the stock image | **no — `NotImplementedError`**; yes with [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) (unmerged), see "W4A16 on the JAX path" |
 | **mxfp4** (4-bit) | `layers/jax/quantization/mxfp4.py` | **no — MoE-only**, see below |
 | compressed-tensors int8 w8a8, w4a8 fp8, w4a4 nvfp4 | `layers/vllm/.../schemes/` | no — torch path only |
 | AWQ | `layers/vllm/quantization/awq.py` | no — torch path only |
@@ -154,7 +176,7 @@ That list is actively misleading read on its own.
 **Measured 2026-09-24 on one v6e chip** (`vllm/vllm-tpu@sha256:19a1a052…`, vLLM `0.29.1rc1.dev468+g0b7f11a1e`, `jev-tpu/RESULTS.md`):
 
 - **The fp8 w8a8 row serves a 26B-A4B on one chip.** `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic` (26.67 GiB on disk) booted in 616 s at `--max-model-len 2048 --max-num-seqs 16` and read the 3,880-record public suite at 76.0%, level with the 26B AWQ 4-bit build on an L4 (75.3%). It is the first 26B served by vLLM on one v6e chip in this monorepo. The 31B fp8 builds (30.98 GiB) exceed the ~28.7 GiB cap and were not tried.
-- **The w4a16 row is still dead on this build.** `google/gemma-4-31B-it-qat-w4a16-ct` and `cyankiwi/gemma-4-31B-it-AWQ-4bit` — the cyankiwi "AWQ" exports are stored as compressed-tensors w4a16 — both fail in 120 s with `NotImplementedError: compressed-tensors scheme for layer 'model.language_model.layers.0.self_attn.q_proj' is not yet supported in the JAX path`.
+- **The w4a16 row is still dead on this build** (the stock image; with three unmerged patches every size serves, see "W4A16 on the JAX path" below). `google/gemma-4-31B-it-qat-w4a16-ct` and `cyankiwi/gemma-4-31B-it-AWQ-4bit` — the cyankiwi "AWQ" exports are stored as compressed-tensors w4a16 — both fail in 120 s with `NotImplementedError: compressed-tensors scheme for layer 'model.language_model.layers.0.self_attn.q_proj' is not yet supported in the JAX path`.
 - **Per-request `logprob_token_ids` is not implemented.** `tpu_inference` gathers only the top-k log-probabilities (`compute_and_gather_logprobs(..., max_logprobs)`); a completions request carrying `logprob_token_ids` returns HTTP 500 `list index out of range`, while token-id prompts and `logprobs` up to `--max-logprobs` work. Read label probabilities out of the top k.
 
 The JAX compressed-tensors dispatcher handles `_is_fp8_w8a8`, then falls off the end:
@@ -163,6 +185,86 @@ The JAX compressed-tensors dispatcher handles `_is_fp8_w8a8`, then falls off the
 # TODO: w4a8 / wNa16 schemes need their own JAX methods (not yet ported).
 raise NotImplementedError(...)
 ```
+
+### W4A16 on the JAX path: three patches make every size serve on one v6e chip
+
+**MEASURED 2026-09-25** on one v6e chip at `vllm/vllm-tpu@sha256:19a1a052…`, with three patches applied to
+the image's `tpu_inference`. All three are upstream pull requests and **none is merged**, so every
+result in this section needs them; the stock image still fails as the 2026-09-24 bullets above say.
+Measurements, logs and the read's pre-registration are in `jev-tpu-31b/` (`results/2026-09-25-w4a16-*`,
+`results/2026-09-25-followup-*`, `PREREGISTRATION.md`).
+
+| Patch | Pull request | Needed by |
+| :--- | :--- | :--- |
+| KV-shared layers own no K/V parameters | [#3299](https://github.com/vllm-project/tpu-inference/pull/3299) (fixes #3225) | E2B, E4B QAT exports |
+| JAX compressed-tensors W4A16 linear method on `gmm_v2` | [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) | every `-qat-w4a16-ct` export |
+| `Gemma4UnifiedForConditionalGeneration` text-only on JAX | [#3654](https://github.com/vllm-project/tpu-inference/pull/3654) | 12B |
+
+Scope of #3653: symmetric int4, `group` or `channel` strategy, `pack-quantized`, no activation
+quantization — the format of every Google QAT release. Asymmetric, 8-bit, `actorder=group` and other
+formats still raise. Weights are unpacked on the host, so HBM holds half a byte per weight.
+
+**The kernel path is the whole speed story.** `sharded_quantized_matmul` picks its implementation from
+the *rank of the scale*: a 3D `[in // group, 1, out]` scale routes to the `gmm_v2` Pallas kernel, which
+dequantizes each tile in VMEM; a 2D scale routes to `xla_quantized_matmul`, which rebuilds the
+full-precision weight in HBM on every call. Same weights, same numbers (the two agree to 2.4e-3), very
+different cost:
+
+| Per layer, 16 tokens, device time | bf16 | 2D scale (XLA) | 3D scale (`gmm_v2`) |
+| :--- | ---: | ---: | ---: |
+| 31B gate_up, 5376→43008 | 418 µs | 1654 µs | 168 µs |
+| 12B down, 15360→3840 | 82 µs | 422 µs | 59 µs |
+| E4B down, 10240→2560 | 46 µs | 192 µs | 48 µs |
+| 31B o_proj, 8192→5376 | 30 µs | 298 µs | 43 µs |
+
+Whole-model, the XLA path served at roughly 0.3–0.6x bf16 (single, EOS-terminated passes); the kernel
+path, 16 concurrent requests of exactly 256 tokens, median of 3 passes:
+
+| Model | HBM used | KV cache | Output tok/s | vs bf16 |
+| :--- | ---: | ---: | ---: | ---: |
+| E2B `-qat-w4a16-ct` | 7.17 GiB | 1,256,448 tokens | 4060 | 1.14x |
+| E4B `-qat-w4a16-ct` | 10.15 GiB | 348,160 tokens | 2157 | 1.21x |
+| 12B `-qat-w4a16-ct` | 9.46 GiB | 60,160 tokens | 984 | 1.41x |
+| 31B `-qat-w4a16-ct` | 21.67 GiB | 8,320 tokens | 500 | bf16 does not fit |
+
+E2B saves little HBM because the QAT export leaves its PLE table at bf16 (see the PLE section below).
+
+- **The kernel has a fixed cost of about 40 µs per call**, so the smallest projections run faster in
+  bf16 (the o_proj row). The gain grows with matrix size.
+- **The kernel branch depends on the chip.** `gmm_v2` dequantizes in VMEM only when the quant group is
+  narrower than the MXU (128 columns before v6e, 256 on v6e); a wider group takes its
+  dequantize-after-matmul branch instead. #3653 applies that same test on the attached chip, so a
+  group-128 checkpoint uses the kernel on v6e and the XLA path on v5e. Google's QAT exports use group 32.
+- **Startup compile is about 2.7x the XLA path's** (warm-up pass 181 s → 472 s on E4B, 207 s → 570 s on
+  12B), and **31B takes about 27 minutes to boot cold**. A persistent compile cache
+  (`VLLM_XLA_CACHE_PATH` on a host volume) brings the same boot to 9 minutes (541 s), about half of it weight loading (279 s).
+- **Untested:** tensor parallelism above 1, and every chip but v6e.
+
+**The accuracy cost is 1–3 points and shrinks with size.** A label read on the 3,880-record public suite,
+each W4A16 export paired per record with its bf16 checkpoint on the same patched image:
+
+| Model | bf16 | W4A16 | Difference (95% bootstrap range) |
+| :--- | ---: | ---: | :--- |
+| E2B | 68.5% | 65.7% | −2.8 pts (−4.0 to −1.6) |
+| E4B | 73.1% | 71.4% | −1.6 pts (−2.5 to −0.9) |
+| 12B | 76.0% | 75.0% | −1.0 pts (−1.7 to −0.3) |
+| 31B | — | 77.6% | bf16 does not fit one chip |
+
+That read takes label probabilities from the top 32 log-probabilities (per-request
+`logprob_token_ids` is unimplemented, above), and arms differ in how often every label comes back;
+restricting to records where both arms returned every label moves the task-level differences by at most
+1.5 points (E2B, AG News). The patches themselves leave bf16 unchanged: on the same suite, E2B and E4B on the patched
+image differ from the stock image by 0.0 and +0.3 points, and 12B on the JAX path from the PyTorch path by
+−0.3 (95% range −0.6 to +0.0).
+
+**A quantized MoE on the stock JAX path loads as dense, by code reading.** For a MoE layer the stock
+compressed-tensors dispatcher returns `Fp8FusedMoEMethod` for fp8 and otherwise falls back to
+`UnquantizedFusedMoEMethod` — including for int4 experts
+([tpu-inference #3542](https://github.com/vllm-project/tpu-inference/issues/3542)).
+`cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit` packs its experts that way (`experts.N.*.weight_packed`, I32),
+so on the stock image it would read packed words as dense weights. It has not been served here. #3653
+makes that case raise at load; fp8 MoE is unaffected (`RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic` still
+serves, 669 output tok/s on the same benchmark).
 
 > **The GGUF row is a property of vLLM itself, not of the TPU platform. Verified 2026-09-02** against a
 > stock **vLLM 0.26.0 CUDA** install: `grep -ril gguf` over the entire installed package returns **two**
@@ -244,12 +346,14 @@ because the QAT w4a16 export leaves the PLE at bf16 — one tensor, 56.5% of tha
 [tpu-inference #3225](https://github.com/vllm-project/tpu-inference/issues/3225).
 `tpu-pytorch-v5e1-12b` is currently pinned at `gemma-4-12B-it-qat-w4a16-ct` and does not load.
 
-> **Which export shows which failure is not cleanly recorded.** The devto forensics tabulate them
+> **Which export shows which failure — settled 2026-09-25.** The devto forensics tabulate them
 > against **E2B**, and there they are *different* checkpoints: `-qat-w4a16-ct` dies on the int4
 > compressed-tensors scheme being unimplemented for `per_layer_model_projection`, while
-> `-qat-q4_0-unquantized` is the one that dies on `k_norm`. Whether the 12B `-qat-w4a16-ct` reaches
-> the `k_norm` error or hits the `wNa16` `NotImplementedError` first has not been separately
-> established. Don't assume both failures apply to both exports.
+> `-qat-q4_0-unquantized` is the one that dies on `k_norm`. Read from the safetensors headers, the
+> E2B `-qat-w4a16-ct` export ships `k_proj`, `v_proj` and `k_norm` for layers 0–14 only (`q_proj` for
+> all 35), so it carries the `k_norm` gap too and needs both #3653 and #3299 to load; with both it
+> serves. **12B and 31B never hit `k_norm`**: both declare `num_kv_shared_layers: 0`. 12B's failure on
+> the stock image is the PyTorch-path fallback above; 31B's is the `wNa16` `NotImplementedError`.
 
 > **The `k_norm` failure is a loader bug. Re-diagnosed 2026-08-07 — this supersedes both the original
 > architectural explanation and its retraction.**
@@ -264,7 +368,11 @@ because the QAT w4a16 export leaves the PLE at bf16 — one tensor, 56.5% of tha
 > only for the 15 non-KV-shared layers** — both configs declaring `num_kv_shared_layers: 20`. Those
 > two readings are compatible: the base carries tensors layers 15-34 never use, and the QAT export
 > drops them. So the QAT export is the architecturally honest one and the loader is wrong to demand
-> the tensors. #3225 proposes skipping K/V-side parameters for KV-shared layers.
+> the tensors. #3225 proposes skipping K/V-side parameters for KV-shared layers;
+> [#3299](https://github.com/vllm-project/tpu-inference/pull/3299) implements it (approved
+> 2026-07-30, rebased onto `main` 2026-09-25, **unmerged**: it has not yet received the `ready` label
+> this repo requires before CI runs). With it, bf16 E2B/E4B read the same on the 3,880-record suite
+> (0.0 / +0.3 points against the stock image) and the E2B/E4B QAT exports load.
 >
 > **What survives from the retraction:** KV sharing is a runtime property, so the base checkpoint's
 > header count is not evidence about the QAT export *in either direction*. Never cite it as proof
@@ -283,8 +391,10 @@ because the QAT w4a16 export leaves the PLE at bf16 — one tensor, 56.5% of tha
 
 Properties of **Google's QAT artifacts**, independent of which engine reads them — established while
 porting the 12B/26B/31B to the hand-rolled JAX engine (`tpu-jax-v6e1-31b-w4a16`,
-`tpu-jax-v6e1-26b-q4_0`). They apply to any decoder, including the vLLM path above if `wNa16` is ever
-implemented there.
+`tpu-jax-v6e1-26b-q4_0`). They apply to any decoder, including the vLLM path above — whose `wNa16`
+method ([#3653](https://github.com/vllm-project/tpu-inference/pull/3653), unmerged) avoids both decoding
+traps below: it unpacks with `u32_unpack_i4` (biased nibbles) and refuses packed words that arrive as a
+float dtype.
 
 **Note the stack boundary.** Everything above this section is vLLM + tpu_inference. Everything in
 this section was measured on a *different* stack — the pure-JAX engine in `~/tpu-jax-*`. What carries
