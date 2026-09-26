@@ -199,7 +199,7 @@ Measurements, logs and the read's pre-registration are in `jev-tpu-31b/` (`resul
 | KV-shared layers own no K/V parameters | [#3299](https://github.com/vllm-project/tpu-inference/pull/3299) (fixes #3225) | E2B, E4B QAT exports |
 | JAX compressed-tensors W4A16 linear method on `gmm_v2` | [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) | every `-qat-w4a16-ct` export |
 | ~~`Gemma4UnifiedForConditionalGeneration` text-only on JAX~~ | ~~[#3654](https://github.com/vllm-project/tpu-inference/pull/3654)~~ closed 2026-09-26 | 12B serves with a flag instead (below) |
-| JAX compressed-tensors W4A16 fused-MoE method | branch [`gemma4-w4a16-moe`](https://github.com/xbill9/tpu-inference/tree/gemma4-w4a16-moe), no PR yet | 26B (below) |
+| JAX compressed-tensors W4A16 fused-MoE method | [#3660](https://github.com/vllm-project/tpu-inference/pull/3660) (stacked on #3653) | 26B (below) |
 
 Scope of #3653: symmetric int4, `group` or `channel` strategy, `pack-quantized`, no activation
 quantization — the format of every Google QAT release. Asymmetric, 8-bit, `actorder=group` and other
