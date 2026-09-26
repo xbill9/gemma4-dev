@@ -324,9 +324,27 @@ of these fails quietly or changes the numbers:
 - The MoE path widens scales to float32 on the chip, so expert scales stored at better than bf16
   precision would survive to the kernel. #3653's dense path loads `weight_scale` as bf16 regardless.
 
-**Status 2026-09-26:** the `gemma4-w4a16-moe` branch (on #3653) passes 36 of 36 unit tests on one v6e
-chip, including a forward test through a real `JaxRoutedExperts` against a hand-written reference at
-the 26B's expert shape (2816 / 704). Serving the repacked 26B: **PENDING**, run `2026-09-26-moe2`.
+**MEASURED 2026-09-26: Google's QAT 26B serves on one v6e chip.** The `gemma4-w4a16-moe` branch (on
+#3653) passes 36 of 36 unit tests on the chip, including a forward test through a real
+`JaxRoutedExperts` against a hand-written reference at the 26B's expert shape (2816 / 704), and serves
+the repacked checkpoint (`jev-tpu-31b/results/2026-09-26-moe2-*`; FP8 from `2026-09-26-moe` and
+`../jev-tpu/results/2026-09-24-v6e1-26b-fp8`):
+
+| 26B-A4B on one v6e chip | HBM used | KV cache | Output tok/s | Suite |
+| :--- | ---: | ---: | ---: | ---: |
+| `RedHatAI/...-FP8-dynamic` | 27.99 GiB | 27 blocks, 3,456 tokens | 668 | 76.0% |
+| QAT W4A16 repack (this route) | 17.43 GiB | 421 blocks, 53,888 tokens | 1,283 | 75.3% |
+
+- **15.6x the KV cache and 1.92x the throughput** (16 concurrent requests of exactly 256 tokens,
+  median of 3 passes; FP8 measured the same day on a second VM, and throughput moved ~2% between VMs).
+- **Accuracy, paired per record against FP8:** suite −0.7 points (95% range −1.5 to +0.1; 133 records
+  right→wrong, 106 wrong→right); the four tasks within ±1.7 points, every range spanning zero. FP8 is
+  itself a quantization of bf16, and no bf16 26B fits one chip, so there is no bf16 reference here.
+- Boot 796 s cold (334 s of it compilation); the saved compile cache is
+  `xla-cache/vllm-tpu-19a1a052-patched-moe`.
+- The KV cost is **120 KiB/token** at fp8 (8 heads × K,V × 256 × 30 layers, windows off), from the
+  allocation shape `(num_blocks, (128, 8, 2, 256))` over 30 layers.
+- vLLM gave KV 6.17 GiB of the 11.32 GiB left after weights; the rest is its activation reserve.
 
 > **The GGUF row is a property of vLLM itself, not of the TPU platform. Verified 2026-09-02** against a
 > stock **vLLM 0.26.0 CUDA** install: `grep -ril gguf` over the entire installed package returns **two**

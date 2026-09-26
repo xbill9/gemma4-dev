@@ -1,0 +1,200 @@
+..................................FF                                     [100%]
+=================================== FAILURES ===================================
+_____________ test_moe_forward_matches_dequant_on_tpu[8-256-96-2] ______________
+
+mesh = Mesh(axis_sizes=(1, 1, 1, 1, 1, 1, 1), axis_names=('data', 'attn_dp', 'attn_dp_expert', 'expert', 'model', 'dcp', 'pcp'), axis_types=(Auto, Auto, Auto, Auto, Auto, Auto, Auto))
+num_experts = 8, hidden = 256, inter = 96, top_k = 2
+
+    @pytest.mark.skipif(jax.default_backend() != "tpu",
+                        reason="gmm_v2 is a TPU kernel")
+    @pytest.mark.parametrize(
+        "num_experts,hidden,inter,top_k",
+        [
+            # Intermediate not a multiple of 128, like the 26B's 704.
+            (8, 256, 96, 2),
+            # gemma-4-26B-A4B's expert shape, fewer experts.
+            (8, 2816, 704, 4),
+        ])
+    def test_moe_forward_matches_dequant_on_tpu(mesh, num_experts, hidden, inter,
+                                                top_k):
+        from tpu_inference.layers.jax.moe.moe import JaxRoutedExperts
+        prefix = "model.language_model.layers.0.experts"
+        rng = np.random.default_rng(3)
+        tensors, ref = _w4a16_moe_expert_tensors(rng, num_experts, hidden, inter)
+        with patch.object(JaxRoutedExperts, "_compute_use_ep", return_value=False):
+>           layer = JaxRoutedExperts(dtype=jnp.bfloat16,
+                                     num_local_experts=num_experts,
+                                     hidden_size=hidden,
+                                     intermediate_size_moe=inter,
+                                     hidden_act="silu",
+                                     rngs=nnx.Rngs(0),
+                                     mesh=mesh,
+                                     top_k=top_k,
+                                     quant_config=CompressedTensorsConfig(
+                                         _w4a16_config()),
+                                     prefix=prefix)
+
+test_wna16.py:513: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.12/site-packages/flax/nnx/pytreelib.py:421: in __call__
+    return _graph_node_meta_call(cls, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/site-packages/flax/nnx/pytreelib.py:436: in _graph_node_meta_call
+    cls._pytree_meta_construct(node, *args, **kwargs)
+/usr/local/lib/python3.12/site-packages/flax/nnx/pytreelib.py:424: in _pytree_meta_construct
+    self.__init__(*args, **kwargs)
+/workspace/tpu_inference/tpu_inference/layers/jax/moe/moe.py:401: in __init__
+    self.kernel_gating_EDF = create_param(rngs,
+/workspace/tpu_inference/tpu_inference/layers/jax/base.py:167: in create_param
+    return nnx.Param(_init_fn(key, shape, dtype),
+/usr/local/lib/python3.12/site-packages/flax/nnx/variablelib.py:1167: in __call__
+    return cls._variable_meta_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/site-packages/flax/nnx/variablelib.py:1170: in _variable_meta_call
+    variable = super().__call__(*args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/site-packages/flax/nnx/variablelib.py:1378: in __init__
+    value = core_spmd.shard_value(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = Array([[[0.00878906, 0.00360107, 0.00921631, ..., 0.00180054,
+         0.00148773, 0.00750732],
+        [0.00250244, 0...15],
+        [0.00227356, 0.00352478, 0.00367737, ..., 0.00750732,
+         0.000234604, 0.00265503]]], dtype=bfloat16)
+out_sharding = P(None, None, 'model'), sharding_rules = None, mesh = None
+
+    def shard_value(value, out_sharding, sharding_rules, mesh):
+      if not out_sharding:
+        return value
+    
+      if mesh is None:
+        mesh = meta.get_global_mesh()
+    
+      out_sharding = apply_rules(out_sharding, sharding_rules)
+    
+      sharding_mesh = get_mesh(out_sharding)
+    
+      if sharding_mesh:
+        if mesh:
+          assert mesh == out_sharding.mesh
+        mesh = sharding_mesh
+    
+      if mesh is None:
+>       raise ValueError(
+          'An auto mesh context or metadata is required if creating a variable'
+          f' with annotation {out_sharding=}. '
+          'For more guidance, see https://flax.readthedocs.io/en/latest/flip/4844-var-eager-sharding.html.')
+E       ValueError: An auto mesh context or metadata is required if creating a variable with annotation out_sharding=P(None, None, 'model'). For more guidance, see https://flax.readthedocs.io/en/latest/flip/4844-var-eager-sharding.html.
+
+/usr/local/lib/python3.12/site-packages/flax/core/spmd.py:86: ValueError
+____________ test_moe_forward_matches_dequant_on_tpu[8-2816-704-4] _____________
+
+mesh = Mesh(axis_sizes=(1, 1, 1, 1, 1, 1, 1), axis_names=('data', 'attn_dp', 'attn_dp_expert', 'expert', 'model', 'dcp', 'pcp'), axis_types=(Auto, Auto, Auto, Auto, Auto, Auto, Auto))
+num_experts = 8, hidden = 2816, inter = 704, top_k = 4
+
+    @pytest.mark.skipif(jax.default_backend() != "tpu",
+                        reason="gmm_v2 is a TPU kernel")
+    @pytest.mark.parametrize(
+        "num_experts,hidden,inter,top_k",
+        [
+            # Intermediate not a multiple of 128, like the 26B's 704.
+            (8, 256, 96, 2),
+            # gemma-4-26B-A4B's expert shape, fewer experts.
+            (8, 2816, 704, 4),
+        ])
+    def test_moe_forward_matches_dequant_on_tpu(mesh, num_experts, hidden, inter,
+                                                top_k):
+        from tpu_inference.layers.jax.moe.moe import JaxRoutedExperts
+        prefix = "model.language_model.layers.0.experts"
+        rng = np.random.default_rng(3)
+        tensors, ref = _w4a16_moe_expert_tensors(rng, num_experts, hidden, inter)
+        with patch.object(JaxRoutedExperts, "_compute_use_ep", return_value=False):
+>           layer = JaxRoutedExperts(dtype=jnp.bfloat16,
+                                     num_local_experts=num_experts,
+                                     hidden_size=hidden,
+                                     intermediate_size_moe=inter,
+                                     hidden_act="silu",
+                                     rngs=nnx.Rngs(0),
+                                     mesh=mesh,
+                                     top_k=top_k,
+                                     quant_config=CompressedTensorsConfig(
+                                         _w4a16_config()),
+                                     prefix=prefix)
+
+test_wna16.py:513: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/local/lib/python3.12/site-packages/flax/nnx/pytreelib.py:421: in __call__
+    return _graph_node_meta_call(cls, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/site-packages/flax/nnx/pytreelib.py:436: in _graph_node_meta_call
+    cls._pytree_meta_construct(node, *args, **kwargs)
+/usr/local/lib/python3.12/site-packages/flax/nnx/pytreelib.py:424: in _pytree_meta_construct
+    self.__init__(*args, **kwargs)
+/workspace/tpu_inference/tpu_inference/layers/jax/moe/moe.py:401: in __init__
+    self.kernel_gating_EDF = create_param(rngs,
+/workspace/tpu_inference/tpu_inference/layers/jax/base.py:167: in create_param
+    return nnx.Param(_init_fn(key, shape, dtype),
+/usr/local/lib/python3.12/site-packages/flax/nnx/variablelib.py:1167: in __call__
+    return cls._variable_meta_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/site-packages/flax/nnx/variablelib.py:1170: in _variable_meta_call
+    variable = super().__call__(*args, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.12/site-packages/flax/nnx/variablelib.py:1378: in __init__
+    value = core_spmd.shard_value(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+value = Array([[[0.00878906, 0.00360107, 0.00921631, ..., 0.00335693,
+         0.00485229, 0.00344849],
+        [0.00601196, 0...6],
+        [0.00531006, 0.00610352, 7.82013e-05, ..., 0.00148773,
+         0.000156403, 0.00491333]]], dtype=bfloat16)
+out_sharding = P(None, None, 'model'), sharding_rules = None, mesh = None
+
+    def shard_value(value, out_sharding, sharding_rules, mesh):
+      if not out_sharding:
+        return value
+    
+      if mesh is None:
+        mesh = meta.get_global_mesh()
+    
+      out_sharding = apply_rules(out_sharding, sharding_rules)
+    
+      sharding_mesh = get_mesh(out_sharding)
+    
+      if sharding_mesh:
+        if mesh:
+          assert mesh == out_sharding.mesh
+        mesh = sharding_mesh
+    
+      if mesh is None:
+>       raise ValueError(
+          'An auto mesh context or metadata is required if creating a variable'
+          f' with annotation {out_sharding=}. '
+          'For more guidance, see https://flax.readthedocs.io/en/latest/flip/4844-var-eager-sharding.html.')
+E       ValueError: An auto mesh context or metadata is required if creating a variable with annotation out_sharding=P(None, None, 'model'). For more guidance, see https://flax.readthedocs.io/en/latest/flip/4844-var-eager-sharding.html.
+
+/usr/local/lib/python3.12/site-packages/flax/core/spmd.py:86: ValueError
+=============================== warnings summary ===============================
+../usr/local/lib/python3.12/site-packages/tpu_info/device.py:33
+  /usr/local/lib/python3.12/site-packages/tpu_info/device.py:33: DeprecationWarning: In 3.13 classes created inside an enum will not become a member.  Use the `member` decorator to keep the current behavior.
+    class Info(typing.NamedTuple):
+
+../usr/local/lib/python3.12/site-packages/torch/jit/_script.py:362: 14 warnings
+  /usr/local/lib/python3.12/site-packages/torch/jit/_script.py:362: DeprecationWarning: `torch.jit.script_method` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+test_compressed_tensors.py::TestCompressedTensorsConfig::test_fp8_block_routes_to_blockwise_method
+  /tests/test_compressed_tensors.py:91: DeprecationWarning: `with mesh:` context manager has been deprecated. Please use `with jax.set_mesh(mesh):` instead.
+    with Mesh(device_mesh, axis_names=MESH_AXIS_NAMES) as m:
+
+test_wna16.py::TestWNA16Dispatch::test_linear_routes_to_wna16
+  /tests/test_wna16.py:122: DeprecationWarning: `with mesh:` context manager has been deprecated. Please use `with jax.set_mesh(mesh):` instead.
+    with Mesh(device_mesh, axis_names=MESH_AXIS_NAMES) as m:
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED test_wna16.py::test_moe_forward_matches_dequant_on_tpu[8-256-96-2] - V...
+FAILED test_wna16.py::test_moe_forward_matches_dequant_on_tpu[8-2816-704-4]
+2 failed, 34 passed, 17 warnings in 25.87s

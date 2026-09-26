@@ -511,22 +511,27 @@ Every group of the whole model recovers onto a 4-bit grid, and all 748 copied te
 The values that differ do so by the bf16 scale (at most 2.8 bf16 steps); the levels do not. The
 checkpoint is `gs://aisprint-491218-bucket/jev-tpu-31b/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`.
 
-**HBM budget on one v6e chip, arithmetic from that checkpoint's tensor headers** (not yet an allocation
-log; run `2026-09-26-moe2` will give one):
+**HBM budget on one v6e chip.** Arithmetic from that checkpoint's tensor headers, then the allocation
+log of run `2026-09-26-moe2`:
 
 | on the chip | GiB |
 | :--- | ---: |
 | experts, int4, with GMM_TP's 704 → 768 padding and f32 scales | 14.10 |
 | embeddings, bf16 | 1.38 |
 | attention and dense MLP, int4 | 0.86 |
-| **text weights** | **16.36** |
-| vision tower (in the file, skipped on the JAX path) | 1.07 |
+| text weights | 16.36 |
+| vision tower, bf16 | 1.07 |
+| **arithmetic total** | **17.43** |
+| **measured, `total_hbm_used_gb`** | **17.43** |
 
-Against 28.74 GiB usable that leaves ~12.4 GiB, **~118,000 tokens at ~110 KiB/token**, less activations
-and compile scratch. `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic`, the only 26B that serves on one chip
-today, measured 27.99 GiB with 0.75 GiB left (~7,100 tokens). Two further savings are available: expert
-scales kept bf16 on the chip (~0.8 GiB) and int4 embeddings (the grid covers them; the repack leaves them
-bf16 to match cyankiwi).
+**The vision tower is resident.** 26B loads through the JAX `Gemma4ForConditionalGeneration`
+(`gemma4_mm.py`), which builds the SigLIP encoder even with `--limit-mm-per-prompt` at 0; only the
+text-only `Gemma4ForCausalLM` skips `vision` tensors. The measured 11.32 GiB left holds **53,888 KV
+tokens at 120 KiB/token** (fp8, windows off): vLLM sized the KV pool at 6.17 GiB and kept the rest as its
+activation reserve. `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic`, the only other 26B that serves on one
+chip, measured 27.99 GiB with 0.75 GiB left: 3,456 tokens. Unmeasured savings still on the table: the
+vision tower (1.07 GiB) if a text-only class loads the 26B, expert scales kept bf16 on the chip
+(~0.8 GiB), and int4 embeddings (the grid covers them; the repack leaves them bf16 to match cyankiwi).
 
 Two ways to destroy those weights while "just repacking" them, both silent:
 
