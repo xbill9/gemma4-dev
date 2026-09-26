@@ -6,10 +6,12 @@
 # BOOT_TIMEOUT (seconds, default 1500) bounds the wait; XLA_CACHE_DIR, when set, keeps vLLM's
 # JAX compile cache on the host so the next boot of the same model skips recompiling.
 # MM_LIMIT sets --limit-mm-per-prompt (default: every modality at 0); empty omits the flag.
+# TP sets --tensor-parallel-size (default 1).
 set -u
 IMAGE=${IMAGE:-vllm/vllm-tpu:nightly}
 LOGS=${LOGS:-/opt/jev-tpu-logs}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-1500}
+TP=${TP:-1}
 MM_LIMIT=${MM_LIMIT-'{"image":0,"audio":0,"video":0}'}
 MM_ARGS=(); [ -n "$MM_LIMIT" ] && MM_ARGS=(--limit-mm-per-prompt "$MM_LIMIT")
 CACHE_ARGS=()
@@ -25,7 +27,7 @@ docker run -d --name vllm --privileged --net=host --shm-size 10gb -v /dev/shm:/d
   -e HF_TOKEN="$(cat /root/hf_token)" -e HF_HOME=/dev/shm/hf -v /opt/jev-tpu:/work "${CACHE_ARGS[@]}" \
   "$IMAGE" \
   vllm serve "$MODEL" --served-model-name "$MODEL" --host 127.0.0.1 --port 8000 \
-    --tensor-parallel-size 1 --max-model-len 2048 --max-num-seqs 16 --max-logprobs 32 \
+    --tensor-parallel-size "$TP" --max-model-len 2048 --max-num-seqs 16 --max-logprobs 32 \
     --generation-config vllm "${MM_ARGS[@]}" --enable-prefix-caching "$@" >/dev/null
 START=$(date +%s)
 while :; do

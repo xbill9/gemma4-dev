@@ -9,7 +9,8 @@
 # w4a16_client.py) or both, and an optional fourth field naming extra serve flags: override
 # (--hf-overrides to Gemma4ForCausalLM), override-nolimit (the same, without
 # --limit-mm-per-prompt) or kv-bf16 (--kv-cache-dtype bfloat16; v6e picks fp8 by itself). Metadata jev-patches, when set, replaces the list of diffs applied
-# (default: kvshare.diff wna16.diff unified.diff). Metadata jev-gcs-models, when set, names
+# (default: kvshare.diff wna16.diff unified.diff). Metadata jev-tp sets the tensor-parallel size
+# for every arm (default 1). Metadata jev-gcs-models, when set, names
 # space-separated gs:// checkpoint directories copied to /opt/jev-tpu/models/<basename>, which
 # an arm serves as /work/models/<basename>. When tests/ is in the bundle the unit tests run on the chip first,
 # and with metadata jev-bench=1 so does w4a16_matmul_bench.py.
@@ -47,6 +48,8 @@ docker rm -f patch >/dev/null 2>&1
 docker create --name patch "$BASE" >/dev/null  # never started; commit keeps the base entrypoint
 rm -rf /opt/ti && mkdir -p /opt/ti && docker cp "patch:$SITE/tpu_inference" /opt/ti/
 PATCHES=$(attr jev-patches) || PATCHES="kvshare.diff wna16.diff unified.diff"
+TP=$(attr jev-tp) || TP=1; export TP
+log "tensor parallel size $TP"
 for p in $PATCHES; do
   log "patch $p sha256 $(sha256sum $W/patches/$p | cut -c1-16)"
   (cd /opt/ti && patch -p1 --dry-run < $W/patches/$p > $L/patch-$p.log 2>&1 && patch -p1 < $W/patches/$p >> $L/patch-$p.log 2>&1) \
