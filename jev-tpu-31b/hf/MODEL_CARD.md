@@ -72,14 +72,18 @@ On one NVIDIA L4 with stock vLLM 0.30.0: 14.8 GiB model load, 17,990 KV tokens, 
 
 Throughput is 16 concurrent requests of exactly 256 output tokens, median of three passes, with `--max-model-len 2048 --max-num-seqs 16`. Accuracy is measured on Bespoke Labs' 3,880-record public suite, reading each answer by label probability:
 
-- **TPU:** 75.3%, against 76.0% for the FP8 build (−0.7 points, 95% range −1.5 to +0.1).
-- **L4:** 76.0% for this checkpoint.
+| Build | Suite | Difference from bf16 (95% range) |
+|---|---:|---|
+| bf16 `google/gemma-4-26B-A4B-it`, v6e-4 at tensor parallelism 4 | 76.4% | |
+| RedHat FP8, one v6e chip | 76.0% | −0.4 points (−0.9 to +0.2) |
+| **This checkpoint, NVIDIA L4, stock vLLM** | 76.0% | −0.4 points (−1.2 to +0.3) |
+| **This checkpoint, one v6e chip, #3653 + #3660** | 75.3% | −1.1 points (−1.8 to −0.3) |
 
-No bf16 26B-A4B fits either device, so there is no bf16 reference. Logs, per-record outputs and scripts are at https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b.
+On four 300-example classification tasks every build is within noise of bf16. Logs, per-record outputs and scripts are at https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b.
 
 ## Limitations
 
-- Tested on one NVIDIA L4 and one TPU v6e chip, each at tensor parallelism 1. Other GPUs, other TPU generations and multi-device serving are untested.
+- Tested on one NVIDIA L4 and one TPU v6e chip, each at tensor parallelism 1. On TPU at tensor parallelism 4 the current #3660 fails at load (22 scale groups in the experts' down projection do not split four ways). Other GPUs and other TPU generations are untested.
 - Text only was tested; the vision tower is present, but image input was not exercised.
 - Unofficial. Report problems here, not to Google.
 

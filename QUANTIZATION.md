@@ -338,8 +338,15 @@ the repacked checkpoint (`jev-tpu-31b/results/2026-09-26-moe2-*`; FP8 from `2026
 - **15.6x the KV cache and 1.92x the throughput** (16 concurrent requests of exactly 256 tokens,
   median of 3 passes; FP8 measured the same day on a second VM, and throughput moved ~2% between VMs).
 - **Accuracy, paired per record against FP8:** suite −0.7 points (95% range −1.5 to +0.1; 133 records
-  right→wrong, 106 wrong→right); the four tasks within ±1.7 points, every range spanning zero. FP8 is
-  itself a quantization of bf16, and no bf16 26B fits one chip, so there is no bf16 reference here.
+  right→wrong, 106 wrong→right); the four tasks within ±1.7 points, every range spanning zero.
+- **Against bf16** (`google/gemma-4-26B-A4B-it` at TP=4 on a v6e-4, 76.4%, run `2026-09-26-tp4`): this
+  route −1.1 points (−1.8 to −0.3); the same checkpoint on the L4 below −0.4 (−1.2 to +0.3); FP8 −0.4
+  (−0.9 to +0.2). The four tasks are within noise for all three. Same file on both platforms, so the
+  extra ~0.7 points is the TPU int4 path. bf16 at TP=4: 61.16 GiB over 4 chips, 235,008 KV tokens,
+  1,982 tok/s.
+- **TP=4 fails at load** for this route: w2's scale `[128, 22, 1, 2816]` is sharded four ways on axis 1
+  and 22 = 704 / 32 does not divide (`IndivisibleError`). w13 is padded 704 → 768 for GMM_TP; w2's
+  input and scale need the same (24 groups). Recorded in #3660.
 - Boot 796 s cold (334 s of it compilation); the saved compile cache is
   `xla-cache/vllm-tpu-19a1a052-patched-moe`.
 - **The KV cache on these v6e runs is bf16, by the evidence available; the log line saying fp8 is

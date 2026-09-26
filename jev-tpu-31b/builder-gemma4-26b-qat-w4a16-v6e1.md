@@ -2,7 +2,7 @@
 
 This article provides a step by step guide to serving Google's quantization-aware-trained (QAT) Gemma 4 26B-A4B on one Google Cloud TPU v6e chip with vLLM, and compares it with the FP8 build that is the only 26B serving on one chip today. Every per-record output, log and script is committed.
 
-The QAT 26B serves on one v6e chip at 17.43 GiB of HBM, with 53,888 tokens of KV cache and 1,283 output tokens per second. RedHat's FP8 build uses 27.99 GiB, holds 3,456 tokens and serves 668. On a 3,880-record classification suite the two land within a point of each other. The route is a lossless repack of Google's "unquantized" QAT export and one new method in vLLM's TPU backend; the same repacked checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4.
+The QAT 26B serves on one v6e chip at 17.43 GiB of HBM, with 53,888 tokens of KV cache and 1,283 output tokens per second. RedHat's FP8 build uses 27.99 GiB, holds 3,456 tokens and serves 668. Against the full-precision bf16 model, served across four chips as a reference, the QAT checkpoint reads a 3,880-record classification suite 0.4 points lower on an NVIDIA GPU and 1.1 points lower on the TPU; FP8 reads 0.4 points lower. The route is a lossless repack of Google's "unquantized" QAT export and one new method in vLLM's TPU backend; the same repacked checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4.
 
 https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b
 
@@ -157,17 +157,16 @@ The 17.43 GiB breaks down, by arithmetic from the checkpoint's tensor headers, i
 
 #### Does the Accuracy Hold?
 
-Both builds are quantized, and no bf16 26B fits one chip, so the comparison is W4A16 against FP8, paired on the same records:
+The reference is the bf16 model, `google/gemma-4-26B-A4B-it`, served with the same flags at tensor parallelism 4 on a v6e-4, where its 48 GiB fits: 61.16 GiB of HBM across four chips and 1,982 output tokens per second. Each build is paired with it on the same records:
 
-| Read | FP8 | QAT W4A16 | Difference (95% range) |
-| :--- | ---: | ---: | :--- |
-| 3,880-record suite | 76.0% | 75.3% | −0.7 points (−1.5 to +0.1) |
-| SST-2 | 94.7% | 95.0% | +0.3 (−0.7 to +1.7) |
-| AG News | 86.0% | 86.0% | 0.0 (−1.7 to +1.7) |
-| DAIR Emotion | 58.3% | 60.0% | +1.7 (−0.3 to +4.0) |
-| tweet_eval irony | 91.0% | 90.7% | −0.3 (−2.3 to +2.0) |
+| Build | Suite | Difference from bf16 (95% range) |
+| :--- | ---: | :--- |
+| bf16, four chips | 76.4% | |
+| RedHat FP8, TPU | 76.0% | −0.4 points (−0.9 to +0.2) |
+| QAT W4A16, NVIDIA L4 | 76.0% | −0.4 points (−1.2 to +0.3) |
+| QAT W4A16, TPU | 75.3% | −1.1 points (−1.8 to −0.3) |
 
-Every range spans zero. On the suite 133 records go from right to wrong and 106 from wrong to right.
+On the four classification tasks every build is within noise of bf16: every difference's 95% range spans zero. On the suite, the QAT checkpoint on the GPU lands as close to bf16 as FP8 does; the same weights on the TPU lose 0.7 points more. The checkpoint is the same file on both, so that gap belongs to the TPU's int4 path. Paired directly, W4A16 on the TPU reads 0.7 points below FP8 (−1.5 to +0.1).
 
 ---
 
@@ -213,7 +212,7 @@ That loads bf16 12B on the JAX path at 22.18 GiB against 24.56 GiB on the PyTorc
 
 #### So, Which One?
 
-For serving on one v6e chip, the QAT W4A16 build: it holds 15.6 times the KV cache, serves 1.92 times the tokens per second, and reads the suite 0.7 points below FP8, a difference whose 95% range reaches zero. FP8 remains the build that runs on a stock vLLM TPU image today. On NVIDIA GPUs the same QAT checkpoint needs nothing beyond stock vLLM.
+For serving on one v6e chip, the QAT W4A16 build: it holds 15.6 times the KV cache, serves 1.92 times the tokens per second, and reads the suite 0.7 points below FP8. On a GPU the same checkpoint reads as close to bf16 as FP8 does. FP8 remains the build that runs on a stock vLLM TPU image today. On NVIDIA GPUs the same QAT checkpoint needs nothing beyond stock vLLM.
 
 ---
 
@@ -249,12 +248,12 @@ The goal of this article was to serve Google's QAT Gemma 4 26B-A4B on one TPU v6
 - The QAT 26B serves on one v6e chip at 17.43 GiB, against 27.99 GiB for RedHat's FP8 build
 - 53,888 tokens of KV cache against 3,456, and 1,283 output tokens per second against 668
 - Every one of 765 million weight groups repacks onto its 4-bit grid, and all 748 unquantized tensors copy byte for byte
-- Suite accuracy is 0.7 points below FP8, with a 95% range of −1.5 to +0.1
+- Against bf16 the suite reads 1.1 points lower on the TPU (−1.8 to −0.3) and 0.4 lower on an NVIDIA L4 (−1.2 to +0.3); FP8 reads 0.4 lower
 - The repacked checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4
 - On TPU it needs #3653 and #3660, neither merged yet
 - Gemma 4 12B serves on the TPU backend's JAX path with one `--hf_overrides` flag
 
-Scope: one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and #3660 applied, one run per build, `--max-model-len 2048`, vLLM's default KV cache dtype. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
+Scope: the bf16 reference ran on a v6e-4 (`ct6e-standard-4t`) at tensor parallelism 4, every other TPU arm on one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and #3660 applied, one run per build, `--max-model-len 2048`, vLLM's default KV cache dtype. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
 The strategy for serving Google's QAT Gemma 4 26B on one TPU v6e chip was validated with an incremental step by step approach.
 

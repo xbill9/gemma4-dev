@@ -196,10 +196,12 @@ is committed.</p>
 <figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-31b/medium/img/devto-26b-qat-cover.ff0758f6.jpg" alt="Google&#x27;s QAT Gemma 4 26B-A4B on One TPU v6e: 15.6x the KV Cache and 1.9x the Throughput of FP8" /></figure>
 <p>The QAT 26B serves on one v6e chip at 17.43 GiB of HBM, with 53,888
 tokens of KV cache and 1,283 output tokens per second. RedHat's FP8
-build uses 27.99 GiB, holds 3,456 tokens and serves 668. On a
-3,880-record classification suite the two land within a point of each
-other. The route is a lossless repack of Google's "unquantized" QAT
-export and one new method in vLLM's TPU backend; the same repacked
+build uses 27.99 GiB, holds 3,456 tokens and serves 668. Against the
+full-precision bf16 model, served across four chips as a reference, the
+QAT checkpoint reads a 3,880-record classification suite 0.4 points
+lower on an NVIDIA GPU and 1.1 points lower on the TPU; FP8 reads 0.4
+points lower. The route is a lossless repack of Google's "unquantized"
+QAT export and one new method in vLLM's TPU backend; the same repacked
 checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4.</p>
 <p><a
 href="https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b">https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b</a></p>
@@ -375,12 +377,19 @@ class even with images switched off. vLLM reports the 53,888 tokens as
 room for 26 concurrent 2,048-token requests.</p>
 <hr />
 <h4 id="does-the-accuracy-hold">Does the Accuracy Hold?</h4>
-<p>Both builds are quantized, and no bf16 26B fits one chip, so the
-comparison is W4A16 against FP8, paired on the same records:</p>
+<p>The reference is the bf16 model,
+<code>google/gemma-4-26B-A4B-it</code>, served with the same flags at
+tensor parallelism 4 on a v6e-4, where its 48 GiB fits: 61.16 GiB of HBM
+across four chips and 1,982 output tokens per second. Each build is
+paired with it on the same records:</p>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-31b/medium/img/devto-gemma4-26b-qat-w4a16-v6e1-table-3.png"
-alt="Table: Read, FP8, QAT W4A16, Difference (95% range)" /></p>
-<p>Every range spans zero. On the suite 133 records go from right to
-wrong and 106 from wrong to right.</p>
+alt="Table: Build, Suite, Difference from bf16 (95% range)" /></p>
+<p>On the four classification tasks every build is within noise of bf16:
+every difference's 95% range spans zero. On the suite, the QAT
+checkpoint on the GPU lands as close to bf16 as FP8 does; the same
+weights on the TPU lose 0.7 points more. The checkpoint is the same file
+on both, so that gap belongs to the TPU's int4 path. Paired directly,
+W4A16 on the TPU reads 0.7 points below FP8 (−1.5 to +0.1).</p>
 <hr />
 <h4 id="the-same-checkpoint-on-an-nvidia-gpu">The Same Checkpoint on an
 NVIDIA GPU</h4>
@@ -419,9 +428,10 @@ alt="Table: One v6e chip, RedHat FP8, QAT W4A16" /></p>
 <h4 id="so-which-one">So, Which One?</h4>
 <p>For serving on one v6e chip, the QAT W4A16 build: it holds 15.6 times
 the KV cache, serves 1.92 times the tokens per second, and reads the
-suite 0.7 points below FP8, a difference whose 95% range reaches zero.
-FP8 remains the build that runs on a stock vLLM TPU image today. On
-NVIDIA GPUs the same QAT checkpoint needs nothing beyond stock vLLM.</p>
+suite 0.7 points below FP8. On a GPU the same checkpoint reads as close
+to bf16 as FP8 does. FP8 remains the build that runs on a stock vLLM TPU
+image today. On NVIDIA GPUs the same QAT checkpoint needs nothing beyond
+stock vLLM.</p>
 <hr />
 <h4 id="what-does-it-cost">What Does It Cost?</h4>
 <p>At europe-west4's v6e rates of $1.35 per chip-hour on flex-start and
@@ -455,16 +465,19 @@ GiB for RedHat's FP8 build</li>
 per second against 668</li>
 <li>🟢 Every one of 765 million weight groups repacks onto its 4-bit
 grid, and all 748 unquantized tensors copy byte for byte</li>
-<li>⚠️ Suite accuracy is 0.7 points below FP8, with a 95% range of −1.5
-to +0.1</li>
+<li>⚠️ Against bf16 the suite reads 1.1 points lower on the TPU (−1.8 to
+−0.3) and 0.4 lower on an NVIDIA L4 (−1.2 to +0.3); FP8 reads 0.4
+lower</li>
 <li>🟢 The repacked checkpoint loads unpatched on vLLM 0.30.0 on an
 NVIDIA L4</li>
 <li>⚠️ On TPU it needs #3653 and #3660, neither merged yet</li>
 <li>🟢 Gemma 4 12B serves on the TPU backend's JAX path with one
 <code>--hf_overrides</code> flag</li>
 </ul>
-<p>Scope: one TPU v6e chip (<code>ct6e-standard-1t</code>, flex-start)
-in europe-west4-a, vLLM <code>0.29.1rc1.dev468+g0b7f11a1e</code> at
+<p>Scope: the bf16 reference ran on a v6e-4
+(<code>ct6e-standard-4t</code>) at tensor parallelism 4, every other TPU
+arm on one TPU v6e chip (<code>ct6e-standard-1t</code>, flex-start) in
+europe-west4-a, vLLM <code>0.29.1rc1.dev468+g0b7f11a1e</code> at
 <code>vllm/vllm-tpu@sha256:19a1a052…</code> with #3299, #3653 and #3660
 applied, one run per build, <code>--max-model-len 2048</code>, vLLM's
 default KV cache dtype. The FP8 read comes from a run two days earlier

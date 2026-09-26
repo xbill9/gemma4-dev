@@ -43,9 +43,37 @@
 - reversed options (3 choice tasks): ref 79.8%, test 79.8%, difference +0.0 points (+0.0 to +0.0); 0 right->wrong, 0 wrong->right
 - suite (all subsets): ref 75.3%, test 75.5%, difference +0.2 points (-0.1 to +0.5); 13 right->wrong, 21 wrong->right
 
+### bf16 at TP=4 (ref) against TPU W4A16
+
+- sst2: ref 94.7%, test 95.0%, difference +0.3 points (-0.7 to +1.7); 1 right->wrong, 2 wrong->right
+- ag_news: ref 86.7%, test 86.0%, difference -0.7 points (-2.7 to +1.0); 5 right->wrong, 3 wrong->right
+- emotion: ref 58.7%, test 60.0%, difference +1.3 points (-0.7 to +3.3); 3 right->wrong, 7 wrong->right
+- irony: ref 91.3%, test 90.7%, difference -0.7 points (-2.3 to +1.0); 5 right->wrong, 3 wrong->right
+- reversed options (3 choice tasks): ref 79.4%, test 79.8%, difference +0.3 points (-0.7 to +1.3); 9 right->wrong, 12 wrong->right
+- suite (all subsets): ref 76.4%, test 75.3%, difference -1.1 points (-1.8 to -0.3); 134 right->wrong, 93 wrong->right
+
+### bf16 at TP=4 (ref) against L4 W4A16
+
+- sst2: ref 94.7%, test 94.7%, difference +0.0 points (-1.0 to +1.0); 1 right->wrong, 1 wrong->right
+- ag_news: ref 86.7%, test 86.0%, difference -0.7 points (-2.7 to +1.3); 5 right->wrong, 3 wrong->right
+- emotion: ref 58.7%, test 60.0%, difference +1.3 points (-0.7 to +3.3); 3 right->wrong, 7 wrong->right
+- irony: ref 91.3%, test 91.0%, difference -0.3 points (-2.0 to +1.3); 4 right->wrong, 3 wrong->right
+- reversed options (3 choice tasks): ref 79.4%, test 79.7%, difference +0.2 points (-0.8 to +1.2); 9 right->wrong, 11 wrong->right
+- suite (all subsets): ref 76.4%, test 76.0%, difference -0.4 points (-1.2 to +0.3); 115 right->wrong, 100 wrong->right
+
+### FP8 (ref) against bf16 at TP=4; negate for FP8 vs bf16
+
+- sst2: ref 94.7%, test 94.7%, difference +0.0 points (-1.0 to +1.0); 1 right->wrong, 1 wrong->right
+- ag_news: ref 86.0%, test 86.7%, difference +0.7 points (-0.7 to +2.0); 1 right->wrong, 3 wrong->right
+- emotion: ref 58.3%, test 58.7%, difference +0.3 points (-0.7 to +1.3); 1 right->wrong, 2 wrong->right
+- irony: ref 91.0%, test 91.3%, difference +0.3 points (-1.0 to +2.0); 2 right->wrong, 3 wrong->right
+- reversed options (3 choice tasks): ref 79.4%, test 79.4%, difference +0.0 points (-0.7 to +0.7); 5 right->wrong, 5 wrong->right
+- suite (all subsets): ref 76.0%, test 76.4%, difference +0.4 points (-0.2 to +0.9); 56 right->wrong, 70 wrong->right
+
 
 ## Capacity and speed
 
+- bf16 at TP=4 on a v6e-4: 1982.0 output tok/s, 235,008 KV tokens (boot log), 61.16 GiB over 4 chips
 - KV tokens: W4A16 53,888, FP8 3,456, ratio 15.6x
 - output tok/s: W4A16 1283.3, FP8 668.4, ratio 1.92x
 
