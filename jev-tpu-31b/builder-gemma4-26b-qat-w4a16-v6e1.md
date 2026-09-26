@@ -20,7 +20,7 @@ Google trained 4-bit versions of every Gemma 4 size with quantization-aware trai
 
 So for vLLM on one chip the only 26B choice is a third-party build. RedHat's FP8 checkpoint fits with 0.75 GiB to spare, enough KV cache for 3,456 tokens, which is one and a half 2,048-token requests.
 
-This article builds the missing W4A16 checkpoint from Google's own QAT weights and serves it.
+This article builds the missing W4A16 checkpoint from Google's own QAT weights and serves it. The result is on Hugging Face as [xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct).
 
 ---
 
@@ -59,7 +59,7 @@ model-layer-001.safetensors: 1186 tensors, 0 kept bf16
 total 15.29 GiB in 31 shards; 0 tensors kept bf16 for off-grid groups; 222 ignored modules
 ```
 
-It writes compressed-tensors `pack-quantized` symmetric int4 with group size 32, the format of Google's other QAT releases. Attention, the dense MLP and all 3,840 experts are quantized; the router, embeddings, norms and vision tower are copied unchanged. The experts ship fused in the source, `experts.gate_up_proj` as `[128, 1408, 2816]`, and are written one module per expert, `experts.{i}.{gate,up,down}_proj`, which is the layout vLLM already reads for int4 mixture-of-experts checkpoints. A tensor with any group off the grid would stay bf16; none did. It ran in 388 seconds on a 16-core machine with 15 GB of RAM, streaming one layer at a time.
+The output is published as `xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`, so Steps 2 and 3 can be skipped by downloading it. It writes compressed-tensors `pack-quantized` symmetric int4 with group size 32, the format of Google's other QAT releases. Attention, the dense MLP and all 3,840 experts are quantized; the router, embeddings, norms and vision tower are copied unchanged. The experts ship fused in the source, `experts.gate_up_proj` as `[128, 1408, 2816]`, and are written one module per expert, `experts.{i}.{gate,up,down}_proj`, which is the layout vLLM already reads for int4 mixture-of-experts checkpoints. A tensor with any group off the grid would stay bf16; none did. It ran in 388 seconds on a 16-core machine with 15 GB of RAM, streaming one layer at a time.
 
 ---
 
@@ -262,6 +262,7 @@ The strategy for serving Google's QAT Gemma 4 26B on one TPU v6e chip was valida
 
 #### References
 
+- The repacked checkpoint: https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct
 - Code, repack, per-record results and logs: https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b
 - tpu-inference #3660, W4A16 experts method: https://github.com/vllm-project/tpu-inference/pull/3660
 - tpu-inference #3653, W4A16 linear method: https://github.com/vllm-project/tpu-inference/pull/3653

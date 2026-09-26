@@ -509,7 +509,9 @@ tower are copied. Its `verify` rereads both checkpoints and computes, rather tha
 
 Every group of the whole model recovers onto a 4-bit grid, and all 748 copied tensors are byte-identical.
 The values that differ do so by the bf16 scale (at most 2.8 bf16 steps); the levels do not. The
-checkpoint is `gs://aisprint-491218-bucket/jev-tpu-31b/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`.
+checkpoint is `gs://aisprint-491218-bucket/jev-tpu-31b/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`, and is
+public on Hugging Face as [`xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct)
+(2026-09-26; file sizes checked against the local copy after upload; card: `jev-tpu-31b/hf/MODEL_CARD.md`).
 
 **HBM budget on one v6e chip.** Arithmetic from that checkpoint's tensor headers, then the allocation
 log of run `2026-09-26-moe2`:
