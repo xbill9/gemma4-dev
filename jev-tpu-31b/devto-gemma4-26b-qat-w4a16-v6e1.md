@@ -35,7 +35,7 @@ This article builds the missing W4A16 checkpoint from Google's own QAT weights a
 - A Google Cloud project with v6e quota in a region that offers `ct6e-standard-1t`, and the `gcloud` CLI logged in
 - A Cloud Storage bucket for checkpoints and results
 - About 70 GB of local disk and Python 3 with `numpy`, for the repack
-- Two clones: `git clone https://github.com/xbill9/gemma4-dev` and `git clone -b gemma4-w4a16-moe https://github.com/xbill9/tpu-inference`
+- Two clones: `git clone https://github.com/xbill9/gemma4-dev` and `git clone -b gemma4-w4a16-moe https://github.com/xbill9/tpu-inference`, the branch of #3660
 
 ---
 
@@ -94,7 +94,7 @@ All 748 copied tensors are byte-identical. The 7–10% of values that differ in 
 Gemma 4 runs only on the JAX path of `tpu-inference`, vLLM's TPU backend. Two pieces serve this checkpoint there:
 
 - **W4A16 for linear layers**: [tpu-inference #3653](https://github.com/vllm-project/tpu-inference/pull/3653), approved, which serves Google's other QAT sizes.
-- **W4A16 for the experts**: a `WNA16FusedMoEMethod` on the `gemma4-w4a16-moe` branch, stacked on #3653.
+- **W4A16 for the experts**: a `WNA16FusedMoEMethod`, [tpu-inference #3660](https://github.com/vllm-project/tpu-inference/pull/3660), stacked on #3653.
 
 The experts method loads each expert's packed int4 weights and 32-wide scales, fuses gate and up, and hands them to the GMM kernel unchanged. Three properties of the existing mixture-of-experts path decide how:
 
@@ -213,7 +213,7 @@ That loads bf16 12B on the JAX path at 22.18 GiB against 24.56 GiB on the PyTorc
 | Output tokens/s | 668 | 🥇 1,283 |
 | Suite accuracy | 🥇 76.0% | 75.3% |
 | Flex-start cost per million output tokens | $0.56 | 🥇 $0.29 |
-| Runs on stock vLLM TPU today | 🥇 yes | needs #3653 and the experts method |
+| Runs on stock vLLM TPU today | 🥇 yes | needs #3653 and #3660 |
 
 ---
 
@@ -257,10 +257,10 @@ The goal of this article was to serve Google's QAT Gemma 4 26B-A4B on one TPU v6
 - 🟢 Every one of 765 million weight groups repacks onto its 4-bit grid, and all 748 unquantized tensors copy byte for byte
 - ⚠️ Suite accuracy is 0.7 points below FP8, with a 95% range of −1.5 to +0.1
 - 🟢 The repacked checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4
-- ⚠️ On TPU it needs #3653 and the experts method, neither merged yet
+- ⚠️ On TPU it needs #3653 and #3660, neither merged yet
 - 🟢 Gemma 4 12B serves on the TPU backend's JAX path with one `--hf_overrides` flag
 
-Scope: one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and the experts method applied, one run per build, `--max-model-len 2048`, vLLM's default KV cache dtype. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
+Scope: one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and #3660 applied, one run per build, `--max-model-len 2048`, vLLM's default KV cache dtype. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
 The strategy for serving Google's QAT Gemma 4 26B on one TPU v6e chip was validated with an incremental step by step approach.
 
@@ -269,7 +269,7 @@ The strategy for serving Google's QAT Gemma 4 26B on one TPU v6e chip was valida
 #### References
 
 - Code, repack, per-record results and logs: https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b
-- W4A16 experts method (branch): https://github.com/xbill9/tpu-inference/tree/gemma4-w4a16-moe
+- tpu-inference #3660, W4A16 experts method: https://github.com/vllm-project/tpu-inference/pull/3660
 - tpu-inference #3653, W4A16 linear method: https://github.com/vllm-project/tpu-inference/pull/3653
 - Google's QAT source checkpoint: https://huggingface.co/google/gemma-4-26B-A4B-it-qat-q4_0-unquantized
 - RedHat FP8 build: https://huggingface.co/RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic
