@@ -198,7 +198,8 @@ Measurements, logs and the read's pre-registration are in `jev-tpu-31b/` (`resul
 | :--- | :--- | :--- |
 | KV-shared layers own no K/V parameters | [#3299](https://github.com/vllm-project/tpu-inference/pull/3299) (fixes #3225) | E2B, E4B QAT exports |
 | JAX compressed-tensors W4A16 linear method on `gmm_v2` | [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) | every `-qat-w4a16-ct` export |
-| `Gemma4UnifiedForConditionalGeneration` text-only on JAX | [#3654](https://github.com/vllm-project/tpu-inference/pull/3654) | 12B |
+| ~~`Gemma4UnifiedForConditionalGeneration` text-only on JAX~~ | ~~[#3654](https://github.com/vllm-project/tpu-inference/pull/3654)~~ closed 2026-09-26 | 12B serves with a flag instead (below) |
+| JAX compressed-tensors W4A16 fused-MoE method | branch [`gemma4-w4a16-moe`](https://github.com/xbill9/tpu-inference/tree/gemma4-w4a16-moe), no PR yet | 26B (below) |
 
 Scope of #3653: symmetric int4, `group` or `channel` strategy, `pack-quantized`, no activation
 quantization — the format of every Google QAT release. Asymmetric, 8-bit, `actorder=group` and other
@@ -265,6 +266,67 @@ compressed-tensors dispatcher returns `Fp8FusedMoEMethod` for fp8 and otherwise 
 so on the stock image it would read packed words as dense weights. It has not been served here. #3653
 makes that case raise at load; fp8 MoE is unaffected (`RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic` still
 serves, 669 output tok/s on the same benchmark).
+
+### 12B needs no patch: `--hf_overrides` to `Gemma4ForCausalLM`
+
+**MEASURED 2026-09-26**, one v6e chip, same image, #3299 and #3653 applied and #3654 **not** applied
+(`jev-tpu-31b/results/2026-09-26-override-*`, `2026-09-26-q4_0-*`). 12B ships as
+`Gemma4UnifiedForConditionalGeneration`, which nothing on the JAX path registers, so it falls back to the
+PyTorch path. The JAX `Gemma4ForCausalLM` already reads `hf_config.text_config` and skips every tensor
+whose name contains `vision` or `audio`, so the flag alone puts 12B on the JAX path:
+
+```
+--hf_overrides '{"architectures": ["Gemma4ForCausalLM"]}'
+```
+
+| 12B checkpoint | HBM used | KV blocks | Output tok/s | Suite |
+| :--- | ---: | ---: | ---: | ---: |
+| `-it` (bf16) | 22.18 GiB | 160 | 682 | 76.0% |
+| `-it-qat-q4_0-unquantized` | 22.18 GiB | 160 | 682 | 75.7% (−0.2 vs bf16, −0.9 to +0.4) |
+| `-it-qat-w4a16-ct` (needs #3653) | 9.46 GiB | 470 | 993 | 75.1% (−0.9 vs bf16, −1.6 to −0.2) |
+
+- Memory, KV blocks and suite accuracy are identical to the #3654 build (bf16: 13 records flip each way),
+  and −0.3 points against the PyTorch path, the figure #3654 reported. #3654 was closed in its favour.
+- **`--limit-mm-per-prompt` is not needed** with the override: vLLM then treats the model as text-only.
+- The boot log's tell for the path taken: the PyTorch fallback prints `Falling back to vLLM-native
+  Pytorch definition` and uses 24.56 GiB for bf16 12B; the JAX path prints neither.
+- A second W4A16 run on a second VM repeated the four tasks record for record and the suite within
+  −0.1 points, so a read here carries across VMs; throughput moved about 2% between VMs.
+
+### W4A16 experts: what the MoE path does to them
+
+26B is the one size with no `-qat-w4a16-ct`, and `-q4_0-unquantized` does not fit one chip (48.07 GiB).
+Serving its QAT weights at TP=1 takes a repack (`jev-tpu-31b/repack_q4_0.py`, see `MODELS.md` §26B)
+and a MoE method that #3653 does not have. Read from `tpu_inference` at #3653's base (2026-09-26); each
+of these fails quietly or changes the numbers:
+
+- **`process_quantized_moe_weights` requantizes by default.** It dequantizes and requantizes into the
+  source dtype with `requant_block_size=None`, which is per-channel. For group-32 int4 experts that
+  throws away the QAT grid. A W4A16 method must call `process_moe_weights` and `shard_moe_weights`
+  itself, as the mxfp4 method does.
+- **`quantize_tensor` scales a group by `abs_max / 7`.** Q4_0 grids run −8…+7 with the peak usually at
+  −8, so requantizing Q4_0 data through it moves nearly every group off its grid.
+- **The fused MoE kernel wants blocks that are multiples of 256** (`fused_moe/v1/kernel.py`,
+  `subc_quant_w1_sz % 256`). Group 32 must use the GMM backends (`GMM_TP`/`GMM_EP`), whose `gmm_v2`
+  takes `[E, in // 32, 1, out]` scales.
+- **`gmm_v2` quantizes the activation only on its dequantize-after-matmul branch**, taken when the group
+  is at least the MXU width. Group 32 dequantizes before the matmul and keeps activations bf16; a
+  channelwise or wide-group MoE would silently run as W4A8.
+- **The intermediate padding is harmless.** GMM_TP pads `w13`'s intermediate 704 → 768; `moe_gmm_local`
+  trims the first matmul's output back to `w2`'s own 704 before the second, so `w2` and its 22 scale
+  groups keep the checkpoint shape.
+- **`shard_moe_weights` cannot take host arrays under the TPU mesh.** It puts with a layout, which under
+  the TPU context mesh becomes a jitted reshard: `ValueError: Received incompatible devices for jitted
+  computation ... on platform CPU and jit's context mesh ... on platform TPU`. Copy with
+  `shard_moe_weights_to_tpu(..., source_mesh=cpu_mesh())` first, as the fp8 path does. Construct and
+  test the layer under `jax.set_mesh(mesh)`: an old-style `with Mesh(...)` neither builds a real
+  `JaxRoutedExperts` nor reproduces this failure.
+- The MoE path widens scales to float32 on the chip, so expert scales stored at better than bf16
+  precision would survive to the kernel. #3653's dense path loads `weight_scale` as bf16 regardless.
+
+**Status 2026-09-26:** the `gemma4-w4a16-moe` branch (on #3653) passes 36 of 36 unit tests on one v6e
+chip, including a forward test through a real `JaxRoutedExperts` against a hand-written reference at
+the 26B's expert shape (2816 / 704). Serving the repacked 26B: **PENDING**, run `2026-09-26-moe2`.
 
 > **The GGUF row is a property of vLLM itself, not of the TPU platform. Verified 2026-09-02** against a
 > stock **vLLM 0.26.0 CUDA** install: `grep -ril gguf` over the entire installed package returns **two**
@@ -506,6 +568,16 @@ relationship, done for you.
 every GPU rig here decode at `B=1` is launch-bound, not bandwidth-bound, and the two measurements at the top
 of this file (`ple_bits=4` → **0.0%**, `int8_lm_head` → **+2.3%**) are what a bandwidth cut actually buys.
 **The win is residency**, which is what pays for batching.
+
+**A Q4_0 GGUF converts to compressed-tensors W4A16 directly** (analysis, 2026-09-26; not built). A Q4_0
+block is 32 weights, a 4-bit `q` each and one fp16 `d`, weight `d × (q − 8)`; compressed-tensors
+symmetric int4 group 32 is `scale × level`, level −8…7. So `scale = d`, `level = q − 8`, with no step
+to recover. What it would buy over repacking `-q4_0-unquantized` is only the exact fp16 step, and only
+where the chip keeps it: the MoE path widens expert scales to f32, #3653's dense path rounds every scale
+to bf16. The levels are the same data either way. The costs are a GGUF reader, llama.cpp's tensor
+names, and the tensors that are not Q4_0 (E2B's GGUF has `Q6_K` ×2, `F16` ×1 and `F32` ×263 beside
+275 `Q4_0`; the 26B's mix is unread). Storing fp16 scales in the `-unquantized` repack gets most of the
+way (97% of values bit-identical against 89–93% at bf16, per `~/tpu-jax-26b/ports/gemma4/jax_q4_0.py`).
 
 ### Which runtimes can load a GGUF at all
 

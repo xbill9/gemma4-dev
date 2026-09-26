@@ -392,6 +392,13 @@ requirement of the IT QAT checkpoint. Formatted, JAX and the reference reach 100
 **The 31B does not share this** — it recovers the `<|channel>thought` scaffolding on its own from a
 bare prompt, so a bare-prompt smoke test that passes on the 31B proves nothing about the 12B.
 
+**Every 12B checkpoint declares `Gemma4UnifiedForConditionalGeneration`**, including the QAT ones, and
+the `-qat-q4_0-unquantized` config matches `-it` field for field (48 layers, hidden 3840, 0 KV-shared
+layers, no `quantization_config`, 11,959,730,224 BF16 parameters; read from the Hub 2026-09-26). So
+`-q4_0-unquantized` loads anywhere bf16 12B loads, at bf16's memory and speed, with the QAT weights. On
+vLLM's JAX path all of them need `--hf_overrides '{"architectures": ["Gemma4ForCausalLM"]}'`
+(`QUANTIZATION.md`).
+
 > **Do not quote that rig's per-token KV figure.** Its `REPORT.md` charges the `attention_k_eq_v`
 > layers for a V it also states is free (16 KiB/token where 8 KiB follows if V really is K), and adds
 > that to a *window-capped* sliding-layer figure as though both were uncapped rates. The stated
@@ -468,11 +475,58 @@ Enumerated from the Hub 2026-07-31 — **the suffix set is not uniform across si
 `google/gemma-4-26B-A4B-it-qat-w4a16-ct` 404s. GGUF targets llama.cpp, so the only usable export is
 `-q4_0-unquantized`: **51.61 GB of BF16**.
 
+**Google's QAT model card states the gap outright** (read 2026-09-26, from the `-q4_0-unquantized`
+README): unquantized QAT checkpoints and GGUF are "Available for Gemma 4 E2B, E4B, 12B, 26B A4B, and
+31B"; compressed tensors (w4a16) are "Available for Gemma 4 E2B, E4B, 12B, and 31B". No reason is given.
+The full 26B list under `google` on 2026-09-26: `-it`, the base model, `-it-qat-q4_0-unquantized`,
+`-it-qat-q4_0-gguf`, and two **drafter models** for speculative decoding, `-it-assistant` and
+`-it-qat-q4_0-unquantized-assistant` (420M BF16 parameters each, `Gemma4AssistantForCausalLM`).
+
+A likely cause, inferred and unconfirmed: compressed-tensors quantizes modules its config targets as
+`"Linear"`, and the 26B's experts are fused 3-D `nn.Parameter`s (layout below), not Linear modules. A
+standard export would leave 88% of the weights at bf16 unless the experts are first split per expert,
+which is what `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit` did. llama.cpp stores stacked expert tensors
+natively, so GGUF needed no such step.
+
 It fits a v6e-1 anyway because **"unquantized" describes the container, not the values.** Those are QAT
 weights already sitting on a Q4_0 grid — verified by range-reading the shards, with all 256 sampled groups
 of 32 lying exactly on a 4-bit grid across expert, attention, MLP, router and embedding tensors. Group
 size 64 fails the same test (3/128), which pins the group at **32** rather than leaving it assumed.
 Repacking to W4A16 at load gives **15.27 GB resident**.
+
+**Repacked to compressed-tensors W4A16, 2026-09-26** (`jev-tpu-31b/repack_q4_0.py`, CPU only, 388 s):
+48.07 GiB → **15.29 GiB**, in cyankiwi's layout (per-expert `experts.{i}.{gate,up,down}_proj`,
+`pack-quantized` int4, group 32, bf16 `weight_scale`, explicit ignore list for router, vision tower and
+`lm_head`). Attention, dense MLP and experts are quantized; embeddings, router, norms and the vision
+tower are copied. Its `verify` rereads both checkpoints and computes, rather than samples:
+
+| tensor kind | groups of 32 | levels off the source grid | values bit-identical | worst relative error |
+| :--- | ---: | ---: | ---: | ---: |
+| experts gate/up | 475,791,360 | 0 | 92.6% | 7.8e-3 |
+| experts down | 237,895,680 | 0 | 92.6% | 7.8e-3 |
+| dense MLP | 16,727,040 | 0 | 92.0–92.5% | 1.0e-2 |
+| attention q/k/o/v | 34,693,120 | 0 | 89.7–90.4% | 1.1e-2 |
+
+Every group of the whole model recovers onto a 4-bit grid, and all 748 copied tensors are byte-identical.
+The values that differ do so by the bf16 scale (at most 2.8 bf16 steps); the levels do not. The
+checkpoint is `gs://aisprint-491218-bucket/jev-tpu-31b/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`.
+
+**HBM budget on one v6e chip, arithmetic from that checkpoint's tensor headers** (not yet an allocation
+log; run `2026-09-26-moe2` will give one):
+
+| on the chip | GiB |
+| :--- | ---: |
+| experts, int4, with GMM_TP's 704 → 768 padding and f32 scales | 14.10 |
+| embeddings, bf16 | 1.38 |
+| attention and dense MLP, int4 | 0.86 |
+| **text weights** | **16.36** |
+| vision tower (in the file, skipped on the JAX path) | 1.07 |
+
+Against 28.74 GiB usable that leaves ~12.4 GiB, **~118,000 tokens at ~110 KiB/token**, less activations
+and compile scratch. `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic`, the only 26B that serves on one chip
+today, measured 27.99 GiB with 0.75 GiB left (~7,100 tokens). Two further savings are available: expert
+scales kept bf16 on the chip (~0.8 GiB) and int4 embeddings (the grid covers them; the repack leaves them
+bf16 to match cyankiwi).
 
 Two ways to destroy those weights while "just repacking" them, both silent:
 

@@ -2,6 +2,12 @@
 
 Exploration: a Jev-style label read of Gemma 4 31B on TPU v6e. Sibling of `../jev-tpu`, which read E2B, E4B, 12B and 26B-A4B on one v6e chip and could not serve any 31B. The read, data and scoring code here are copied from `../jev-tpu`; `nimble_suite/run_suite.py` differs by one recorded field (`PREREGISTRATION.md`, deviations).
 
+## Status, 2026-09-26: 12B needs no patch; 26B QAT is next
+
+- **12B serves on the JAX path with `--hf_overrides '{"architectures": ["Gemma4ForCausalLM"]}'`**, so #3654 was closed. bf16, `-qat-w4a16-ct` (with #3653) and `-qat-q4_0-unquantized` all load that way with the same memory and accuracy as the #3654 build (`results/2026-09-26-override-*`, `results/2026-09-26-q4_0-*`; `../QUANTIZATION.md`).
+- **26B has no `-qat-w4a16-ct`**, so `repack_q4_0.py` builds one from `-qat-q4_0-unquantized`: 48.07 GiB → 15.29 GiB, every group back on its 4-bit grid (`../MODELS.md` §26B). Serving it takes a W4A16 MoE method, on branch `gemma4-w4a16-moe` of `xbill9/tpu-inference`; its unit tests pass on the chip. The first serving run, `2026-09-26-moe`, failed at load on a sharding bug since fixed; the rerun is `2026-09-26-moe2`.
+- `tpu/serve.sh` and `tpu/run_quant.sh` take per-run patch lists (`jev-patches`), per-arm serve flags, and GCS checkpoints (`jev-gcs-models`).
+
 ## Status, 2026-09-25: every Gemma 4 size serves on one v6e chip
 
 With three patches to `tpu_inference`, Google's QAT W4A16 checkpoints serve in vLLM on one v6e chip at `vllm/vllm-tpu@sha256:19a1a052…`, 31B included. All three are upstream pull requests, none merged yet:
