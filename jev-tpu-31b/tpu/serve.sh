@@ -5,10 +5,13 @@
 # IMAGE and LOGS override the image and log directory (w4a16_probe.sh serves a patched image).
 # BOOT_TIMEOUT (seconds, default 1500) bounds the wait; XLA_CACHE_DIR, when set, keeps vLLM's
 # JAX compile cache on the host so the next boot of the same model skips recompiling.
+# MM_LIMIT sets --limit-mm-per-prompt (default: every modality at 0); empty omits the flag.
 set -u
 IMAGE=${IMAGE:-vllm/vllm-tpu:nightly}
 LOGS=${LOGS:-/opt/jev-tpu-logs}
 BOOT_TIMEOUT=${BOOT_TIMEOUT:-1500}
+MM_LIMIT=${MM_LIMIT-'{"image":0,"audio":0,"video":0}'}
+MM_ARGS=(); [ -n "$MM_LIMIT" ] && MM_ARGS=(--limit-mm-per-prompt "$MM_LIMIT")
 CACHE_ARGS=()
 if [ -n "${XLA_CACHE_DIR:-}" ]; then
   mkdir -p "$XLA_CACHE_DIR"
@@ -23,7 +26,7 @@ docker run -d --name vllm --privileged --net=host --shm-size 10gb -v /dev/shm:/d
   "$IMAGE" \
   vllm serve "$MODEL" --served-model-name "$MODEL" --host 127.0.0.1 --port 8000 \
     --tensor-parallel-size 1 --max-model-len 2048 --max-num-seqs 16 --max-logprobs 32 \
-    --generation-config vllm --limit-mm-per-prompt '{"image":0,"audio":0,"video":0}' --enable-prefix-caching "$@" >/dev/null
+    --generation-config vllm "${MM_ARGS[@]}" --enable-prefix-caching "$@" >/dev/null
 START=$(date +%s)
 while :; do
   if curl -sf localhost:8000/v1/models | grep -q '"id"'; then

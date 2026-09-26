@@ -6,7 +6,10 @@
 # and uploaded under jev-xla-save when that is set).
 # Metadata jev-arms, when set, replaces the default arm list: space-separated
 # <model>=<tag>=<mode>, mode one of read (the label read), load (fixed-length throughput via
-# w4a16_client.py) or both. When tests/ is in the bundle the unit tests run on the chip first,
+# w4a16_client.py) or both, and an optional fourth field naming extra serve flags: override
+# (--hf-overrides to Gemma4ForCausalLM) or override-nolimit (the same, without
+# --limit-mm-per-prompt). Metadata jev-patches, when set, replaces the list of diffs applied
+# (default: kvshare.diff wna16.diff unified.diff). When tests/ is in the bundle the unit tests run on the chip first,
 # and with metadata jev-bench=1 so does w4a16_matmul_bench.py.
 # Results and logs go to gs://$BUCKET/jev-tpu-31b/<run-prefix>/ as each arm finishes; the VM
 # deletes itself at the end.
@@ -41,7 +44,8 @@ SITE=$(docker run --rm --entrypoint python3 "$BASE" -c "import os,tpu_inference;
 docker rm -f patch >/dev/null 2>&1
 docker create --name patch "$BASE" >/dev/null  # never started; commit keeps the base entrypoint
 rm -rf /opt/ti && mkdir -p /opt/ti && docker cp "patch:$SITE/tpu_inference" /opt/ti/
-for p in kvshare.diff wna16.diff unified.diff; do
+PATCHES=$(attr jev-patches) || PATCHES="kvshare.diff wna16.diff unified.diff"
+for p in $PATCHES; do
   log "patch $p sha256 $(sha256sum $W/patches/$p | cut -c1-16)"
   (cd /opt/ti && patch -p1 --dry-run < $W/patches/$p > $L/patch-$p.log 2>&1 && patch -p1 < $W/patches/$p >> $L/patch-$p.log 2>&1) \
     || finish "patch $p did not apply: $(grep -iE 'fail|reject' $L/patch-$p.log | head -2 | tr '\n' ' ')"
@@ -108,10 +112,15 @@ PY
   sync_up
 }
 
-try_model() {  # try_model <model> <tag> [read|load|both]
-  local model=$1 tag=$2 mode=${3:-read}
-  log "serving $model as $tag ($mode)"
-  if bash $W/tpu/serve.sh "$model" >> $LOG 2>&1; then
+try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nolimit]
+  local model=$1 tag=$2 mode=${3:-read} flags=${4:-} extra=() mm
+  mm='{"image":0,"audio":0,"video":0}'
+  case "$flags" in
+    override) extra=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}') ;;
+    override-nolimit) extra=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}'); mm= ;;
+  esac
+  log "serving $model as $tag ($mode${flags:+, $flags})"
+  if MM_LIMIT=$mm bash $W/tpu/serve.sh "$model" "${extra[@]}" >> $LOG 2>&1; then
     log "$(tail -1 $LOG)"
     if [ "$mode" != load ]; then full_run "$model" "$tag"; fi
     if [ "$mode" != read ]; then
@@ -126,8 +135,8 @@ try_model() {  # try_model <model> <tag> [read|load|both]
 
 if ARMS=$(attr jev-arms); then
   for arm in $ARMS; do
-    IFS='=' read -r model tag mode <<< "$arm"
-    try_model "$model" "$tag" "$mode"
+    IFS='=' read -r model tag mode flags <<< "$arm"
+    try_model "$model" "$tag" "$mode" "$flags"
   done
 else
   try_model google/gemma-4-E2B-it-qat-w4a16-ct e2b-w4a16
