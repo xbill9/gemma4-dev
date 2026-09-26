@@ -9,7 +9,9 @@
 # w4a16_client.py) or both, and an optional fourth field naming extra serve flags: override
 # (--hf-overrides to Gemma4ForCausalLM) or override-nolimit (the same, without
 # --limit-mm-per-prompt). Metadata jev-patches, when set, replaces the list of diffs applied
-# (default: kvshare.diff wna16.diff unified.diff). When tests/ is in the bundle the unit tests run on the chip first,
+# (default: kvshare.diff wna16.diff unified.diff). Metadata jev-gcs-models, when set, names
+# space-separated gs:// checkpoint directories copied to /opt/jev-tpu/models/<basename>, which
+# an arm serves as /work/models/<basename>. When tests/ is in the bundle the unit tests run on the chip first,
 # and with metadata jev-bench=1 so does w4a16_matmul_bench.py.
 # Results and logs go to gs://$BUCKET/jev-tpu-31b/<run-prefix>/ as each arm finishes; the VM
 # deletes itself at the end.
@@ -52,6 +54,15 @@ for p in $PATCHES; do
 done
 docker cp /opt/ti/tpu_inference/. "patch:$SITE/tpu_inference/"
 docker commit patch "$PATCHED" >/dev/null && docker rm -f patch >/dev/null
+
+if GCS_MODELS=$(attr jev-gcs-models); then
+  for src in $GCS_MODELS; do
+    t0=$(date +%s)
+    mkdir -p $W/models && gcloud storage rsync -r -q "$src" "$W/models/$(basename "$src")" >> $LOG 2>&1 \
+      || finish "could not copy $src"
+    log "copied $(basename "$src"): $(du -sh "$W/models/$(basename "$src")" | cut -f1) in $(( $(date +%s) - t0 ))s"
+  done
+fi
 
 if SEED=$(attr jev-xla-seed); then
   mkdir -p $XLA_CACHE_DIR && gcloud storage rsync -r -q "gs://$BUCKET/jev-tpu-31b/xla-cache/$SEED" $XLA_CACHE_DIR >/dev/null 2>&1
