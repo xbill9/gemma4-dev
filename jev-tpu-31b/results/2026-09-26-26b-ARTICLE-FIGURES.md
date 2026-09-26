@@ -34,12 +34,20 @@
 - reversed options (3 choice tasks): ref 79.8%, test 79.7%, difference -0.1 points (-0.6 to +0.2); 2 right->wrong, 1 wrong->right
 - suite (all subsets): ref 75.3%, test 76.0%, difference +0.7 points (+0.3 to +1.1); 16 right->wrong, 42 wrong->right
 
+### TPU default KV (ref) against explicit bf16 KV
+
+- sst2: ref 95.0%, test 95.0%, difference +0.0 points (+0.0 to +0.0); 0 right->wrong, 0 wrong->right
+- ag_news: ref 86.0%, test 86.0%, difference +0.0 points (+0.0 to +0.0); 0 right->wrong, 0 wrong->right
+- emotion: ref 60.0%, test 60.0%, difference +0.0 points (+0.0 to +0.0); 0 right->wrong, 0 wrong->right
+- irony: ref 90.7%, test 90.7%, difference +0.0 points (+0.0 to +0.0); 0 right->wrong, 0 wrong->right
+- reversed options (3 choice tasks): ref 79.8%, test 79.8%, difference +0.0 points (+0.0 to +0.0); 0 right->wrong, 0 wrong->right
+- suite (all subsets): ref 75.3%, test 75.5%, difference +0.2 points (-0.1 to +0.5); 13 right->wrong, 21 wrong->right
+
 
 ## Capacity and speed
 
 - KV tokens: W4A16 53,888, FP8 3,456, ratio 15.6x
 - output tok/s: W4A16 1283.3, FP8 668.4, ratio 1.92x
-- KV cost at fp8: 120 KiB/token; W4A16 pool 6.17 GiB
 
 ## Cost per million output tokens (arithmetic)
 

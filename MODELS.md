@@ -527,8 +527,7 @@ log of run `2026-09-26-moe2`:
 **The vision tower is resident.** 26B loads through the JAX `Gemma4ForConditionalGeneration`
 (`gemma4_mm.py`), which builds the SigLIP encoder even with `--limit-mm-per-prompt` at 0; only the
 text-only `Gemma4ForCausalLM` skips `vision` tensors. The measured 11.32 GiB left holds **53,888 KV
-tokens at 120 KiB/token** (fp8, windows off): vLLM sized the KV pool at 6.17 GiB and kept the rest as its
-activation reserve. `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic`, the only other 26B that serves on one
+tokens**, vLLM's own count (KV dtype and why a derived byte count does not reconcile: `QUANTIZATION.md`). `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic`, the only other 26B that serves on one
 chip, measured 27.99 GiB with 0.75 GiB left: 3,456 tokens. Unmeasured savings still on the table: the
 vision tower (1.07 GiB) if a text-only class loads the 26B, expert scales kept bf16 on the chip
 (~0.8 GiB), and int4 embeddings (the grid covers them; the repack leaves them bf16 to match cyankiwi).

@@ -342,9 +342,16 @@ the repacked checkpoint (`jev-tpu-31b/results/2026-09-26-moe2-*`; FP8 from `2026
   itself a quantization of bf16, and no bf16 26B fits one chip, so there is no bf16 reference here.
 - Boot 796 s cold (334 s of it compilation); the saved compile cache is
   `xla-cache/vllm-tpu-19a1a052-patched-moe`.
-- The KV cost is **120 KiB/token** at fp8 (8 heads × K,V × 256 × 30 layers, windows off), from the
-  allocation shape `(num_blocks, (128, 8, 2, 256))` over 30 layers.
-- vLLM gave KV 6.17 GiB of the 11.32 GiB left after weights; the rest is its activation reserve.
+- **The KV cache on these v6e runs is bf16, by the evidence available; the log line saying fp8 is
+  a red herring.** `Automatically using fp8_e5m2 for FP8 KV cache on TPU v6e` comes from
+  `TpuPlatform.fp8_dtype()` (`tpu_platform.py`), which picks *which* fp8 to use and prints on every
+  call, whether or not the KV cache is fp8. The allocation reads `regular_attn_shape=(num_blocks, (128,
+  8, 2, 256))`: the packing dimension 2 is bf16's, and fp8 makes it 4 (the v5e measurement below).
+  Run `2026-09-26-kvbf16` set `--kv-cache-dtype bfloat16` explicitly and got the identical layout, the
+  identical 53,888 tokens, the four tasks record for record and the suite +0.2 points (95% range −0.1
+  to +0.5). Earlier notes and a published article that describe "vLLM's default fp8 KV cache on v6e"
+  rest on that log line. The bytes per token do not reconcile with a naive 30-layer bf16 count against
+  the 11.32 GiB left, so quote vLLM's token count, not a derived KV size.
 
 **The same checkpoint on stock vLLM CUDA, unpatched** (MEASURED 2026-09-26, one NVIDIA L4 on
 `g2-standard-8`, `vllm/vllm-openai@sha256:8a69ffad…`, vLLM 0.30.0; `jev-tpu-31b/results/2026-09-26-gpu-l4-*`,
@@ -353,9 +360,9 @@ runner `jev-tpu-31b/gpu/run_gpu.sh`, same serve flags). It loads as it stands: v
 dense layers. Model loading takes 14.8 GiB; the KV cache holds 17,990 tokens; boot 255 s; 394 output
 tok/s on the same 16 × 256 load. Paired per record with the TPU W4A16 run, the four tasks agree within
 one example each; the suite reads **+0.7 points on GPU** (76.0% against 75.3%, 95% range +0.3 to +1.1;
-16 records right→wrong, 42 wrong→right). Both runs set `kv_cache_dtype=auto`, which is **fp8_e5m2 on
-v6e and bf16 on CUDA**, so the KV cache is one difference between them and the int4 kernels
-(`gmm_v2` against Marlin) the other.
+16 records right→wrong, 42 wrong→right). The KV cache dtype does not explain it: the TPU run with
+bf16 KV set explicitly reads the same as the default (above). The int4 kernels differ (`gmm_v2` against
+Marlin), and the gap is unexplained.
 
 > **The GGUF row is a property of vLLM itself, not of the TPU platform. Verified 2026-09-02** against a
 > stock **vLLM 0.26.0 CUDA** install: `grep -ril gguf` over the entire installed package returns **two**

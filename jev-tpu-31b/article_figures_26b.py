@@ -35,7 +35,8 @@ def main():
     print(f"- copied: {verify['copied']['byte_identical']} of {verify['copied']['tensors']} byte-identical\n")
     print("## Accuracy, W4A16 against FP8 (2026-09-26-moe2-VS-FP8.json)\n")
     for name, label in (("2026-09-26-moe2-VS-FP8.json", "FP8 (ref) against TPU W4A16"),
-                        ("2026-09-26-gpu-l4-VS-TPU.json", "TPU W4A16 (ref) against L4 W4A16")):
+                        ("2026-09-26-gpu-l4-VS-TPU.json", "TPU W4A16 (ref) against L4 W4A16"),
+                        ("2026-09-26-kvbf16-VS-DEFAULT.json", "TPU default KV (ref) against explicit bf16 KV")):
         print(f"### {label}\n")
         for arm in load(name).values():
             for group, g in arm.items():
@@ -47,8 +48,6 @@ def main():
     print("\n## Capacity and speed\n")
     print(f"- KV tokens: W4A16 {kv_w4:,}, FP8 {kv_fp8:,}, ratio {kv_w4 / kv_fp8:.1f}x")
     print(f"- output tok/s: W4A16 {w4}, FP8 {fp8}, ratio {w4 / fp8:.2f}x")
-    kv_per_tok = 8 * 2 * 256 * 30  # heads x (K, V) x head dim x layers, 1-byte fp8
-    print(f"- KV cost at fp8: {kv_per_tok / 1024:.0f} KiB/token; W4A16 pool {kv_w4 * kv_per_tok / 2**30:.2f} GiB")
     print("\n## Cost per million output tokens (arithmetic)\n")
     for name, rate in RATES.items():
         for build, tps in (("W4A16", w4), ("FP8", fp8)):

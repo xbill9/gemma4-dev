@@ -157,7 +157,7 @@ Memory statistics | total_hbm_limit_gb=31.24GiB | total_hbm_limit_cap_gb=28.74Gi
 | RedHat FP8 | 27.99 GiB | 0.75 GiB | 3,456 tokens |
 | QAT W4A16 | 17.43 GiB | 11.32 GiB | 53,888 tokens |
 
-The 17.43 GiB breaks down, by arithmetic from the checkpoint's tensor headers, into 14.10 GiB of experts, 1.38 GiB of embeddings, 1.07 GiB of vision encoder and 0.86 GiB of attention and dense MLP. The vision encoder is resident because the 26B loads through the multimodal model class even with images switched off. The KV cache costs 120 KiB per token at the fp8 that vLLM picks on v6e (arithmetic from the allocation shape, 8 heads × K and V × 256 × 30 layers), so 53,888 tokens is 26 concurrent 2,048-token requests.
+The 17.43 GiB breaks down, by arithmetic from the checkpoint's tensor headers, into 14.10 GiB of experts, 1.38 GiB of embeddings, 1.07 GiB of vision encoder and 0.86 GiB of attention and dense MLP. The vision encoder is resident because the 26B loads through the multimodal model class even with images switched off. vLLM reports the 53,888 tokens as room for 26 concurrent 2,048-token requests.
 
 ---
 
@@ -187,9 +187,7 @@ The repacked checkpoint loads on stock vLLM with no patches. On one NVIDIA L4 (`
 [jev-gpu 2026-09-26T14:16:23Z] load: 393.7 tok/s, range 389.5 to 396.3
 ```
 
-vLLM picks its existing Marlin int4 kernels for both the experts and the linear layers. Paired with the TPU run, the four tasks agree within one example each, and the suite reads 0.7 points higher on the L4 (76.0% against 75.3%, 95% range +0.3 to +1.1).
-
-KVRESULT_PENDING
+vLLM picks its existing Marlin int4 kernels for both the experts and the linear layers. Paired with the TPU run, the four tasks agree within one example each, and the suite reads 0.7 points higher on the L4 (76.0% against 75.3%, 95% range +0.3 to +1.1). The KV cache dtype is ruled out as the cause: a TPU run with `--kv-cache-dtype bfloat16` set explicitly allocates the same 53,888 tokens and reads the four tasks record for record, with the suite 0.2 points from the default run. The two platforms run different int4 kernels, `gmm_v2` on the TPU and Marlin on the GPU.
 
 ---
 
@@ -262,7 +260,7 @@ The goal of this article was to serve Google's QAT Gemma 4 26B-A4B on one TPU v6
 - ⚠️ On TPU it needs #3653 and the experts method, neither merged yet
 - 🟢 Gemma 4 12B serves on the TPU backend's JAX path with one `--hf_overrides` flag
 
-Scope: one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and the experts method applied, one run per build, `--max-model-len 2048`, vLLM's default fp8 KV cache on v6e. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0 and a bf16 KV cache. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
+Scope: one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and the experts method applied, one run per build, `--max-model-len 2048`, vLLM's default KV cache dtype. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
 The strategy for serving Google's QAT Gemma 4 26B on one TPU v6e chip was validated with an incremental step by step approach.
 
