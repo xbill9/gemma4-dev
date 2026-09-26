@@ -3,7 +3,7 @@ title: "Google's QAT Gemma 4 26B-A4B on One TPU v6e: 15.6x the KV Cache and 1.9x
 published: false
 description: "Google ships its quantization-aware-trained Gemma 4 26B-A4B as GGUF and as a 48 GiB bf16 export, and as compressed-tensors W4A16 for every size but this one. A lossless repack to W4A16, a W4A16 mixture-of-experts method for vLLM's JAX path on TPU, and one v6e chip: 17.43 GiB of HBM, 53,888 KV tokens and 1,283 output tokens per second, against RedHat's FP8 build at 27.99 GiB, 3,456 tokens and 668. The same checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4."
 tags: gemma, googlecloud, machinelearning, llm
-cover_image: COVER_PENDING
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-31b/devto-26b-qat-cover.ff0758f6.jpg
 ---
 
 This article provides a step by step guide to serving Google's quantization-aware-trained (QAT) Gemma 4 26B-A4B on one Google Cloud TPU v6e chip with vLLM, and compares it with the FP8 build that is the only 26B serving on one chip today. Every per-record output, log and script is committed.
