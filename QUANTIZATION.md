@@ -346,6 +346,17 @@ the repacked checkpoint (`jev-tpu-31b/results/2026-09-26-moe2-*`; FP8 from `2026
   allocation shape `(num_blocks, (128, 8, 2, 256))` over 30 layers.
 - vLLM gave KV 6.17 GiB of the 11.32 GiB left after weights; the rest is its activation reserve.
 
+**The same checkpoint on stock vLLM CUDA, unpatched** (MEASURED 2026-09-26, one NVIDIA L4 on
+`g2-standard-8`, `vllm/vllm-openai@sha256:8a69ffad…`, vLLM 0.30.0; `jev-tpu-31b/results/2026-09-26-gpu-l4-*`,
+runner `jev-tpu-31b/gpu/run_gpu.sh`, same serve flags). It loads as it stands: vLLM picks
+`CompressedTensorsWNA16MoEMethod` with `MarlinExperts` for the experts and `MarlinLinearKernel` for the
+dense layers. Model loading takes 14.8 GiB; the KV cache holds 17,990 tokens; boot 255 s; 394 output
+tok/s on the same 16 × 256 load. Paired per record with the TPU W4A16 run, the four tasks agree within
+one example each; the suite reads **+0.7 points on GPU** (76.0% against 75.3%, 95% range +0.3 to +1.1;
+16 records right→wrong, 42 wrong→right). Both runs set `kv_cache_dtype=auto`, which is **fp8_e5m2 on
+v6e and bf16 on CUDA**, so the KV cache is one difference between them and the int4 kernels
+(`gmm_v2` against Marlin) the other.
+
 > **The GGUF row is a property of vLLM itself, not of the TPU platform. Verified 2026-09-02** against a
 > stock **vLLM 0.26.0 CUDA** install: `grep -ril gguf` over the entire installed package returns **two**
 > files, both incidental (`lora/layers/utils.py`, `models/qwen2_moe.py`); there is no `gguf.py` under
