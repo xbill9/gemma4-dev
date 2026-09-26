@@ -7,8 +7,8 @@
 # Metadata jev-arms, when set, replaces the default arm list: space-separated
 # <model>=<tag>=<mode>, mode one of read (the label read), load (fixed-length throughput via
 # w4a16_client.py) or both, and an optional fourth field naming extra serve flags: override
-# (--hf-overrides to Gemma4ForCausalLM) or override-nolimit (the same, without
-# --limit-mm-per-prompt). Metadata jev-patches, when set, replaces the list of diffs applied
+# (--hf-overrides to Gemma4ForCausalLM), override-nolimit (the same, without
+# --limit-mm-per-prompt) or kv-bf16 (--kv-cache-dtype bfloat16; v6e picks fp8 by itself). Metadata jev-patches, when set, replaces the list of diffs applied
 # (default: kvshare.diff wna16.diff unified.diff). Metadata jev-gcs-models, when set, names
 # space-separated gs:// checkpoint directories copied to /opt/jev-tpu/models/<basename>, which
 # an arm serves as /work/models/<basename>. When tests/ is in the bundle the unit tests run on the chip first,
@@ -123,12 +123,13 @@ PY
   sync_up
 }
 
-try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nolimit]
+try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nolimit|kv-bf16]
   local model=$1 tag=$2 mode=${3:-read} flags=${4:-} extra=() mm
   mm='{"image":0,"audio":0,"video":0}'
   case "$flags" in
     override) extra=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}') ;;
     override-nolimit) extra=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}'); mm= ;;
+    kv-bf16) extra=(--kv-cache-dtype bfloat16) ;;
   esac
   log "serving $model as $tag ($mode${flags:+, $flags})"
   if MM_LIMIT=$mm bash $W/tpu/serve.sh "$model" "${extra[@]}" >> $LOG 2>&1; then
