@@ -39,7 +39,9 @@ def main():
                         ("2026-09-26-kvbf16-VS-DEFAULT.json", "TPU default KV (ref) against explicit bf16 KV"),
                         ("2026-09-26-moe2-VS-BF16.json", "bf16 at TP=4 (ref) against TPU W4A16"),
                         ("2026-09-26-gpu-l4-VS-BF16.json", "bf16 at TP=4 (ref) against L4 W4A16"),
-                        ("2026-09-26-fp8-VS-BF16.json", "FP8 (ref) against bf16 at TP=4; negate for FP8 vs bf16")):
+                        ("2026-09-26-fp8-VS-BF16.json", "FP8 (ref) against bf16 at TP=4; negate for FP8 vs bf16"),
+                        ("2026-09-27-tp4fix3-VS-TP1.json", "TPU W4A16 at TP=1 (ref) against TP=4"),
+                        ("2026-09-27-tp4fix3-VS-BF16.json", "bf16 at TP=4 (ref) against TPU W4A16 at TP=4")):
         print(f"### {label}\n")
         for arm in load(name).values():
             for group, g in arm.items():
@@ -51,6 +53,8 @@ def main():
     print("\n## Capacity and speed\n")
     bf16 = load("2026-09-26-tp4-evidence/26b-bf16.load.json")["output_tok_per_s"]
     print(f"- bf16 at TP=4 on a v6e-4: {bf16} output tok/s, 235,008 KV tokens (boot log), 61.16 GiB over 4 chips")
+    w4tp4 = load("2026-09-27-tp4fix3-evidence/26b-q4w4-tp4.load.json")["output_tok_per_s"]
+    print(f"- W4A16 at TP=4 on a v6e-4: {w4tp4} output tok/s, 407,168 KV tokens (boot log), 21.75 GiB over 4 chips")
     print(f"- KV tokens: W4A16 {kv_w4:,}, FP8 {kv_fp8:,}, ratio {kv_w4 / kv_fp8:.1f}x")
     print(f"- output tok/s: W4A16 {w4}, FP8 {fp8}, ratio {w4 / fp8:.2f}x")
     print("\n## Cost per million output tokens (arithmetic)\n")

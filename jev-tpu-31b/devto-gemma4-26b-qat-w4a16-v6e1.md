@@ -104,6 +104,8 @@ The experts method loads each expert's packed int4 weights and 32-wide scales, f
 
 Its unit tests include a forward pass through a real expert layer at the 26B's shape, 2816 hidden and 704 intermediate, against a NumPy reference.
 
+The same two changes serve the checkpoint across four chips at tensor parallelism 4. There, two layers split their input rows across chips mid-group, 176 of the experts' 704 rows and 528 of the dense MLP's 2112 per chip, so each 32-row scale is stored as two 16-row groups; every weight keeps the same scale. On a v6e-4 the model uses 21.75 GiB across the four chips, holds 407,168 KV tokens and serves 2,073 output tokens per second, and it reads the suite exactly as it does on one chip.
+
 ---
 
 #### Step 5 — Launch One v6e Chip
@@ -257,9 +259,10 @@ The goal of this article was to serve Google's QAT Gemma 4 26B-A4B on one TPU v6
 - ⚠️ Against bf16 the suite reads 1.1 points lower on the TPU (−1.8 to −0.3) and 0.4 lower on an NVIDIA L4 (−1.2 to +0.3); FP8 reads 0.4 lower
 - 🟢 The repacked checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4
 - ⚠️ On TPU it needs #3653 and #3660, neither merged yet
+- 🟢 Across four chips (tensor parallelism 4) it serves at 21.75 GiB with 407,168 KV tokens and reads the suite as it does on one chip
 - 🟢 Gemma 4 12B serves on the TPU backend's JAX path with one `--hf_overrides` flag
 
-Scope: the bf16 reference ran on a v6e-4 (`ct6e-standard-4t`) at tensor parallelism 4, every other TPU arm on one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and #3660 applied, one run per build, `--max-model-len 2048`, vLLM's default KV cache dtype. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
+Scope: the bf16 reference and the four-chip QAT run used a v6e-4 (`ct6e-standard-4t`) at tensor parallelism 4, every other TPU arm on one TPU v6e chip (`ct6e-standard-1t`, flex-start) in europe-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with #3299, #3653 and #3660 applied, one run per build, `--max-model-len 2048`, vLLM's default KV cache dtype. The FP8 read comes from a run two days earlier on the same image without the patches, and its throughput from a second VM the same day; the four-task reads repeat record for record across VMs here, the suite within 0.1 points, and throughput moved about 2% between VMs. The GPU run used one NVIDIA L4 in us-central1-a with vLLM 0.30.0. Costs are arithmetic from list prices and the measured throughput. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
 The strategy for serving Google's QAT Gemma 4 26B on one TPU v6e chip was validated with an incremental step by step approach.
 
