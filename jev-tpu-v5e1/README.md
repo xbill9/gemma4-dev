@@ -1,6 +1,27 @@
 # jev-tpu-v5e1
 
-Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Nothing here has been run yet.
+Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. One test run is in (E2B bf16, 2026-09-27); see Status below.
+
+## Status and next steps (2026-09-27)
+
+**Done: `2026-09-27-v5e1-e2btest`**, E2B bf16 only (`jev-arms`), bundle `e2btest-baf42672.tgz` (this tree plus `patches/` from `../jev-tpu-31b`'s `tp4fix3-54532225.tgz`). Boot 360 s. Paired with `../jev-tpu-31b/results/2026-09-25-followup-e2b-bf16` in `results/2026-09-27-v5e1-e2btest-QUANT.md`: suite 0.685 on both (−0.001, 95% −0.004 to +0.003), every task within a point. `quant_compare.py` heads the columns "bf16" / "4-bit"; there "bf16" is v6e and "4-bit" is v5e. `score.py` writes an empty summary for this run because it only scores autoregressive-plus-diffusion pairs.
+
+Answered from the boot log: **the KV cache is bf16 on v5e** (`kv_cache_dtype=auto`, 323,456 tokens in 5.55 GiB, 18.0 KiB/token). The v6e E2B run is also bf16 (1,153,792 tokens in 19.81 GiB), so for E2B the pairing changes only the chip; "v6e picks fp8 by itself" below does not hold for E2B. Weights resident 8.94 GiB. Concurrency-1 latency 12.8 ms median (v6e: 8.7).
+
+Fixed after that run: the self-delete called `gcloud compute tpus queued-resources`, which the TPU VM's gcloud has only under `alpha`, so the node stayed up and was deleted by hand. `run_quant.sh` now calls `gcloud alpha`.
+
+**Running: `2026-09-27-v5e1-w4a16`**, queued resource `jev-tpu-v5e1-2026-09-27-v5e1-w4a16` in `us-west4-a` (project `aisprint-491218`), launched about 20:55 UTC, bundle `w4a16-352c9e6a.tgz` (has the delete fix), `jev-bench=1`, arms `e2b-w4a16`, `e4b-w4a16`, `12b-w4a16` (override). Flex-start: it lapses if not granted within 2 h and is capped at 4 h once up. It deletes itself at the end; check that it did.
+
+Next, on any machine:
+
+1. Check progress: `gcloud storage cat gs://aisprint-491218-bucket/jev-tpu-v5e1/2026-09-27-v5e1-w4a16/logs/run.log | grep -E 'jev-quant|READY|FAILED'`, and `gcloud alpha compute tpus queued-resources list --project aisprint-491218 --zone us-west4-a`. If it shows `DONE` and the QR is still listed, delete it with `gcloud alpha compute tpus queued-resources delete jev-tpu-v5e1-2026-09-27-v5e1-w4a16 --project aisprint-491218 --zone us-west4-a --force --quiet`. Leave `jax-gemma4-qr` and `torchtpu-v5e1-qr` alone; they belong to other rigs.
+2. Read `logs/matmul-bench.txt` first: it settles whether `wna16.diff`'s bf16-activation branch holds on v5e's 128x128 MXUs (open item below).
+3. Read the KV pool for 12B W4A16 from `logs/google_gemma-4-12B-it-qat-w4a16-ct.boot.log` (`TPU KV cache size`) — the third open item.
+4. Pull results: `gcloud storage rsync -r gs://aisprint-491218-bucket/jev-tpu-v5e1/2026-09-27-v5e1-w4a16/results results`.
+5. Compare: `python3 quant_compare.py --prefix 2026-09-27-v5e1-w4a16 --pair e2b-w4a16=results/2026-09-27-v5e1-e2btest-e2b-bf16 --solo e4b-w4a16 --solo 12b-w4a16`. The E2B pair is same-chip; E4B and 12B have no bf16 arm on v5e, so only cross-chip reads against the v6e bf16 runs are possible for them. The same arms on v6e are in `../jev-tpu-31b/results/2026-09-25-w4a16-*` for a chip-only pairing.
+6. Commit `results/` and a note here.
+
+Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` or this README, add `patches/` from `gs://aisprint-491218-bucket/jev-tpu-31b/inputs/tp4fix3-54532225.tgz`, name it by content hash, upload to `gs://aisprint-491218-bucket/jev-tpu-v5e1/inputs/`. `tests/` stays out because `run_quant.sh` runs pytest from a `/tests` mount where the scoring tests cannot import `score.py`.
 
 ## What differs from the v6e trees
 
