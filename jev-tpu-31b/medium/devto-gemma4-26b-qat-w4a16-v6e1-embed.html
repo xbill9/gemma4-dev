@@ -331,6 +331,13 @@ stays weight-only 4-bit.</li>
 <p>Its unit tests include a forward pass through a real expert layer at
 the 26B's shape, 2816 hidden and 704 intermediate, against a NumPy
 reference.</p>
+<p>The same two changes serve the checkpoint across four chips at tensor
+parallelism 4. There, two layers split their input rows across chips
+mid-group, 176 of the experts' 704 rows and 528 of the dense MLP's 2112
+per chip, so each 32-row scale is stored as two 16-row groups; every
+weight keeps the same scale. On a v6e-4 the model uses 21.75 GiB across
+the four chips, holds 407,168 KV tokens and serves 2,073 output tokens
+per second, and it reads the suite exactly as it does on one chip.</p>
 <hr />
 <h4 id="step-5--launch-one-v6e-chip">Step 5 — Launch One v6e Chip</h4>
 <p>The VM applies the patches to the pinned vLLM TPU image, runs the
@@ -471,10 +478,12 @@ lower</li>
 <li>🟢 The repacked checkpoint loads unpatched on vLLM 0.30.0 on an
 NVIDIA L4</li>
 <li>⚠️ On TPU it needs #3653 and #3660, neither merged yet</li>
+<li>🟢 Across four chips (tensor parallelism 4) it serves at 21.75 GiB
+with 407,168 KV tokens and reads the suite as it does on one chip</li>
 <li>🟢 Gemma 4 12B serves on the TPU backend's JAX path with one
 <code>--hf_overrides</code> flag</li>
 </ul>
-<p>Scope: the bf16 reference ran on a v6e-4
+<p>Scope: the bf16 reference and the four-chip QAT run used a v6e-4
 (<code>ct6e-standard-4t</code>) at tensor parallelism 4, every other TPU
 arm on one TPU v6e chip (<code>ct6e-standard-1t</code>, flex-start) in
 europe-west4-a, vLLM <code>0.29.1rc1.dev468+g0b7f11a1e</code> at
