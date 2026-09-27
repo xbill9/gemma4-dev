@@ -83,7 +83,7 @@ On four 300-example classification tasks every build is within noise of bf16. Lo
 
 ## Limitations
 
-- Tested on one NVIDIA L4 and one TPU v6e chip, each at tensor parallelism 1. On TPU at tensor parallelism 4 the current #3660 fails at load (22 scale groups in the experts' down projection do not split four ways). Other GPUs and other TPU generations are untested.
+- Tested on one NVIDIA L4 at tensor parallelism 1, and on TPU v6e at tensor parallelism 1 and 4 (on a v6e-4 with #3660: 21.75 GiB across four chips, 407,168 KV tokens, 2,073 output tok/s, the same suite accuracy as on one chip). Other GPUs and other TPU generations are untested.
 - Text only was tested; the vision tower is present, but image input was not exercised.
 - Unofficial. Report problems here, not to Google.
 

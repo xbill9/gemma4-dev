@@ -344,9 +344,14 @@ the repacked checkpoint (`jev-tpu-31b/results/2026-09-26-moe2-*`; FP8 from `2026
   (−0.9 to +0.2). The four tasks are within noise for all three. Same file on both platforms, so the
   extra ~0.7 points is the TPU int4 path. bf16 at TP=4: 61.16 GiB over 4 chips, 235,008 KV tokens,
   1,982 tok/s.
-- **TP=4 fails at load** for this route: w2's scale `[128, 22, 1, 2816]` is sharded four ways on axis 1
-  and 22 = 704 / 32 does not divide (`IndivisibleError`). w13 is padded 704 → 768 for GMM_TP; w2's
-  input and scale need the same (24 groups). Recorded in #3660.
+- **TP=4 works** with #3660's second commit (run `2026-09-27-tp4fix3`, v6e-4): 21.75 GiB across four
+  chips, 407,168 KV tokens, 2,073 tok/s; suite identical to TP=1 (+0.0, −0.4 to +0.4) and −1.1 against
+  bf16 at the same TP. Two input-sharded layers of the 26B do not split into whole groups of 32 at TP=4
+  -- the experts' w2 (704 rows, 176 per shard) and the dense MLP's row-parallel down_proj (2112 rows,
+  528 per shard) -- and failed at load with `IndivisibleError` until each scale is repeated over
+  sub-groups of `gcd(group, rows per shard)` = 16. The row-parallel case needs the serving mesh's size
+  read before `cpu_mesh_context()`: inside it the current mesh is the host's, and the JAX
+  `QuantLinearConfig` carries no mesh (`self.mesh = None`).
 - Boot 796 s cold (334 s of it compilation); the saved compile cache is
   `xla-cache/vllm-tpu-19a1a052-patched-moe`.
 - **The KV cache on these v6e runs is bf16, by the evidence available; the log line saying fp8 is
