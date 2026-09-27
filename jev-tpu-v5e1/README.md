@@ -12,10 +12,16 @@ Fixed after that run: the self-delete called `gcloud compute tpus queued-resourc
 
 **Running: `2026-09-27-v5e1-w4a16`**, queued resource `jev-tpu-v5e1-2026-09-27-v5e1-w4a16` in `us-west4-a` (project `aisprint-491218`), launched about 20:55 UTC, bundle `w4a16-352c9e6a.tgz` (has the delete fix), `jev-bench=1`, arms `e2b-w4a16`, `e4b-w4a16`, `12b-w4a16` (override). Flex-start: it lapses if not granted within 2 h and is capped at 4 h once up. It deletes itself at the end; check that it did.
 
+As of 21:04 UTC: the QR went `ACTIVE` at about 20:51 (so the 4 h cap ends it by about 00:51), both patches applied, and the matmul bench finished at 21:00:36. `run.log` has no later line yet because it uploads only at `sync_up` points. The bench (`logs/matmul-bench.txt`) partly settles the first open item:
+
+- On the 31B shapes that ran (`gate_up` at 1, 16, 64 tokens; `down` at 1, 16), the kernel matched XLA (relative error ≤ 0.0024, no non-finite values) and ran 1.32–1.44x faster than bf16 and about 6x faster than the XLA fallback.
+- **31B `down` at 64 tokens failed to compile**: `CompileTimeScopedVmemOom`, a 115.92M scoped VMEM allocation against a 115.20M limit (737 KB over), from tile `tk=21504, tn=2688`. The bench script stopped there, so no later shape ran.
+- The serving arms may not reach that case, because `--max-num-seqs 16` and the E2B, E4B and 12B layers are narrower than 31B's, but that is inferred. If they do, it shows in the arm's `.boot.log` or as a `FAILED` line. `run_quant.sh` has no `set -e`, so the bench failure did not stop the run.
+
 Next, on any machine:
 
 1. Check progress: `gcloud storage cat gs://aisprint-491218-bucket/jev-tpu-v5e1/2026-09-27-v5e1-w4a16/logs/run.log | grep -E 'jev-quant|READY|FAILED'`, and `gcloud alpha compute tpus queued-resources list --project aisprint-491218 --zone us-west4-a`. If it shows `DONE` and the QR is still listed, delete it with `gcloud alpha compute tpus queued-resources delete jev-tpu-v5e1-2026-09-27-v5e1-w4a16 --project aisprint-491218 --zone us-west4-a --force --quiet`. Leave `jax-gemma4-qr` and `torchtpu-v5e1-qr` alone; they belong to other rigs.
-2. Read `logs/matmul-bench.txt` first: it settles whether `wna16.diff`'s bf16-activation branch holds on v5e's 128x128 MXUs (open item below).
+2. Check each arm's boot log for the same `CompileTimeScopedVmemOom` as the bench (above).
 3. Read the KV pool for 12B W4A16 from `logs/google_gemma-4-12B-it-qat-w4a16-ct.boot.log` (`TPU KV cache size`) — the third open item.
 4. Pull results: `gcloud storage rsync -r gs://aisprint-491218-bucket/jev-tpu-v5e1/2026-09-27-v5e1-w4a16/results results`.
 5. Compare: `python3 quant_compare.py --prefix 2026-09-27-v5e1-w4a16 --pair e2b-w4a16=results/2026-09-27-v5e1-e2btest-e2b-bf16 --solo e4b-w4a16 --solo 12b-w4a16`. The E2B pair is same-chip; E4B and 12B have no bf16 arm on v5e, so only cross-chip reads against the v6e bf16 runs are possible for them. The same arms on v6e are in `../jev-tpu-31b/results/2026-09-25-w4a16-*` for a chip-only pairing.
@@ -42,10 +48,10 @@ Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` o
 
 The default arms in `run_quant.sh` are therefore E2B bf16, E2B W4A16, E4B W4A16, and 12B W4A16 served with `--hf-overrides` to `Gemma4ForCausalLM` (the route `../jev-tpu-31b` found needs no `unified.diff`). The default patch list is `kvshare.diff wna16.diff`. As in `../jev-tpu-31b`, the diffs are not in the tree: they come from the upstream PR branches (vllm-project/tpu-inference#3299, #3653) and go into the code bundle under `patches/`.
 
-## Open before the first run
+## Open items
 
-- **`wna16.diff` has only run on v6e.** Its `gmm_v2` path keeps activations in bf16 when the quantization group is narrower than the matrix unit, which is 256 columns on v6e. v5e's MXUs are 128x128 (`../HARDWARE.md`). A group of 32 is narrower than either, so the same branch should be taken, but that is inferred, not measured. Run `jev-bench=1` (per-layer `w4a16_matmul_bench.py`, kernel checked against XLA) on the first boot.
-- **KV cache dtype.** v6e picks an fp8 KV cache on its own. v5e has no native fp8 (`../HARDWARE.md`), and what vLLM picks there is unrecorded. Read it from the first boot log before pairing any arm against a v6e result.
+- **`wna16.diff` on v5e.** Partly answered by the 2026-09-27 bench (Status above): correct and faster than bf16 on the 31B shapes that ran, but 31B `down` at 64 tokens exceeds v5e's scoped VMEM limit at the kernel's chosen tile. Whether any shape the serving arms use hits that limit is not yet known.
+- **KV cache dtype.** Answered for E2B bf16: `auto` resolves to bf16 on v5e (Status above). The W4A16 arms' boot logs will show theirs.
 - **12B W4A16 headroom.** The KV pool left over at `--max-model-len 2048 --max-num-seqs 16` is arithmetic until a boot log shows it.
 
 ## Pairing with the v6e results
