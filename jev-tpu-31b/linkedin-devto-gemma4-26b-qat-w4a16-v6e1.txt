@@ -1,0 +1,14 @@
+Google's QAT Gemma 4 26B-A4B on One TPU v6e: 15.6x the KV Cache and 1.9x the Throughput of FP8
+
+Google ships its quantization-aware-trained Gemma 4 26B-A4B as GGUF and as a 48 GiB bf16 export, and as compressed-tensors W4A16 for every size but this one. A lossless repack to W4A16, a W4A16 mixture-of-experts method for vLLM's JAX path on TPU, and one v6e chip: 17.43 GiB of HBM, 53,888 KV tokens and 1,283 output tokens per second, against RedHat's FP8 build at 27.99 GiB, 3,456 tokens and 668. The same checkpoint loads unpatched on vLLM 0.30.0 on an NVIDIA L4.
+
+What is in it:
+
+- 🟢 The QAT 26B serves on one v6e chip at 17.43 GiB, against 27.99 GiB for RedHat's FP8 build
+- 🟢 53,888 tokens of KV cache against 3,456, and 1,283 output tokens per second against 668
+- 🟢 Every one of 765 million weight groups repacks onto its 4-bit grid, and all 748 unquantized tensors copy byte for byte
+- ⚠️ Against bf16 the suite reads 1.1 points lower on the TPU (−1.8 to −0.3) and 0.4 lower on an NVIDIA L4 (−1.2 to +0.3); FP8 reads 0.4 lower
+
+dev.to (Google Developer Experts): https://dev.to/gde/googles-qat-gemma-4-26b-a4b-on-one-tpu-v6e-156x-the-kv-cache-and-19x-the-throughput-of-fp8-36kl
+Source: https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-31b
+Checkpoint: https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct
