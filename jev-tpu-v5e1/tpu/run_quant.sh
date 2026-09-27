@@ -41,7 +41,7 @@ save_cache() {
 finish() {
   log "DONE: $1"; save_cache; sync_up
   local qr; qr=$(attr jev-qr) || { log "no jev-qr metadata: leaving the node up, delete it by hand"; exit 0; }
-  gcloud compute tpus queued-resources delete "$qr" --zone "$ZONE" --force --quiet --async >> $LOG 2>&1
+  gcloud alpha compute tpus queued-resources delete "$qr" --zone "$ZONE" --force --quiet --async >> $LOG 2>&1
   sync_up; exit 0
 }
 cx() { docker exec -e JEV_TOPK=32 -w /work vllm "$@"; }
