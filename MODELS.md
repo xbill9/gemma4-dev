@@ -658,11 +658,34 @@ _BF16_WEIGHTS_GB = {"E2B": 10.2, "E4B": 16.0, "12B": 24.0, "26B": 52.0, "31B": 6
 | E2B | 2B effective / ~5B total | 10.2 GB | 9.5 | ~4.8 | ~2.4 | bf16 fits (8.97 measured) | yes |
 | **E4B** | 4.5B effective / 8.0B total | 16.0 GB | **14.9** | ~7.5 | ~3.7 | needs int8 | bf16 fits |
 | 12B | 12B | 24.0 GB | 22.4 | ~11.2 | ~5.6 | needs int4 | bf16 fits |
-| **26B A4B** | 26.5B total / **~4B active** | 51.61 GB | 48.1 | ~24 | **15.27 measured** | no | **yes, repacked** |
+| **26B A4B** | 26.5B total / **~4B active** | 51.61 GB | 48.1 | ~24 | **15.29 on disk, 17.43 resident** | **no** (below) | **yes, repacked** |
 | 31B | 31.0B | 62.0 GB | 57.7 | ~29 | ~14.4 | no | multi-chip |
 
-int8/int4 columns are arithmetic halving/quartering **except** the 26B, whose 15.27 GB is the measured
-resident size after load-time Q4_0→W4A16 repacking of the `-q4_0-unquantized` export.
+int8/int4 columns are arithmetic halving/quartering **except** the 26B, whose int4 figures are measured:
+15.29 GiB is the W4A16 repack's safetensors on disk, 17.43 GiB its `total_hbm_used_gb` on one v6e chip
+(§26B, HBM budget).
+
+### The 26B W4A16 repack does not fit a v5e-1
+
+[`xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct)
+cannot serve on one v5e chip (16 GB nominal, 15.75 GiB total, **14.49 GiB usable**, `HARDWARE.md` §v5e-1).
+Each line below is over the limit on its own:
+
+| | GiB | against 14.49 |
+| :--- | ---: | ---: |
+| safetensors on disk (31 files, Hugging Face listing 2026-09-28) | 15.29 | +0.80 |
+| text weights resident, text-only class (§26B, HBM budget) | 16.36 | +1.87 |
+| as served today, vision tower resident (measured on v6e-1) | 17.43 | +2.94 |
+
+The on-chip figure exceeds the file because the MoE kernel pads the experts 704 → 768 and keeps their
+scales in f32. The three savings §26B lists as unmeasured (text-only class, bf16 expert scales, int4
+embeddings) together reach 14.52 GiB, still 0.03 over with no KV pool at all. Only with the expert
+padding also removed, a kernel change, does it come to 13.35 GiB, leaving 1.14 GiB for KV. All of that is
+arithmetic; none of it has been built.
+
+The route on v5e is **four chips at TP=4** (`v5litepod-4`, about 4.4 GiB of weights per chip if nothing
+is replicated), the same split that serves on a v6e-4. That is unmeasured on v5e, and v5e's scoped VMEM
+limit (`HARDWARE.md` §v5e-1) is a second constraint on the expert kernel that more HBM does not remove.
 
 ### The E2B W4A16 QAT export does NOT quantize the PLE, and that is 56.5% of it
 

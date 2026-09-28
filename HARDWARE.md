@@ -102,7 +102,15 @@ Measured on `v5litepod-1` with vLLM:
 | Usable at `gpu_memory_utilization=0.92` | **14.49** |
 
 **14.49 GiB is the number to size against**, not 16. Weights plus KV must fit inside it. See `MODELS.md`
-for per-model weight footprints — the short version is that only E2B fits at bf16.
+for per-model weight footprints — the short version is that only E2B fits at bf16, and the 26B A4B
+W4A16 repack does not fit at all (15.29 GiB on disk; `MODELS.md`, "The 26B W4A16 repack does not fit a
+v5e-1").
+
+**Scoped VMEM limit: 115.20M per kernel.** Measured 2026-09-27 on `v5litepod-1`
+(`jev-tpu-v5e1/results/2026-09-27-v5e1-w4a16-logs/`). The W4A16 `gmm_v2` kernel from
+vllm-project/tpu-inference#3653 picks tiles that exceed it: 117.62M for a 12B layer (`k=15360, n=3840`)
+at 128 tokens, which stopped 12B W4A16 from serving, and 115.92M for 31B `down` at 64 tokens in the
+matmul bench. HBM headroom does not help; the tile has to shrink.
 
 ### v6e-1 — 32 GB nominal
 

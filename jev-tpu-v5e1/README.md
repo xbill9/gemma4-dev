@@ -45,7 +45,7 @@ Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` o
 | `google/gemma-4-E4B-it-qat-w4a16-ct` | not measured | expected yes |
 | `google/gemma-4-12B-it` bf16 | 22.4 GiB | no |
 | `google/gemma-4-12B-it-qat-w4a16-ct` | not measured; ~5.6 GiB body plus bf16 embeddings | expected yes, with a small KV pool |
-| 26B A4B W4A16 (repacked) | 15.27 GiB measured | no |
+| 26B A4B W4A16 (repacked, `xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`) | 15.29 GiB on disk, 17.43 resident on v6e | no, 0.80 GiB over before loading (`../MODELS.md`, "The 26B W4A16 repack does not fit a v5e-1") |
 | 31B, any build | ≥ 14.4 GiB before anything else | no |
 
 The default arms in `run_quant.sh` are therefore E2B bf16, E2B W4A16, E4B W4A16, and 12B W4A16 served with `--hf-overrides` to `Gemma4ForCausalLM` (the route `../jev-tpu-31b` found needs no `unified.diff`). The default patch list is `kvshare.diff wna16.diff`. As in `../jev-tpu-31b`, the diffs are not in the tree: they come from the upstream PR branches (vllm-project/tpu-inference#3299, #3653) and go into the code bundle under `patches/`.
