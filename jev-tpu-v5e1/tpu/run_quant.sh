@@ -20,7 +20,8 @@
 # A patch named tokamax-*.diff applies to the image's tokamax instead of tpu_inference. Metadata
 # jev-env (space-separated KEY=VALUE) is set in every arm's vLLM container, and metadata
 # jev-serve-args (space-separated, no quoting) is appended to every arm's serve flags. Metadata
-# jev-swap-gb adds a swap file of that size before serving. Host memory is sampled every 30 s
+# jev-swap-gb adds a swap file of that size before serving. Metadata jev-load-conc (default 16) lists the
+# concurrencies the load mode runs at. Host memory is sampled every 30 s
 # into logs/<tag>.hostmem.txt while an arm boots, and the kernel's OOM-killer lines are kept on failure.
 # Results and logs go to gs://$BUCKET/jev-tpu-v5e1/<run-prefix>/ as each arm finishes; the VM
 # deletes its queued resource (metadata jev-qr) at the end.
@@ -170,8 +171,10 @@ try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nol
     log "$(tail -1 $LOG)"
     if [ "$mode" != load ]; then full_run "$model" "$tag"; fi
     if [ "$mode" != read ]; then
-      python3 $W/tpu/w4a16_client.py load "$model" $L/$tag.load.json > /dev/null 2>&1
-      log "$tag load: $(python3 -c "import json;d=json.load(open('$L/$tag.load.json'));print(d['output_tok_per_s'],'tok/s, range',d['output_tok_per_s_min'],'to',d['output_tok_per_s_max'])" 2>&1)"
+      for c in $(attr jev-load-conc || echo 16); do  # metadata jev-load-conc: space-separated concurrencies
+        JEV_LOAD_CONCURRENCY=$c python3 $W/tpu/w4a16_client.py load "$model" $L/$tag.load.c$c.json > /dev/null 2>&1
+        log "$tag load at concurrency $c: $(python3 -c "import json;d=json.load(open('$L/$tag.load.c$c.json'));print(d['output_tok_per_s'],'tok/s, range',d['output_tok_per_s_min'],'to',d['output_tok_per_s_max'])" 2>&1)"
+      done
     fi
   else
     log "$(grep -E '^(FAILED|READY)' $LOG | tail -1)"

@@ -1,8 +1,8 @@
 diff --git a/tpu_inference/envs.py b/tpu_inference/envs.py
-index 22ed41338..d3090a24c 100644
+index 22ed41338..e1b7c6493 100644
 --- a/tpu_inference/envs.py
 +++ b/tpu_inference/envs.py
-@@ -39,6 +39,10 @@ if TYPE_CHECKING:
+@@ -39,6 +39,11 @@ if TYPE_CHECKING:
      MOE_REQUANTIZE_WEIGHT_DTYPE: str = ""
      MOE_REQUANTIZE_CLIP_PERCENTILE: float | None = None
      MOE_STAGE_WEIGHTS_ON_HOST: bool = False
@@ -10,10 +10,11 @@ index 22ed41338..d3090a24c 100644
 +    W4A16_MOE_NO_PAD: bool = False
 +    SKIP_IDENTITY_MODEL_JIT: bool = False
 +    EMBED_INT8_GROUP: int = 0
++    GMM_V2_TILE_VMEM_FRACTION: float = 1.0
      ATTN_BUCKETIZED_NUM_REQS: bool = False
      ATTN_CUSTOM_NUM_REQS_BUCKETS: list[int] = []
      LAYOUT_Q_PROJ_AS_NDH: bool = False
-@@ -352,6 +356,28 @@ environment_variables: dict[str, Callable[[], Any]] = {
+@@ -352,6 +357,33 @@ environment_variables: dict[str, Callable[[], Any]] = {
      # stage the full tensor on device regardless.
      "MOE_STAGE_WEIGHTS_ON_HOST":
      env_bool("MOE_STAGE_WEIGHTS_ON_HOST", default=False),
@@ -39,14 +40,32 @@ index 22ed41338..d3090a24c 100644
 +    # 262144 x 2816 vocabulary at 32).
 +    "EMBED_INT8_GROUP":
 +    lambda: int(os.getenv("EMBED_INT8_GROUP", "0")),
++    # gmm_v2 picks tiles against its full scoped-VMEM limit, and its estimate
++    # leaves out in-kernel temporaries; below 1.0, tiles are chosen against
++    # this fraction of the limit while the compiler keeps the full limit.
++    "GMM_V2_TILE_VMEM_FRACTION":
++    lambda: float(os.getenv("GMM_V2_TILE_VMEM_FRACTION", "1.0")),
      # By default, it only use max_reqs for attentions. But if set true, it
      # will precompile max_reqs to power-of-twos between min and max reqs,
      # and attention will have the num_reqs closer to actual num_reqs. This
 diff --git a/tpu_inference/layers/common/fused_moe_gmm.py b/tpu_inference/layers/common/fused_moe_gmm.py
-index a6dcc548d..cd3e9c224 100644
+index a6dcc548d..c7de1b34b 100644
 --- a/tpu_inference/layers/common/fused_moe_gmm.py
 +++ b/tpu_inference/layers/common/fused_moe_gmm.py
-@@ -122,6 +122,29 @@ def gmm_wrapper(lhs,
+@@ -29,6 +29,7 @@ from tpu_inference.kernels.sparse_core.ragged_gather_reduce_v2 import \
+     ragged_gather_reduce
+ from tpu_inference.kernels.sparse_core.ragged_gather_v2 import \
+     ragged_gather_v2 as ragged_gather
++from tpu_inference.layers.common.linear import gmm_tile_info
+ from tpu_inference.layers.common.quantization import quantize_tensor
+ from tpu_inference.layers.common.sharding import ShardingAxisName
+ from tpu_inference.logger import init_logger
+@@ -118,10 +119,34 @@ def gmm_wrapper(lhs,
+         zero_initialize=False,
+         fuse_act=fuse_act,
+         preferred_element_type=preferred_element_type,
++        tile_info=gmm_tile_info(),
+     )
      return gmm_res
  
  
@@ -76,7 +95,7 @@ index a6dcc548d..cd3e9c224 100644
  def valid_rows_mask(batch_size: int, group_sizes: jax.Array,
                      group_start: jax.Array, group_end: jax.Array) -> jax.Array:
      """Mask indicating rows processed by current shard."""
-@@ -187,6 +210,10 @@ def moe_gmm_local(x: jax.Array,
+@@ -187,6 +212,10 @@ def moe_gmm_local(x: jax.Array,
      assert parallelism in ["tp", "ep"]
  
      # GMM1 computes x @ (W_up | W_gate) together and activation, output is [tokens,padded_intermediate_size]
@@ -87,7 +106,7 @@ index a6dcc548d..cd3e9c224 100644
      gmm1_res = gmm_wrapper(
          x,
          w1,
-@@ -194,9 +221,11 @@ def moe_gmm_local(x: jax.Array,
+@@ -194,9 +223,11 @@ def moe_gmm_local(x: jax.Array,
          w1_bias,
          group_sizes,
          group_offset,
@@ -101,6 +120,52 @@ index a6dcc548d..cd3e9c224 100644
  
      # When the parallelism is TP since w2_bias is not sharded, we should only apply bias
      # once, not applying to every shard. So we set w2_bias to 0 to all shards other than
+diff --git a/tpu_inference/layers/common/linear.py b/tpu_inference/layers/common/linear.py
+index bf01b777d..17cfee1e2 100644
+--- a/tpu_inference/layers/common/linear.py
++++ b/tpu_inference/layers/common/linear.py
+@@ -16,17 +16,32 @@ import jax
+ import jax.numpy as jnp
+ from jax.sharding import Mesh, NamedSharding
+ from jax.sharding import PartitionSpec as P
+-from tokamax._src.ops.experimental.gmm_v2.gmm_v2 import gmm_v2
++from tokamax._src.ops.experimental.gmm_v2.gmm_v2 import (calculate_tiling,
++                                                         gmm_v2)
+ 
+ from tpu_inference.kernels.quantized_matmul.util import (
+     quantize_tensor, xla_quantized_batched_matmul)
+ from tpu_inference.layers.common.sharding import ShardingAxisName
++from tpu_inference import envs
+ from tpu_inference.logger import init_logger
+ from tpu_inference.utils import get_mesh_shape_product
+ 
+ logger = init_logger(__name__)
+ 
+ 
++def gmm_v2_tiling(dims, lhs_cfgs, rhs_cfgs, vmem_limit_bytes, fuse_act=None):
++    """calculate_tiling against GMM_V2_TILE_VMEM_FRACTION of the VMEM limit."""
++    return calculate_tiling(
++        dims, lhs_cfgs, rhs_cfgs,
++        int(vmem_limit_bytes * envs.GMM_V2_TILE_VMEM_FRACTION), fuse_act)
++
++
++def gmm_tile_info():
++    """tile_info for gmm_v2: the stock heuristic unless a fraction is set."""
++    return (calculate_tiling
++            if envs.GMM_V2_TILE_VMEM_FRACTION >= 1.0 else gmm_v2_tiling)
++
++
+ def xla_quantized_matmul(
+     x: jax.Array,
+     w_q: jax.Array,
+@@ -232,6 +247,7 @@ def sharded_quantized_matmul(x: jax.Array,
+                 zero_initialize=False,
+                 preferred_element_type=x.dtype,
+                 maybe_quantize_lhs=maybe_quantize_x,
++                tile_info=gmm_tile_info(),
+             )
+         else:
+             output = xla_quantized_matmul(x,
 diff --git a/tpu_inference/layers/common/process_weights/moe_weights.py b/tpu_inference/layers/common/process_weights/moe_weights.py
 index 85753d26f..59bc838bd 100644
 --- a/tpu_inference/layers/common/process_weights/moe_weights.py

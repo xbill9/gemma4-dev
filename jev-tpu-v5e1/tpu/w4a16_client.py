@@ -11,6 +11,7 @@
                               counts, median and range over the repeats
 """
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -27,7 +28,7 @@ PROMPTS = [
     "Summarize the plot of Romeo and Juliet in three sentences.",
     "A train leaves at 14:10 and arrives at 17:45. How long is the trip?",
 ]
-CONCURRENCY = 16
+CONCURRENCY = int(os.environ.get("JEV_LOAD_CONCURRENCY", "16"))  # parallel requests in load
 MAX_TOKENS = 256
 REPEATS = 3
 
