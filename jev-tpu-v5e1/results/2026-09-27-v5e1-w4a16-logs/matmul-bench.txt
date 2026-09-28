@@ -1,0 +1,51 @@
+WARNING 09-27 20:54:00 [tpu_platform.py:543] Pin memory is not supported on TPU.
+INFO 09-27 20:54:08 [importing.py:74] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+INFO 09-27 20:54:08 [importing.py:98] Triton not installed or not compatible; certain GPU-related functions will not be available.
+INFO 09-27 20:54:08 [__init__.py:75] TPU info: node_name=jev-tpu-v5e1-2026-09-27-v5e1-w4a16-node | tpu_type=v5litepod-1 | worker_id=0 | num_chips=1 | num_cores_per_chip=1
+{"device": "TPU_0(process=0,(0,0,0,0))", "jax": "0.11.0"}
+INFO 09-27 20:54:12 [linear.py:65] Skipping activation quantization due to weight requantization being disabled.
+{"shape": "31B gate_up", "in": 5376, "out": 43008, "tokens": 1, "bf16_us": 617.1, "xla_us": 2792.9, "kernel_us": 430.0, "kernel_vs_bf16": 1.44, "kernel_vs_xla": 6.5, "xla_vs_bf16": 0.22, "kernel_rel_err_vs_xla": 0.0023735288996249437, "kernel_nonfinite": 0}
+{"shape": "31B gate_up", "in": 5376, "out": 43008, "tokens": 16, "bf16_us": 618.2, "xla_us": 2793.9, "kernel_us": 432.1, "kernel_vs_bf16": 1.43, "kernel_vs_xla": 6.47, "xla_vs_bf16": 0.22, "kernel_rel_err_vs_xla": 0.0, "kernel_nonfinite": 0}
+{"shape": "31B gate_up", "in": 5376, "out": 43008, "tokens": 64, "bf16_us": 627.1, "xla_us": 2800.6, "kernel_us": 471.0, "kernel_vs_bf16": 1.33, "kernel_vs_xla": 5.95, "xla_vs_bf16": 0.22, "kernel_rel_err_vs_xla": 0.0, "kernel_nonfinite": 0}
+{"shape": "31B down", "in": 21504, "out": 5376, "tokens": 1, "bf16_us": 311.1, "xla_us": 1406.8, "kernel_us": 234.5, "kernel_vs_bf16": 1.33, "kernel_vs_xla": 6.0, "xla_vs_bf16": 0.22, "kernel_rel_err_vs_xla": 0.0023456946946680546, "kernel_nonfinite": 0}
+{"shape": "31B down", "in": 21504, "out": 5376, "tokens": 16, "bf16_us": 312.4, "xla_us": 1406.5, "kernel_us": 235.9, "kernel_vs_bf16": 1.32, "kernel_vs_xla": 5.96, "xla_vs_bf16": 0.22, "kernel_rel_err_vs_xla": 0.0, "kernel_nonfinite": 0}
+Traceback (most recent call last):
+  File "/w/tpu/w4a16_matmul_bench.py", line 125, in <module>
+    main()
+  File "/w/tpu/w4a16_matmul_bench.py", line 99, in main
+    y_k, t_k = timed(kernel_mm, x, w_q, s3)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/w/tpu/w4a16_matmul_bench.py", line 46, in timed
+    out = fn(*args)
+          ^^^^^^^^^
+jax.errors.JaxRuntimeError: RESOURCE_EXHAUSTED: E1001: CompileTimeScopedVmemOom:
+Ran out of memory in memory space vmem while allocating on stack for %gmm_v2-g_1-m_64-k_21504-act_None-n_5376-tm_64-tk_21504-tn_2688.1 = bf16[64,5376]{1,0:T(8,128)(2,1)} custom-call(%constant.2.lhs_group_sizes_ref, %constant.3.group_offset_ref, %custom-call, %bitcast.4, %bitcast_convert_fusion.rhs_ref.scale), custom_call_target="tpu_custom_call", operand_layout_constraints={s32[1]{0}, s32[1]{0}, bf16[64,21504]{1,0}, s4[1,21504,5376]{2,1,0}, f32[1,672,1,5376]{3,2,1,0}}, frontend_attributes={kernel_metadata={
+"acc_dtype":"float32",
+"dims.size_group":1,
+"dims.size_k":21504,
+"dims.size_lhs_group":1,
+"dims.size_lhs_sublane":8,
+"dims.size_m":64,
+"dims.size_n":5376,
+"lhs_cfgs.dtype":"bfloat16",
+"lhs_cfgs.has_bias":false,
+"lhs_cfgs.has_scale":false,
+"lhs_cfgs.is_transposed":false,
+"lhs_cfgs.quant_block_size":512,
+"out_dtype":"bfloat16",
+"rhs_cfgs.dtype":"int4",
+"rhs_cfgs.has_bias":false,
+"rhs_cfgs.has_scale":true,
+"rhs_cfgs.is_transposed":false,
+"rhs_cfgs.quant_block_size":32,
+"rhs_cfgs.quant_dtype":"int4",
+"tiles.bucket_base":64,
+"tiles.tile_k":21504,
+"tiles.tile_m":64,
+"tiles.tile_n":2688,
+"transpose_rhs":false,
+"zero_init":false
+}}, metadata={op_name="jit(kernel_mm)/jit(gmm_v2)/gmm_v2-g_1-m_64-k_21504-act_None-n_5376-tm_64-tk_21504-tn_2688/mpmd_map" stack_frame_id=6}. Scoped allocation with size 115.92M and limit 115.20M exceeded scoped vmem limit by 737.2K. It should not be possible to run out of scoped vmem - 
+See https://openxla.org/xla/errors/error_1001 for more details.
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
