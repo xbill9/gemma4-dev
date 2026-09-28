@@ -1,0 +1,185 @@
+diff --git a/tpu_inference/envs.py b/tpu_inference/envs.py
+index 22ed41338..8dfa006b1 100644
+--- a/tpu_inference/envs.py
++++ b/tpu_inference/envs.py
+@@ -39,6 +39,8 @@ if TYPE_CHECKING:
+     MOE_REQUANTIZE_WEIGHT_DTYPE: str = ""
+     MOE_REQUANTIZE_CLIP_PERCENTILE: float | None = None
+     MOE_STAGE_WEIGHTS_ON_HOST: bool = False
++    W4A16_MOE_BF16_SCALES: bool = False
++    W4A16_MOE_NO_PAD: bool = False
+     ATTN_BUCKETIZED_NUM_REQS: bool = False
+     ATTN_CUSTOM_NUM_REQS_BUCKETS: list[int] = []
+     LAYOUT_Q_PROJ_AS_NDH: bool = False
+@@ -352,6 +354,16 @@ environment_variables: dict[str, Callable[[], Any]] = {
+     # stage the full tensor on device regardless.
+     "MOE_STAGE_WEIGHTS_ON_HOST":
+     env_bool("MOE_STAGE_WEIGHTS_ON_HOST", default=False),
++    # W4A16 routed experts: keep the checkpoint's bf16 group scales on the
++    # device instead of widening them to float32. Halves the scale footprint;
++    # gmm_v2 multiplies in the activation dtype either way.
++    "W4A16_MOE_BF16_SCALES":
++    env_bool("W4A16_MOE_BF16_SCALES", default=False),
++    # W4A16 routed experts: do not pad the intermediate dim to a multiple of
++    # 128. gmm1 then runs without the fused activation whenever its output
++    # width is not a multiple of 256, and the activation runs in JAX.
++    "W4A16_MOE_NO_PAD":
++    env_bool("W4A16_MOE_NO_PAD", default=False),
+     # By default, it only use max_reqs for attentions. But if set true, it
+     # will precompile max_reqs to power-of-twos between min and max reqs,
+     # and attention will have the num_reqs closer to actual num_reqs. This
+diff --git a/tpu_inference/layers/common/fused_moe_gmm.py b/tpu_inference/layers/common/fused_moe_gmm.py
+index a6dcc548d..cd3e9c224 100644
+--- a/tpu_inference/layers/common/fused_moe_gmm.py
++++ b/tpu_inference/layers/common/fused_moe_gmm.py
+@@ -122,6 +122,29 @@ def gmm_wrapper(lhs,
+     return gmm_res
+ 
+ 
++def _gate_up_act(gate_up: jax.Array, activation: str,
++                 out_dtype: jnp.dtype) -> jax.Array:
++    """act(gate) * up for a gmm1 output laid out as [gate | up], unfused.
++
++    Mirrors gmm_v2's fused activations for the names it supports; the fused
++    path splits interleaved lane chunks instead, which needs the intermediate
++    dim padded to a multiple of 128. Pass gate_up in float32, as the fused
++    kernel's accumulator is, so that only the product is rounded.
++    """
++    gate, up = jnp.split(gate_up, 2, axis=-1)
++    match activation:
++        case "silu":
++            act = jax.nn.silu(gate)
++        case "gelu":
++            act = jax.nn.gelu(gate)
++        case "gelu_tanh":
++            act = jax.nn.gelu(gate, approximate=True)
++        case _:
++            raise NotImplementedError(
++                f"Unfused gmm1 does not support activation {activation}")
++    return (act * up).astype(out_dtype)
++
++
+ def valid_rows_mask(batch_size: int, group_sizes: jax.Array,
+                     group_start: jax.Array, group_end: jax.Array) -> jax.Array:
+     """Mask indicating rows processed by current shard."""
+@@ -187,6 +210,10 @@ def moe_gmm_local(x: jax.Array,
+     assert parallelism in ["tp", "ep"]
+ 
+     # GMM1 computes x @ (W_up | W_gate) together and activation, output is [tokens,padded_intermediate_size]
++    # The fused activation needs w1's output width to be a multiple of
++    # 2 * 128 lanes; an unpadded intermediate dim (W4A16_MOE_NO_PAD) takes
++    # the activation outside the kernel instead.
++    fuse_act = activation if w1.shape[-1] % 256 == 0 else None
+     gmm1_res = gmm_wrapper(
+         x,
+         w1,
+@@ -194,9 +221,11 @@ def moe_gmm_local(x: jax.Array,
+         w1_bias,
+         group_sizes,
+         group_offset,
+-        fuse_act=activation,
+-        preferred_element_type=x.dtype,
++        fuse_act=fuse_act,
++        preferred_element_type=x.dtype if fuse_act else jnp.float32,
+     )
++    if fuse_act is None:
++        gmm1_res = _gate_up_act(gmm1_res, activation, x.dtype)
+ 
+     # When the parallelism is TP since w2_bias is not sharded, we should only apply bias
+     # once, not applying to every shard. So we set w2_bias to 0 to all shards other than
+diff --git a/tpu_inference/layers/common/process_weights/moe_weights.py b/tpu_inference/layers/common/process_weights/moe_weights.py
+index 85753d26f..59bc838bd 100644
+--- a/tpu_inference/layers/common/process_weights/moe_weights.py
++++ b/tpu_inference/layers/common/process_weights/moe_weights.py
+@@ -272,6 +272,8 @@ def process_moe_weights(
+     w13_reorder_size: int | None = None,
+     w13_interleave: bool = False,
+     disable_weight_requantization: bool = False,
++    scale_dtype: jnp.dtype = jnp.float32,
++    w13_align: int = 128,
+ ) -> FusedMoEWeights:
+     """Process fused moe weights to a layout that moe backend expects.
+ 
+@@ -287,6 +289,9 @@ def process_moe_weights(
+             we uninterleave so that first half is w1 and second half is w3.
+         disable_weight_requantization: whether to keep scales broad for GMM
+             setups.
++        scale_dtype: dtype the weight scales are stored in on the device.
++        w13_align: GMM backends pad each w13 shard's intermediate dim to a
++            multiple of this.
+ 
+     Returns:
+         MoE weights that are processed for specified backend.
+@@ -331,12 +336,12 @@ def process_moe_weights(
+     if w13_weight_scale is not None:
+         # For block scales (experts, out_blocks, in_blocks), we need to maintain
+         # the block dims
+-        w13_weight_scale = w13_weight_scale.astype(jnp.float32)
++        w13_weight_scale = w13_weight_scale.astype(scale_dtype)
+         w13_weight_scale = jnp.swapaxes(w13_weight_scale, 1, 2)
+         w13_weight_scale = jnp.expand_dims(w13_weight_scale, 2)
+ 
+     if w2_weight_scale is not None:
+-        w2_weight_scale = w2_weight_scale.astype(jnp.float32)
++        w2_weight_scale = w2_weight_scale.astype(scale_dtype)
+         w2_weight_scale = jnp.swapaxes(w2_weight_scale, 1, 2)
+         w2_weight_scale = jnp.expand_dims(w2_weight_scale, 2)
+ 
+@@ -426,7 +431,7 @@ def process_moe_weights(
+ 
+             pad_config_weight = get_w13_padding_config(intermediate_size,
+                                                        w13_reorder_size,
+-                                                       align=128)
++                                                       align=w13_align)
+ 
+             padded_output_sizes = [
+                 pad_config_weight.padded_intermediate_size,
+@@ -444,7 +449,7 @@ def process_moe_weights(
+                 pad_config_scale = get_w13_padding_config(
+                     intermediate_size,
+                     w13_reorder_size,
+-                    align=128,
++                    align=w13_align,
+                     outer_block_size=w13_outer_block_size)
+                 padded_output_sizes_scales = [
+                     pad_config_scale.padded_intermediate_size,
+@@ -482,7 +487,7 @@ def process_moe_weights(
+         case MoEBackend.GMM_EP:
+             pad_config_weight = get_w13_padding_config(intermediate_size,
+                                                        reorder_size=1,
+-                                                       align=128)
++                                                       align=w13_align)
+ 
+             w13_weight = process_w13_for_gmm(tensor=w13_weight,
+                                              concat_dim=2,
+@@ -493,7 +498,7 @@ def process_moe_weights(
+                 pad_config_scale = get_w13_padding_config(
+                     intermediate_size,
+                     reorder_size=1,
+-                    align=128,
++                    align=w13_align,
+                     outer_block_size=w13_outer_block_size)
+                 w13_weight_scale = process_w13_for_gmm(tensor=w13_weight_scale,
+                                                        concat_dim=3,
+diff --git a/tpu_inference/layers/jax/quantization/wna16.py b/tpu_inference/layers/jax/quantization/wna16.py
+index e6ccc5f66..7a1d6098c 100644
+--- a/tpu_inference/layers/jax/quantization/wna16.py
++++ b/tpu_inference/layers/jax/quantization/wna16.py
+@@ -45,6 +45,7 @@ from flax import nnx
+ from jax.experimental.pallas import tpu as pltpu
+ from jax.sharding import PartitionSpec as P
+ 
++from tpu_inference import envs
+ from tpu_inference.layers.common.linear import sharded_quantized_matmul
+ from tpu_inference.layers.common.moe import MoEBackend, moe_apply
+ from tpu_inference.layers.common.process_weights.linear_weights import (
+@@ -549,6 +550,9 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
+                 w13_reorder_size=get_mesh_shape_product(
+                     layer.mesh, ShardingAxisName.MLP_TENSOR),
+                 w13_interleave=False,
++                scale_dtype=(jnp.bfloat16 if envs.W4A16_MOE_BF16_SCALES
++                             else jnp.float32),
++                w13_align=1 if envs.W4A16_MOE_NO_PAD else 128,
+             )
+             for name in staged:
+                 delattr(layer, name)

@@ -1,0 +1,13 @@
+--- a/tokamax/_src/ops/experimental/gmm_v2/gmm_v2.py	2026-09-28 10:15:13.728360065 -0400
++++ b/tokamax/_src/ops/experimental/gmm_v2/gmm_v2.py	2026-09-28 10:15:24.795573963 -0400
+@@ -1638,7 +1638,9 @@
+   else:
+     lhs_scale = None
+ 
+-  if rhs_scale is not None:
++  # bf16 scales stay bf16: the kernel multiplies in the lhs or accumulator
++  # dtype, and widening here copies every expert's scales on every call.
++  if rhs_scale is not None and rhs_scale.dtype != jnp.bfloat16:
+     rhs_scale = rhs_scale.astype(jnp.float32)
+   if rhs_bias is not None:
+     rhs_bias = rhs_bias.astype(jnp.float32)

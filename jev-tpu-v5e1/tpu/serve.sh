@@ -6,7 +6,8 @@
 # BOOT_TIMEOUT (seconds, default 1500) bounds the wait; XLA_CACHE_DIR, when set, keeps vLLM's
 # JAX compile cache on the host so the next boot of the same model skips recompiling.
 # MM_LIMIT sets --limit-mm-per-prompt (default: every modality at 0); empty omits the flag.
-# TP sets --tensor-parallel-size (default 1).
+# TP sets --tensor-parallel-size (default 1). VLLM_ENV, space-separated KEY=VALUE pairs, is passed
+# into the container's environment.
 set -u
 IMAGE=${IMAGE:-vllm/vllm-tpu:nightly}
 LOGS=${LOGS:-/opt/jev-tpu-logs}
@@ -19,12 +20,13 @@ if [ -n "${XLA_CACHE_DIR:-}" ]; then
   mkdir -p "$XLA_CACHE_DIR"
   CACHE_ARGS=(-e VLLM_XLA_CACHE_PATH=/xla-cache -v "$XLA_CACHE_DIR":/xla-cache)
 fi
+ENV_ARGS=(); for kv in ${VLLM_ENV:-}; do ENV_ARGS+=(-e "$kv"); done
 MODEL="$1"; shift
 TAG=$(echo "$MODEL" | tr '/' '_')
 mkdir -p "$LOGS"
 docker rm -f vllm >/dev/null 2>&1
 docker run -d --name vllm --privileged --net=host --shm-size 10gb -v /dev/shm:/dev/shm \
-  -e HF_TOKEN="$(cat /root/hf_token)" -e HF_HOME=/dev/shm/hf -v /opt/jev-tpu:/work "${CACHE_ARGS[@]}" \
+  -e HF_TOKEN="$(cat /root/hf_token)" -e HF_HOME=/dev/shm/hf -v /opt/jev-tpu:/work "${CACHE_ARGS[@]}" "${ENV_ARGS[@]}" \
   "$IMAGE" \
   vllm serve "$MODEL" --served-model-name "$MODEL" --host 127.0.0.1 --port 8000 \
     --tensor-parallel-size "$TP" --max-model-len 2048 --max-num-seqs 16 --max-logprobs 32 \

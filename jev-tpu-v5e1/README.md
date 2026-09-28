@@ -31,6 +31,29 @@ Next:
 
 Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` or this README, add `patches/` from `gs://aisprint-491218-bucket/jev-tpu-31b/inputs/tp4fix3-54532225.tgz`, name it by content hash, upload to `gs://aisprint-491218-bucket/jev-tpu-v5e1/inputs/`. `tests/` stays out because `run_quant.sh` runs pytest from a `/tests` mount where the scoring tests cannot import `score.py`.
 
+## 26B W4A16 on one v5e chip (prepared 2026-09-28, not yet run)
+
+The repack's weights are 16.36 GiB on the chip as served text-only, against 14.49 usable (`../MODELS.md`, "The 26B W4A16 repack on a v5e-1"). Two patches in `patches/` remove 2.14 GiB of it, both off unless their switch is set:
+
+| patch | switch | what it does | saves |
+|---|---|---|---:|
+| `lowmem.diff` (branch `gemma4-w4a16-moe-lowmem` in `~/tpu-inference`, on top of `moe.diff`) | `W4A16_MOE_BF16_SCALES=1` | keeps expert scales bf16 on the chip instead of f32 | 1.41 GiB |
+| same | `W4A16_MOE_NO_PAD=1` | no 704 → 768 padding of gate/up; gmm1 runs unfused and the activation runs in JAX, with gate/up kept in f32 until the product | 0.73 GiB |
+| `tokamax-bf16-scale.diff` | none | gmm_v2 stops widening bf16 scales to f32 on every call | a per-call copy of every expert's scales |
+
+With the text-only override that is 14.22 GiB of weights, leaving about 0.27 GiB under the 14.49 cap. The suite needs `--max-model-len 2048` (its longest record is about 1,930 tokens), so the KV cache is fixed at 17 blocks of 128 tokens with `--num-gpu-blocks-override 17` and the cap raised to 0.95 so vLLM's start-up check passes. That leaves about 1.1 GiB of the 15.75 GiB for the compiled model, which is the open risk: E4B W4A16 needed 1.77 GiB there.
+
+`tpu/moe_lowmem_probe.py` runs first (`jev-bench`). It computes the 26B MoE MLP on the chip in both layouts and checks each against an XLA reference, which tests the two things CPU cannot: gmm_v2 reading bf16 scales, and gmm1 at an unpadded width of 1408.
+
+The runners take three new metadata keys, in both this tree and `../jev-tpu-31b`: a `tokamax-*.diff` in `jev-patches` applies to the image's tokamax, `jev-env` sets variables in the vLLM container, and `jev-serve-args` is appended to every arm's serve flags. `jev-bench` also takes script names.
+
+Planned runs, in parallel:
+
+- **v6e-1 validation**, `../jev-tpu-31b` runner, bundle `lowmem-v6e-471ebbce.tgz`: the same 26B arm as `2026-09-26-moe2` (`both`, override) with both switches on. It should show about 14.2 GiB resident against 17.43 (1.07 of the difference from the override dropping the vision tower, 2.14 from the switches) and the same suite score (75.3%).
+- **v5e-1 attempt**, this runner, bundle `lowmem-v5e-ee7fa68a.tgz`: patches `kvshare.diff wna16.diff moe.diff lowmem.diff tokamax-bf16-scale.diff`, `jev-gcs-models=gs://aisprint-491218-bucket/jev-tpu-31b/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`, arm `/work/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct=26b-lowmem=read=override`, `jev-env="W4A16_MOE_BF16_SCALES=1 W4A16_MOE_NO_PAD=1"`, `jev-serve-args="--gpu-memory-utilization 0.95 --num-gpu-blocks-override 17"`, `jev-bench=moe_lowmem_probe.py`.
+
+If the v5e arm fails on memory for the compiled model, the next saving is int8 embeddings (0.69 GiB, a new embedding quantization method; `../MODELS.md`).
+
 ## What differs from the v6e trees
 
 **Provisioning.** v5e has no Compute Engine path: `instances create` refuses `ct5lp-hightpu-1t` (`../HARDWARE.md`, "Can v5e use the Compute Engine path?"). The `gcloud compute instances create` launches in `../jev-tpu` and `../jev-tpu-31b` therefore have no v5e equivalent. This tree runs on a Cloud TPU queued resource, and flex-start `v5litepod-1` is accepted only in `us-west4-a` (`../CLAUDE.md`, Cloud gotchas). Because the node is a queued resource, `run_quant.sh` deletes itself through metadata `jev-qr` rather than `compute instances delete "$(hostname)"`. A TPU VM's hostname is not its node name. Without `jev-qr` the node is left up.

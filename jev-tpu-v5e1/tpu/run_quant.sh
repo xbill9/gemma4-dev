@@ -16,7 +16,10 @@
 # for every arm (default 1). Metadata jev-gcs-models, when set, names
 # space-separated gs:// checkpoint directories copied to /opt/jev-tpu/models/<basename>, which
 # an arm serves as /work/models/<basename>. When tests/ is in the bundle the unit tests run on the chip first,
-# and with metadata jev-bench=1 so does w4a16_matmul_bench.py.
+# and with metadata jev-bench=1 so does w4a16_matmul_bench.py (or jev-bench names scripts in tpu/).
+# A patch named tokamax-*.diff applies to the image's tokamax instead of tpu_inference. Metadata
+# jev-env (space-separated KEY=VALUE) is set in every arm's vLLM container, and metadata
+# jev-serve-args (space-separated, no quoting) is appended to every arm's serve flags.
 # Results and logs go to gs://$BUCKET/jev-tpu-v5e1/<run-prefix>/ as each arm finishes; the VM
 # deletes its queued resource (metadata jev-qr) at the end.
 set -u
@@ -55,15 +58,21 @@ SITE=$(docker run --rm --entrypoint python3 "$BASE" -c "import os,tpu_inference;
 docker rm -f patch >/dev/null 2>&1
 docker create --name patch "$BASE" >/dev/null  # never started; commit keeps the base entrypoint
 rm -rf /opt/ti && mkdir -p /opt/ti && docker cp "patch:$SITE/tpu_inference" /opt/ti/
+rm -rf /opt/tk && mkdir -p /opt/tk && docker cp "patch:$SITE/tokamax" /opt/tk/
 PATCHES=$(attr jev-patches) || PATCHES="kvshare.diff wna16.diff"
 TP=$(attr jev-tp) || TP=1; export TP
 log "tensor parallel size $TP"
 for p in $PATCHES; do
   log "patch $p sha256 $(sha256sum $W/patches/$p | cut -c1-16)"
-  (cd /opt/ti && patch -p1 --dry-run < $W/patches/$p > $L/patch-$p.log 2>&1 && patch -p1 < $W/patches/$p >> $L/patch-$p.log 2>&1) \
+  dir=/opt/ti; case "$p" in tokamax-*) dir=/opt/tk ;; esac
+  (cd $dir && patch -p1 --dry-run < $W/patches/$p > $L/patch-$p.log 2>&1 && patch -p1 < $W/patches/$p >> $L/patch-$p.log 2>&1) \
     || finish "patch $p did not apply: $(grep -iE 'fail|reject' $L/patch-$p.log | head -2 | tr '\n' ' ')"
 done
 docker cp /opt/ti/tpu_inference/. "patch:$SITE/tpu_inference/"
+docker cp /opt/tk/tokamax/. "patch:$SITE/tokamax/"
+VLLM_ENV=$(attr jev-env) || VLLM_ENV=; export VLLM_ENV
+SERVE_ARGS=$(attr jev-serve-args) || SERVE_ARGS=
+[ -n "$VLLM_ENV$SERVE_ARGS" ] && log "vllm env: ${VLLM_ENV:-none}; extra serve args: ${SERVE_ARGS:-none}"
 docker commit patch "$PATCHED" >/dev/null && docker rm -f patch >/dev/null
 
 if GCS_MODELS=$(attr jev-gcs-models); then
@@ -86,10 +95,11 @@ if [ -d $W/tests ]; then
     "pip install -q pytest >/dev/null 2>&1; cd /tests && python3 -m pytest -q -p no:cacheprovider ." > $L/pytest.log 2>&1
   log "pytest: $(tail -1 $L/pytest.log)"
 fi
-if [ "$(attr jev-bench)" = 1 ]; then
-  docker run --rm --privileged --net=host -v $W:/w --entrypoint python3 "$PATCHED" /w/tpu/w4a16_matmul_bench.py > $L/matmul-bench.txt 2>&1
-  log "matmul bench: $(tail -1 $L/matmul-bench.txt)"
-fi
+for bench in $(attr jev-bench); do  # 1 means w4a16_matmul_bench.py; otherwise script names in tpu/
+  [ "$bench" = 1 ] && bench=w4a16_matmul_bench.py
+  docker run --rm --privileged --net=host -v $W:/w --entrypoint python3 "$PATCHED" /w/tpu/$bench > $L/${bench%.py}.txt 2>&1
+  log "$bench: $(tail -1 $L/${bench%.py}.txt)"
+done
 sync_up
 
 # Suite, copied in and re-checked against Nimble's manifests (as ../jev-tpu).
@@ -142,6 +152,7 @@ try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nol
     override-nolimit) extra=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}'); mm= ;;
     kv-bf16) extra=(--kv-cache-dtype bfloat16) ;;
   esac
+  extra+=($SERVE_ARGS)
   log "serving $model as $tag ($mode${flags:+, $flags})"
   if MM_LIMIT=$mm bash $W/tpu/serve.sh "$model" "${extra[@]}" >> $LOG 2>&1; then
     log "$(tail -1 $LOG)"
