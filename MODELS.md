@@ -532,7 +532,7 @@ text-only `Gemma4ForCausalLM` skips `vision` tensors. The measured 11.32 GiB lef
 tokens**, vLLM's own count (KV dtype and why a derived byte count does not reconcile: `QUANTIZATION.md`). `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic`, the only other 26B that serves on one
 chip, measured 27.99 GiB with 0.75 GiB left: 3,456 tokens. Unmeasured savings still on the table: the
 vision tower (1.07 GiB) if a text-only class loads the 26B, expert scales kept bf16 on the chip
-(~0.8 GiB), and int4 embeddings (the grid covers them; the repack leaves them bf16 to match cyankiwi).
+(1.41 GiB, from the tensor headers: see "The 26B W4A16 repack on a v5e-1"), and int4 embeddings (the grid covers them; the repack leaves them bf16 to match cyankiwi).
 
 Two ways to destroy those weights while "just repacking" them, both silent:
 
@@ -665,27 +665,56 @@ int8/int4 columns are arithmetic halving/quartering **except** the 26B, whose in
 15.29 GiB is the W4A16 repack's safetensors on disk, 17.43 GiB its `total_hbm_used_gb` on one v6e chip
 (§26B, HBM budget).
 
-### The 26B W4A16 repack does not fit a v5e-1
+### The 26B W4A16 repack on a v5e-1: not as it stands, possibly after three loader changes
 
 [`xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct)
-cannot serve on one v5e chip (16 GB nominal, 15.75 GiB total, **14.49 GiB usable**, `HARDWARE.md` §v5e-1).
-Each line below is over the limit on its own:
+does not serve on one v5e chip as it loads today (16 GB nominal, 15.75 GiB total, **14.49 GiB usable**,
+`HARDWARE.md` §v5e-1). The safetensors on disk alone are 15.29 GiB, 0.80 over.
 
-| | GiB | against 14.49 |
+**Tensor inventory**, from the headers of all 31 safetensors files on Hugging Face (2026-09-28, 35,923
+tensors, range-read):
+
+| group | GiB on disk |
+| :--- | ---: |
+| experts, int4 packed | 10.635 |
+| expert scales, bf16, group 32 | 1.329 |
+| `embed_tokens`, bf16 `[262144, 2816]`, tied to the LM head | 1.375 |
+| vision tower, bf16 | 1.067 |
+| attention and dense MLP, int4 packed plus scales | 0.862 |
+| norms, router and other bf16 | 0.021 |
+| **total** | **15.290** |
+
+On the chip the experts grow to 14.10 GiB: gate/up are padded 704 → 768 (down is not), and every expert
+scale is widened to f32. That model of the load reproduces §26B's 14.10, 16.36 and 17.43 exactly.
+
+**The savings, cumulative, against 14.49** (arithmetic on the inventory; none built):
+
+| | GiB on chip | against 14.49 |
 | :--- | ---: | ---: |
-| safetensors on disk (31 files, Hugging Face listing 2026-09-28) | 15.29 | +0.80 |
-| text weights resident, text-only class (§26B, HBM budget) | 16.36 | +1.87 |
-| as served today, vision tower resident (measured on v6e-1) | 17.43 | +2.94 |
+| as served today, vision tower resident (measured on v6e-1: 17.43) | 17.42 | −2.93 |
+| 1. text-only class (`Gemma4ForCausalLM`), drops the vision tower | 16.36 | −1.87 |
+| 2. + expert scales kept bf16 on the chip (saves 1.41) | 14.95 | −0.46 |
+| 3. + `embed_tokens` int4 at group 32 (1.375 → 0.387) | 13.96 | **+0.53** |
+| 4. + gate/up unpadded (saves 0.73; a kernel change) | 13.23 | +1.26 |
 
-The on-chip figure exceeds the file because the MoE kernel pads the experts 704 → 768 and keeps their
-scales in f32. The three savings §26B lists as unmeasured (text-only class, bf16 expert scales, int4
-embeddings) together reach 14.52 GiB, still 0.03 over with no KV pool at all. Only with the expert
-padding also removed, a kernel change, does it come to 13.35 GiB, leaving 1.14 GiB for KV. All of that is
-arithmetic; none of it has been built.
+**Steps 1–3 fit the weights with 0.53 GiB left**, which at the rate vLLM sized the KV pool on v6e (53,888
+tokens in 11.32 GiB, bf16 KV) is about 2,500 tokens — one 2,048-token request at a time. Step 4 roughly
+doubles that. Three things decide whether it would serve, all unmeasured on v5e:
 
-The route on v5e is **four chips at TP=4** (`v5litepod-4`, about 4.4 GiB of weights per chip if nothing
-is replicated), the same split that serves on a v6e-4. That is unmeasured on v5e, and v5e's scoped VMEM
-limit (`HARDWARE.md` §v5e-1) is a second constraint on the expert kernel that more HBM does not remove.
+- **HBM outside the cap.** `gpu_memory_utilization=0.92` leaves 1.26 GiB above 14.49, and the W4A16
+  warm-up program has to load there: E2B needed 1.15 GiB and E4B 1.77 GiB on v5e, and E4B failed
+  (`jev-tpu-v5e1/results/2026-09-27-v5e1-w4a16-logs/`). Raising the utilization moves the cap into that
+  space rather than creating any.
+- **Scoped VMEM.** The W4A16 `gmm_v2` tiles already exceed v5e's 115.20M on 12B and 31B shapes
+  (`HARDWARE.md` §v5e-1).
+- **Whether bf16 scales and int4 embeddings load at all**: both need changes to #3660's loader and to the
+  repack; the embeddings are on the Q4_0 grid, so step 3 is lossless in the same sense as the experts.
+
+Lossy options, which change the model and would need the suite re-read: dropping experts saves 95.7 MiB
+per expert across the 30 layers (16 of 128 is 1.50 GiB).
+
+The other route on v5e is **four chips at TP=4** (`v5litepod-4`, about 4.4 GiB of weights per chip if
+nothing is replicated), the same split that serves on a v6e-4, with the same VMEM question.
 
 ### The E2B W4A16 QAT export does NOT quantize the PLE, and that is 56.5% of it
 

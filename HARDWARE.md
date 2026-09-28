@@ -103,8 +103,8 @@ Measured on `v5litepod-1` with vLLM:
 
 **14.49 GiB is the number to size against**, not 16. Weights plus KV must fit inside it. See `MODELS.md`
 for per-model weight footprints — the short version is that only E2B fits at bf16, and the 26B A4B
-W4A16 repack does not fit at all (15.29 GiB on disk; `MODELS.md`, "The 26B W4A16 repack does not fit a
-v5e-1").
+W4A16 repack does not fit as it loads today (15.29 GiB on disk, 16.36 resident text-only); three loader
+changes would bring it to 13.96 (`MODELS.md`, "The 26B W4A16 repack on a v5e-1").
 
 **Scoped VMEM limit: 115.20M per kernel.** Measured 2026-09-27 on `v5litepod-1`
 (`jev-tpu-v5e1/results/2026-09-27-v5e1-w4a16-logs/`). The W4A16 `gmm_v2` kernel from
