@@ -19,7 +19,9 @@
 # and with metadata jev-bench=1 so does w4a16_matmul_bench.py (or jev-bench names scripts in tpu/).
 # A patch named tokamax-*.diff applies to the image's tokamax instead of tpu_inference. Metadata
 # jev-env (space-separated KEY=VALUE) is set in every arm's vLLM container, and metadata
-# jev-serve-args (space-separated, no quoting) is appended to every arm's serve flags.
+# jev-serve-args (space-separated, no quoting) is appended to every arm's serve flags. Metadata
+# jev-swap-gb adds a swap file of that size before serving. Host memory is sampled every 30 s
+# into logs/<tag>.hostmem.txt while an arm boots, and the kernel's OOM-killer lines are kept on failure.
 # Results and logs go to gs://$BUCKET/jev-tpu-v5e1/<run-prefix>/ as each arm finishes; the VM
 # deletes its queued resource (metadata jev-qr) at the end.
 set -u
@@ -85,6 +87,11 @@ if GCS_MODELS=$(attr jev-gcs-models); then
       || finish "could not copy $src"
     log "copied $(basename "$src"): $(du -sh "$W/models/$(basename "$src")" | cut -f1) in $(( $(date +%s) - t0 ))s"
   done
+fi
+
+if SWAP=$(attr jev-swap-gb); then
+  { fallocate -l ${SWAP}G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile; } >> $LOG 2>&1
+  log "swap: $(free -g | awk '/^Swap:/{print $2}') GiB; disk free: $(df -h / | awk 'NR==2{print $4}')"
 fi
 
 if SEED=$(attr jev-xla-seed); then
@@ -157,6 +164,8 @@ try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nol
   esac
   extra+=($SERVE_ARGS)
   log "serving $model as $tag ($mode${flags:+, $flags})"
+  ( while :; do echo "$(date -u +%T) $(free -m | awk '/^Mem:/{print "used",$3,"avail",$7} /^Swap:/{print "swap_used",$3}' | tr '\n' ' ')"; sleep 30; done ) > $L/$tag.hostmem.txt 2>&1 &
+  local memlog=$!
   if MM_LIMIT=$mm bash $W/tpu/serve.sh "$model" "${extra[@]}" >> $LOG 2>&1; then
     log "$(tail -1 $LOG)"
     if [ "$mode" != load ]; then full_run "$model" "$tag"; fi
@@ -166,7 +175,10 @@ try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nol
     fi
   else
     log "$(grep -E '^(FAILED|READY)' $LOG | tail -1)"
+    dmesg -T 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' > $L/$tag.oom.txt
+    log "$tag host memory at the end: $(tail -1 $L/$tag.hostmem.txt); kernel OOM lines: $(wc -l < $L/$tag.oom.txt)"
   fi
+  kill $memlog 2>/dev/null
   docker rm -f vllm >/dev/null 2>&1; rm -rf /dev/shm/hf; sync_up
 }
 
