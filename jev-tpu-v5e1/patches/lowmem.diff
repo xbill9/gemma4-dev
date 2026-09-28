@@ -1,18 +1,19 @@
 diff --git a/tpu_inference/envs.py b/tpu_inference/envs.py
-index 22ed41338..b7807fbae 100644
+index 22ed41338..d3090a24c 100644
 --- a/tpu_inference/envs.py
 +++ b/tpu_inference/envs.py
-@@ -39,6 +39,9 @@ if TYPE_CHECKING:
+@@ -39,6 +39,10 @@ if TYPE_CHECKING:
      MOE_REQUANTIZE_WEIGHT_DTYPE: str = ""
      MOE_REQUANTIZE_CLIP_PERCENTILE: float | None = None
      MOE_STAGE_WEIGHTS_ON_HOST: bool = False
 +    W4A16_MOE_BF16_SCALES: bool = False
 +    W4A16_MOE_NO_PAD: bool = False
 +    SKIP_IDENTITY_MODEL_JIT: bool = False
++    EMBED_INT8_GROUP: int = 0
      ATTN_BUCKETIZED_NUM_REQS: bool = False
      ATTN_CUSTOM_NUM_REQS_BUCKETS: list[int] = []
      LAYOUT_Q_PROJ_AS_NDH: bool = False
-@@ -352,6 +355,22 @@ environment_variables: dict[str, Callable[[], Any]] = {
+@@ -352,6 +356,28 @@ environment_variables: dict[str, Callable[[], Any]] = {
      # stage the full tensor on device regardless.
      "MOE_STAGE_WEIGHTS_ON_HOST":
      env_bool("MOE_STAGE_WEIGHTS_ON_HOST", default=False),
@@ -32,6 +33,12 @@ index 22ed41338..b7807fbae 100644
 +    # which does not fit when the weights fill most of the chip.
 +    "SKIP_IDENTITY_MODEL_JIT":
 +    env_bool("SKIP_IDENTITY_MODEL_JIT", default=False),
++    # When > 0, a tied token embedding is stored after loading as int8 with
++    # one bf16 scale per this many columns; lookups and the tied LM head
++    # dequantize on the fly. Halves the table (1.38 -> 0.73 GiB for a
++    # 262144 x 2816 vocabulary at 32).
++    "EMBED_INT8_GROUP":
++    lambda: int(os.getenv("EMBED_INT8_GROUP", "0")),
      # By default, it only use max_reqs for attentions. But if set true, it
      # will precompile max_reqs to power-of-twos between min and max reqs,
      # and attention will have the num_reqs closer to actual num_reqs. This
@@ -168,6 +175,93 @@ index 85753d26f..59bc838bd 100644
                      outer_block_size=w13_outer_block_size)
                  w13_weight_scale = process_w13_for_gmm(tensor=w13_weight_scale,
                                                         concat_dim=3,
+diff --git a/tpu_inference/layers/jax/embed.py b/tpu_inference/layers/jax/embed.py
+index 97ec21d80..8fae66c5a 100644
+--- a/tpu_inference/layers/jax/embed.py
++++ b/tpu_inference/layers/jax/embed.py
+@@ -15,6 +15,8 @@
+ from typing import Optional
+ 
+ import jax
++import jax.numpy as jnp
++import numpy as np
+ from flax import nnx
+ 
+ from tpu_inference.layers.jax import JaxModule
+@@ -55,9 +57,73 @@ class JaxEmbed(nnx.Embed, JaxModule):
+             return self.weight
+ 
+     def __call__(self, x) -> jax.Array:
++        if getattr(self, "int8_group", 0):
++            return self._int8_rows(x)
+         if self.quant_method is None:
+             return super().__call__(x)
+         return self.quant_method.apply_jax(self, x)
+ 
+     def decode(self, x: jax.Array) -> jax.Array:
++        if getattr(self, "int8_group", 0):
++            return self._int8_decode(x)
+         return jax.numpy.dot(x, self.weight.value.T)
++
++    # int8 storage (EMBED_INT8_GROUP): values [V, D] int8 and one bf16 scale
++    # per `int8_group` columns [V, D // group], symmetric, scale = amax / 127.
++    _DECODE_CHUNK = 8192
++
++    def quantize_int8(self, group: int) -> None:
++        """Replaces the loaded table with int8 values and group scales.
++
++        Quantizes on the host in row chunks and puts only the int8 table back,
++        so the device never holds both copies.
++        """
++        w = self.weight.value
++        v, d = w.shape
++        if d % group:
++            raise ValueError(f"embedding width {d} is not a multiple of {group}")
++        dtype, sharding = w.dtype, w.sharding
++        host = np.asarray(jax.device_get(w))
++        w.delete()
++        q = np.empty((v, d), np.int8)
++        s = np.empty((v, d // group), jnp.bfloat16)
++        for r in range(0, v, 16384):
++            blk = host[r:r + 16384].astype(np.float32).reshape(-1, d // group,
++                                                               group)
++            amax = np.abs(blk).max(axis=-1)
++            sc = np.where(amax > 0, amax / 127.0, 1.0).astype(jnp.bfloat16)
++            s[r:r + 16384] = sc
++            q[r:r + 16384] = np.clip(
++                np.rint(blk / sc.astype(np.float32)[..., None]), -127,
++                127).astype(np.int8).reshape(-1, d)
++        del host
++        self.weight = nnx.Param(jnp.zeros((1, d), dtype))
++        self.weight_q = nnx.Param(jax.device_put(q, sharding))
++        self.weight_scale = nnx.Param(jax.device_put(s, sharding))
++        self.int8_group = group
++        self.int8_dtype = dtype
++
++    def _dequant(self, q: jax.Array, s: jax.Array) -> jax.Array:
++        g = self.int8_group
++        lead, d = q.shape[:-1], q.shape[-1]
++        w = (q.reshape(*lead, d // g, g).astype(jnp.float32) *
++             s.astype(jnp.float32)[..., None])
++        return w.reshape(*lead, d).astype(self.int8_dtype)
++
++    def _int8_rows(self, ids: jax.Array) -> jax.Array:
++        return self._dequant(jnp.take(self.weight_q.value, ids, axis=0),
++                             jnp.take(self.weight_scale.value, ids, axis=0))
++
++    def _int8_decode(self, x: jax.Array) -> jax.Array:
++        """x @ W.T with W dequantized a vocabulary chunk at a time."""
++        q, s = self.weight_q.value, self.weight_scale.value
++        v, d = q.shape
++        c = self._DECODE_CHUNK if v % self._DECODE_CHUNK == 0 else v
++        n = v // c
++
++        def chunk(args):
++            qc, sc = args
++            return jnp.dot(x, self._dequant(qc, sc).T)
++
++        out = jax.lax.map(chunk, (q.reshape(n, c, d), s.reshape(n, c, -1)))
++        return jnp.moveaxis(out, 0, -2).reshape(*x.shape[:-1], v)
 diff --git a/tpu_inference/layers/jax/quantization/wna16.py b/tpu_inference/layers/jax/quantization/wna16.py
 index e6ccc5f66..dbbcb4181 100644
 --- a/tpu_inference/layers/jax/quantization/wna16.py
@@ -228,16 +322,18 @@ index e6ccc5f66..dbbcb4181 100644
          )
          return moe_apply(layer, x_TD, router_logits, weights,
 diff --git a/tpu_inference/models/common/model_loader.py b/tpu_inference/models/common/model_loader.py
-index 0717cc455..ae3e4378a 100644
+index 0717cc455..7131ff921 100644
 --- a/tpu_inference/models/common/model_loader.py
 +++ b/tpu_inference/models/common/model_loader.py
-@@ -302,9 +302,16 @@ def _get_nnx_model(
+@@ -302,12 +302,32 @@ def _get_nnx_model(
                  model.load_weights(rng)
              if hasattr(vllm_config, "pytorch_pooler"):
                  del vllm_config.pytorch_pooler
 -            jit_model = create_jit_model(
 -                model,
 -                use_qwix_on_abstract_model=should_apply_qwix_on_abstract_model)
++            if envs.EMBED_INT8_GROUP:
++                _quantize_token_embedding(model, envs.EMBED_INT8_GROUP)
 +            if (envs.SKIP_IDENTITY_MODEL_JIT
 +                    and not vllm_config.additional_config.get("quantization")):
 +                # create_jit_model only applies Qwix; with none configured
@@ -250,4 +346,18 @@ index 0717cc455..ae3e4378a 100644
 +                    use_qwix_on_abstract_model=should_apply_qwix_on_abstract_model)
      return jit_model
  
+ 
++def _quantize_token_embedding(model: nnx.Module, group: int) -> None:
++    """EMBED_INT8_GROUP: store every `embed_tokens` JaxEmbed as int8."""
++    from tpu_inference.layers.jax.embed import JaxEmbed
++    for path, module in nnx.iter_graph(model):
++        if (isinstance(module, JaxEmbed) and path
++                and path[-1] == "embed_tokens"):
++            module.quantize_int8(group)
++            logger.info("%s stored as int8, group %d",
++                        ".".join(map(str, path)), group)
++
++
+ def _not_support(*args, **kwargs):
+     raise NotImplementedError("The action on this path is not supported yet.")
  
