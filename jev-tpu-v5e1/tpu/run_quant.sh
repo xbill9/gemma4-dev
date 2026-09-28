@@ -21,7 +21,7 @@
 # jev-env (space-separated KEY=VALUE) is set in every arm's vLLM container, and metadata
 # jev-serve-args (space-separated, no quoting) is appended to every arm's serve flags. Metadata
 # jev-swap-gb adds a swap file of that size before serving. Metadata jev-load-conc (default 16) lists the
-# concurrencies the load mode runs at. Host memory is sampled every 30 s
+# concurrencies the load mode runs at. Metadata jev-boot-timeout sets each arm's boot budget in seconds (default 3600). Host memory is sampled every 30 s
 # into logs/<tag>.hostmem.txt while an arm boots, and the kernel's OOM-killer lines are kept on failure.
 # Results and logs go to gs://$BUCKET/jev-tpu-v5e1/<run-prefix>/ as each arm finishes; the VM
 # deletes its queued resource (metadata jev-qr) at the end.
@@ -67,6 +67,7 @@ TKSITE=$(docker run --rm --entrypoint python3 "$BASE" -c "import os,tokamax;prin
 rm -rf /opt/tk && mkdir -p /opt/tk && docker cp "patch:$TKSITE/tokamax" /opt/tk/
 PATCHES=$(attr jev-patches) || PATCHES="kvshare.diff wna16.diff"
 TP=$(attr jev-tp) || TP=1; export TP
+BOOT_TIMEOUT=$(attr jev-boot-timeout) || BOOT_TIMEOUT=3600; export BOOT_TIMEOUT  # seconds per arm
 log "tensor parallel size $TP"
 for p in $PATCHES; do
   log "patch $p sha256 $(sha256sum $W/patches/$p | cut -c1-16)"
