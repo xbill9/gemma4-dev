@@ -11,7 +11,7 @@ each rig's `benchmarks/runs/` for what was measured where.
 Verified against vLLM `0.26.1rc1.dev125+ga7a204cc6` / `vllm/vllm-tpu:nightly`
 (`sha256:2a4a1f82…`) on 2026-08-07. The W4A16, 12B and KV-sharing findings were re-measured on
 2026-09-25 against `sha256:19a1a052…` (vLLM `0.29.1rc1.dev468+g0b7f11a1e`), with and without three
-unmerged upstream patches; the section "W4A16 on the JAX path" says which result needs which. The
+upstream patches, then unmerged (#3653 has since merged, 2026-09-27); the section "W4A16 on the JAX path" says which result needs which. The
 stack moves; re-check before trusting a negative.
 
 ## What the hardware allows before the software matters
@@ -167,7 +167,7 @@ That list is actively misleading read on its own.
 | :--- | :--- | :--- |
 | **qwix PTQ** — int8/int4/fp8, weight-only or W8A8 | `models/jax/utils/qwix/` | reachable, but **does not boot** — see below |
 | compressed-tensors fp8 w8a8 | `layers/jax/quantization/compressed_tensors.py` | yes (needs a pre-quantized ckpt) |
-| compressed-tensors **w4a16 / wNa16** | nowhere on the JAX path in the stock image | **no — `NotImplementedError`**; yes with [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) (unmerged), see "W4A16 on the JAX path" |
+| compressed-tensors **w4a16 / wNa16** | nowhere on the JAX path in the stock image | **no — `NotImplementedError`**; yes with [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) (merged into `main` 2026-09-27), see "W4A16 on the JAX path" |
 | **mxfp4** (4-bit) | `layers/jax/quantization/mxfp4.py` | **no — MoE-only**, see below |
 | compressed-tensors int8 w8a8, w4a8 fp8, w4a4 nvfp4 | `layers/vllm/.../schemes/` | no — torch path only |
 | AWQ | `layers/vllm/quantization/awq.py` | no — torch path only |
@@ -176,7 +176,7 @@ That list is actively misleading read on its own.
 **Measured 2026-09-24 on one v6e chip** (`vllm/vllm-tpu@sha256:19a1a052…`, vLLM `0.29.1rc1.dev468+g0b7f11a1e`, `jev-tpu/RESULTS.md`):
 
 - **The fp8 w8a8 row serves a 26B-A4B on one chip.** `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic` (26.67 GiB on disk) booted in 616 s at `--max-model-len 2048 --max-num-seqs 16` and read the 3,880-record public suite at 76.0%, level with the 26B AWQ 4-bit build on an L4 (75.3%). It is the first 26B served by vLLM on one v6e chip in this monorepo. The 31B fp8 builds (30.98 GiB) exceed the ~28.7 GiB cap and were not tried.
-- **The w4a16 row is still dead on this build** (the stock image; with three unmerged patches every size serves, see "W4A16 on the JAX path" below). `google/gemma-4-31B-it-qat-w4a16-ct` and `cyankiwi/gemma-4-31B-it-AWQ-4bit` — the cyankiwi "AWQ" exports are stored as compressed-tensors w4a16 — both fail in 120 s with `NotImplementedError: compressed-tensors scheme for layer 'model.language_model.layers.0.self_attn.q_proj' is not yet supported in the JAX path`.
+- **The w4a16 row is still dead on this build** (the stock image; with three patches, one since merged, every size serves, see "W4A16 on the JAX path" below). `google/gemma-4-31B-it-qat-w4a16-ct` and `cyankiwi/gemma-4-31B-it-AWQ-4bit` — the cyankiwi "AWQ" exports are stored as compressed-tensors w4a16 — both fail in 120 s with `NotImplementedError: compressed-tensors scheme for layer 'model.language_model.layers.0.self_attn.q_proj' is not yet supported in the JAX path`.
 - **Per-request `logprob_token_ids` is not implemented.** `tpu_inference` gathers only the top-k log-probabilities (`compute_and_gather_logprobs(..., max_logprobs)`); a completions request carrying `logprob_token_ids` returns HTTP 500 `list index out of range`, while token-id prompts and `logprobs` up to `--max-logprobs` work. Read label probabilities out of the top k.
 
 The JAX compressed-tensors dispatcher handles `_is_fp8_w8a8`, then falls off the end:
@@ -189,17 +189,18 @@ raise NotImplementedError(...)
 ### W4A16 on the JAX path: three patches make every size serve on one v6e chip
 
 **MEASURED 2026-09-25** on one v6e chip at `vllm/vllm-tpu@sha256:19a1a052…`, with three patches applied to
-the image's `tpu_inference`. All three are upstream pull requests and **none is merged**, so every
-result in this section needs them; the stock image still fails as the 2026-09-24 bullets above say.
+the image's `tpu_inference`. All three were unmerged when measured; since then #3653 has merged into `main` (2026-09-27) and #3654
+was closed, while #3299 and #3660 are open. Every result in this section needs them; the measured image
+predates the merge and still fails as the 2026-09-24 bullets above say.
 Measurements, logs and the read's pre-registration are in `jev-tpu-31b/` (`results/2026-09-25-w4a16-*`,
 `results/2026-09-25-followup-*`, `PREREGISTRATION.md`).
 
 | Patch | Pull request | Needed by |
 | :--- | :--- | :--- |
 | KV-shared layers own no K/V parameters | [#3299](https://github.com/vllm-project/tpu-inference/pull/3299) (fixes #3225) | E2B, E4B QAT exports |
-| JAX compressed-tensors W4A16 linear method on `gmm_v2` | [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) | every `-qat-w4a16-ct` export |
+| JAX compressed-tensors W4A16 linear method on `gmm_v2` | [#3653](https://github.com/vllm-project/tpu-inference/pull/3653), merged 2026-09-27 | every `-qat-w4a16-ct` export |
 | ~~`Gemma4UnifiedForConditionalGeneration` text-only on JAX~~ | ~~[#3654](https://github.com/vllm-project/tpu-inference/pull/3654)~~ closed 2026-09-26 | 12B serves with a flag instead (below) |
-| JAX compressed-tensors W4A16 fused-MoE method | [#3660](https://github.com/vllm-project/tpu-inference/pull/3660) (stacked on #3653) | 26B (below) |
+| JAX compressed-tensors W4A16 fused-MoE method | [#3660](https://github.com/vllm-project/tpu-inference/pull/3660), open, rebased onto `main` 2026-09-28 | 26B (below) |
 
 Scope of #3653: symmetric int4, `group` or `channel` strategy, `pack-quantized`, no activation
 quantization — the format of every Google QAT release. Asymmetric, 8-bit, `actorder=group` and other
@@ -502,7 +503,7 @@ because the QAT w4a16 export leaves the PLE at bf16 — one tensor, 56.5% of tha
 Properties of **Google's QAT artifacts**, independent of which engine reads them — established while
 porting the 12B/26B/31B to the hand-rolled JAX engine (`tpu-jax-v6e1-31b-w4a16`,
 `tpu-jax-v6e1-26b-q4_0`). They apply to any decoder, including the vLLM path above — whose `wNa16`
-method ([#3653](https://github.com/vllm-project/tpu-inference/pull/3653), unmerged) avoids both decoding
+method ([#3653](https://github.com/vllm-project/tpu-inference/pull/3653), merged 2026-09-27) avoids both decoding
 traps below: it unpacks with `u32_unpack_i4` (biased nibbles) and refuses packed words that arrive as a
 float dtype.
 

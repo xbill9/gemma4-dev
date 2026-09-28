@@ -6,16 +6,17 @@ Exploration: a Jev-style label read of Gemma 4 31B on TPU v6e. Sibling of `../je
 
 - **12B serves on the JAX path with `--hf_overrides '{"architectures": ["Gemma4ForCausalLM"]}'`**, so #3654 was closed. bf16, `-qat-w4a16-ct` (with #3653) and `-qat-q4_0-unquantized` all load that way with the same memory and accuracy as the #3654 build (`results/2026-09-26-override-*`, `results/2026-09-26-q4_0-*`; `../QUANTIZATION.md`).
 - **26B has no `-qat-w4a16-ct`**, so `repack_q4_0.py` builds one from `-qat-q4_0-unquantized`: 48.07 GiB → 15.29 GiB, every group back on its 4-bit grid (`../MODELS.md` §26B). With a W4A16 MoE method (vllm-project/tpu-inference#3660, stacked on #3653) **it serves on one v6e chip at 17.43 GiB, with 53,888 KV tokens and 1,283 output tok/s**, against RedHat FP8's 27.99 GiB, 3,456 tokens and 668 tok/s. Suite accuracy is −0.7 points against FP8 (95% range −1.5 to +0.1) (`results/2026-09-26-moe2-VS-FP8.md`). **Stock vLLM 0.30.0 on one NVIDIA L4 loads the same checkpoint unpatched** (Marlin kernels, 14.8 GiB, 17,990 KV tokens, 394 tok/s) and reads the suite 0.7 points higher than the TPU run (`results/2026-09-26-gpu-l4-VS-TPU.md`); an explicit bf16 KV cache on TPU changes nothing (`results/2026-09-26-kvbf16-VS-DEFAULT.md`). **Against bf16** (TP=4 on a v6e-4, 76.4%): TPU W4A16 −1.1 points (−1.8 to −0.3), L4 W4A16 −0.4 (−1.2 to +0.3), FP8 −0.4 (−0.9 to +0.2) (`results/2026-09-26-*-VS-BF16.md`). W4A16 at TP=4 serves with #3660's second commit: 21.75 GiB over 4 chips, 407,168 KV tokens, 2,073 tok/s, suite identical to TP=1 (`results/2026-09-27-tp4fix3-*`).
+- **2026-09-28 retest after #3653 merged:** #3660 rebased onto `main` (at `ba2045c`) plus #3299, on that day's `vllm-tpu` nightly, serves E2B, E4B and 12B `-qat-w4a16-ct` with the same HBM, KV cache and throughput as the 2026-09-25 runs; load and throughput only (`results/2026-09-28-pr3660-evidence/`).
 - `tpu/serve.sh` and `tpu/run_quant.sh` take per-run patch lists (`jev-patches`), per-arm serve flags, and GCS checkpoints (`jev-gcs-models`).
 
 ## Status, 2026-09-25: every Gemma 4 size serves on one v6e chip
 
-With three patches to `tpu_inference`, Google's QAT W4A16 checkpoints serve in vLLM on one v6e chip at `vllm/vllm-tpu@sha256:19a1a052…`, 31B included. All three are upstream pull requests, none merged yet:
+With three patches to `tpu_inference`, Google's QAT W4A16 checkpoints serve in vLLM on one v6e chip at `vllm/vllm-tpu@sha256:19a1a052…`, 31B included. All three were unmerged upstream pull requests when measured; #3653 has since merged (2026-09-27) and #3654 was closed in favour of a flag (above):
 
 | patch | pull request | needed for |
 |---|---|---|
 | KV-shared layers own no K/V parameters | vllm-project/tpu-inference#3299 (rebased) | E2B, E4B QAT exports |
-| JAX-path compressed-tensors W4A16 on `gmm_v2` | vllm-project/tpu-inference#3653 | every QAT W4A16 export |
+| JAX-path compressed-tensors W4A16 on `gmm_v2` | vllm-project/tpu-inference#3653 (merged 2026-09-27) | every QAT W4A16 export |
 | `Gemma4UnifiedForConditionalGeneration` (12B) text-only on JAX | vllm-project/tpu-inference#3654 | 12B |
 
 Label read on the 3,880-record public suite, W4A16 against bf16 on the same records (`results/2026-09-25-w4a16-QUANT.md`, from `quant_compare.py`): E2B −2.8 points (95% range −4.0 to −1.6), E4B −1.6 (−2.5 to −0.9), 12B −1.0 (−1.7 to −0.3); 31B scores 77.6% and has no bf16 reference on one chip. Output tokens per second, 16 concurrent requests of 256 tokens: W4A16 runs 1.14x (E2B), 1.21x (E4B) and 1.41x (12B) faster than bf16, and 31B runs at 500. `PREREGISTRATION.md` defines the read and records its deviations; logs are in `results/*-evidence/`.
