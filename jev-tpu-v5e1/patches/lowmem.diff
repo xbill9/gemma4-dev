@@ -1,17 +1,18 @@
 diff --git a/tpu_inference/envs.py b/tpu_inference/envs.py
-index 22ed41338..8dfa006b1 100644
+index 22ed41338..b7807fbae 100644
 --- a/tpu_inference/envs.py
 +++ b/tpu_inference/envs.py
-@@ -39,6 +39,8 @@ if TYPE_CHECKING:
+@@ -39,6 +39,9 @@ if TYPE_CHECKING:
      MOE_REQUANTIZE_WEIGHT_DTYPE: str = ""
      MOE_REQUANTIZE_CLIP_PERCENTILE: float | None = None
      MOE_STAGE_WEIGHTS_ON_HOST: bool = False
 +    W4A16_MOE_BF16_SCALES: bool = False
 +    W4A16_MOE_NO_PAD: bool = False
++    SKIP_IDENTITY_MODEL_JIT: bool = False
      ATTN_BUCKETIZED_NUM_REQS: bool = False
      ATTN_CUSTOM_NUM_REQS_BUCKETS: list[int] = []
      LAYOUT_Q_PROJ_AS_NDH: bool = False
-@@ -352,6 +354,16 @@ environment_variables: dict[str, Callable[[], Any]] = {
+@@ -352,6 +355,22 @@ environment_variables: dict[str, Callable[[], Any]] = {
      # stage the full tensor on device regardless.
      "MOE_STAGE_WEIGHTS_ON_HOST":
      env_bool("MOE_STAGE_WEIGHTS_ON_HOST", default=False),
@@ -25,6 +26,12 @@ index 22ed41338..8dfa006b1 100644
 +    # width is not a multiple of 256, and the activation runs in JAX.
 +    "W4A16_MOE_NO_PAD":
 +    env_bool("W4A16_MOE_NO_PAD", default=False),
++    # After loading real weights, skip the jitted pass over the model state
++    # when no Qwix quantization is configured. Without Qwix that pass is an
++    # identity, but it can still materialize a second copy of every weight,
++    # which does not fit when the weights fill most of the chip.
++    "SKIP_IDENTITY_MODEL_JIT":
++    env_bool("SKIP_IDENTITY_MODEL_JIT", default=False),
      # By default, it only use max_reqs for attentions. But if set true, it
      # will precompile max_reqs to power-of-twos between min and max reqs,
      # and attention will have the num_reqs closer to actual num_reqs. This
@@ -183,3 +190,27 @@ index e6ccc5f66..7a1d6098c 100644
              )
              for name in staged:
                  delattr(layer, name)
+diff --git a/tpu_inference/models/common/model_loader.py b/tpu_inference/models/common/model_loader.py
+index 0717cc455..ae3e4378a 100644
+--- a/tpu_inference/models/common/model_loader.py
++++ b/tpu_inference/models/common/model_loader.py
+@@ -302,9 +302,16 @@ def _get_nnx_model(
+                 model.load_weights(rng)
+             if hasattr(vllm_config, "pytorch_pooler"):
+                 del vllm_config.pytorch_pooler
+-            jit_model = create_jit_model(
+-                model,
+-                use_qwix_on_abstract_model=should_apply_qwix_on_abstract_model)
++            if (envs.SKIP_IDENTITY_MODEL_JIT
++                    and not vllm_config.additional_config.get("quantization")):
++                # create_jit_model only applies Qwix; with none configured
++                # the loaded model is already the result.
++                logger.info("Skipping the identity jit over the loaded model")
++                jit_model = model
++            else:
++                jit_model = create_jit_model(
++                    model,
++                    use_qwix_on_abstract_model=should_apply_qwix_on_abstract_model)
+     return jit_model
+ 
+ 
