@@ -7,7 +7,11 @@ set -u
 md() { curl -s -H 'Metadata-Flavor: Google' "http://metadata.google.internal/computeMetadata/v1/$1"; }
 PROJECT=$(md project/project-id)
 mkdir -p /opt/jev-tpu/results
-gcloud storage cp -q "gs://aisprint-491218-bucket/jev-tpu-31b/inputs/$(md instance/attributes/jev-code)" /tmp/code.tgz && tar xzf /tmp/code.tgz -C /opt/jev-tpu
+if ! gcloud storage cp -q "gs://aisprint-491218-bucket/jev-tpu-31b/inputs/$(md instance/attributes/jev-code)" /tmp/code.tgz || ! tar xzf /tmp/code.tgz -C /opt/jev-tpu; then
+  echo "code bundle $(md instance/attributes/jev-code) missing or unreadable; deleting this node"
+  gcloud compute instances delete "$(hostname)" --zone "$(md instance/zone | awk -F/ '{print $NF}')" --quiet
+  exit 1
+fi
 command -v docker >/dev/null || { apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io >/dev/null; }
 command -v patch >/dev/null || { apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq patch >/dev/null; }
 for i in $(seq 1 60); do
