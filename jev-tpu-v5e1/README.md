@@ -1,6 +1,6 @@
 # jev-tpu-v5e1
 
-Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Two runs are in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); see Status below.
+Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); and the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28). See the sections below.
 
 ## Status and next steps (2026-09-28)
 
@@ -31,28 +31,46 @@ Next:
 
 Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` or this README, add `patches/` from `gs://aisprint-491218-bucket/jev-tpu-31b/inputs/tp4fix3-54532225.tgz`, name it by content hash, upload to `gs://aisprint-491218-bucket/jev-tpu-v5e1/inputs/`. `tests/` stays out because `run_quant.sh` runs pytest from a `/tests` mount where the scoring tests cannot import `score.py`.
 
-## 26B W4A16 on one v5e chip (prepared 2026-09-28, not yet run)
+## 26B W4A16 on one v5e chip: serves (2026-09-28)
 
-The repack's weights are 16.36 GiB on the chip as served text-only, against 14.49 usable (`../MODELS.md`, "The 26B W4A16 repack on a v5e-1"). Two patches in `patches/` remove 2.14 GiB of it, both off unless their switch is set:
+**`2026-09-28-lowmem7-v5e1`** served [`xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct) on one v5e chip and ran the full read. Paired record for record with the same checkpoint on one v6e chip (`../jev-tpu-31b/results/2026-09-26-moe2-26b-q4w4`) in `results/2026-09-28-lowmem7-v5e1-QUANT.md` (its "bf16" column is the v6e run, "4-bit" the v5e one):
 
-| patch | switch | what it does | saves |
-|---|---|---|---:|
-| `lowmem.diff` (branch `gemma4-w4a16-moe-lowmem` in `~/tpu-inference`, on top of `moe.diff`) | `W4A16_MOE_BF16_SCALES=1` | keeps expert scales bf16 on the chip instead of f32 | 1.41 GiB |
-| same | `W4A16_MOE_NO_PAD=1` | no 704 → 768 padding of gate/up; gmm1 runs unfused and the activation runs in JAX, with gate/up kept in f32 until the product | 0.73 GiB |
-| `tokamax-bf16-scale.diff` | none | gmm_v2 stops widening bf16 scales to f32 on every call | a per-call copy of every expert's scales |
+| group | n | v6e-1 | v5e-1 | difference | 95% range |
+|---|---:|---:|---:|---:|---|
+| sst2 | 300 | 0.950 | 0.950 | +0.000 | +0.000 to +0.000 |
+| ag_news | 300 | 0.860 | 0.863 | +0.003 | −0.007 to +0.013 |
+| emotion | 300 | 0.600 | 0.603 | +0.003 | −0.007 to +0.017 |
+| irony | 300 | 0.907 | 0.903 | −0.003 | −0.010 to +0.000 |
+| reversed options | 900 | 0.798 | 0.797 | −0.001 | −0.004 to +0.002 |
+| suite | 3,880 | 0.753 | 0.754 | +0.001 | −0.004 to +0.005 |
 
-With the text-only override that is 14.22 GiB of weights, leaving about 0.27 GiB under the 14.49 cap. The suite needs `--max-model-len 2048` (its longest record is about 1,930 tokens), so the KV cache is fixed at 17 blocks of 128 tokens with `--num-gpu-blocks-override 17` and the cap raised to 0.95 so vLLM's start-up check passes. That leaves about 1.1 GiB of the 15.75 GiB for the compiled model, which is the open risk: E4B W4A16 needed 1.77 GiB there.
+Concurrency-1 latency is 68.2 ms median against 27.1 ms on v6e. Boot 1,806 s, 30 minutes, most of it compiling.
 
-`tpu/moe_lowmem_probe.py` runs first (`jev-bench`). It computes the 26B MoE MLP on the chip in both layouts and checks each against an XLA reference, which tests the two things CPU cannot: gmm_v2 reading bf16 scales, and gmm1 at an unpadded width of 1408.
+**On the chip** (15.75 GiB total): 13.58 GiB of weights, a 17-block KV cache (2,176 tokens, 0.46 GiB), and a compiled model of about 1.26 GiB (1.15 GiB of it "overlays"). **On the host** (48 GB): compiling the eight backbone buckets peaked at 45.7 GB used plus 2.75 GB of swap.
 
-The runners take three new metadata keys, in both this tree and `../jev-tpu-31b`: a `tokamax-*.diff` in `jev-patches` applies to the image's tokamax, `jev-env` sets variables in the vLLM container, and `jev-serve-args` is appended to every arm's serve flags. `jev-bench` also takes script names.
+Serve settings, in addition to the siblings' flags and `--max-model-len 2048` (the suite's longest record is about 1,930 tokens):
 
-Planned runs, in parallel:
+| setting | what it does | measured effect |
+|---|---|---|
+| `--hf-overrides` to `Gemma4ForCausalLM` (arm flag `override`) | text-only class, no vision tower | −1.07 GiB |
+| `W4A16_MOE_NO_PAD=1` | experts' intermediate dim stays 704 (not 768); gmm1 runs unfused and the activation runs in JAX with gate/up in f32 | −0.81 GiB (16.36 → 15.55) |
+| `W4A16_MOE_BF16_SCALES=1` | expert scales stored bf16 as `[E, 1, groups, N]`, widened to f32 per layer in the forward | −1.33 GiB |
+| `EMBED_INT8_GROUP=32` | tied embedding stored int8 with a bf16 scale per 32 columns; the LM head dequantizes 8,192 rows at a time | −0.64 GiB |
+| `SKIP_IDENTITY_MODEL_JIT=1` | skips the post-load `create_jit_model` pass, an identity without Qwix | avoids a 16.00 GiB temporary |
+| `--gpu-memory-utilization 0.97 --num-gpu-blocks-override 17` | the smallest KV cache that holds 2,048 tokens | |
+| metadata `jev-swap-gb=24` | a swap file on the host | keeps compilation from being OOM-killed |
 
-- **v6e-1 validation**, `../jev-tpu-31b` runner, bundle `lowmem-v6e-471ebbce.tgz`: the same 26B arm as `2026-09-26-moe2` (`both`, override) with both switches on. It should show about 14.2 GiB resident against 17.43 (1.07 of the difference from the override dropping the vision tower, 2.14 from the switches) and the same suite score (75.3%).
-- **v5e-1 attempt**, this runner, bundle `lowmem-v5e-ee7fa68a.tgz`: patches `kvshare.diff wna16.diff moe.diff lowmem.diff tokamax-bf16-scale.diff`, `jev-gcs-models=gs://aisprint-491218-bucket/jev-tpu-31b/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`, arm `/work/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct=26b-lowmem=read=override`, `jev-env="W4A16_MOE_BF16_SCALES=1 W4A16_MOE_NO_PAD=1"`, `jev-serve-args="--gpu-memory-utilization 0.95 --num-gpu-blocks-override 17"`, `jev-bench=moe_lowmem_probe.py`.
+All four environment switches are in `patches/lowmem.diff` (branch `gemma4-w4a16-moe-lowmem` in `~/tpu-inference`, on top of `moe.diff`), each off unless set. Patch list: `kvshare.diff wna16.diff moe.diff lowmem.diff`.
 
-If the v5e arm fails on memory for the compiled model, the next saving is int8 embeddings (0.69 GiB, a new embedding quantization method; `../MODELS.md`).
+What each attempt found, all in the logs under `gs://aisprint-491218-bucket/jev-tpu-v5e1/2026-09-28-lowmem*`:
+
+- **gmm_v2 cannot read bf16 scales on v5e**: `Strided load with non 32-bit data` (Mosaic), from the zero-stride sublane broadcast of the scale. `tokamax-bf16-scale.diff` is kept in `patches/` but not applied; scales are widened per call instead, which costs 190–235 µs per MoE layer on v5e (`tpu/moe_lowmem_probe.py`: identical error to the served layout, worst 2.6e-3 against an XLA reference).
+- **A bf16 scale shaped `[E, groups, 1, N]` takes as much HBM as f32**: the size-1 dim second from minor is padded to bf16's two-row sublane packing. 15.55 GiB resident with the switch on, the f32 figure. Moving the axis gave the saving.
+- **`create_jit_model` asked for 16.00 GiB of HLO temporaries** after the weights loaded; skipping it changes nothing without Qwix.
+- **With weights at 14.22 GiB (bf16 embeddings) the compile was 199 MB over**: 15.94 of 15.75 GiB used.
+- **The host ran out of memory compiling**: without swap the engine was SIGKILLed 17 minutes into the backbone compiles.
+
+The int8 embedding is the one change that alters the served weights; the paired read above is its check. The v6e check of these switches (`2026-09-28-lowmem*-v6e1`) never got flex-start capacity in `europe-west4-a`.
 
 ## What differs from the v6e trees
 
@@ -68,7 +86,7 @@ If the v5e arm fails on memory for the compiled model, the next saving is int8 e
 | `google/gemma-4-E4B-it-qat-w4a16-ct` | not measured | expected yes |
 | `google/gemma-4-12B-it` bf16 | 22.4 GiB | no |
 | `google/gemma-4-12B-it-qat-w4a16-ct` | not measured; ~5.6 GiB body plus bf16 embeddings | expected yes, with a small KV pool |
-| 26B A4B W4A16 (repacked, `xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`) | 15.29 GiB on disk, 17.43 resident on v6e | no as it loads today (0.80 GiB over on disk); 13.96 GiB after three unbuilt loader changes, leaving room for about one request (`../MODELS.md`, "The 26B W4A16 repack on a v5e-1") |
+| 26B A4B W4A16 (repacked, `xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`) | 15.29 GiB on disk, 17.43 resident on v6e | **yes, with `lowmem.diff`**: 13.58 GiB resident, measured (below) |
 | 31B, any build | ≥ 14.4 GiB before anything else | no |
 
 The default arms in `run_quant.sh` are therefore E2B bf16, E2B W4A16, E4B W4A16, and 12B W4A16 served with `--hf-overrides` to `Gemma4ForCausalLM` (the route `../jev-tpu-31b` found needs no `unified.diff`). The default patch list is `kvshare.diff wna16.diff`. As in `../jev-tpu-31b`, the diffs are not in the tree: they come from the upstream PR branches (vllm-project/tpu-inference#3299, #3653) and go into the code bundle under `patches/`.

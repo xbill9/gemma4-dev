@@ -103,8 +103,14 @@ Measured on `v5litepod-1` with vLLM:
 
 **14.49 GiB is the number to size against**, not 16. Weights plus KV must fit inside it. See `MODELS.md`
 for per-model weight footprints — the short version is that only E2B fits at bf16, and the 26B A4B
-W4A16 repack does not fit as it loads today (15.29 GiB on disk, 16.36 resident text-only); three loader
-changes would bring it to 13.96 (`MODELS.md`, "The 26B W4A16 repack on a v5e-1").
+W4A16 repack serves only with four loader changes that bring it to 13.58 GiB (`MODELS.md`, "The 26B W4A16
+repack on a v5e-1"). Its compile also needs more than the host's 48 GB: it peaked at 45.7 GB plus 2.75 GB of
+swap.
+
+**bf16 layout trap.** A bf16 array whose second-from-minor dim is 1 is padded to bf16's two-row sublane
+packing, so it takes as much HBM as the same array in f32 (measured 2026-09-28 on the 26B's expert scales,
+`[E, groups, 1, N]`). Put the size-1 dim elsewhere. Mosaic on v5e also rejects a zero-stride load of
+non-32-bit data, which is how gmm_v2 broadcasts its scales.
 
 **Scoped VMEM limit: 115.20M per kernel.** Measured 2026-09-27 on `v5litepod-1`
 (`jev-tpu-v5e1/results/2026-09-27-v5e1-w4a16-logs/`). The W4A16 `gmm_v2` kernel from
