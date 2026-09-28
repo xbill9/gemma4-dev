@@ -50,7 +50,8 @@ finish() {
 cx() { docker exec -e JEV_TOPK=32 -w /work vllm "$@"; }
 
 log "start $PREFIX on $ZONE"
-docker pull -q "$BASE" >> $LOG 2>&1 || finish "image pull failed"
+for i in 1 2 3 4 5; do docker pull -q "$BASE" >> $LOG 2>&1 && break; log "image pull attempt $i failed"; sleep 30; done
+docker image inspect "$BASE" >/dev/null 2>&1 || finish "image pull failed"
 log "image $(docker inspect --format '{{index .RepoDigests 0}}' "$BASE")"
 
 # Patched image: apply the diffs to the installed tpu_inference, commit a derived image.
@@ -58,7 +59,9 @@ SITE=$(docker run --rm --entrypoint python3 "$BASE" -c "import os,tpu_inference;
 docker rm -f patch >/dev/null 2>&1
 docker create --name patch "$BASE" >/dev/null  # never started; commit keeps the base entrypoint
 rm -rf /opt/ti && mkdir -p /opt/ti && docker cp "patch:$SITE/tpu_inference" /opt/ti/
-rm -rf /opt/tk && mkdir -p /opt/tk && docker cp "patch:$SITE/tokamax" /opt/tk/
+# tokamax is a regular site-packages install, not beside the source-installed tpu_inference.
+TKSITE=$(docker run --rm --entrypoint python3 "$BASE" -c "import os,tokamax;print(os.path.dirname(os.path.dirname(tokamax.__file__)))" 2>/dev/null | tail -1)
+rm -rf /opt/tk && mkdir -p /opt/tk && docker cp "patch:$TKSITE/tokamax" /opt/tk/
 PATCHES=$(attr jev-patches) || PATCHES="kvshare.diff wna16.diff"
 TP=$(attr jev-tp) || TP=1; export TP
 log "tensor parallel size $TP"
@@ -69,7 +72,7 @@ for p in $PATCHES; do
     || finish "patch $p did not apply: $(grep -iE 'fail|reject' $L/patch-$p.log | head -2 | tr '\n' ' ')"
 done
 docker cp /opt/ti/tpu_inference/. "patch:$SITE/tpu_inference/"
-docker cp /opt/tk/tokamax/. "patch:$SITE/tokamax/"
+docker cp /opt/tk/tokamax/. "patch:$TKSITE/tokamax/"
 VLLM_ENV=$(attr jev-env) || VLLM_ENV=; export VLLM_ENV
 SERVE_ARGS=$(attr jev-serve-args) || SERVE_ARGS=
 [ -n "$VLLM_ENV$SERVE_ARGS" ] && log "vllm env: ${VLLM_ENV:-none}; extra serve args: ${SERVE_ARGS:-none}"
