@@ -37,3 +37,9 @@ claimed. First light through the rig's MCP tools served the v2 file and answered
   Docker figures, which used the earlier reference; the first rebuild scores 0.001761 here against
   0.001753 there.
 - Throughput: `llama-bench`, 60 s pause before and 90 s between passes, `x86_pkg_temp` logged.
+
+## Published
+
+`xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf` has served v2 since Hub revision `74b2c92` (2026-09-29); v1 (`25f21f14…`) is at revision `e5d65c8`. The upload is byte-identical to this run's file
+(SHA-256 checked on the Hub), rebuilt independently on an i7-10750H in
+`local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-29-exact-gguf-v2-1650ti/`.

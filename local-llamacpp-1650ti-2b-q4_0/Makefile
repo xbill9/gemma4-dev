@@ -44,8 +44,8 @@ help:
 	@echo "  make lint          - ruff on the module list below"
 	@echo "  make clean         - remove caches"
 	@echo "========================================================="
-	@echo "Memory: only ~1.31 GiB of the 3.35 GB artifact is resident."
-	@echo "per_layer_token_embd (58% of the file) is TENSOR_READ_LAZY and stays"
+	@echo "Memory: only ~1.2 GiB of the 2.62 GB artifact is resident."
+	@echo "per_layer_token_embd (50% of the file) is TENSOR_READ_LAZY and stays"
 	@echo "in the mmap. Never pass --no-mmap: it breaks that and forces an OOM."
 
 install:
@@ -86,6 +86,7 @@ serve:
 	  -t $(THREADS) \
 	  -tb $(THREADS_BATCH) \
 	  --parallel $(PARALLEL_SLOTS) \
+	  --reasoning $(REASONING) \
 	  $(if $(filter 1,$(METRICS)),--metrics,)
 
 status:

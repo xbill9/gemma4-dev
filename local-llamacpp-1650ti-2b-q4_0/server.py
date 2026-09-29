@@ -13,15 +13,15 @@ wrong name (NAMING.md, "`local` is the absence of a control plane").
 What is left is the half that is actually the same everywhere: start the model
 server, check it, ask it something, and report what the hardware is doing.
 
-MEMORY, BECAUSE IT IS THE ONLY REAL CONSTRAINT HERE: the artifact is 3.35 GB on
-disk but only ~1.31 GiB has to be resident, because per_layer_token_embd (1.93 GB,
-58% of the file) is created with TENSOR_READ_LAZY in llama.cpp's
+MEMORY, BECAUSE IT IS THE ONLY REAL CONSTRAINT HERE: the artifact is 2.62 GB on
+disk but only ~1.2 GiB has to be resident, because per_layer_token_embd (1.32 GB,
+50% of the file) is created with TENSOR_READ_LAZY in llama.cpp's
 src/models/gemma4.cpp and served by GET_ROWS out of the mmap. Full offload fits a
 4 GiB card with ~2.3 GiB to spare. Do not "fix" a memory worry by lowering
 N_GPU_LAYERS or passing --no-mmap; the second one breaks the mechanism outright.
 See CLAUDE.md.
 
-STATUS 2026-09-22: serving since 2026-09-03. llama.cpp is rebuilt at f95b0d9
+STATUS 2026-09-29: serving the exact Q4_0 GGUF (v2). llama.cpp is rebuilt at f95b0d9
 (Debian sid, gcc 16.2, CUDA 13.4); tpu.env's LLAMA_CPP_COMMIT is authoritative.
 """
 
@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 RIG_NAME = RIG_DIR.name
 MCP_SERVER_NAME = os.environ.get("MCP_SERVER_NAME", RIG_NAME)
 
-MODEL_NAME = os.environ.get("MODEL_NAME", "google/gemma-4-E2B-it-qat-q4_0-gguf")
+MODEL_NAME = os.environ.get("MODEL_NAME", "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf")
 MODEL_PATH = os.environ.get("MODEL_PATH", "")
 LLAMA_SERVER_BIN = os.environ.get("LLAMA_SERVER_BIN", "")
 HOST = os.environ.get("HOST", "127.0.0.1")
@@ -68,6 +68,8 @@ THREADS = os.environ.get("THREADS", "4")
 # "identically", and a control does not get to assume which.
 THREADS_BATCH = os.environ.get("THREADS_BATCH", "8")
 PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
+# Thinking on/off/auto for the whole server; tpu.env explains why it is off.
+REASONING = os.environ.get("REASONING", "off")
 METRICS = os.environ.get("METRICS", "0")
 
 RUN_DIR = RIG_DIR / "run"
@@ -173,11 +175,12 @@ async def model_info() -> str:
         f"- **Name:** `{MODEL_NAME}`\n"
         f"- **Path:** `{path}`\n"
         f"- **On disk:** {size_gb:.2f} GB\n"
-        f"- **Quantization slot:** `q4_0` — but the dominant tensor type is **Q6_K**. "
-        f"Both embedding tensors are Q6_K (2.257 GB of 3.334 GB); only the ~1.08 GB "
-        f"transformer body is actually Q4_0.\n"
-        f"- **Resident on GPU:** ~1.31 GiB. `per_layer_token_embd` (1.93 GB, 58% of the "
-        f"file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out of the mmap.\n\n"
+        f"- **Quantization:** every weight matrix is Q4_0, embeddings included — the exact "
+        f"rebuild of Google's GGUF on the QAT grid (v2, 2026-09-29). Only 1.1 MB of F32 "
+        f"norms is stored otherwise.\n"
+        f"- **Resident on GPU:** 1223.91 MiB of weights (measured). `per_layer_token_embd` "
+        f"(1.32 GB, 50% of the file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out "
+        f"of the mmap.\n\n"
         f"Run `inspect_gguf.py` to re-derive the split from the artifact rather than "
         f"trusting these numbers."
     )
@@ -203,6 +206,7 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
         "-tb", THREADS_BATCH,
         # llama.cpp splits -c across slots, and its default is more than one.
         "--parallel", PARALLEL_SLOTS,
+        "--reasoning", REASONING,
     ]
     # llama.cpp serves /metrics only when asked; without this it answers 501.
     # Operational visibility only — see tpu.env, METRICS, for why it must not
@@ -210,7 +214,7 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
     if METRICS == "1":
         cmd.append("--metrics")
     # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
-    # disabling it forces the 1.93 GB per-layer embedding tensor to be
+    # disabling it forces the 1.32 GB per-layer embedding tensor to be
     # materialised and turns a comfortable fit into an OOM.
     return cmd
 

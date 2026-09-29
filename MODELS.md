@@ -888,7 +888,8 @@ Google's file, is QAT data too (0 of 430,080 groups off the grid); stored as Q4_
 2,620,370,912 B with mean KL divergence 0.001683 ± 0.000066 against 0.001761 ± 0.000077 before, on
 the native build. With the embeddings at Q4_0,
 `per_layer_token_embd` is 1.321 GB and **50% of the file**, not 58%: the lazy share above is a
-property of Google's Q6_K file. Published as `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`; build script
+property of Google's Q6_K file. Published as `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf` (v2 since Hub
+revision `74b2c92`; v1 at `e5d65c8`); build script
 and evidence in the rig's `benchmarks/runs/2026-09-29-exact-gguf-i71360p/`.
 
 **REPRODUCED 2026-09-29 on `local-llamacpp-1650ti-2b-q4_0`** (i7-10750H + GTX 1650 Ti, llama.cpp

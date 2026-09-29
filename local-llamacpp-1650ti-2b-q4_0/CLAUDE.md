@@ -6,8 +6,9 @@ mostly does **not** hold here. Read this file before changing anything.
 
 ## What this rig is
 
-`llama-server` from `ggml-org/llama.cpp`, driven directly, serving
-`google/gemma-4-E2B-it-qat-q4_0-gguf` off one **GTX 1650 Ti (Max-Q)** in the
+`llama-server` from `ggml-org/llama.cpp`, driven directly, serving the exact
+Q4_0 GGUF of Gemma 4 E2B-it (v2, since 2026-09-29; Google's `google/gemma-4-E2B-it-qat-q4_0-gguf`
+before that) off one **GTX 1650 Ti (Max-Q)** in the
 machine under the desk. One process, one GGUF file named on the command line.
 
 **STATUS 2026-09-22: serving on `f95b0d9`, re-measured as one arm of an ABBA pair.**
@@ -17,16 +18,27 @@ llama.cpp was rebuilt from clean on 2026-09-22 after the host moved to Debian si
 `llama-server --list-devices` shows `CUDA0` (3732 MiB), and the CPU arm shows no
 devices.
 
-**2026-09-29: the exact Q4_0 re-pack, measured here but NOT adopted.**
-`benchmarks/runs/2026-09-29-exact-gguf-1650ti` rebuilt `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`
-bit-identically on this machine and compared it with Google's file on the card: tg128 1.10x in
-all four ABBA passes, pp512 unchanged, 99 MiB less VRAM, KLD vs bf16 0.054 → 0.0015 on CUDA.
-v2 (`...-exact-gguf-v2-1650ti`, `per_layer_model_proj` also Q4_0) is 1.11-1.12x on decode and
-+1.2-1.9% on prefill here, with 118 MiB less VRAM than Google's file. It is the file to adopt if this pair moves.
-`tpu.env` still serves Google's file, because this rig is one arm of a pair. Switching it means
-switching `local-llamacpp-cpu-2b-q4_0` too, and neither arm's older runs would pair with the result.
+**2026-09-29: BOTH ARMS NOW SERVE THE v2 EXACT Q4_0 GGUF, and the server's thinking default is
+OFF.** `tpu.env` names `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf` (SHA-256 `419db9a6…`, rebuilt
+here in `local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-29-exact-gguf-v2-1650ti`), in both
+arms together so the pair still differs only in `-ngl`. Every paired run before 2026-09-29 served
+Google's `gemma-4-E2B_q4_0-it.gguf` and does not pair with anything newer. `REASONING=off` becomes
+`--reasoning off` for the single-user demo; `sweep.py` asks for thinking per request, so its
+workload is unchanged (checked live: 708 chars of reasoning with the server at `off`).
 
-**NEWEST PAIRED RUN: `benchmarks/runs/2026-09-22-paired-sweep-1650ti`**, the re-run on
+**NEWEST: `benchmarks/runs/2026-09-29-paired-sweep-1650ti`**, the 2026-09-22 protocol with v2 weights:
+GPU **4.37x** decode, **3.80x** prefill, **3.99x** end-to-end, 32/32 cells, prompt cache 0 of 28,553.
+The wider lead has two causes: the file helps the GPU more (decode 1.10x against the CPU's 1.03–1.06x),
+and this session ran much hotter (CPU passes 50,918 and 59,190 throttle events, 90 °C), which cost
+the CPU arm ~9% of prefill. `local-llamacpp-cpu-2b-q4_0/benchmarks/runs/2026-09-29-google-vs-v2-cpu`
+shows the file itself leaves CPU prefill unchanged (0.995–0.998) and speeds CPU decode by 1.06x.
+
+The exact re-pack itself: `2026-09-29-exact-gguf-1650ti` (v1) and `2026-09-29-exact-gguf-v2-1650ti`
+(v2: tg128 1.11–1.12x Google's file, pp512 1.02x, 118 MiB less VRAM, KLD vs bf16 0.054 → 0.0017).
+`2026-09-29-ple-offload-1650ti`: forcing `per_layer_token_embd` into VRAM fits (2732 MiB) and gains
+nothing (within 0.7%), so it stays lazy. `DEMO.md` is the rehearsed single-user demo.
+
+**PREVIOUS PAIRED RUN: `benchmarks/runs/2026-09-22-paired-sweep-1650ti`**, the re-run on
 `f95b0d9` in ABBA order (CPU, GPU, GPU, CPU) with a temperature-gated cooldown
 before every pass and identical flags except `-ngl` (`-t 6 -tb 12` on both).
 32/32 cells: GPU **4.14x** decode, **3.42x** prefill, **3.62x** end-to-end. The
@@ -156,6 +168,10 @@ four are places where sibling code would be actively wrong here:
 
 ## The memory arithmetic, and why the obvious version of it is wrong
 
+> **Figures below are Google's file.** On the v2 file served since 2026-09-29 the CUDA0 model
+> buffer is 1223.91 MiB and `per_layer_token_embd` is 1.32 GB (50% of the file); the mechanism
+> is unchanged.
+
 The file is 3.35 GB on disk against 3.63 GiB free. Read those two numbers
 side by side and you conclude that full offload barely fits and that you should
 lower `-ngl` and cap `-c`. **That conclusion is wrong**, and it was reached and
@@ -248,6 +264,10 @@ The finding describes **llama.cpp's treatment of E2B's per-layer embeddings**, n
 is filed in `@MODELS.md`. Do not re-derive it from a rig.
 
 ## The file is only 32% Q4_0
+
+> **Google's file, served until 2026-09-29.** The v2 exact rebuild now served is Q4_0 in every
+> weight matrix (2,603 MB of Q4_0, 1.1 MB of F32 norms), so the caveats below apply to Google's
+> artifact and to runs made on it.
 
 Slot 5 of the directory name is `q4_0` because that is what `MODEL_NAME` says,
 per `@NAMING.md` ("named exactly as the file does"). **The dominant tensor type

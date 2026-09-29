@@ -14,6 +14,7 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-08-conc-shortprompt-1650ti.json` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ok | — |
 | `2026-09-16-paired-sweep-1650ti.json` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ok | — |
 | `2026-09-22-paired-sweep-1650ti.json` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ok | — |
+| `2026-09-29-paired-sweep-1650ti.json` | xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ok | — |
 
 ## Run directories in this rig
 
@@ -23,4 +24,8 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes |
 | `2026-09-08-conc-shortprompt-1650ti` | 6 | 2 | 0 | yes |
 | `2026-09-16-paired-sweep-1650ti` | 4 | 1 | 0 | yes |
-| `2026-09-22-paired-sweep-1650ti` | 10 | 0 | 0 | yes |
+| `2026-09-22-paired-sweep-1650ti` | 12 | 0 | 0 | yes |
+| `2026-09-29-exact-gguf-1650ti` | 26 | 1 | 0 | yes |
+| `2026-09-29-exact-gguf-v2-1650ti` | 16 | 1 | 0 | yes |
+| `2026-09-29-paired-sweep-1650ti` | 13 | 0 | 0 | yes |
+| `2026-09-29-ple-offload-1650ti` | 6 | 0 | 0 | yes |

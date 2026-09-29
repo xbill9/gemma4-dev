@@ -12,7 +12,7 @@ child gets an empty CUDA_VISIBLE_DEVICES, and `start_model_server` refuses a
 llama-server binary built with a GPU backend. A CPU number from a process that
 could have offloaded to a GPU is not a CPU number.
 
-MEMORY: per_layer_token_embd (1.93 GB, 58% of the file) is created with
+MEMORY: per_layer_token_embd (1.32 GB, 50% of the file) is created with
 TENSOR_READ_LAZY in llama.cpp's src/models/gemma4.cpp and served by GET_ROWS out
 of the mmap. On a GPU that decided whether the model fit the card; on a CPU it
 decides how much of the file stays hot in the page cache. --no-mmap breaks the
@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 RIG_NAME = RIG_DIR.name
 MCP_SERVER_NAME = os.environ.get("MCP_SERVER_NAME", RIG_NAME)
 
-MODEL_NAME = os.environ.get("MODEL_NAME", "google/gemma-4-E2B-it-qat-q4_0-gguf")
+MODEL_NAME = os.environ.get("MODEL_NAME", "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf")
 MODEL_PATH = os.environ.get("MODEL_PATH", "")
 LLAMA_SERVER_BIN = os.environ.get("LLAMA_SERVER_BIN", "")
 HOST = os.environ.get("HOST", "127.0.0.1")
@@ -78,6 +78,8 @@ FLASH_ATTENTION = os.environ.get("FLASH_ATTENTION", "1")
 THREADS = os.environ.get("THREADS", "6")
 THREADS_BATCH = os.environ.get("THREADS_BATCH", "12")
 PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
+# Thinking on/off/auto for the whole server; tpu.env explains why it is off.
+REASONING = os.environ.get("REASONING", "off")
 METRICS = os.environ.get("METRICS", "0")
 
 # Deliberately not read from the environment. See the module docstring.
@@ -246,10 +248,10 @@ async def model_info() -> str:
         f"- **Name:** `{MODEL_NAME}`\n"
         f"- **Path:** `{path}`\n"
         f"- **On disk:** {size_gb:.2f} GB\n"
-        f"- **Quantization slot:** `q4_0` — but the dominant tensor type is **Q6_K**. "
-        f"Both embedding tensors are Q6_K (2.257 GB of 3.334 GB); only the ~1.08 GB "
-        f"transformer body is actually Q4_0.\n"
-        f"- **Touched every token:** ~1.31 GiB. `per_layer_token_embd` (1.93 GB, 58% of the "
+        f"- **Quantization:** every weight matrix is Q4_0, embeddings included — the exact "
+        f"rebuild of Google's GGUF on the QAT grid (v2, 2026-09-29). Only 1.1 MB of F32 "
+        f"norms is stored otherwise.\n"
+        f"- **Touched every token:** ~1.2 GiB. `per_layer_token_embd` (1.32 GB, 50% of the "
         f"file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out of the mmap, a few rows "
         f"per token.\n\n"
         f"Run `inspect_gguf.py` to re-derive the split from the artifact rather than "
@@ -298,6 +300,7 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
         "-tb", THREADS_BATCH,
         # llama.cpp splits -c across slots, and its default is more than one.
         "--parallel", PARALLEL_SLOTS,
+        "--reasoning", REASONING,
     ]
     # llama.cpp serves /metrics only when asked; without this it answers 501.
     if METRICS == "1":

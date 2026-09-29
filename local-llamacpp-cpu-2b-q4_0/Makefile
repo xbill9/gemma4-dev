@@ -39,7 +39,7 @@ help:
 	@echo "  make lint          - ruff on the module list below"
 	@echo "  make clean         - remove caches"
 	@echo "========================================================="
-	@echo "Never pass --no-mmap: per_layer_token_embd (58% of the file) is"
+	@echo "Never pass --no-mmap: per_layer_token_embd (50% of the file) is"
 	@echo "TENSOR_READ_LAZY and requires mmap."
 
 install:
@@ -64,6 +64,10 @@ build:
 download:
 	@command -v hf >/dev/null || { echo "hf not found; install with: pip install huggingface_hub"; exit 1; }
 	hf download $(MODEL_NAME) $(notdir $(MODEL_PATH)) --local-dir $(MODEL_DIR)
+	@echo "$(MODEL_SHA256)  $(MODEL_PATH)" | sha256sum -c --quiet || { \
+	  echo "SHA-256 mismatch: $(MODEL_PATH) is not the file tpu.env names (MODEL_SHA256)."; \
+	  echo "The Hub has served v2 since revision 74b2c92; v1 is at e5d65c8."; \
+	  echo "Rebuild v2 with ../local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-29-exact-gguf-v2-1650ti/gguf_exact.py (see its REPORT.md)."; exit 1; }
 
 info:
 	python3 inspect_gguf.py
@@ -82,6 +86,7 @@ serve:
 	  -t $(THREADS) \
 	  -tb $(THREADS_BATCH) \
 	  --parallel $(PARALLEL_SLOTS) \
+	  --reasoning $(REASONING) \
 	  $(if $(filter 1,$(METRICS)),--metrics,)
 
 status:

@@ -151,6 +151,10 @@ def _chat_body(model: str, prompt: str, max_tokens: int, stream: bool) -> dict:
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.0,
+        # Explicit, so the workload does not follow the server's --reasoning
+        # default (off since 2026-09-29). Every sweep before that date ran with
+        # thinking on by default and measured the thinking phase; this keeps it so.
+        "chat_template_kwargs": {"enable_thinking": True},
     }
     if DEFEAT_PROMPT_CACHE:
         # llama.cpp-specific, and REQUIRED for an honest prefill number here.
@@ -375,7 +379,7 @@ def measure(base: str, model: str, prompt: str, max_tokens: int, source: str) ->
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", required=True, help="e.g. http://1.2.3.4:8000/v1")
-    ap.add_argument("--model", default=os.getenv("MODEL_NAME", "google/gemma-4-E2B-it-qat-q4_0-gguf"))
+    ap.add_argument("--model", default=os.getenv("MODEL_NAME", "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf"))
     ap.add_argument("--out", required=True, help="run directory to write into")
     ap.add_argument("--repeats", type=int, default=REPEATS)
     # Configurable because the first run swept only to 2,501 tokens against a

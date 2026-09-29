@@ -1,0 +1,241 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-29-paired-sweep-cpu",
+    "date": "2026-09-29",
+    "source": "local-llamacpp-cpu-2b-q4_0",
+    "notes": "PAIRED A/B, CPU ARM, ABBA. Context sweep at concurrency 1, 4 contexts x 2 output lengths, 3 repeats per pass, TWO passes per arm in ABBA order (CPU, GPU, GPU, CPU) so a linear thermal drift cancels between arms. Each pass started only after a >=120 s cooldown with the CPU package <=50 C and the GPU <=45 C. Figures are the mean of the two passes' per-cell medians; raw min/max span all 6 repeats. BOTH ARMS SERVE THE v2 EXACT Q4_0 GGUF (xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf, SHA-256 419db9a6, 2,620,370,912 B), the first paired run on it; every earlier paired run served Google's gemma-4-E2B_q4_0-it.gguf. Both arms: llama.cpp f95b0d9 (the same binaries as 2026-09-22, by sha256), identical flags except -ngl, -t 6 -tb 12 from both tpu.env files. Thinking ON for every request (the server default then; sweep.py now asks for it explicitly). Prompt cache verified defeated: 0 of 28,553 prompt tokens cached in every pass. Host: Lenovo Yoga 9 15IMH5, i7-10750H 6C/12T, GTX 1650 Ti Max-Q, one shared thermal envelope; package throttle events rose 50,918 in CPU pass 1, 3,209 in GPU pass 1, 4,932 in GPU pass 2 and 59,190 in CPU pass 2 - several times 2026-09-22's (9,604 / 420 / 2,879 / 19,279), with the package at 90 C at the end of both CPU passes. Page cache hot throughout. Arm attested from /proc on both passes: device=cpu, exe=/home/xbill/llama.cpp/build-cpu/bin/llama-server, sha256=9c88c7821fcc11a6, model /home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf. Not comparable to 2026-09-22 as a file comparison: the weights changed and the host ran much hotter; see the run's REPORT.md."
+  },
+  "hardware": {
+    "accelerator": "Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz",
+    "chips": 1,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "6 cores / 12 threads, homogeneous Comet Lake - NO P/E split; SMT siblings pair (0,6)...(5,11). avx2, NO avx_vnni, NO AVX-512. 15 GiB RAM. Lenovo Yoga 9 15IMH5, bare metal. No CPU affinity was set for this run; what that costs is unresolved - the prior llama-bench sweep that put it at 1.61x via E-core stragglers described a hybrid die this machine does not have, and is quarantined. CORRECTED 2026-09-22 (was: 12 cores / 16 threads, hybrid 4P+8E, avx_vnni)."
+    }
+  },
+  "model": {
+    "id": "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf",
+    "family": "gemma-4",
+    "parameters_b": 4.63,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 8192,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes; sweep.py counts both. v2 exact rebuild: every weight matrix is Q4_0 (both embeddings and per_layer_model_proj included), only 1.1 MB of F32 norms otherwise. per_layer_token_embd (1.32 GB, 50% of the file) is TENSOR_READ_LAZY."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b318-f95b0d9",
+    "backend": "CPU (AVX2)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-m",
+      "/home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "0",
+      "-c",
+      "8192",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "6",
+      "-tb",
+      "12",
+      "--parallel",
+      "1",
+      "--metrics"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (byte-identical in both arms)",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 6,
+      "notes": "decode-source auto -> stream; llama-server emits no usage.decode_tokens_per_second, so decode is client-side inter-token latency off the SSE stream. Prompts are device-neutral and identical across arms. prompt_mode=unique (per-request nonce first, so the prefix cache cannot hit). 6 = 3 repeats x 2 ABBA passes."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 11.884,
+        "per_stream_tok_per_s": 18.865,
+        "ttft_ms": {
+          "median": 1201.113,
+          "p99": 1472.8
+        },
+        "tpot_ms": {
+          "median": 53.0134
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 3.45,
+          "min": 18.435,
+          "max": 19.087
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 15.937,
+        "per_stream_tok_per_s": 18.302,
+        "ttft_ms": {
+          "median": 1294.947,
+          "p99": 1373.07
+        },
+        "tpot_ms": {
+          "median": 54.6555
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 6.71,
+          "min": 17.478,
+          "max": 18.706
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 4.123,
+        "per_stream_tok_per_s": 17.831,
+        "ttft_ms": {
+          "median": 6187.538,
+          "p99": 6312.657
+        },
+        "tpot_ms": {
+          "median": 56.0819
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 1.22,
+          "min": 17.687,
+          "max": 17.904
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 9.879,
+        "per_stream_tok_per_s": 17.684,
+        "ttft_ms": {
+          "median": 5970.258,
+          "p99": 6314.138
+        },
+        "tpot_ms": {
+          "median": 56.5491
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 1.53,
+          "min": 17.526,
+          "max": 17.796
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 2.363,
+        "per_stream_tok_per_s": 17.429,
+        "ttft_ms": {
+          "median": 11939.822,
+          "p99": 12150.179
+        },
+        "tpot_ms": {
+          "median": 57.3735
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 5.38,
+          "min": 16.553,
+          "max": 17.491
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 6.609,
+        "per_stream_tok_per_s": 17.348,
+        "ttft_ms": {
+          "median": 12223.333,
+          "p99": 12356.301
+        },
+        "tpot_ms": {
+          "median": 57.6445
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 1.81,
+          "min": 17.085,
+          "max": 17.399
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 1.219,
+        "per_stream_tok_per_s": 16.523,
+        "ttft_ms": {
+          "median": 24566.065,
+          "p99": 25821.259
+        },
+        "tpot_ms": {
+          "median": 60.5245
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 5.76,
+          "min": 15.921,
+          "max": 16.873
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 3.994,
+        "per_stream_tok_per_s": 16.713,
+        "ttft_ms": {
+          "median": 24602.196,
+          "p99": 24727.426
+        },
+        "tpot_ms": {
+          "median": 59.8368
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 2.29,
+          "min": 16.487,
+          "max": 16.869
+        }
+      }
+    ]
+  },
+  "memory": {
+    "weights_gib": 1.21,
+    "kv_bytes_per_token": 18432,
+    "notes": "NOT re-measured on the v2 file. The RssAnon figure previously here (1,202,152 kB, 2026-09-16) was on Google's file. weights_gib is the v2 file's resident part (everything except the lazy per_layer_token_embd)."
+  }
+}

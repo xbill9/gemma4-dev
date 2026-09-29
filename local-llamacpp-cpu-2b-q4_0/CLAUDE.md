@@ -6,7 +6,8 @@ imported across a rig boundary. Read this file before changing anything.
 ## What this rig is
 
 `llama-server` from `ggml-org/llama.cpp`, driven directly, serving
-`google/gemma-4-E2B-it-qat-q4_0-gguf` on the **CPU only** of this workstation. No
+the exact Q4_0 GGUF of Gemma 4 E2B-it (v2, since 2026-09-29; Google's
+`google/gemma-4-E2B-it-qat-q4_0-gguf` before that) on the **CPU only** of this workstation. No
 GPU, no control plane, no cloud. One process, one GGUF file named on the command
 line.
 
@@ -25,7 +26,22 @@ headline (E-core stragglers, a 1.61x affinity swing) describes a die that is not
 here; the run is kept and quarantined. `THREADS`/`THREADS_BATCH` are re-derived to
 `6`/`12` and spot-checked, not swept.
 
-**NEWEST: `benchmarks/runs/2026-09-22-paired-sweep-cpu`**, the re-run on
+**2026-09-29: BOTH ARMS NOW SERVE THE v2 EXACT Q4_0 GGUF, and the server's thinking default is
+OFF.** `tpu.env` names `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf` (SHA-256 `419db9a6…`, rebuilt
+here in `local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-09-29-exact-gguf-v2-1650ti`), in both
+arms together so the pair still differs only in `-ngl`. Every paired run before 2026-09-29 served
+Google's `gemma-4-E2B_q4_0-it.gguf` and does not pair with anything newer. `REASONING=off` becomes
+`--reasoning off` for the single-user demo; `sweep.py` asks for thinking per request, so its
+workload is unchanged (checked live: 708 chars of reasoning with the server at `off`).
+
+**NEWEST: `benchmarks/runs/2026-09-29-paired-sweep-cpu`**, the 2026-09-22 protocol with v2 weights:
+GPU **4.37x** decode, **3.80x** prefill, **3.99x** end-to-end, 32/32 cells, prompt cache 0 of 28,553.
+The wider lead has two causes: the file helps the GPU more (decode 1.10x against the CPU's 1.03–1.06x),
+and this session ran much hotter (CPU passes 50,918 and 59,190 throttle events, 90 °C), which cost
+the CPU arm ~9% of prefill. `local-llamacpp-cpu-2b-q4_0/benchmarks/runs/2026-09-29-google-vs-v2-cpu`
+shows the file itself leaves CPU prefill unchanged (0.995–0.998) and speeds CPU decode by 1.06x.
+
+**PREVIOUS: `benchmarks/runs/2026-09-22-paired-sweep-cpu`**, the re-run on
 `f95b0d9` in ABBA order (CPU, GPU, GPU, CPU) with a temperature-gated cooldown
 before every pass and identical flags except `-ngl` (`-t 6 -tb 12` on both).
 32/32 cells: GPU **4.14x** decode, **3.42x** prefill, **3.62x** end-to-end. The

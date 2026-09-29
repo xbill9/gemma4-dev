@@ -33,7 +33,9 @@ should not depend on which machine it is checked out on.
 Google's `gemma-4-E2B-it-qat-q4_0-gguf` metadata, byte for byte, with every Q4_0
 tensor, both embedding tables and `per_layer_model_proj` rebuilt from
 `google/gemma-4-E2B-it-qat-q4_0-unquantized` on the trained grid step
-(`gguf_exact.py` in the v2 run directory). SHA-256 in `tpu.env`.
+(`gguf_exact.py` in the v2 run directory). SHA-256 in `tpu.env`. The Hub repo
+`xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf` has served v2 since Hub revision `74b2c92` (2026-09-29); v1 (`25f21f14…`) is at revision `e5d65c8`. `make download`
+fetches v2.
 
 | tensor | type | bytes | touched per token |
 | --- | --- | ---: | --- |
