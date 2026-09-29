@@ -37,6 +37,9 @@ The exact re-pack itself: `2026-09-29-exact-gguf-1650ti` (v1) and `2026-09-29-ex
 (v2: tg128 1.11–1.12x Google's file, pp512 1.02x, 118 MiB less VRAM, KLD vs bf16 0.054 → 0.0017).
 `2026-09-29-ple-offload-1650ti`: forcing `per_layer_token_embd` into VRAM fits (2732 MiB) and gains
 nothing (within 0.7%), so it stays lazy. `DEMO.md` is the rehearsed single-user demo.
+`2026-09-29-ngram-spec-1650ti`: n-gram speculative decoding is off on purpose. On a first-seen prompt
+the best case is 1.16x on a code rewrite; conversational prompts are neutral or slower, and every
+drafting variant changes greedy output (batched verification runs different kernels).
 
 **PREVIOUS PAIRED RUN: `benchmarks/runs/2026-09-22-paired-sweep-1650ti`**, the re-run on
 `f95b0d9` in ABBA order (CPU, GPU, GPU, CPU) with a temperature-gated cooldown
