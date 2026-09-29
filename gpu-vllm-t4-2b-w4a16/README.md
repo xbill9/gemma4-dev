@@ -42,11 +42,15 @@ has a few GB free.
 ## Serving
 
 ```bash
-VLLM_T4_RIG=~/gemma4-dev/gpu-vllm-t4-2b-w4a16 ~/bin/vllm-t4 start
+./vllm-t4 start      # also: stop | status | query | log | swap
 ```
 
-or the MCP server's `start_vllm_server`. Not `make serve`: its short-lived
-interpreter kills vLLM about a second after launch (see `~/bin/vllm-t4`).
+`vllm-t4` drives the rig it sits in: it turns on the swapfile vLLM needs on this
+7.8 GB host, refuses to start unless the Turing clamp is confirmed, launches vLLM
+detached with every flag read from `tpu.env`, and waits for `/health`. On this VM
+`~/bin/vllm-t4` is the same script with this rig as its default. The MCP server's
+`start_vllm_server` also works. Not `make serve`: its short-lived interpreter kills
+vLLM about a second after launch.
 **One rig serves at a time**: this rig and
 `gpu-vllm-t4-2b` share the GPU and port 8000, and each tracks only its own process.
 After changing `MODEL_NAME`, restart once: the first start compiles from scratch

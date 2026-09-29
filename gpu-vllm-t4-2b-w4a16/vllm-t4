@@ -1,0 +1,218 @@
+#!/bin/bash
+#
+# Start, stop and check the Gemma 4 vLLM server on this VM's Tesla T4.
+#
+# usage: vllm-t4 [start|stop|status|query|log|swap] [nowait]
+#
+# This copy lives in the rig it drives: the rig is the directory this script
+# sits in (symlinks resolved), or VLLM_T4_RIG. That rig's tpu.env stays the source
+# of truth: every
+# serving value below is READ OUT OF ITS tpu.env, never spelled here, and the
+# Turing clamp is checked with the rig's own verifier.  What this script owns is
+# the three things that are host state rather than rig config -- the swapfile,
+# the detached launch, and waiting for the endpoint.
+#
+# WHY IT DOES NOT CALL `make serve`.  That target is
+# `python3 -c "asyncio.run(server.start_vllm_server())"`, and asyncio KILLS the
+# subprocess when that short-lived interpreter exits: the engine is gone about a
+# second after launch, having written nothing to the log, which reads exactly
+# like a crash.  It survives only under the long-lived MCP server process, which
+# is how the 2026-09-18 sweep was started.  Verified 2026-09-21 with a two-line
+# repro on /bin/sleep.  So the launch here is nohup + disown from bash.
+#
+# THE SWAPFILE IS NOT OPTIONAL.  7.8 GB of RAM, no swap as provisioned, and vLLM
+# is OOM-killed loading E2B weights without it -- measured 2026-09-18, peak 6.8
+# GB for bf16.  /opt1/swapfile is not in fstab, so a reboot loses it and `start`
+# puts it back.
+#
+# Startup is minutes, not seconds: 2 vCPU compiling Triton kernels.  `start`
+# waits for /health; `start nowait` returns once the process is up.
+
+prog=`basename $0`
+rig=${VLLM_T4_RIG:-$(cd "$(dirname "$(readlink -f "$0")")" && pwd)}
+swapfile=${VLLM_T4_SWAPFILE:-/opt1/swapfile}
+swapsize=${VLLM_T4_SWAPSIZE:-16G}
+waitsecs=${VLLM_T4_WAIT:-1800}
+
+die() {
+  echo "$prog: $*" >&2
+  exit 1
+}
+
+usage() {
+  echo "usage: $prog [start|stop|status|query|log|swap] [nowait]" >&2
+  exit 2
+}
+
+# One value out of the rig's tpu.env.  tpu.env is NOT sourced: it is a dotenv
+# file whose prose comments are not shell, and sourcing it would drag TMPDIR and
+# PYTHONUSERBASE into this shell whether or not they were wanted.
+rigval() {
+  sed -n "s/^$1=//p" "$rig/tpu.env" | tail -1
+}
+
+ensure_swap() {
+  if [ -n "`awk 'NR>1 {print $1; exit}' /proc/swaps`" ] ; then
+    echo "$prog: swap already on: `awk 'NR>1 {printf "%s (%s KB)", $1, $3; exit}' /proc/swaps`"
+    return 0
+  fi
+  if [ ! -f "$swapfile" ] ; then
+    echo "$prog: creating $swapfile ($swapsize)"
+    sudo fallocate -l "$swapsize" "$swapfile" || die "fallocate $swapfile failed"
+    sudo chmod 600 "$swapfile" || die "chmod $swapfile failed"
+    sudo mkswap "$swapfile" >/dev/null || die "mkswap $swapfile failed"
+  fi
+  echo "$prog: enabling $swapfile"
+  sudo swapon "$swapfile" || die "swapon $swapfile failed -- vLLM would be OOM-killed loading weights"
+}
+
+# The rig refuses to serve unless the Turing clamp is POSITIVELY confirmed, and
+# so does this: an unclamped engine spends ten minutes loading and then dies with
+# an OutOfResources that gets blamed on configuration.  A verifier that cannot
+# import vLLM at all answers neither way, so anything but the positive string is
+# a refusal.
+check_clamp() {
+  out=`make -s -C "$rig" verify-patch 2>&1`
+  case $out in
+    *'✅ **Patched**'*) echo "$prog: Turing clamp confirmed" ;;
+    *) echo "$out" >&2
+       die "the Turing clamp is not confirmed -- run 'make -C $rig patch' and read the rig's CLAUDE.md" ;;
+  esac
+}
+
+running_pid() {
+  pid=`cat "$rig/run/vllm.pid" 2>/dev/null`
+  [ -n "$pid" ] && [ -d "/proc/$pid" ] && echo "$pid"
+}
+
+# Poll /health.  VRAM is printed beside the clock because "still compiling" and
+# "died at engine init" look identical from outside for the first few minutes,
+# and claimed device memory is the tell.
+wait_healthy() {
+  endpoint=`rigval ENDPOINT`
+  endpoint=${endpoint:-http://127.0.0.1:8000}
+  start=`date +%s`
+  echo "$prog: waiting up to ${waitsecs}s for $endpoint/health"
+  while : ; do
+    if curl -fsS -o /dev/null --max-time 5 "$endpoint/health" 2>/dev/null ; then
+      echo ""
+      echo "$prog: healthy after $((`date +%s` - start))s -- $endpoint"
+      return 0
+    fi
+    if [ -z "`running_pid`" ] ; then
+      echo "" >&2
+      echo "$prog: the engine died during startup; last 20 log lines:" >&2
+      tail -20 "$rig/run/vllm.log" >&2
+      echo "$prog: if there is no traceback, check 'dmesg -T | grep -i oom' -- see the swap note in this script" >&2
+      return 1
+    fi
+    elapsed=$((`date +%s` - start))
+    if [ $elapsed -ge $waitsecs ] ; then
+      echo "" >&2
+      echo "$prog: not healthy after ${elapsed}s; it is still running -- follow with '$prog log'" >&2
+      return 1
+    fi
+    printf "\r  %4ds  VRAM %s" $elapsed "`nvidia-smi --query-gpu=memory.used,utilization.gpu --format=csv,noheader 2>/dev/null`"
+    sleep 15
+  done
+}
+
+# Launch detached, writing the same run/vllm.pid and run/vllm.log the rig's own
+# status and stop tools read, so `vllm-t4 status|stop` and the MCP tools agree
+# about what is running.
+launch() {
+  model=`rigval MODEL_NAME`
+  host=`rigval HOST`
+  port=`rigval PORT`
+  dtype=`rigval DTYPE`
+  kvdtype=`rigval KV_CACHE_DTYPE`
+  tp=`rigval TENSOR_PARALLEL_SIZE`
+  gpumem=`rigval GPU_MEMORY_UTILIZATION`
+  maxlen=`rigval MAX_MODEL_LEN`
+  maxseqs=`rigval MAX_NUM_SEQS`
+  python_bin=`rigval PYTHON_BIN`
+
+  # Optional: absent or anything but true keeps vLLM's multimodal default.
+  mmflag=
+  [ "`rigval LANGUAGE_MODEL_ONLY`" = true ] && mmflag=--language-model-only
+
+  for v in model host port dtype kvdtype tp gpumem maxlen maxseqs python_bin ; do
+    eval "[ -n \"\$$v\" ]" || die "$v is not set in $rig/tpu.env"
+  done
+  [ -x "$python_bin" ] || die "PYTHON_BIN is not executable: $python_bin"
+
+  # PYTHONUSERBASE is load-bearing: the packages live in /opt1/pyuser, not on the
+  # nearly-full root disk, and without it this interpreter cannot see its own
+  # vLLM.  TMPDIR keeps anything that spills off /tmp, which has 3.88 GB.
+  export PYTHONUSERBASE=`rigval PYTHONUSERBASE`
+  export TMPDIR=`rigval TMPDIR`
+
+  mkdir -p "$rig/run"
+  echo "$prog: starting $model on $host:$port${mmflag:+ (text only)}"
+  nohup "$python_bin" -m vllm.entrypoints.openai.api_server \
+    --model "$model" \
+    --host "$host" \
+    --port "$port" \
+    --dtype "$dtype" \
+    --kv-cache-dtype "$kvdtype" \
+    --tensor-parallel-size "$tp" \
+    --gpu-memory-utilization "$gpumem" \
+    --max-model-len "$maxlen" \
+    --max-num-seqs "$maxseqs" \
+    $mmflag \
+    >> "$rig/run/vllm.log" 2>&1 &
+  pid=$!
+  disown
+  echo "$pid" > "$rig/run/vllm.pid"
+  echo "$prog: pid $pid, log $rig/run/vllm.log"
+}
+
+[ -d "$rig" ] || die "rig not found: $rig (set VLLM_T4_RIG)"
+
+case $1 in
+  -h|--help) usage ;;
+esac
+
+cmd=${1:-start}
+mode=$2
+
+case $cmd in
+
+  start)
+    [ -n "$mode" ] && [ "$mode" != nowait ] && usage
+    pid=`running_pid`
+    [ -n "$pid" ] && die "already running (pid $pid) -- '$prog status', or '$prog stop' first"
+    ensure_swap
+    check_clamp
+    launch
+    [ "$mode" = nowait ] && exit 0
+    wait_healthy || exit 1
+    make -s -C "$rig" status
+    ;;
+
+  stop)
+    # Swap is deliberately left on: it costs nothing idle and the next start
+    # needs it anyway.
+    make -s -C "$rig" stop
+    ;;
+
+  status)
+    make -s -C "$rig" status
+    ;;
+
+  query)
+    make -s -C "$rig" query
+    ;;
+
+  log)
+    tail -f "$rig/run/vllm.log"
+    ;;
+
+  swap)
+    ensure_swap
+    ;;
+
+  *)
+    usage
+    ;;
+esac

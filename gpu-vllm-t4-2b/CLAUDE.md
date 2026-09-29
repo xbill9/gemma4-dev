@@ -12,6 +12,8 @@ the rig runs on**, serving the bf16 reference build `google/gemma-4-E2B-it`.
 served QAT builds by default from 2026-09-18 until then, under a bare `-2b` name
 that `@NAMING.md` reads as a claim of the reference weights; it is back on bf16.
 The two rigs share this GPU and port 8000 — stop one before starting the other.
+`~/bin/vllm-t4` defaults to the sibling; `VLLM_T4_RIG=~/gemma4-dev/gpu-vllm-t4-2b`
+drives this rig.
 The 2026-09-18 sweep below measured both builds and stays here.
 
 **STATUS 2026-09-18: serving and measured.** vLLM 0.29.0 on torch 2.13.0+cu130.

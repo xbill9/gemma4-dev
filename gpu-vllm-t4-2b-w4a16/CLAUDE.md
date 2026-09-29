@@ -24,8 +24,8 @@ so the pair is an encoding A/B on identical hardware, runtime and flags.
 
 **The two rigs share one GPU and port 8000, and neither sees the other's
 process** — each `server.py` tracks only its own `run/vllm.pid`. Stop one before
-starting the other. `~/bin/vllm-t4` defaults to the parent; set
-`VLLM_T4_RIG=~/gemma4-dev/gpu-vllm-t4-2b-w4a16` to drive this one.
+starting the other. `~/bin/vllm-t4` defaults to this rig (since 2026-09-29); set
+`VLLM_T4_RIG=~/gemma4-dev/gpu-vllm-t4-2b` to drive the bf16 parent.
 
 ## `repack/` — the tools that built the checkpoint
 
