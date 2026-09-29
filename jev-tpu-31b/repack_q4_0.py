@@ -352,7 +352,7 @@ def verify(src, out_dir):
                 continue
             a, b = np.asarray(r.raw(name)), np.asarray(out[name].raw(name))
             copied["tensors"] += 1
-            if a.dtype == b.dtype and a.shape == b.shape and np.array_equal(a.view(np.uint8), b.view(np.uint8)):
+            if a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes():
                 copied["byte_identical"] += 1
             else:
                 problems.append(f"copied tensor differs: {name}")
