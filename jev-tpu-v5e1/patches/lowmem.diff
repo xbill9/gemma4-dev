@@ -328,7 +328,7 @@ index 97ec21d80..8fae66c5a 100644
 +        out = jax.lax.map(chunk, (q.reshape(n, c, d), s.reshape(n, c, -1)))
 +        return jnp.moveaxis(out, 0, -2).reshape(*x.shape[:-1], v)
 diff --git a/tpu_inference/layers/jax/quantization/compressed_tensors.py b/tpu_inference/layers/jax/quantization/compressed_tensors.py
-index 5e06525ff..547252c1d 100644
+index 5e06525ff..0b723db9b 100644
 --- a/tpu_inference/layers/jax/quantization/compressed_tensors.py
 +++ b/tpu_inference/layers/jax/quantization/compressed_tensors.py
 @@ -39,7 +39,8 @@ from tpu_inference.layers.jax.quantization.configs import (QuantizationConfig,
@@ -341,11 +341,12 @@ index 5e06525ff..547252c1d 100644
  from tpu_inference.layers.jax.quantization.unquantized import (
      UnquantizedFusedMoEMethod, UnquantizedLinearMethod)
  from tpu_inference.layers.jax.quantization.wna16 import (
-@@ -207,6 +208,14 @@ class CompressedTensorsConfig(QuantizationConfig):
+@@ -207,6 +208,15 @@ class CompressedTensorsConfig(QuantizationConfig):
                  return Fp8TensorwiseMergedLinearMethod(layer, linear_config)
              return Fp8TensorwiseLinearMethod(layer, linear_config)
  
-+        if (self._ct._is_dynamic_token_w8a8(weight_quant, input_quant)
++        if (weight_quant is not None and input_quant is not None
++                and self._ct._is_dynamic_token_w8a8(weight_quant, input_quant)
 +                and weight_quant.type == "int"
 +                and weight_quant.strategy == "channel"
 +                and input_quant.symmetric):
