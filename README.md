@@ -27,6 +27,7 @@ boundaries.
 | [`tpu-vllm-v5e1-2b`](tpu-vllm-v5e1-2b/) | vLLM in Docker | v5e-1 | `gemma-4-E2B-it` | Flex-start Queued Resource; the live-demo rig |
 | [`tpu-vllm-v5e1-2b-q4_0`](tpu-vllm-v5e1-2b-q4_0/) | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | QAT-at-q4_0 weights shipped as bf16; the 4-bit load path is unsupported on this stack — see the rig README |
 | [`tpu-vllm-v5e1-2b-w4a16`](tpu-vllm-v5e1-2b-w4a16/) | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | Real 4-bit compressed-tensors weights; **expected to fail** at `compressed_tensors.py:149` until a `wNa16` scheme lands — the rig exists to record that |
+| [`tpu-vllm-v5e1-2b-w8a8`](tpu-vllm-v5e1-2b-w8a8/) | vLLM in Docker, patched `tpu_inference` | v5e-1 | `xbill9/gemma-4-E2B-it-qat-w8a8-int8` | int8 W8A8 built from Google's QAT weights; suite level with bf16 at ~1.5x bf16 throughput on v5e (measured 2026-09-29) |
 | [`tpu-vllm-v6e1-2b`](tpu-vllm-v6e1-2b/) | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | Fork of the v5e-1 rig retargeted to Trillium; provisions in `us-east5-b` |
 | [`tpu-jax-v5e1-2b`](tpu-jax-v5e1-2b/) | pure JAX | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | Hand-rolled engine + OpenAI-compatible server; no Docker, no HF token |
 | [`tpu-jax-v6e1-2b`](tpu-jax-v6e1-2b/) | pure JAX | v6e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | Fork of the v5e-1 JAX rig retargeted to Trillium and **migrated off the Cloud TPU API onto Compute Engine** — no queued-resource path at all |

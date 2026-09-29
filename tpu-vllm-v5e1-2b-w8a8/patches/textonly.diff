@@ -1,0 +1,11 @@
+--- a/tpu_inference/models/jax/gemma4.py	2026-09-29 15:39:31.435067721 -0400
++++ b/tpu_inference/models/jax/gemma4.py	2026-09-29 15:39:31.446088652 -0400
+@@ -1112,7 +1112,7 @@
+             skip_substrs=["vision", "audio", "multi_modal"],
+         )
+         # KV-shared layers own no K/V params; a BF16 export still ships them.
+-        text_config = self.vllm_config.model_config.hf_config.text_config
++        text_config = _text_config(self.vllm_config.model_config.hf_config)
+         weights = drop_shared_kv_weights(text_config, weights)
+         return loader.load_weights(mapper.apply(weights))
+ 
