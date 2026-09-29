@@ -859,6 +859,32 @@ exactly: 1.407 GB "streamed per decode step" is the same set of tensors under th
 and 31B have `hidden_size_per_layer_input=0` and no such tensor at all (see the family table
 above), so their GGUF footprint is resident in full.
 
+### Google's E2B GGUF moves the QAT values; an exact Q4_0 rebuild is 2.64 GB
+
+**MEASURED 2026-09-29 on `local-llamacpp-i71360p-2b-q4_0`** (llama.cpp `fc07d781e`, CPU). A property
+of the artifacts, so it holds wherever they are served.
+
+`google/gemma-4-E2B-it-qat-q4_0-gguf` (`675cff4`) stores the QAT weights off their trained grid in
+two ways. Its Q4_0 layers use llama.cpp's `amax/8` step, which is wrong for any block whose peak is
+below level 8 (the rule the W4A16 repacks already correct, §26B above); values in those blocks move by
+up to one full step, and 51% of `blk.0.attn_q` values equal the `-q4_0-unquantized` source. Its two
+embedding tables are Q6_K, off by up to 28% of a grid step, although both are on the Q4_0 grid.
+
+Rebuilt with Google's metadata byte for byte and every layer matrix and embedding table as Q4_0 on the
+trained step, no block is off the grid and 96.84% of values are bit-identical to the source:
+
+| against a bf16 GGUF of the same weights (wikitext-2, 16 x 512) | Google GGUF | exact rebuild |
+|---|---|---|
+| file | 3,349,516,256 B | 2,640,154,592 B |
+| mean KL divergence | 0.054303 | 0.001753 |
+| same top token | 87.18% | 98.06% |
+| PPL / PPL(bf16) | 1.0892 | 1.0213 |
+
+Generation is 1.069x / 1.074x Google's file in the two run orders. With the embeddings at Q4_0,
+`per_layer_token_embd` is 1.321 GB and **50% of the file**, not 58%: the lazy share above is a
+property of Google's Q6_K file. Published as `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`; build script
+and evidence in the rig's `benchmarks/runs/2026-09-29-exact-gguf-i71360p/`.
+
 **The `E` prefix is load-bearing.** E4B is *not* a 4B dense model — 4.5B effective, 8.0B total. Reading
 `E4B` as "4B" understates its weights by roughly 2x, which is the difference between fitting a 16 GB
 accelerator and not.
