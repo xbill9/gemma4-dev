@@ -550,6 +550,29 @@ Across 20 (layer, projection) pairs: min 0.06663, max 0.06671 — a spread of **
 disproportionately damaged by W4A16, so spending extra bits on a subset of projections buys
 proportionally little.
 
+### Why: `-w4a16-ct` is the QAT weights re-quantized by min-max round-to-nearest
+
+MEASURED 2026-09-29 on the 12B (`google/gemma-4-12B-it-qat-w4a16-ct` range-read from the Hub, dequantized
+against the local `-qat-q4_0-unquantized`; layer 0 `q_proj` and layer 24 `down_proj`):
+
+| | layer 0 q_proj | layer 24 down_proj |
+| :--- | ---: | ---: |
+| `-w4a16-ct` values against the QAT values, relative error | 0.0666 | 0.0667 |
+| `-w4a16-ct` scale ÷ (max\|w\| / 7.5), median | 1.0000 | 1.0000 |
+| groups whose `-w4a16-ct` step equals the QAT step | 0.0% | 0.0% |
+
+The export ships its `recipe.yaml`: llm-compressor `QuantizationModifier`, symmetric int4, group 32,
+`observer: memoryless_minmax`. That observer sets each group's scale to max|w| / 7.5 (half of the −8..7
+range). The QAT grid's step is d, with max|w| = m·d for whatever level m the group's peak sits on, so
+the min-max step m·d / 7.5 never equals d and every weight is rounded again onto a shifted grid: the flat
+6.67% error, the same on the 12B as on the 31B above. The model was trained for the Q4_0 grid, not for
+that second rounding.
+
+`jev-tpu-31b/repack_q4_0.py` recovers d per group instead (none of the 12B's 340,623,360 groups off the
+grid). On one v5e chip, same flags, suite paired record for record: repack 0.758, `-w4a16-ct` 0.752
+(+0.6 points, 95% range +0.0 to +1.2); the repack is level with its bf16 source (0.757 on v6e) and with
+the bf16 12B (0.760, −0.1, −0.7 to +0.5). `jev-tpu-v5e1/results/2026-09-28-12b3-v5e1-VS-*.md`.
+
 ### `-q4_0-unquantized` is QAT data in an unquantized container
 
 The 26B A4B is **the only size with no `-w4a16-ct` release** — enumerated from the Hub 2026-07-31, so

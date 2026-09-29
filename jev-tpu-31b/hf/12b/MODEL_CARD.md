@@ -22,7 +22,7 @@ tags:
 
 ## How it differs from `google/gemma-4-12B-it-qat-w4a16-ct`
 
-Google publishes its own W4A16 QAT checkpoint for the 12B. Its 4-bit values are not the grid values of the `-q4_0-unquantized` export: on the 31B, dequantizing Google's `-w4a16-ct` against its `-q4_0-unquantized` gives 6.67% relative error on every projection, while every unquantized tensor is bit-identical. This repack stores the `-q4_0-unquantized` grid values themselves.
+Google publishes its own W4A16 QAT checkpoint for the 12B. Its 4-bit values are not the grid values of the `-q4_0-unquantized` export. Its `recipe.yaml` shows why: it was made by re-quantizing the QAT weights with llm-compressor's round-to-nearest `QuantizationModifier` and a `memoryless_minmax` observer, which sets every group's scale to max|w| / 7.5. The QAT grid's step is max|w| / m for the level m that group's largest weight sits on, so the two steps never coincide, and every weight is rounded a second time onto a shifted grid. Measured on this 12B: Google's scales are exactly max|w| / 7.5 in every group, equal to the QAT step in none, and its values differ from the QAT values by 6.67% relative error (the same as on the 31B). This repack recovers each group's QAT step and stores the `-q4_0-unquantized` grid values themselves.
 
 On a 3,880-record public suite read by label probability, paired record for record:
 
