@@ -1,0 +1,77 @@
+# 2026-09-29 gpu-vllm-t4-2b: E2B with PLE, embed_tokens and lm_head int4 (vLLM 0.29.0, Tesla T4)
+#
+# Checkpoint: xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 (built locally at
+#   /opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 and tested before upload), from
+#   xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text by
+#   jev-tpu-31b/embed_int4.py --embed-tokens (default --scale-dtype f16).
+#   embed_tokens_per_layer 4.375 -> 1.230 GiB; embed_tokens 0.750 -> 0.211 GiB; lm_head untied,
+#   0.211 GiB int4 copy of the same levels/scales; tie_word_embeddings false; ignore [].
+#   Checkpoint 6.11 -> 2.64 GiB (2,830,620,814 B). 0 off-grid groups in either table.
+#
+# Scale dtype, same tables (values bit-identical after the runtime's fp16 rounding / worst error
+# as a fraction of the group max):
+#                       bf16 scales        f16 scales (per-group best of 3 steps)
+#   PLE                 73.80% / 7.81e-03  74.26% / 6.58e-03
+#   embed_tokens        73.48% / 7.81e-03  74.02% / 6.62e-03
+# Mismatches, embed_tokens rows 0-19999, in bf16 ulps of the source value:
+#   bf16 scales: 27.31% mismatched, 99.9% within 1 ulp, max 1.50 ulp
+#   f16 scales:  26.74% mismatched, 99.9% within 1 ulp, max 1.25 ulp
+# The residual is the source's own bf16 rounding of step x level, not the scale storage.
+# (A first f16 attempt that rounded the least-squares step straight to fp16 got only 29%
+#  bit-identical: the refinement drifts off the grid step and bf16 happened to round it back.)
+#
+# Same serving flags as tpu.env (float16, 0.90, 16384, 8 seqs), warm compile cache:
+#                          -text (bf16 emb)  -text-ple4 (bf16 sc.)  -text-emb4 (f16 sc.)
+# model loading            6.33 GiB          3.19 GiB               2.86 GiB
+# KV cache, warm           711,539           1,062,334              1,099,362 tokens
+# KV cache, cold compile   224,728           943,857                980,210 tokens
+# decode c=1, 256 tok      81.6 tok/s        81.2 tok/s             109.7 tok/s
+# greedy 8 x 160 tokens    reference         7/8 identical          8/8 identical
+#   (-ple4 diverged at token 55 of "What does the HTTP status code 418 mean?")
+
+# --- vllm.log, -text-emb4 engines (cold, then warm) ---
+(EngineCore pid=39419) INFO 09-29 20:21:51 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4'
+(EngineCore pid=39419) INFO 09-29 20:22:12 [model_runner.py:404] Model loading took 2.86 GiB memory and 18.217162 seconds
+(EngineCore pid=39419) INFO 09-29 20:24:17 [monitor.py:53] torch.compile took 120.78 s in total
+(EngineCore pid=39419) INFO 09-29 20:24:37 [kv_cache_utils.py:2032] GPU KV cache size: 980,210 tokens, Maximum concurrency for 16,384 tokens per request: 59.83x
+(EngineCore pid=39419) INFO 09-29 20:24:39 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 2.95 GiB for consumed memory (weights + non-torch), 1.39 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. 
+
+(EngineCore pid=39996) INFO 09-29 20:26:27 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4'
+(EngineCore pid=39996) INFO 09-29 20:26:44 [model_runner.py:404] Model loading took 2.86 GiB memory and 13.881366 seconds
+(EngineCore pid=39996) INFO 09-29 20:26:50 [monitor.py:53] torch.compile took 1.96 s in total
+(EngineCore pid=39996) INFO 09-29 20:26:54 [kv_cache_utils.py:2032] GPU KV cache size: 1,099,362 tokens, Maximum concurrency for 16,384 tokens per request: 67.10x
+(EngineCore pid=39996) INFO 09-29 20:26:56 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 2.95 GiB for consumed memory (weights + non-torch), 0.32 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. 
+
+# --- greedy outputs, -text vs -text-emb4 ---
+PROMPT: What is the capital of France? Answer in one word.
+SAME TOKENS: True
+TEXT  : Paris
+
+PROMPT: Write a Python function that returns the nth Fibonacci number. Code only.
+SAME TOKENS: True
+TEXT  : ```python def fibonacci(n):     """     Returns the nth Fibonacci number.     """     if n <= 0:         return 0     elif n == 1:         return 1     else:         a, b = 0, 1         for _ in range(2, n + 1):             a, b = b, a + b         return b ```
+
+PROMPT: Explain in two sentences why the sky is blue.
+SAME TOKENS: True
+TEXT  : The sky appears blue because of a phenomenon called Rayleigh scattering, where the Earth's atmosphere scatters shorter, blue wavelengths of sunlight more effectively than longer, red wavelengths. This scattered blue light is what reaches our eyes from all directions, making the sky look blue during the day.
+
+PROMPT: List the first ten prime numbers, comma separated.
+SAME TOKENS: True
+TEXT  : 2, 3, 5, 7, 11, 13, 17, 19, 23, 29
+
+PROMPT: Translate 'Where is the train station?' into German and Spanish.
+SAME TOKENS: True
+TEXT  : Here are the translations of "Where is the train station?" in German and Spanish:  **German:**  * **Wo ist der Bahnhof?** (Most common and natural)  **Spanish:**  * **¿Dónde está la estación de tren?** (Most common and natural)
+
+PROMPT: A farmer has 17 sheep and all but 9 run away. How many are left? Explain briefly.
+SAME TOKENS: True
+TEXT  : There are **9** sheep left.  **Explanation:**  The phrase "all but 9 run away" means that 9 sheep did *not* run away. Therefore, 9 sheep are still present.
+
+PROMPT: Summarize the plot of Romeo and Juliet in three sentences.
+SAME TOKENS: True
+TEXT  : In Verona, the star-crossed lovers Romeo and Juliet fall instantly in love despite their families' bitter feud. They secretly marry in a desperate attempt to be together, but their happiness is tragically short-lived when Romeo is forced to flee and Juliet fakes her death. Ultimately, their passionate love leads to a devastating climax where both characters die, finally bringing an end to the dest
+
+PROMPT: What does the HTTP status code 418 mean?
+SAME TOKENS: True
+TEXT  : The HTTP status code **418 I'm a teapot** is a **non-standard, humorous status code** defined in the HTTP specification (RFC 2324).  Here's a breakdown of what it means and why it exists:  ### 1. What it Means The code **418 I'm a teapot** is used to indicate that the server **refuses to brew coffee** because it is a teapot and not a coffee maker.  It is essentially a **joke** or a **playful error
+

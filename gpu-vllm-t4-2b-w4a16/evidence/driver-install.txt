@@ -1,0 +1,29 @@
+How the NVIDIA driver got onto this VM. MEASURED 2026-09-21 on the running host.
+The Debian 13 image ships no driver; these packages come from NVIDIA's own CUDA
+repository for debian13, not from Debian's archive.
+
+$ grep -rniE 'nvidia|cuda' /etc/apt/sources.list.d/
+/etc/apt/sources.list.d/cuda-debian13-x86_64.list:1:deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/ /
+
+$ apt-cache policy nvidia-driver
+nvidia-driver:
+  Installed: 615.71.09-2
+  Candidate: 615.71.09-2
+     500 https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64  Packages
+
+$ dpkg -l | grep -E '^ii +(nvidia-|linux-headers)'
+linux-headers-7.1.8+deb13-cloud-amd64   7.1.8-1~bpo13+1
+linux-headers-7.1.8+deb13-common        7.1.8-1~bpo13+1
+nvidia-driver                           615.71.09-2
+nvidia-driver-cuda                      615.71.09-2
+nvidia-driver-libs:amd64                615.71.09-2
+nvidia-kernel-open-dkms                 615.71.09-2
+nvidia-kernel-support                   615.71.09-2
+cuda-keyring                            1.1-1
+
+The kernel module is the OPEN variant built by DKMS (nvidia-kernel-open-dkms),
+so the matching linux-headers package must be installed first. The headers here
+come from backports (~bpo13+1) because the running kernel is 7.1.8+deb13-cloud-amd64.
+
+$ uname -r
+7.1.8+deb13-cloud-amd64

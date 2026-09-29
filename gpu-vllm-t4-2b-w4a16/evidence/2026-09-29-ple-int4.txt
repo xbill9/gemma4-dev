@@ -1,0 +1,71 @@
+# 2026-09-29 gpu-vllm-t4-2b: E2B with the PLE table packed int4 (vLLM 0.29.0, Tesla T4)
+#
+# Checkpoint: /opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-ple4, built by
+#   jev-tpu-31b/ple_int4.py from xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text (not published).
+#   That script is now jev-tpu-31b/embed_int4.py; this build = `embed_int4.py --scale-dtype bf16`.
+#   Superseded by the -text-emb4 build: 2026-09-29-embed-int4.txt.
+#   embed_tokens_per_layer: 4.375 GiB bf16 -> 1.230 GiB int4 group 32 + bf16 scales.
+#   All 73,400,320 groups on the QAT 4-bit grid (0 off-grid); 73.80% of values bit-identical,
+#   worst error 7.81e-03 of the group max (the bf16 scale). Scales 0.0030..0.910, exact in fp16.
+#   Checkpoint 6.11 -> 2.96 GiB. vLLM loads it through CompressedTensorsEmbeddingWNA16Int
+#   (config group `re:.*embed_tokens_per_layer$`); no code change.
+# Grid control: 24 random rows of google/gemma-4-E2B-it-qat-q4_0-unquantized (range-read):
+#   PLE 6720/6720 groups on grid, embed_tokens 1152/1152; the bf16 google/gemma-4-E2B-it:
+#   PLE 0/6720, embed_tokens 0/1152.
+# Serving flags identical to tpu.env (float16, 0.90, 16384, 8 seqs, no --language-model-only).
+#
+#                        text (bf16 PLE)   text-ple4
+# model loading          6.33 GiB          3.19 GiB
+# peak activation, warm  0.31 GiB          0.31 GiB
+# KV cache, warm         711,539 tokens    1,062,334 tokens (64.8x of 16,384)
+# KV cache, cold compile 224,728 tokens    943,857 tokens (1.37 GiB peak activation)
+# decode c=1, 256 tok    81.6 tok/s        81.2 tok/s   (median of runs 2-4, ignore_eos)
+# greedy, 8 prompts x 160 tokens: 7 token-identical; 1 diverges at token 55
+#   ("What does the HTTP status code 418 mean?")
+
+# --- vllm.log, int4-PLE engines (cold, then warm) ---
+(EngineCore pid=32985) INFO 09-29 18:51:29 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-ple4'
+(EngineCore pid=32985) INFO 09-29 18:51:54 [model_runner.py:404] Model loading took 3.19 GiB memory and 21.934521 seconds
+(EngineCore pid=32985) INFO 09-29 18:54:02 [monitor.py:53] torch.compile took 123.42 s in total
+(EngineCore pid=32985) INFO 09-29 18:54:21 [kv_cache_utils.py:2032] GPU KV cache size: 943,857 tokens, Maximum concurrency for 16,384 tokens per request: 57.61x
+(EngineCore pid=32985) INFO 09-29 18:54:24 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 3.29 GiB for consumed memory (weights + non-torch), 1.37 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. 
+
+(EngineCore pid=33502) INFO 09-29 18:55:52 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-ple4'
+(EngineCore pid=33502) INFO 09-29 18:56:38 [model_runner.py:404] Model loading took 3.19 GiB memory and 43.781421 seconds
+(EngineCore pid=33502) INFO 09-29 18:56:48 [monitor.py:53] torch.compile took 5.27 s in total
+(EngineCore pid=33502) INFO 09-29 18:56:53 [kv_cache_utils.py:2032] GPU KV cache size: 1,062,334 tokens, Maximum concurrency for 16,384 tokens per request: 64.84x
+(EngineCore pid=33502) INFO 09-29 18:56:56 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 3.29 GiB for consumed memory (weights + non-torch), 0.31 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. 
+
+# --- greedy outputs ---
+PROMPT: What is the capital of France? Answer in one word.
+TEXT : Paris
+PLE4 : Paris
+
+PROMPT: Write a Python function that returns the nth Fibonacci number. Code only.
+TEXT : ```python def fibonacci(n):     """     Returns the nth Fibonacci number.     """     if n <= 0:         return 0     elif n == 1:         return 1     else:         a, b = 0, 1         for _ in range(2, n + 1):             a, b = b, a + b         return b ```
+PLE4 : ```python def fibonacci(n):     """     Returns the nth Fibonacci number.     """     if n <= 0:         return 0     elif n == 1:         return 1     else:         a, b = 0, 1         for _ in range(2, n + 1):             a, b = b, a + b         return b ```
+
+PROMPT: Explain in two sentences why the sky is blue.
+TEXT : The sky appears blue because of a phenomenon called Rayleigh scattering, where the Earth's atmosphere scatters shorter, blue wavelengths of sunlight more effectively than longer, red wavelengths. This scattered blue light is what reaches our eyes from all directions, making the sky look blue during the day.
+PLE4 : The sky appears blue because of a phenomenon called Rayleigh scattering, where the Earth's atmosphere scatters shorter, blue wavelengths of sunlight more effectively than longer, red wavelengths. This scattered blue light is what reaches our eyes from all directions, making the sky look blue during the day.
+
+PROMPT: List the first ten prime numbers, comma separated.
+TEXT : 2, 3, 5, 7, 11, 13, 17, 19, 23, 29
+PLE4 : 2, 3, 5, 7, 11, 13, 17, 19, 23, 29
+
+PROMPT: Translate 'Where is the train station?' into German and Spanish.
+TEXT : Here are the translations of "Where is the train station?" in German and Spanish:  **German:**  * **Wo ist der Bahnhof?** (Most common and natural)  **Spanish:**  * **¿Dónde está la estación de tren?** (Most common and natural)
+PLE4 : Here are the translations of "Where is the train station?" in German and Spanish:  **German:**  * **Wo ist der Bahnhof?** (Most common and natural)  **Spanish:**  * **¿Dónde está la estación de tren?** (Most common and natural)
+
+PROMPT: A farmer has 17 sheep and all but 9 run away. How many are left? Explain briefly.
+TEXT : There are **9** sheep left.  **Explanation:**  The phrase "all but 9 run away" means that 9 sheep did *not* run away. Therefore, 9 sheep are still present.
+PLE4 : There are **9** sheep left.  **Explanation:**  The phrase "all but 9 run away" means that 9 sheep did *not* run away. Therefore, 9 sheep are still present.
+
+PROMPT: Summarize the plot of Romeo and Juliet in three sentences.
+TEXT : In Verona, the star-crossed lovers Romeo and Juliet fall instantly in love despite their families' bitter feud. They secretly marry in a desperate attempt to be together, but their happiness is tragically short-lived when Romeo is forced to flee and Juliet fakes her death. Ultimately, their passionate love leads to a devastating climax where both characters die, finally bringing an end to the dest
+PLE4 : In Verona, the star-crossed lovers Romeo and Juliet fall instantly in love despite their families' bitter feud. They secretly marry in a desperate attempt to be together, but their happiness is tragically short-lived when Romeo is forced to flee and Juliet fakes her death. Ultimately, their passionate love leads to a devastating climax where both characters die, finally bringing an end to the dest
+
+PROMPT: What does the HTTP status code 418 mean?
+TEXT : The HTTP status code **418 I'm a teapot** is a **non-standard, humorous status code** defined in the HTTP specification (RFC 2324).  Here's a breakdown of what it means and why it exists:  ### 1. What it Means The code **418 I'm a teapot** is used to indicate that the server **refuses to brew coffee** because it is a teapot and not a coffee maker.  It is essentially a **joke** or a **playful error
+PLE4 : The HTTP status code **418 I'm a teapot** is a **non-standard, humorous status code** defined in the HTTP specification (RFC 2324).  Here's a breakdown of what it means and why it exists:  ### What it Means  The code **418 I'm a teapot** is used to indicate that the server **refuses to brew coffee** because it is a teapot and not a coffee maker.  In a real-world scenario, this code is used as a **
+

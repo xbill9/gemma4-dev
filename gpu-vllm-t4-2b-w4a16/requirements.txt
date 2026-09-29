@@ -1,0 +1,28 @@
+# gpu-vllm-t4-2b — dependencies of the MCP SERVER, not of the model.
+#
+# Install into the interpreter that runs the MCP server:
+#   python3 -m pip install -r requirements.txt
+# Never create a virtualenv — see CLAUDE.md.
+#
+# vLLM AND torch ARE NOT LISTED HERE, and the omission is deliberate rather than
+# an oversight:
+#
+#   * They belong to a DIFFERENT INTERPRETER. On this host the MCP server runs
+#     under whatever python3 started it, while the model runs under
+#     `PYTHON_BIN=/usr/bin/python3.13` with `PYTHONUSERBASE=/opt1/pyuser`, whose
+#     site-packages is on the only volume with room. A `pip install -r` that
+#     dragged torch into the server's interpreter would put several GB on the
+#     nearly-full root disk and still not give the model anything.
+#   * The right torch build is not a constant. It has to match the CUDA the
+#     driver exposes (13.4 here) and the vLLM already installed; pinning it in a
+#     requirements file is how this host ended up with a CUDA vLLM on
+#     `torch 2.11.0+cpu`, which imports nothing.
+#
+# `check_host_capacity` prints the model-side install command with this host's
+# required redirections. Run it first.
+
+# PINNED BELOW 2. `mcp` 2.x renamed FastMCP to MCPServer, so the import in
+# server.py raises ModuleNotFoundError against it.
+mcp>=2,<3
+httpx>=0.27.0
+python-dotenv>=1.0.0

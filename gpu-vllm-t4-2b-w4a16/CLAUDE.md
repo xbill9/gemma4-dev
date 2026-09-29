@@ -1,35 +1,53 @@
-# CLAUDE.md — gpu-vllm-t4-2b
+# CLAUDE.md — gpu-vllm-t4-2b-w4a16
 
 Guidance for working inside this rig. The siblings are not layers; nothing is
 imported across a rig boundary. Read this file before changing anything.
 
 ## What this rig is
 
-**vLLM on one NVIDIA Tesla T4 that is already attached to the Compute Engine VM
-the rig runs on**, serving the bf16 reference build `google/gemma-4-E2B-it`.
+**vLLM on the NVIDIA Tesla T4 already attached to this Compute Engine VM, serving
+Gemma 4 E2B as 4-bit weights end to end**:
+`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` — Google's QAT weights repacked
+to compressed-tensors W4A16, text only, with the PLE table, `embed_tokens` and an
+untied `lm_head` packed int4 as well. `tpu.env` holds the full lineage.
 
-**4-bit builds moved to the sibling `gpu-vllm-t4-2b-w4a16` on 2026-09-29.** This rig
-served QAT builds by default from 2026-09-18 until then, under a bare `-2b` name
-that `@NAMING.md` reads as a claim of the reference weights; it is back on bf16.
-The two rigs share this GPU and port 8000 — stop one before starting the other.
-The 2026-09-18 sweep below measured both builds and stays here.
+**STATUS 2026-09-29: serving and measured**, vLLM 0.29.0. Warm compile cache,
+`tpu.env` flags: model loading **2.86 GiB**, KV cache **1,099,362 tokens**, decode
+**109.7 tok/s** at c=1, 8 of 8 greedy outputs token-identical to the
+bf16-embedding build. `evidence/2026-09-29-embed-int4.txt`. One stream only —
+**no concurrency sweep yet**; do not quote a batched number from this rig.
 
-**STATUS 2026-09-18: serving and measured.** vLLM 0.29.0 on torch 2.13.0+cu130.
-One run, `benchmarks/runs/2026-09-18-qat-vs-bf16-t4/` — read its `REPORT.md`
-before quoting a number from this rig. Headline: **QAT is 1.79x bf16 per stream
-and 1.31x at c=8** on 512-token prompts, because decode is bandwidth-bound and QAT
-reads 1.86 GB per token against 4.60; vLLM 0.29's Marlin runs on SM 7.5. The
-4-bit side of that comparison now serves from `gpu-vllm-t4-2b-w4a16`.
+**Forked from `gpu-vllm-t4-2b` on 2026-09-29**, which had been serving 4-bit
+builds under a bare `-2b` name — a claim of the bf16 reference weights under
+`@NAMING.md`. That rig is back on bf16. **Slot 5 is the only slot that differs**,
+so the pair is an encoding A/B on identical hardware, runtime and flags.
 
-**Prefill is this part's weak point and is not yet explained:** a 4096-token
-prompt takes ~7.2 s to first token on both builds, 24x the 512-token time for 8x
-the tokens. The suspect is the Turing clamp's effect on the 512-wide global
-attention layers; that is an inference, not a profile.
+**The two rigs share one GPU and port 8000, and neither sees the other's
+process** — each `server.py` tracks only its own `run/vllm.pid`. Stop one before
+starting the other. `~/bin/vllm-t4` defaults to the parent; set
+`VLLM_T4_RIG=~/gemma4-dev/gpu-vllm-t4-2b-w4a16` to drive this one.
 
-Forked from `gpu-vllm-g4dn-2b` (the T4 facts, the Turing patch) with its structure
-taken from `local-vllm-cpu-2b` (a rig with no control plane). Neither parent's
-shape survives intact, and the mixture is the point: the chip knowledge is the EC2
-rig's, the absent-provisioning shape is the local rig's.
+## `repack/` — the tools that built the checkpoint
+
+Self-contained copies, first written in `jev-tpu-31b` (which keeps its
+originals, so the published model cards' links still resolve). Run with
+`PYTHONUSERBASE=/opt1/pyuser /usr/bin/python3.13`; numpy only, no torch.
+
+| Script | Does |
+| :--- | :--- |
+| `repack_q4_0.py` | `-qat-q4_0-unquantized` → compressed-tensors W4A16, recovering each group's grid step |
+| `text_only.py` | drops the vision/audio towers, config → `Gemma4ForCausalLM`; everything else byte-identical |
+| `embed_int4.py` | packs the PLE table, and with `--embed-tokens` also `embed_tokens` + an untied int4 `lm_head`; fp16 scales by default |
+
+Three things that bit while writing them, all recorded in `@QUANTIZATION.md`:
+
+- **Output lands where the input's filesystem is.** Unchanged shards are
+  hard-linked; `~/.cache` is a symlink to `/opt1`, so write outputs under `/opt1`
+  or the root disk (~4-6 GB free) fills with copies.
+- **Host RAM is 7.8 GB.** `embed_int4.py` works in row chunks for that reason;
+  do not "simplify" it into one whole-table pass.
+- **fp16 scales help only when the step is chosen for exactness**, not for least
+  squares — see the script's `recover()` docstring.
 
 ## Slot 1 is `gpu`, not `local`, and this is the question people will re-open
 
@@ -65,24 +83,15 @@ types out of slot 3 entirely.
 the EC2 carve-out was about `t4g`, which AWS also sells as GPU-less Graviton2 CPU
 instances.
 
-## The A/B twin is `gpu-vllm-g4dn-2b`, and it is a clean one
+## The A/B twins
 
-Same TU104 T4, same 15360 MiB, same 5001 MHz memory clock, same x86_64 host
-architecture, same vLLM, same checkpoint, same serving flags. **Slots 1 and 3 are
-the only slots that differ**, and slot 3 differs only in spelling — `g4dn` is the
-EC2 family whose GPU is this same part. So the pair isolates the control plane:
-EC2-with-provisioning against a GPU that is simply present.
+- **`gpu-vllm-t4-2b`** — same everything except slot 5. The encoding comparison.
+- **`gpu-vllm-g6-2b-w4a16`** — same encoding on an L4, and the xbill9 repacks run
+  there as a `MODEL_NAME` override. Slots 1 and 3 differ, so a difference between
+  the two is hardware plus control plane, never the weights.
 
-`tpu.env` carries that rig's serving configuration **verbatim** for this reason.
-Changing `GPU_MEMORY_UTILIZATION`, `MAX_MODEL_LEN` or `MAX_NUM_SEQS` before the
-first run here forfeits the comparison. Both rigs have now MEASURED this
-configuration (g4dn 2026-08-30, here 2026-09-18), but **the pair is not yet a
-controlled A/B**: the runs differ in vLLM version (0.28.0 vs 0.29.0), benchmark
-tool and prompt content, and host vCPU (4 vs 2). A matched-version run on both is
-what would make the difference attributable to the control plane.
-
-The same relationship exists between `local-llamacpp-1650ti-2b-q4_0` and
-`gpu-llamacpp-g5g-2b-q4_0`, and `@NAMING.md` describes it there in the same terms.
+The serving flags in `tpu.env` are the parent's, carried verbatim so that the
+encoding A/B stays clean. Change them in both rigs or in neither.
 
 ## What actually blocks this rig, and it is not what it looks like
 
@@ -194,10 +203,10 @@ admits every unknown-bad one. A test pins this.
   `.gitignore`.
 - Read **`MemAvailable`, never `MemFree`**.
 - **Never a single `df`.** Disk is measured per target path. This host is the reason.
-- No `.claude-plugin/`, no `.codex/`, no `skills/` yet — matching the `local` rigs
-  rather than the EC2 ones. If they are added, the skill name must be
-  `gpu-vllm-t4-2b-management`: `make skill-install` does `rm -rf` on its
-  destination, so a shared skill name is destructive rather than merely confusing.
+- `.claude-plugin/` and `.codex/` register the MCP server as `gpu-vllm-t4-2b-w4a16`
+  (the directory name — `RIG_NAME` is derived from it). No `skills/` yet; if one is
+  added its name must be `gpu-vllm-t4-2b-w4a16-management`, because `make
+  skill-install` does `rm -rf` on its destination.
 
 ## Canonical root references
 

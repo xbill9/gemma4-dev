@@ -104,7 +104,12 @@
     {
       "name": "gpu-vllm-t4-2b",
       "source": "./gpu-vllm-t4-2b",
-      "description": "Compute Engine DevOps for the vLLM Gemma 4 E2B rig on one already-attached NVIDIA Tesla T4 (Turing, SM 7.5, 15360 MiB): host capacity arithmetic across three filesystems, GPU architecture verification against the target interpreter, the Triton shared-memory clamp Turing needs, server lifecycle and SRE diagnostics via the gpu-vllm-t4-2b MCP server. Serves google/gemma-4-E2B-it-qat-w4a16-ct by default, with the bf16 reference kept for the A/B against gpu-vllm-g4dn-2b \u2014 same TU104 T4 at the same clocks, one rig provisioning its hardware and the other simply having it. The first gpu rig here with no provisioning half: no launch, no image resolution, no teardown. Measured 2026-09-18 \u2014 QAT decodes 1.79x bf16 per stream."
+      "description": "Compute Engine DevOps for the vLLM Gemma 4 E2B rig on one already-attached NVIDIA Tesla T4 (Turing, SM 7.5, 15360 MiB): host capacity arithmetic across three filesystems, GPU architecture verification against the target interpreter, the Triton shared-memory clamp Turing needs, server lifecycle and SRE diagnostics via the gpu-vllm-t4-2b MCP server. Serves the bf16 reference google/gemma-4-E2B-it (4-bit builds moved to gpu-vllm-t4-2b-w4a16 2026-09-29), for the A/B against gpu-vllm-g4dn-2b \u2014 same TU104 T4 at the same clocks, one rig provisioning its hardware and the other simply having it. The first gpu rig here with no provisioning half: no launch, no image resolution, no teardown. Measured 2026-09-18 \u2014 QAT decodes 1.79x bf16 per stream."
+    },
+    {
+      "name": "gpu-vllm-t4-2b-w4a16",
+      "source": "./gpu-vllm-t4-2b-w4a16",
+      "description": "Manage vLLM serving of Gemma 4 E2B as 4-bit weights end to end (xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4: QAT W4A16 with int4 embeddings, text only) on one NVIDIA Tesla T4 (Turing, SM 7.5) already attached to a Compute Engine VM, via the gpu-vllm-t4-2b-w4a16 MCP server: host capacity across three filesystems, GPU architecture verification, the Triton shared-memory clamp Turing needs, server lifecycle and SRE diagnostics. Carries the repack tools that built the checkpoint. Forked from gpu-vllm-t4-2b 2026-09-29; slot 5 is the only difference. Measured: 2.86 GiB loaded, 1,099,362 KV tokens, 109.7 tok/s at c=1."
     },
     {
       "name": "tpu-jax-v5e1-2b",

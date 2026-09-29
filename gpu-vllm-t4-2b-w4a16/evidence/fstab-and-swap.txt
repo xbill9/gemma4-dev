@@ -1,0 +1,20 @@
+Which mounts survive a reboot on this host. MEASURED 2026-09-21.
+
+$ grep -vE '^\s*#' /etc/fstab
+PARTUUID=becee98a-a92f-428c-89f1-03050d2856e9 / ext4 rw,discard,errors=remount-ro,x-systemd.growfs 0 1
+PARTUUID=c6c99169-9e1f-4cf2-a2f6-d5d8822ff2ce /boot/efi vfat defaults,umask=077 0 2
+UUID=8bd96fe8-e301-41d9-8ccc-8123ce89c4a8 /opt1 ext4 discard,defaults,nofail 0 2
+
+The 250 GB data disk IS in fstab and mounts at boot. There is NO swap line, so
+/opt1/swapfile is not enabled at boot even though the file itself persists on
+that disk. `vllm-t4 start` runs swapon before launching for this reason.
+
+$ cat /proc/swaps
+Filename                Type    Size            Used            Priority
+/opt1/swapfile          file    16777212        3301828         -1
+
+$ df -B1 --output=target,size,avail / /tmp /opt1
+Mounted on    1B-blocks        Avail
+/           33570021376   8450138112
+/tmp         3898789888   3897544704
+/opt1      263086084096 200857059328

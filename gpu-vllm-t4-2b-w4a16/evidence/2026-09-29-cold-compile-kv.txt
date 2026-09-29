@@ -1,0 +1,38 @@
+# 2026-09-29 gpu-vllm-t4-2b: cold vs warm torch.compile, E2B W4A16 (vLLM 0.29.0, Tesla T4)
+# Identical serving flags on every start: --dtype float16 --kv-cache-dtype auto --tensor-parallel-size 1
+#   --gpu-memory-utilization 0.90 --max-model-len 16384 --max-num-seqs 8 (max_num_batched_tokens default 2048).
+# 21287: multimodal repack + --language-model-only, warm cache.  25933: text-only, local path, cold.
+# 28421: text-only, Hub id, cold.  30454: text-only, Hub id, warm (restart only).
+# Excerpted from run/vllm.log, one block per EngineCore.
+
+(EngineCore pid=21287) INFO 09-29 17:44:10 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct'
+(EngineCore pid=21287) INFO 09-29 17:46:28 [model_runner.py:404] Model loading took 6.37 GiB memory and 130.658687 seconds
+(EngineCore pid=21287) INFO 09-29 17:46:35 [decorators.py:313] Directly load AOT compilation from path /home/xbill_glitnir_com/.cache/vllm/torch_compile_cache/torch_aot_compile/a4a1545e52e3b1a66af801b9cfdf32b50f570d2f590eb17c989019e5335eadd1/rank_0_0/model
+(EngineCore pid=21287) INFO 09-29 17:46:35 [monitor.py:53] torch.compile took 1.66 s in total
+(EngineCore pid=21287) INFO 09-29 17:46:40 [kv_cache_utils.py:2032] GPU KV cache size: 707,617 tokens, Maximum concurrency for 16,384 tokens per request: 43.19x
+(EngineCore pid=21287) INFO 09-29 17:46:42 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 6.46 GiB for consumed memory (weights + non-torch), 0.31 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. Replace gpu_memory_utilization
+(EngineCore pid=21287) INFO 09-29 17:46:46 [core.py:361] init engine (profile, create kv cache, warmup model) took 17.35 s (compilation: 1.66 s)
+
+(EngineCore pid=25933) INFO 09-29 18:13:01 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text'
+(EngineCore pid=25933) INFO 09-29 18:14:36 [model_runner.py:404] Model loading took 6.33 GiB memory and 92.095020 seconds
+(EngineCore pid=25933) INFO 09-29 18:16:26 [backends.py:393] Compiling a graph for compile range (1, 2048) takes 79.75 s
+(EngineCore pid=25933) INFO 09-29 18:16:37 [monitor.py:53] torch.compile took 116.71 s in total
+(EngineCore pid=25933) INFO 09-29 18:16:56 [kv_cache_utils.py:2032] GPU KV cache size: 224,728 tokens, Maximum concurrency for 16,384 tokens per request: 13.72x
+(EngineCore pid=25933) INFO 09-29 18:16:59 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 6.43 GiB for consumed memory (weights + non-torch), 4.67 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. Replace gpu_memory_utilization
+(EngineCore pid=25933) INFO 09-29 18:17:10 [core.py:361] init engine (profile, create kv cache, warmup model) took 154.36 s (compilation: 116.71 s)
+
+(EngineCore pid=28421) INFO 09-29 18:24:12 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text'
+(EngineCore pid=28421) INFO 09-29 18:27:08 [model_runner.py:404] Model loading took 6.33 GiB memory and 173.871130 seconds
+(EngineCore pid=28421) INFO 09-29 18:28:59 [backends.py:393] Compiling a graph for compile range (1, 2048) takes 79.08 s
+(EngineCore pid=28421) INFO 09-29 18:29:10 [monitor.py:53] torch.compile took 117.11 s in total
+(EngineCore pid=28421) INFO 09-29 18:29:30 [kv_cache_utils.py:2032] GPU KV cache size: 224,728 tokens, Maximum concurrency for 16,384 tokens per request: 13.72x
+(EngineCore pid=28421) INFO 09-29 18:29:33 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 6.43 GiB for consumed memory (weights + non-torch), 4.67 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. Replace gpu_memory_utilization
+(EngineCore pid=28421) INFO 09-29 18:29:45 [core.py:361] init engine (profile, create kv cache, warmup model) took 155.78 s (compilation: 117.11 s)
+
+(EngineCore pid=30454) INFO 09-29 18:33:25 [core.py:123] Initializing a V1 LLM engine (v0.29.0) with config: model='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text'
+(EngineCore pid=30454) INFO 09-29 18:34:56 [model_runner.py:404] Model loading took 6.33 GiB memory and 88.630855 seconds
+(EngineCore pid=30454) INFO 09-29 18:35:02 [decorators.py:313] Directly load AOT compilation from path /home/xbill_glitnir_com/.cache/vllm/torch_compile_cache/torch_aot_compile/e39d1722997bf1cc44f5189c082c32b57bf2fc9aed4d812b8a408d64ddc21b49/rank_0_0/model
+(EngineCore pid=30454) INFO 09-29 18:35:02 [monitor.py:53] torch.compile took 1.47 s in total
+(EngineCore pid=30454) INFO 09-29 18:35:07 [kv_cache_utils.py:2032] GPU KV cache size: 711,539 tokens, Maximum concurrency for 16,384 tokens per request: 43.43x
+(EngineCore pid=30454) INFO 09-29 18:35:09 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 6.43 GiB for consumed memory (weights + non-torch), 0.31 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. Replace gpu_memory_utilization
+(EngineCore pid=30454) INFO 09-29 18:35:13 [core.py:361] init engine (profile, create kv cache, warmup model) took 16.46 s (compilation: 1.47 s)
