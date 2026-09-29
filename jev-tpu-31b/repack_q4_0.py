@@ -58,6 +58,8 @@ EXPERTS = re.compile(r"^model\.language_model\.layers\.(\d+)\.experts\.(gate_up_
 LAYER = re.compile(r"^model\.language_model\.layers\.(\d+)\.")
 # 2-D weights of modules that compressed-tensors' "Linear" target would match but
 # that stay bf16 on purpose; they go on the ignore list by module name.
+# --text-only drops these towers and serves the language model alone.
+TOWERS = re.compile(r"^model\.(vision_tower|vision_embedder|embed_vision|audio_tower|embed_audio)\.")
 KEEP_LINEAR = re.compile(r"(router\.proj|vision_tower\..*|embed_vision\..*)\.weight$")
 
 _DTYPES = {"BF16": (np.uint16, 2), "F16": (np.float16, 2), "F32": (np.float32, 4),
@@ -233,11 +235,13 @@ def _layer_job(args):
     return fname, [t[0] for t in tensors], ignored, kept
 
 
-def repack(src, out_dir, workers):
+def repack(src, out_dir, workers, text_only=False):
     os.makedirs(out_dir, exist_ok=True)
     ck = open_checkpoint(src)
     by_layer, rest = {}, []
     for name in ck:
+        if text_only and TOWERS.match(name):
+            continue
         m = LAYER.match(name)
         (by_layer.setdefault(int(m.group(1)), []) if m else rest).append(name)
 
@@ -282,6 +286,8 @@ def repack(src, out_dir, workers):
     for name in ck:
         if len(ck[name].header[name]["shape"]) != 2 or not name.endswith(".weight"):
             continue
+        if text_only and TOWERS.match(name):
+            continue
         if KEEP_LINEAR.search(name) or (
                 ".language_model." in name and "embed" not in name and name in weight_map):
             ignored.append(name[: -len(".weight")])
@@ -292,6 +298,9 @@ def repack(src, out_dir, workers):
               open(os.path.join(out_dir, "model.safetensors.index.json"), "w"), indent=2)
 
     cfg = json.load(open(os.path.join(src, "config.json")))
+    if text_only:
+        # No vision or audio weights: load the text-only class by default.
+        cfg["architectures"] = ["Gemma4ForCausalLM"]
     cfg["quantization_config"] = {
         "quant_method": "compressed-tensors",
         "format": "pack-quantized",
@@ -357,9 +366,16 @@ def verify(src, out_dir):
     ck, out = open_checkpoint(src), open_checkpoint(out_dir)
     cfg = json.load(open(os.path.join(out_dir, "config.json")))
     ignored = set(cfg["quantization_config"]["ignore"])
+    text_only = cfg.get("architectures") == ["Gemma4ForCausalLM"]
     stats, copied, problems = {}, {"tensors": 0, "byte_identical": 0}, []
+    dropped = 0
     for name in sorted(ck):
         r = ck[name]
+        if text_only and TOWERS.match(name):
+            dropped += 1
+            if name in out:
+                problems.append(f"text-only output still has a tower tensor: {name}")
+            continue
         kind = _kind(name)
         quantized_here = kind and name not in out
         if not quantized_here:
@@ -393,7 +409,7 @@ def verify(src, out_dir):
         print(f"checked {name}", file=sys.stderr, flush=True)
     for kind, a in stats.items():
         a["share_bit_identical"] = a["values_bit_identical"] / a["values"]
-    report = {"quantized": stats, "copied": copied, "problems": problems,
+    report = {"quantized": stats, "copied": copied, "problems": problems, "dropped_tower_tensors": dropped,
               "src_bytes": sum(os.path.getsize(r.path) for r in {id(r): r for r in ck.values()}.values()),
               "out_bytes": sum(os.path.getsize(r.path) for r in {id(r): r for r in out.values()}.values())}
     json.dump(report, open(os.path.join(out_dir, "verify_report.json"), "w"), indent=2)
@@ -407,9 +423,11 @@ def main():
     p.add_argument("src")
     p.add_argument("out")
     p.add_argument("--workers", type=int, default=6)
+    p.add_argument("--text-only", action="store_true",
+                   help="drop the vision and audio towers; config architectures -> Gemma4ForCausalLM")
     a = p.parse_args()
     if a.mode == "repack":
-        repack(a.src, a.out, a.workers)
+        repack(a.src, a.out, a.workers, a.text_only)
         return 0
     return verify(a.src, a.out)
 

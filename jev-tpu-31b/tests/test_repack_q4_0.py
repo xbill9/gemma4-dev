@@ -139,5 +139,19 @@ class LinearNames(unittest.TestCase):
                      "model.vision_tower.encoder.layers.0.mlp.up_proj.linear.weight"]:
             self.assertIsNone(rp._kind(name), name)
 
+
+class TextOnly(unittest.TestCase):
+    def test_towers_match_only_vision_and_audio(self):
+        for name in ["model.vision_tower.encoder.layers.0.mlp.up_proj.linear.weight",
+                     "model.embed_vision.embedding_projection.weight",
+                     "model.audio_tower.layers.3.self_attn.q_proj.linear.weight",
+                     "model.embed_audio.embedding_projection.weight",
+                     "model.vision_embedder.patch_dense.weight"]:
+            self.assertTrue(rp.TOWERS.match(name), name)
+        for name in ["model.language_model.embed_tokens.weight",
+                     "model.language_model.layers.0.self_attn.q_proj.weight",
+                     "model.language_model.embed_tokens_per_layer.weight"]:
+            self.assertFalse(rp.TOWERS.match(name), name)
+
 if __name__ == "__main__":
     unittest.main()
