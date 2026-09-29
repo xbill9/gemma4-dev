@@ -1,6 +1,6 @@
 # jev-tpu-v5e1
 
-Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); and the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28). See the sections below.
+Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28); and the 12B QAT W4A16 repack, which serves with a smaller patch and scores level with bf16 (2026-09-29). **For one user or a few agents on this chip, use the 12B repack.** See the sections below.
 
 ## Status and next steps (2026-09-28)
 
@@ -30,6 +30,35 @@ Next:
 3. Once an arm serves: `python3 quant_compare.py --prefix <run> --pair e2b-w4a16=results/2026-09-27-v5e1-e2btest-e2b-bf16 --solo e4b-w4a16 --solo 12b-w4a16`. The same arms on v6e are in `../jev-tpu-31b/results/2026-09-25-w4a16-*` for a chip-only pairing.
 
 Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` or this README, add `patches/` from `gs://aisprint-491218-bucket/jev-tpu-31b/inputs/tp4fix3-54532225.tgz`, name it by content hash, upload to `gs://aisprint-491218-bucket/jev-tpu-v5e1/inputs/`. `tests/` stays out because `run_quant.sh` runs pytest from a `/tests` mount where the scoring tests cannot import `score.py`.
+
+## 12B QAT W4A16 repack on one v5e chip: the model to use here (2026-09-29)
+
+**`2026-09-28-12b3-v5e1`** served [`xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct), the 12B repacked from `google/gemma-4-12B-it-qat-q4_0-unquantized` with `../jev-tpu-31b/repack_q4_0.py` (340,623,360 groups, none off the source grid; card and upload script in `../jev-tpu-31b/hf/12b/`), and `google/gemma-4-12B-it-qat-w4a16-ct` after it on the same chip with the same flags. Suite, paired record for record (`results/2026-09-28-12b3-v5e1-VS-*.md`):
+
+| repack on v5e-1 against | reference | repack | difference | 95% range |
+|---|---:|---:|---:|---|
+| Google's `-qat-w4a16-ct`, **same v5e chip** | 0.752 | 0.758 | +0.006 | +0.000 to +0.012 |
+| Google's `-qat-w4a16-ct`, v6e-1 | 0.751 | 0.758 | +0.007 | +0.001 to +0.013 |
+| `-qat-q4_0-unquantized` (its source, bf16), v6e-1 | 0.757 | 0.758 | +0.001 | −0.002 to +0.004 |
+| `google/gemma-4-12B-it` bf16, v6e-1 | 0.760 | 0.758 | −0.001 | −0.007 to +0.005 |
+
+The 26B on this chip scores 0.754 (section below).
+
+| one v5e chip | 12B repack | 12B Google | 26B repack (`lowmem.diff`) |
+|---|---:|---:|---:|
+| weights on the chip | 7.59 GiB | 9.46 GiB | 13.58 GiB |
+| compiled model | 3.98 GiB | — | 1.26 GiB |
+| KV room left (arithmetic from the boot logs) | ~3.9 GiB | ~2.0 GiB | ~0.65 GiB |
+| first-token latency, concurrency 1, median | 62.9 ms | 63.1 ms | 68.2 ms |
+| output tok/s at concurrency 1 / 4 / 16 | 33.0 / 127.4 / 387.9 | — | — |
+| boot, first / with the compile cache | 2,852 s / 436 s | 436 s (cache from the repack) | 1,806 s / — |
+
+Settings (`jev-env`, `jev-serve-args`): `GMM_V2_TILE_VMEM_FRACTION=0.85` (in `patches/lowmem.diff`; without it the 12B's gmm_v2 tile exceeds v5e's scoped VMEM), `MIN_TOKEN_BUCKET=64` and `--max-num-batched-tokens 512` (four backbone buckets, 64–512, instead of eight), `--gpu-memory-utilization 0.85 --num-gpu-blocks-override 40` (5,120 tokens), and `jev-swap-gb=40`, `jev-boot-timeout=7200`, `--hf-overrides` to `Gemma4ForCausalLM` (arm flag `override`). The compile cache is at `gs://aisprint-491218-bucket/jev-tpu-v5e1/xla-cache/v5e-12b-repack` (`jev-xla-seed=v5e-12b-repack`).
+
+What set those, from the two earlier runs:
+
+- **The compiled model is 3.92 GiB of "overlays"** for the dense 12B (1.15 for the 26B). With the KV cache filled to the 0.85 cap (5.78 GiB, 18,048 tokens) the compile needed 17.60 GiB (`2026-09-28-12b-v5e1`), hence the block cap. 40 blocks is what the suite and the load test need; about 90 would fit.
+- **Compiling eight buckets did not finish in an hour**: host memory grew about 7 GB per 5 minutes, filled RAM and 21 GB of swap (`2026-09-28-12b2-v5e1`). Four buckets peaked at about 40 GB plus 9 GB of swap.
 
 ## 26B W4A16 on one v5e chip: serves (2026-09-28)
 
@@ -85,7 +114,8 @@ The int8 embedding is the one change that alters the served weights; the paired 
 | `google/gemma-4-E4B-it` bf16 | 14.9 GiB | no |
 | `google/gemma-4-E4B-it-qat-w4a16-ct` | not measured | expected yes |
 | `google/gemma-4-12B-it` bf16 | 22.4 GiB | no |
-| `google/gemma-4-12B-it-qat-w4a16-ct` | not measured; ~5.6 GiB body plus bf16 embeddings | expected yes, with a small KV pool |
+| `google/gemma-4-12B-it-qat-w4a16-ct` | 9.46 GiB resident, measured | yes (above) |
+| `xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct` (repack) | 7.59 GiB resident, measured | **yes, recommended** (above) |
 | 26B A4B W4A16 (repacked, `xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`) | 15.29 GiB on disk, 17.43 resident on v6e | **yes, with `lowmem.diff`**: 13.58 GiB resident, measured (below) |
 | 31B, any build | ≥ 14.4 GiB before anything else | no |
 

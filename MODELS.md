@@ -665,6 +665,23 @@ int8/int4 columns are arithmetic halving/quartering **except** the 26B, whose in
 15.29 GiB is the W4A16 repack's safetensors on disk, 17.43 GiB its `total_hbm_used_gb` on one v6e chip
 (§26B, HBM budget).
 
+### The 12B QAT W4A16 repack on a v5e-1: level with bf16, above Google's export
+
+`google/gemma-4-12B-it-qat-q4_0-unquantized` repacked to W4A16 by `jev-tpu-31b/repack_q4_0.py` is exact:
+340,623,360 groups, none off the source grid, 89.6% of values bit-identical, the rest within the bf16
+scale (max 1.09e-2 relative); 7.68 GiB on disk against 22.28, 7.59 GiB resident on a v5e chip against
+9.46 for `-qat-w4a16-ct`. Published as [`xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct).
+
+MEASURED 2026-09-29 (`jev-tpu-v5e1`, run `2026-09-28-12b3-v5e1`), suite paired record for record: 0.758
+against 0.752 for Google's `-qat-w4a16-ct` on the same v5e chip (+0.6 points, 95% range +0.0 to +1.2),
+against 0.757 for its bf16 source on v6e (+0.1), and against 0.760 for the bf16 12B on v6e (−0.1, −0.7 to
++0.5). So Google's W4A16 export costs about 0.6 points that the Q4_0 grid values do not, consistent with
+the 6.67% weight-level difference measured on the 31B (`QUANTIZATION.md`).
+
+On one v5e chip it takes the gmm_v2 VMEM headroom (`GMM_V2_TILE_VMEM_FRACTION=0.85`) and four compile
+buckets; its compiled model is 3.98 GiB, leaving about 3.9 GiB for KV. 33 output tok/s at concurrency 1,
+388 at 16 (v6e: 992 at 16); first-token latency 62.9 ms median.
+
 ### The 26B W4A16 repack on a v5e-1: serves with four loader changes
 
 [`xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct)

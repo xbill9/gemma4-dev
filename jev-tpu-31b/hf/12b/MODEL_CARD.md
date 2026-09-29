@@ -24,15 +24,17 @@ tags:
 
 Google publishes its own W4A16 QAT checkpoint for the 12B. Its 4-bit values are not the grid values of the `-q4_0-unquantized` export: on the 31B, dequantizing Google's `-w4a16-ct` against its `-q4_0-unquantized` gives 6.67% relative error on every projection, while every unquantized tensor is bit-identical. This repack stores the `-q4_0-unquantized` grid values themselves.
 
-On a 3,880-record public suite read by label probability, on one TPU v6e chip, the two 12B sources scored:
+On a 3,880-record public suite read by label probability, paired record for record:
 
-| 12B build | Suite |
-|---|---:|
-| `google/gemma-4-12B-it` bf16 | 76.0% |
-| `google/gemma-4-12B-it-qat-q4_0-unquantized` (the values this repack stores, served in bf16) | 75.7% |
-| `google/gemma-4-12B-it-qat-w4a16-ct` | 75.1% |
+| 12B build | Where | Suite | This repack on one v5e chip, difference (95% range) |
+|---|---|---:|---|
+| `google/gemma-4-12B-it` bf16 | one v6e chip | 76.0% | −0.1 points (−0.7 to +0.5) |
+| `google/gemma-4-12B-it-qat-q4_0-unquantized` (this repack's source, served in bf16) | one v6e chip | 75.7% | +0.1 (−0.2 to +0.4) |
+| `google/gemma-4-12B-it-qat-w4a16-ct` | one v6e chip | 75.1% | +0.7 (+0.1 to +1.3) |
+| `google/gemma-4-12B-it-qat-w4a16-ct` | **the same v5e chip, same flags** | 75.2% | **+0.6 (+0.0 to +1.2)** |
+| **This repack** | one v5e chip | **75.8%** | |
 
-The difference between the last two is −0.7 points (95% range −1.3 to 0.0). This repack itself has not yet been scored.
+It scores level with bf16 and its bf16 source, and above Google's W4A16 export on the same chip.
 
 ## What it is
 
@@ -59,6 +61,18 @@ The textbook Q4_0 step, `max|w| / 8`, is wrong for any group whose largest weigh
 
 All 349 unquantized tensors are byte-identical to the source. The values that are not bit-identical differ through the bf16 scale (Q4_0 carries a 16-bit float step), by at most 1.09e-2 relative. `repack_report.json` and `verify_report.json` in this repository are that run's outputs.
 
+## Measured on one TPU v5e chip
+
+One `v5litepod-1` (15.75 GiB HBM), vLLM TPU `vllm/vllm-tpu@sha256:19a1a052…` with the W4A16 patches below:
+
+| | This repack | `google/gemma-4-12B-it-qat-w4a16-ct` |
+|---|---:|---:|
+| Weights resident | 7.59 GiB | 9.46 GiB |
+| First-token latency, one request, median | 62.9 ms | 63.1 ms |
+| Output tokens/s at 1 / 4 / 16 concurrent requests (256 tokens each) | 33.0 / 127.4 / 387.9 | not measured |
+
+On v5e it needs gmm_v2 tiles chosen with VMEM headroom, fewer compile buckets and a capped KV cache; the settings, logs and per-record outputs are at https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-v5e1 (section "12B QAT W4A16 repack on one v5e chip").
+
 ## Serving it
 
 **Google Cloud TPU.** vLLM's TPU backend loads W4A16 linear layers with [tpu-inference #3653](https://github.com/vllm-project/tpu-inference/pull/3653). The 12B loads on the JAX path as a text-only model with:
@@ -72,7 +86,7 @@ vllm serve <this-repo> --max-model-len 2048 \
 
 ## Limitations
 
-- Not yet served or scored; the measurements above are of the source checkpoints.
+- Measured on TPU v5e and v6e only, at tensor parallelism 1; NVIDIA GPUs untested with this checkpoint.
 - Text only is the intended path on TPU; the vision tower is present but untested.
 - Unofficial. Report problems here, not to Google.
 
