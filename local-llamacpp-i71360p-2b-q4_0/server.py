@@ -22,7 +22,7 @@ CUDA_VISIBLE_DEVICES, and `start_model_server` refuses a llama-server binary bui
 with a GPU backend. This host has no NVIDIA device, and the guards stay so the
 rig's claim does not depend on which machine it is checked out on.
 
-MEMORY: per_layer_token_embd (1.32 GB, 50% of the file) is created with
+MEMORY: per_layer_token_embd (1.32 GB, 51% of the file) is created with
 TENSOR_READ_LAZY in llama.cpp's src/models/gemma4.cpp and served by GET_ROWS out
 of the mmap. --no-mmap breaks the mechanism. See CLAUDE.md.
 """
@@ -232,9 +232,9 @@ async def model_info() -> str:
         f"- **Name:** `{MODEL_NAME}`\n"
         f"- **Path:** `{path}`\n"
         f"- **On disk:** {size_gb:.2f} GB\n"
-        f"- **Quantization slot:** `q4_0`, and every quantized tensor is Q4_0 — both "
+        f"- **Quantization slot:** `q4_0`, and every weight matrix is Q4_0 — both "
         f"embedding tables included (Google's GGUF stores those as Q6_K).\n"
-        f"- **Touched every token:** ~1.30 GB. `per_layer_token_embd` (1.32 GB, 50% of the "
+        f"- **Touched every token:** ~1.28 GB. `per_layer_token_embd` (1.32 GB, 51% of the "
         f"file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out of the mmap, a few rows "
         f"per token.\n\n"
         f"Run `inspect_gguf.py` to re-derive the split from the artifact rather than "

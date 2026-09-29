@@ -40,7 +40,7 @@ help:
 	@echo "  make lint          - ruff on the module list below"
 	@echo "  make clean         - remove caches"
 	@echo "========================================================="
-	@echo "Never pass --no-mmap: per_layer_token_embd (50% of the file) is"
+	@echo "Never pass --no-mmap: per_layer_token_embd (51% of the file) is"
 	@echo "TENSOR_READ_LAZY and requires mmap."
 
 install:

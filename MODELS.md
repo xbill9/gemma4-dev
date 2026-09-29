@@ -883,7 +883,10 @@ trained step, no block is off the grid and 96.84% of values are bit-identical to
 | same top token | 87.18% | 98.06% |
 | PPL / PPL(bf16) | 1.0892 | 1.0213 |
 
-Generation is 1.069x / 1.074x Google's file in the two run orders. With the embeddings at Q4_0,
+Generation is 1.069x / 1.074x Google's file in the two run orders. `per_layer_model_proj`, F16 in
+Google's file, is QAT data too (0 of 430,080 groups off the grid); stored as Q4_0 it takes the file to
+2,620,370,912 B with mean KL divergence 0.001683 ± 0.000066 against 0.001761 ± 0.000077 before, on
+the native build. With the embeddings at Q4_0,
 `per_layer_token_embd` is 1.321 GB and **50% of the file**, not 58%: the lazy share above is a
 property of Google's Q6_K file. Published as `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`; build script
 and evidence in the rig's `benchmarks/runs/2026-09-29-exact-gguf-i71360p/`.

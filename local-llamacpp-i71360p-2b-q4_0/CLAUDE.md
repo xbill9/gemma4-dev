@@ -11,7 +11,9 @@ only** of a Lenovo Yoga 9 14IRP8 (i7-1360P). No GPU, no control plane, no cloud.
 
 **STATUS 2026-09-29: serving on `fc07d781e`.** First light through the MCP tools,
 the Google-vs-rebuilt comparison and a thread spot-check are in
-`benchmarks/runs/2026-09-29-exact-gguf-i71360p/`.
+`benchmarks/runs/2026-09-29-exact-gguf-i71360p/`. The file now served also stores
+`per_layer_model_proj` as Q4_0 (19.8 MB smaller, KL divergence unchanged):
+`benchmarks/runs/2026-09-29-exact-gguf-v2-i71360p/`.
 
 ## Where the code came from, and what did not come with it
 
@@ -29,21 +31,23 @@ should not depend on which machine it is checked out on.
 ## The model
 
 Google's `gemma-4-E2B-it-qat-q4_0-gguf` metadata, byte for byte, with every Q4_0
-tensor and both embedding tables rebuilt from
+tensor, both embedding tables and `per_layer_model_proj` rebuilt from
 `google/gemma-4-E2B-it-qat-q4_0-unquantized` on the trained grid step
-(`gguf_exact.py` in the run directory). SHA-256 in `tpu.env`.
+(`gguf_exact.py` in the v2 run directory). SHA-256 in `tpu.env`.
 
 | tensor | type | bytes | touched per token |
 | --- | --- | ---: | --- |
 | `per_layer_token_embd.weight` `[8960, 262144]` | Q4_0 | 1,321.2 MB | a few rows — `TENSOR_READ_LAZY` |
 | `token_embd.weight` `[1536, 262144]` | Q4_0 | 226.5 MB | all of it (tied output projection) |
 | 35 transformer blocks | Q4_0 (norms F32) | 1,049.1 MB | all of it |
+| `per_layer_model_proj.weight` `[1536, 8960]` | Q4_0 | 7.7 MB | all of it |
 
-`inspect_gguf.py` re-derives this from the file. 98.9% of the file is Q4_0.
+`inspect_gguf.py` re-derives this from the file. All of it is Q4_0 except 1.1 MB
+of F32 norms and scale vectors.
 
 - **Never pass `--no-mmap`.** `TENSOR_READ_LAZY` requires mmap. A test asserts it.
-- **Reported model size:** llama-bench prints 2.44 GiB for this file and 3.10 GiB
-  for Google's.
+- **Reported model size:** llama-bench prints 2.43 GiB for this file, 2.44 GiB for
+  the first rebuild and 3.10 GiB for Google's.
 
 ## This host
 

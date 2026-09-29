@@ -8,8 +8,8 @@ Q4_0 GGUF: Google's QAT weights on their trained 4-bit grid, embeddings included
 | Platform | `local` — no control plane, nothing provisioned, Ctrl-C is a complete teardown |
 | Runtime | `llama-server` from llama.cpp `fc07d781e`, CPU-only build (`GGML_CUDA=OFF`) |
 | Hardware | `i71360p` — Lenovo Yoga 9 14IRP8, i7-1360P (4 P + 8 E cores, 16 threads), AVX2 + AVX-VNNI, 15 GiB, no discrete GPU |
-| Model | [`xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf), 2.64 GB |
-| Encoding | `q4_0` — every quantized tensor, both embedding tables included |
+| Model | [`xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf), 2.62 GB |
+| Encoding | `q4_0` — every weight matrix, both embedding tables included |
 | Endpoint | `http://127.0.0.1:8090` |
 
 `tpu.env` holds the authoritative values.
@@ -19,7 +19,8 @@ Q4_0 GGUF: Google's QAT weights on their trained 4-bit grid, embeddings included
 Rebuilt GGUF against Google's `gemma-4-E2B-it-qat-q4_0-gguf`, both measured against a bf16
 GGUF of the same QAT weights:
 
-- 🟢 **2.64 GB against 3.35 GB.**
+- 🟢 **2.64 GB against 3.35 GB**, and 2.62 GB with `per_layer_model_proj` also at Q4_0
+  (KL divergence unchanged, [v2 run](benchmarks/runs/2026-09-29-exact-gguf-v2-i71360p/REPORT.md)).
 - 🟢 **Mean KL divergence 0.00175 against 0.0543**; same top token 98.06% against 87.18%.
 - 🟢 **Generation 7% faster** in both run orders (1.069x, 1.074x). Prefill shows no stable
   difference.
