@@ -327,6 +327,78 @@ index 97ec21d80..8fae66c5a 100644
 +
 +        out = jax.lax.map(chunk, (q.reshape(n, c, d), s.reshape(n, c, -1)))
 +        return jnp.moveaxis(out, 0, -2).reshape(*x.shape[:-1], v)
+diff --git a/tpu_inference/layers/jax/quantization/compressed_tensors.py b/tpu_inference/layers/jax/quantization/compressed_tensors.py
+index 5e06525ff..547252c1d 100644
+--- a/tpu_inference/layers/jax/quantization/compressed_tensors.py
++++ b/tpu_inference/layers/jax/quantization/compressed_tensors.py
+@@ -39,7 +39,8 @@ from tpu_inference.layers.jax.quantization.configs import (QuantizationConfig,
+                                                            QuantLinearConfig)
+ from tpu_inference.layers.jax.quantization.fp8 import (
+     Fp8BlockwiseLinearMethod, Fp8FusedMoEMethod, Fp8TensorwiseLinearMethod,
+-    Fp8TensorwiseMergedLinearMethod)
++    Fp8TensorwiseMergedLinearMethod, Int8ChannelwiseLinearMethod,
++    Int8ChannelwiseMergedLinearMethod)
+ from tpu_inference.layers.jax.quantization.unquantized import (
+     UnquantizedFusedMoEMethod, UnquantizedLinearMethod)
+ from tpu_inference.layers.jax.quantization.wna16 import (
+@@ -207,6 +208,14 @@ class CompressedTensorsConfig(QuantizationConfig):
+                 return Fp8TensorwiseMergedLinearMethod(layer, linear_config)
+             return Fp8TensorwiseLinearMethod(layer, linear_config)
+ 
++        if (self._ct._is_dynamic_token_w8a8(weight_quant, input_quant)
++                and weight_quant.type == "int"
++                and weight_quant.strategy == "channel"
++                and input_quant.symmetric):
++            if isinstance(layer, JaxMergedColumnParallelLinear):
++                return Int8ChannelwiseMergedLinearMethod(layer, linear_config)
++            return Int8ChannelwiseLinearMethod(layer, linear_config)
++
+         if _is_w4a16(weight_quant, input_quant):
+             _check_w4a16_layout(scheme, weight_quant, self._ct, prefix)
+             if isinstance(layer, JaxMergedColumnParallelLinear):
+diff --git a/tpu_inference/layers/jax/quantization/fp8.py b/tpu_inference/layers/jax/quantization/fp8.py
+index 1a74e4176..70e753287 100644
+--- a/tpu_inference/layers/jax/quantization/fp8.py
++++ b/tpu_inference/layers/jax/quantization/fp8.py
+@@ -57,6 +57,11 @@ class Fp8TensorwiseLinearMethod(QuantizeMethodBase,
+                                 common_fp8.Fp8LinearMethod):
+     """Tensor-wise Fp8 method for JAX Linear layer."""
+ 
++    # Per-output-channel scale; sharded_quantized_matmul quantizes the
++    # activation to this dtype per token, so an integer dtype runs an integer
++    # matmul (int8 x int8 -> int32 on the MXU).
++    WEIGHT_DTYPE = jnp.float8_e4m3fn
++
+     def __init__(self, layer: JaxEinsum, linear_config: QuantLinearConfig):
+         common_fp8.Fp8LinearMethod.__init__(self, linear_config)
+ 
+@@ -85,7 +90,7 @@ class Fp8TensorwiseLinearMethod(QuantizeMethodBase,
+ 
+         layer.weight = create_param(rngs,
+                                     shape=self.kernel_shape,
+-                                    dtype=jnp.float8_e4m3fn,
++                                    dtype=self.WEIGHT_DTYPE,
+                                     sharding=self.weight_sharding)
+ 
+         layer.weight.set_metadata(
+@@ -207,6 +212,17 @@ class Fp8TensorwiseMergedLinearMethod(Fp8TensorwiseLinearMethod):
+                               param_name=layer.prefix + ".weight_scale"))
+ 
+ 
++class Int8ChannelwiseLinearMethod(Fp8TensorwiseLinearMethod):
++    """compressed-tensors int8 W8A8: int8 weights with a per-channel scale and
++    activations quantized to int8 per token at run time."""
++    WEIGHT_DTYPE = jnp.int8
++
++
++class Int8ChannelwiseMergedLinearMethod(Fp8TensorwiseMergedLinearMethod):
++    """Int8ChannelwiseLinearMethod for fused gate_up / qkv layers."""
++    WEIGHT_DTYPE = jnp.int8
++
++
+ class Fp8BlockwiseLinearMethod(QuantizeMethodBase, common_fp8.Fp8LinearMethod):
+     """Block-wise Fp8 method for JAX Linear layer."""
+ 
 diff --git a/tpu_inference/layers/jax/quantization/wna16.py b/tpu_inference/layers/jax/quantization/wna16.py
 index e6ccc5f66..dbbcb4181 100644
 --- a/tpu_inference/layers/jax/quantization/wna16.py
