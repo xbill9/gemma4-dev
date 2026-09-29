@@ -1,0 +1,815 @@
+diff --git a/tpu_inference/envs.py b/tpu_inference/envs.py
+index 22ed41338..e1b7c6493 100644
+--- a/tpu_inference/envs.py
++++ b/tpu_inference/envs.py
+@@ -39,6 +39,11 @@ if TYPE_CHECKING:
+     MOE_REQUANTIZE_WEIGHT_DTYPE: str = ""
+     MOE_REQUANTIZE_CLIP_PERCENTILE: float | None = None
+     MOE_STAGE_WEIGHTS_ON_HOST: bool = False
++    W4A16_MOE_BF16_SCALES: bool = False
++    W4A16_MOE_NO_PAD: bool = False
++    SKIP_IDENTITY_MODEL_JIT: bool = False
++    EMBED_INT8_GROUP: int = 0
++    GMM_V2_TILE_VMEM_FRACTION: float = 1.0
+     ATTN_BUCKETIZED_NUM_REQS: bool = False
+     ATTN_CUSTOM_NUM_REQS_BUCKETS: list[int] = []
+     LAYOUT_Q_PROJ_AS_NDH: bool = False
+@@ -352,6 +357,33 @@ environment_variables: dict[str, Callable[[], Any]] = {
+     # stage the full tensor on device regardless.
+     "MOE_STAGE_WEIGHTS_ON_HOST":
+     env_bool("MOE_STAGE_WEIGHTS_ON_HOST", default=False),
++    # W4A16 routed experts: keep the checkpoint's bf16 group scales on the
++    # device instead of widening them to float32. Halves the scale footprint;
++    # gmm_v2 multiplies in the activation dtype either way.
++    "W4A16_MOE_BF16_SCALES":
++    env_bool("W4A16_MOE_BF16_SCALES", default=False),
++    # W4A16 routed experts: do not pad the intermediate dim to a multiple of
++    # 128. gmm1 then runs without the fused activation whenever its output
++    # width is not a multiple of 256, and the activation runs in JAX.
++    "W4A16_MOE_NO_PAD":
++    env_bool("W4A16_MOE_NO_PAD", default=False),
++    # After loading real weights, skip the jitted pass over the model state
++    # when no Qwix quantization is configured. Without Qwix that pass is an
++    # identity, but it can still materialize a second copy of every weight,
++    # which does not fit when the weights fill most of the chip.
++    "SKIP_IDENTITY_MODEL_JIT":
++    env_bool("SKIP_IDENTITY_MODEL_JIT", default=False),
++    # When > 0, a tied token embedding is stored after loading as int8 with
++    # one bf16 scale per this many columns; lookups and the tied LM head
++    # dequantize on the fly. Halves the table (1.38 -> 0.73 GiB for a
++    # 262144 x 2816 vocabulary at 32).
++    "EMBED_INT8_GROUP":
++    lambda: int(os.getenv("EMBED_INT8_GROUP", "0")),
++    # gmm_v2 picks tiles against its full scoped-VMEM limit, and its estimate
++    # leaves out in-kernel temporaries; below 1.0, tiles are chosen against
++    # this fraction of the limit while the compiler keeps the full limit.
++    "GMM_V2_TILE_VMEM_FRACTION":
++    lambda: float(os.getenv("GMM_V2_TILE_VMEM_FRACTION", "1.0")),
+     # By default, it only use max_reqs for attentions. But if set true, it
+     # will precompile max_reqs to power-of-twos between min and max reqs,
+     # and attention will have the num_reqs closer to actual num_reqs. This
+diff --git a/tpu_inference/layers/common/fused_moe_gmm.py b/tpu_inference/layers/common/fused_moe_gmm.py
+index a6dcc548d..c7de1b34b 100644
+--- a/tpu_inference/layers/common/fused_moe_gmm.py
++++ b/tpu_inference/layers/common/fused_moe_gmm.py
+@@ -29,6 +29,7 @@ from tpu_inference.kernels.sparse_core.ragged_gather_reduce_v2 import \
+     ragged_gather_reduce
+ from tpu_inference.kernels.sparse_core.ragged_gather_v2 import \
+     ragged_gather_v2 as ragged_gather
++from tpu_inference.layers.common.linear import gmm_tile_info
+ from tpu_inference.layers.common.quantization import quantize_tensor
+ from tpu_inference.layers.common.sharding import ShardingAxisName
+ from tpu_inference.logger import init_logger
+@@ -118,10 +119,34 @@ def gmm_wrapper(lhs,
+         zero_initialize=False,
+         fuse_act=fuse_act,
+         preferred_element_type=preferred_element_type,
++        tile_info=gmm_tile_info(),
+     )
+     return gmm_res
+ 
+ 
++def _gate_up_act(gate_up: jax.Array, activation: str,
++                 out_dtype: jnp.dtype) -> jax.Array:
++    """act(gate) * up for a gmm1 output laid out as [gate | up], unfused.
++
++    Mirrors gmm_v2's fused activations for the names it supports; the fused
++    path splits interleaved lane chunks instead, which needs the intermediate
++    dim padded to a multiple of 128. Pass gate_up in float32, as the fused
++    kernel's accumulator is, so that only the product is rounded.
++    """
++    gate, up = jnp.split(gate_up, 2, axis=-1)
++    match activation:
++        case "silu":
++            act = jax.nn.silu(gate)
++        case "gelu":
++            act = jax.nn.gelu(gate)
++        case "gelu_tanh":
++            act = jax.nn.gelu(gate, approximate=True)
++        case _:
++            raise NotImplementedError(
++                f"Unfused gmm1 does not support activation {activation}")
++    return (act * up).astype(out_dtype)
++
++
+ def valid_rows_mask(batch_size: int, group_sizes: jax.Array,
+                     group_start: jax.Array, group_end: jax.Array) -> jax.Array:
+     """Mask indicating rows processed by current shard."""
+@@ -187,6 +212,10 @@ def moe_gmm_local(x: jax.Array,
+     assert parallelism in ["tp", "ep"]
+ 
+     # GMM1 computes x @ (W_up | W_gate) together and activation, output is [tokens,padded_intermediate_size]
++    # The fused activation needs w1's output width to be a multiple of
++    # 2 * 128 lanes; an unpadded intermediate dim (W4A16_MOE_NO_PAD) takes
++    # the activation outside the kernel instead.
++    fuse_act = activation if w1.shape[-1] % 256 == 0 else None
+     gmm1_res = gmm_wrapper(
+         x,
+         w1,
+@@ -194,9 +223,11 @@ def moe_gmm_local(x: jax.Array,
+         w1_bias,
+         group_sizes,
+         group_offset,
+-        fuse_act=activation,
+-        preferred_element_type=x.dtype,
++        fuse_act=fuse_act,
++        preferred_element_type=x.dtype if fuse_act else jnp.float32,
+     )
++    if fuse_act is None:
++        gmm1_res = _gate_up_act(gmm1_res, activation, x.dtype)
+ 
+     # When the parallelism is TP since w2_bias is not sharded, we should only apply bias
+     # once, not applying to every shard. So we set w2_bias to 0 to all shards other than
+diff --git a/tpu_inference/layers/common/linear.py b/tpu_inference/layers/common/linear.py
+index bf01b777d..17cfee1e2 100644
+--- a/tpu_inference/layers/common/linear.py
++++ b/tpu_inference/layers/common/linear.py
+@@ -16,17 +16,32 @@ import jax
+ import jax.numpy as jnp
+ from jax.sharding import Mesh, NamedSharding
+ from jax.sharding import PartitionSpec as P
+-from tokamax._src.ops.experimental.gmm_v2.gmm_v2 import gmm_v2
++from tokamax._src.ops.experimental.gmm_v2.gmm_v2 import (calculate_tiling,
++                                                         gmm_v2)
+ 
+ from tpu_inference.kernels.quantized_matmul.util import (
+     quantize_tensor, xla_quantized_batched_matmul)
+ from tpu_inference.layers.common.sharding import ShardingAxisName
++from tpu_inference import envs
+ from tpu_inference.logger import init_logger
+ from tpu_inference.utils import get_mesh_shape_product
+ 
+ logger = init_logger(__name__)
+ 
+ 
++def gmm_v2_tiling(dims, lhs_cfgs, rhs_cfgs, vmem_limit_bytes, fuse_act=None):
++    """calculate_tiling against GMM_V2_TILE_VMEM_FRACTION of the VMEM limit."""
++    return calculate_tiling(
++        dims, lhs_cfgs, rhs_cfgs,
++        int(vmem_limit_bytes * envs.GMM_V2_TILE_VMEM_FRACTION), fuse_act)
++
++
++def gmm_tile_info():
++    """tile_info for gmm_v2: the stock heuristic unless a fraction is set."""
++    return (calculate_tiling
++            if envs.GMM_V2_TILE_VMEM_FRACTION >= 1.0 else gmm_v2_tiling)
++
++
+ def xla_quantized_matmul(
+     x: jax.Array,
+     w_q: jax.Array,
+@@ -232,6 +247,7 @@ def sharded_quantized_matmul(x: jax.Array,
+                 zero_initialize=False,
+                 preferred_element_type=x.dtype,
+                 maybe_quantize_lhs=maybe_quantize_x,
++                tile_info=gmm_tile_info(),
+             )
+         else:
+             output = xla_quantized_matmul(x,
+diff --git a/tpu_inference/layers/common/process_weights/moe_weights.py b/tpu_inference/layers/common/process_weights/moe_weights.py
+index 85753d26f..59bc838bd 100644
+--- a/tpu_inference/layers/common/process_weights/moe_weights.py
++++ b/tpu_inference/layers/common/process_weights/moe_weights.py
+@@ -272,6 +272,8 @@ def process_moe_weights(
+     w13_reorder_size: int | None = None,
+     w13_interleave: bool = False,
+     disable_weight_requantization: bool = False,
++    scale_dtype: jnp.dtype = jnp.float32,
++    w13_align: int = 128,
+ ) -> FusedMoEWeights:
+     """Process fused moe weights to a layout that moe backend expects.
+ 
+@@ -287,6 +289,9 @@ def process_moe_weights(
+             we uninterleave so that first half is w1 and second half is w3.
+         disable_weight_requantization: whether to keep scales broad for GMM
+             setups.
++        scale_dtype: dtype the weight scales are stored in on the device.
++        w13_align: GMM backends pad each w13 shard's intermediate dim to a
++            multiple of this.
+ 
+     Returns:
+         MoE weights that are processed for specified backend.
+@@ -331,12 +336,12 @@ def process_moe_weights(
+     if w13_weight_scale is not None:
+         # For block scales (experts, out_blocks, in_blocks), we need to maintain
+         # the block dims
+-        w13_weight_scale = w13_weight_scale.astype(jnp.float32)
++        w13_weight_scale = w13_weight_scale.astype(scale_dtype)
+         w13_weight_scale = jnp.swapaxes(w13_weight_scale, 1, 2)
+         w13_weight_scale = jnp.expand_dims(w13_weight_scale, 2)
+ 
+     if w2_weight_scale is not None:
+-        w2_weight_scale = w2_weight_scale.astype(jnp.float32)
++        w2_weight_scale = w2_weight_scale.astype(scale_dtype)
+         w2_weight_scale = jnp.swapaxes(w2_weight_scale, 1, 2)
+         w2_weight_scale = jnp.expand_dims(w2_weight_scale, 2)
+ 
+@@ -426,7 +431,7 @@ def process_moe_weights(
+ 
+             pad_config_weight = get_w13_padding_config(intermediate_size,
+                                                        w13_reorder_size,
+-                                                       align=128)
++                                                       align=w13_align)
+ 
+             padded_output_sizes = [
+                 pad_config_weight.padded_intermediate_size,
+@@ -444,7 +449,7 @@ def process_moe_weights(
+                 pad_config_scale = get_w13_padding_config(
+                     intermediate_size,
+                     w13_reorder_size,
+-                    align=128,
++                    align=w13_align,
+                     outer_block_size=w13_outer_block_size)
+                 padded_output_sizes_scales = [
+                     pad_config_scale.padded_intermediate_size,
+@@ -482,7 +487,7 @@ def process_moe_weights(
+         case MoEBackend.GMM_EP:
+             pad_config_weight = get_w13_padding_config(intermediate_size,
+                                                        reorder_size=1,
+-                                                       align=128)
++                                                       align=w13_align)
+ 
+             w13_weight = process_w13_for_gmm(tensor=w13_weight,
+                                              concat_dim=2,
+@@ -493,7 +498,7 @@ def process_moe_weights(
+                 pad_config_scale = get_w13_padding_config(
+                     intermediate_size,
+                     reorder_size=1,
+-                    align=128,
++                    align=w13_align,
+                     outer_block_size=w13_outer_block_size)
+                 w13_weight_scale = process_w13_for_gmm(tensor=w13_weight_scale,
+                                                        concat_dim=3,
+diff --git a/tpu_inference/layers/jax/embed.py b/tpu_inference/layers/jax/embed.py
+index 97ec21d80..9e4d6e4f8 100644
+--- a/tpu_inference/layers/jax/embed.py
++++ b/tpu_inference/layers/jax/embed.py
+@@ -15,6 +15,8 @@
+ from typing import Optional
+ 
+ import jax
++import jax.numpy as jnp
++import numpy as np
+ from flax import nnx
+ 
+ from tpu_inference.layers.jax import JaxModule
+@@ -55,9 +57,75 @@ class JaxEmbed(nnx.Embed, JaxModule):
+             return self.weight
+ 
+     def __call__(self, x) -> jax.Array:
++        if getattr(self, "int8_group", 0):
++            return self._int8_rows(x)
+         if self.quant_method is None:
+             return super().__call__(x)
+         return self.quant_method.apply_jax(self, x)
+ 
+     def decode(self, x: jax.Array) -> jax.Array:
++        if getattr(self, "int8_group", 0):
++            return self._int8_decode(x)
++        if self.quant_method is not None:
++            return self.quant_method.decode(self, x)
+         return jax.numpy.dot(x, self.weight.value.T)
++
++    # int8 storage (EMBED_INT8_GROUP): values [V, D] int8 and one bf16 scale
++    # per `int8_group` columns [V, D // group], symmetric, scale = amax / 127.
++    _DECODE_CHUNK = 8192
++
++    def quantize_int8(self, group: int) -> None:
++        """Replaces the loaded table with int8 values and group scales.
++
++        Quantizes on the host in row chunks and puts only the int8 table back,
++        so the device never holds both copies.
++        """
++        w = self.weight.value
++        v, d = w.shape
++        if d % group:
++            raise ValueError(f"embedding width {d} is not a multiple of {group}")
++        dtype, sharding = w.dtype, w.sharding
++        host = np.asarray(jax.device_get(w))
++        w.delete()
++        q = np.empty((v, d), np.int8)
++        s = np.empty((v, d // group), jnp.bfloat16)
++        for r in range(0, v, 16384):
++            blk = host[r:r + 16384].astype(np.float32).reshape(-1, d // group,
++                                                               group)
++            amax = np.abs(blk).max(axis=-1)
++            sc = np.where(amax > 0, amax / 127.0, 1.0).astype(jnp.bfloat16)
++            s[r:r + 16384] = sc
++            q[r:r + 16384] = np.clip(
++                np.rint(blk / sc.astype(np.float32)[..., None]), -127,
++                127).astype(np.int8).reshape(-1, d)
++        del host
++        self.weight = nnx.Param(jnp.zeros((1, d), dtype))
++        self.weight_q = nnx.Param(jax.device_put(q, sharding))
++        self.weight_scale = nnx.Param(jax.device_put(s, sharding))
++        self.int8_group = group
++        self.int8_dtype = dtype
++
++    def _dequant(self, q: jax.Array, s: jax.Array) -> jax.Array:
++        g = self.int8_group
++        lead, d = q.shape[:-1], q.shape[-1]
++        w = (q.reshape(*lead, d // g, g).astype(jnp.float32) *
++             s.astype(jnp.float32)[..., None])
++        return w.reshape(*lead, d).astype(self.int8_dtype)
++
++    def _int8_rows(self, ids: jax.Array) -> jax.Array:
++        return self._dequant(jnp.take(self.weight_q.value, ids, axis=0),
++                             jnp.take(self.weight_scale.value, ids, axis=0))
++
++    def _int8_decode(self, x: jax.Array) -> jax.Array:
++        """x @ W.T with W dequantized a vocabulary chunk at a time."""
++        q, s = self.weight_q.value, self.weight_scale.value
++        v, d = q.shape
++        c = self._DECODE_CHUNK if v % self._DECODE_CHUNK == 0 else v
++        n = v // c
++
++        def chunk(args):
++            qc, sc = args
++            return jnp.dot(x, self._dequant(qc, sc).T)
++
++        out = jax.lax.map(chunk, (q.reshape(n, c, d), s.reshape(n, c, -1)))
++        return jnp.moveaxis(out, 0, -2).reshape(*x.shape[:-1], v)
+diff --git a/tpu_inference/layers/jax/quantization/compressed_tensors.py b/tpu_inference/layers/jax/quantization/compressed_tensors.py
+index 5e06525ff..84e7fc0a1 100644
+--- a/tpu_inference/layers/jax/quantization/compressed_tensors.py
++++ b/tpu_inference/layers/jax/quantization/compressed_tensors.py
+@@ -31,6 +31,7 @@ from vllm.model_executor.layers.quantization.utils.config_utils import \
+     is_equal_or_regex_match
+ 
+ from tpu_inference.layers.jax import JaxModule
++from tpu_inference.layers.jax.embed import JaxEmbed
+ from tpu_inference.layers.jax.linear import (JaxEinsum,
+                                              JaxMergedColumnParallelLinear)
+ from tpu_inference.layers.jax.moe.moe import JaxMoE, JaxRoutedExperts
+@@ -39,11 +40,13 @@ from tpu_inference.layers.jax.quantization.configs import (QuantizationConfig,
+                                                            QuantLinearConfig)
+ from tpu_inference.layers.jax.quantization.fp8 import (
+     Fp8BlockwiseLinearMethod, Fp8FusedMoEMethod, Fp8TensorwiseLinearMethod,
+-    Fp8TensorwiseMergedLinearMethod)
++    Fp8TensorwiseMergedLinearMethod, Int8ChannelwiseLinearMethod,
++    Int8ChannelwiseMergedLinearMethod)
+ from tpu_inference.layers.jax.quantization.unquantized import (
+     UnquantizedFusedMoEMethod, UnquantizedLinearMethod)
+ from tpu_inference.layers.jax.quantization.wna16 import (
+-    WNA16FusedMoEMethod, WNA16LinearMethod, WNA16MergedLinearMethod)
++    WNA16EmbedMethod, WNA16FusedMoEMethod, WNA16LinearMethod,
++    WNA16MergedLinearMethod)
+ 
+ 
+ class _Fp8BlockConfigShim:
+@@ -142,6 +145,35 @@ class CompressedTensorsConfig(QuantizationConfig):
+             return self._target_scheme_map["Linear"]
+         return None
+ 
++    def quantizes(self, prefix: str) -> bool:
++        """Whether a config group targets ``prefix`` by name.
++
++        For layers that only exist quantized when the checkpoint says so
++        (an untied ``lm_head``), so the model can build the matching layer.
++        """
++        if should_ignore_layer(prefix,
++                               ignore=self._ignore,
++                               fused_mapping=self._fused_mapping):
++            return False
++        return any(
++            _check_equal_or_regex_match(prefix, [target])
++            for target in self._target_scheme_map)
++
++    def _embed_method(self, layer: JaxModule,
++                      prefix: str) -> Optional[QuantizeMethodBase]:
++        """An embedding table is quantized only when a group names it."""
++        if not self.quantizes(prefix):
++            return None
++        scheme = self._match_target(layer, prefix)
++        weight_quant = scheme.get("weights")
++        input_quant = scheme.get("input_activations")
++        if not _is_w4a16(weight_quant, input_quant):
++            raise NotImplementedError(
++                f"compressed-tensors scheme for embedding '{prefix}' is not "
++                "supported in the JAX path; only w4a16 is.")
++        _check_w4a16_layout(scheme, weight_quant, self._ct, prefix)
++        return WNA16EmbedMethod(layer, weight_quant.group_size, prefix)
++
+     def get_quant_method(self, layer: JaxModule,
+                          prefix: str) -> Optional[QuantizeMethodBase]:
+         if isinstance(layer, (JaxRoutedExperts, JaxMoE)):
+@@ -168,6 +200,8 @@ class CompressedTensorsConfig(QuantizationConfig):
+                     "not yet supported in the JAX path; only fp8 w8a8 and "
+                     "w4a16 are.")
+             return UnquantizedFusedMoEMethod(layer)
++        if isinstance(layer, JaxEmbed):
++            return self._embed_method(layer, prefix)
+         if not isinstance(layer, JaxEinsum):
+             return None
+ 
+@@ -207,6 +241,15 @@ class CompressedTensorsConfig(QuantizationConfig):
+                 return Fp8TensorwiseMergedLinearMethod(layer, linear_config)
+             return Fp8TensorwiseLinearMethod(layer, linear_config)
+ 
++        if (weight_quant is not None and input_quant is not None
++                and self._ct._is_dynamic_token_w8a8(weight_quant, input_quant)
++                and weight_quant.type == "int"
++                and weight_quant.strategy == "channel"
++                and input_quant.symmetric):
++            if isinstance(layer, JaxMergedColumnParallelLinear):
++                return Int8ChannelwiseMergedLinearMethod(layer, linear_config)
++            return Int8ChannelwiseLinearMethod(layer, linear_config)
++
+         if _is_w4a16(weight_quant, input_quant):
+             _check_w4a16_layout(scheme, weight_quant, self._ct, prefix)
+             if isinstance(layer, JaxMergedColumnParallelLinear):
+diff --git a/tpu_inference/layers/jax/quantization/fp8.py b/tpu_inference/layers/jax/quantization/fp8.py
+index 1a74e4176..68a27cf11 100644
+--- a/tpu_inference/layers/jax/quantization/fp8.py
++++ b/tpu_inference/layers/jax/quantization/fp8.py
+@@ -57,6 +57,11 @@ class Fp8TensorwiseLinearMethod(QuantizeMethodBase,
+                                 common_fp8.Fp8LinearMethod):
+     """Tensor-wise Fp8 method for JAX Linear layer."""
+ 
++    # Per-output-channel scale; sharded_quantized_matmul quantizes the
++    # activation to this dtype per token, so an integer dtype runs an integer
++    # matmul (int8 x int8 -> int32 on the MXU).
++    WEIGHT_DTYPE = jnp.float8_e4m3fn
++
+     def __init__(self, layer: JaxEinsum, linear_config: QuantLinearConfig):
+         common_fp8.Fp8LinearMethod.__init__(self, linear_config)
+ 
+@@ -83,10 +88,17 @@ class Fp8TensorwiseLinearMethod(QuantizeMethodBase,
+ 
+         out_features = sum(self.linear_config.output_sizes)
+ 
+-        layer.weight = create_param(rngs,
+-                                    shape=self.kernel_shape,
+-                                    dtype=jnp.float8_e4m3fn,
+-                                    sharding=self.weight_sharding)
++        if jnp.issubdtype(self.WEIGHT_DTYPE, jnp.integer):
++            # create_param's default initializer is float-only; the loader
++            # overwrites the placeholder anyway.
++            layer.weight = nnx.Param(jnp.zeros(self.kernel_shape,
++                                               self.WEIGHT_DTYPE),
++                                     out_sharding=self.weight_sharding)
++        else:
++            layer.weight = create_param(rngs,
++                                        shape=self.kernel_shape,
++                                        dtype=self.WEIGHT_DTYPE,
++                                        sharding=self.weight_sharding)
+ 
+         layer.weight.set_metadata(
+             'weight_loader',
+@@ -207,6 +219,17 @@ class Fp8TensorwiseMergedLinearMethod(Fp8TensorwiseLinearMethod):
+                               param_name=layer.prefix + ".weight_scale"))
+ 
+ 
++class Int8ChannelwiseLinearMethod(Fp8TensorwiseLinearMethod):
++    """compressed-tensors int8 W8A8: int8 weights with a per-channel scale and
++    activations quantized to int8 per token at run time."""
++    WEIGHT_DTYPE = jnp.int8
++
++
++class Int8ChannelwiseMergedLinearMethod(Fp8TensorwiseMergedLinearMethod):
++    """Int8ChannelwiseLinearMethod for fused gate_up / qkv layers."""
++    WEIGHT_DTYPE = jnp.int8
++
++
+ class Fp8BlockwiseLinearMethod(QuantizeMethodBase, common_fp8.Fp8LinearMethod):
+     """Block-wise Fp8 method for JAX Linear layer."""
+ 
+diff --git a/tpu_inference/layers/jax/quantization/wna16.py b/tpu_inference/layers/jax/quantization/wna16.py
+index e6ccc5f66..41924d9c8 100644
+--- a/tpu_inference/layers/jax/quantization/wna16.py
++++ b/tpu_inference/layers/jax/quantization/wna16.py
+@@ -45,6 +45,7 @@ from flax import nnx
+ from jax.experimental.pallas import tpu as pltpu
+ from jax.sharding import PartitionSpec as P
+ 
++from tpu_inference import envs
+ from tpu_inference.layers.common.linear import sharded_quantized_matmul
+ from tpu_inference.layers.common.moe import MoEBackend, moe_apply
+ from tpu_inference.layers.common.process_weights.linear_weights import (
+@@ -66,7 +67,7 @@ from tpu_inference.layers.jax.quantization import QuantizeMethodBase
+ from tpu_inference.layers.jax.quantization.configs import QuantLinearConfig
+ from tpu_inference.models.jax.utils.weight_utils import (
+     assign_and_shard_param, jax_array_from_reshaped_torch,
+-    load_nnx_param_from_reshaped_torch)
++    load_nnx_param_from_reshaped_torch, shard_put)
+ from tpu_inference.utils import get_mesh_shape_product
+ 
+ # The three tensors a compressed-tensors pack-quantized linear layer ships.
+@@ -210,6 +211,10 @@ class WNA16LinearMethod(QuantizeMethodBase):
+             weight, scale = unpack_wna16_linear_weight(
+                 layer.weight_packed[...], layer.weight_scale[...],
+                 self.in_features)
++            if scale.dtype == jnp.float16:
++                # Some exports write fp16 scales (an int4 lm_head); float32
++                # holds them exactly, bf16 would round them.
++                scale = scale.astype(jnp.float32)
+             output_sizes = self.linear_config.output_sizes
+             n_shards = self.linear_config.n_shards
+             if len(output_sizes) > 1 and n_shards > 1:
+@@ -332,6 +337,115 @@ class WNA16MergedLinearMethod(WNA16LinearMethod):
+                                               [None] * n_proj)
+ 
+ 
++class WNA16EmbedMethod(QuantizeMethodBase):
++    """Symmetric int4 embedding table, for ``JaxEmbed``.
++
++    The checkpoint holds the table as a pack-quantized linear would:
++    ``weight_packed`` int32 ``[V, D / 8]`` and ``weight_scale`` ``[V, D /
++    group]``. Both stay packed on the device, so the table costs half a byte
++    per value plus its scales; a lookup unpacks and scales only the gathered
++    rows. Scales keep the checkpoint's float dtype (fp16 and bf16 cost the
++    same, and rounding fp16 steps to bf16 would move every value off the
++    grid). Tables are replicated, which is what a single-chip rig needs.
++    """
++
++    def __init__(self, layer: JaxModule, group_size: Optional[int],
++                 prefix: str):
++        self.prefix = prefix
++        self.num_embeddings = layer.num_embeddings
++        self.features = layer.features
++        if group_size is None or group_size <= 0:
++            group_size = self.features
++        if self.features % group_size or self.features % _PACK_FACTOR:
++            raise ValueError(
++                f"embedding width {self.features} is not a multiple of "
++                f"group_size {group_size} and of {_PACK_FACTOR}.")
++        self.group_size = group_size
++        self.num_groups = self.features // group_size
++        self.dtype = layer.param_dtype
++        self._processed = False
++
++    def create_weights_jax(self, layer: JaxModule, *weight_args,
++                           **extra_weight_attrs):
++        delattr(layer, "weight")
++        v = self.num_embeddings
++        for name, shape, dtype in (
++            ("weight_packed", (v, self.features // _PACK_FACTOR), jnp.int32),
++            ("weight_scale", (v, self.num_groups), jnp.bfloat16),
++        ):
++            param = nnx.Param(jnp.zeros(shape, dtype),
++                              weight_loader=functools.partial(
++                                  load_nnx_param_from_reshaped_torch,
++                                  permute_dims=(0, 1),
++                                  param_name=f"{self.prefix}.{name}"),
++                              eager_sharding=False)
++            param.set_metadata("out_sharding", ())
++            param.set_metadata("mesh", cpu_mesh())
++            setattr(layer, name, param)
++        param = nnx.Param(jnp.zeros((2, ), jnp.int32),
++                          weight_loader=self._check_weight_shape,
++                          eager_sharding=False)
++        param.set_metadata("mesh", cpu_mesh())
++        layer.weight_shape = param
++
++    def _check_weight_shape(self, param: nnx.Param, torch_tensor, *_):
++        got = tuple(int(v) for v in torch_tensor.reshape(-1).tolist())
++        if got != (self.num_embeddings, self.features):
++            raise ValueError(f"{self.prefix}.weight_shape is {got}, expected "
++                             f"{(self.num_embeddings, self.features)}.")
++        param.set_metadata("_is_loaded", True)
++
++    def process_weights_after_loading(self, layer: JaxModule) -> bool:
++        # One method per layer; JaxEmbed answers every missing attribute, so
++        # the layer cannot say whether it was already processed.
++        if self._processed:
++            return True
++        if not all(
++                getattr(layer, name).get_metadata("_is_loaded", False)
++                for name in _CHECKPOINT_PARAMS):
++            return False
++        packed = layer.weight_packed[...]
++        if not jnp.issubdtype(packed.dtype, jnp.integer):
++            raise TypeError("Packed int4 embeddings must be an integer "
++                            f"dtype, got {packed.dtype}.")
++        scale = layer.weight_scale[...]
++        if not jnp.issubdtype(scale.dtype, jnp.floating):
++            raise TypeError(f"{self.prefix}.weight_scale is {scale.dtype}.")
++        for name in _CHECKPOINT_PARAMS:
++            delattr(layer, name)
++        layer.weight_packed = nnx.Param(shard_put(packed, ()))
++        layer.weight_scale = nnx.Param(shard_put(scale, ()))
++        self._processed = True
++        return True
++
++    def _dequant(self, packed: jax.Array, scale: jax.Array) -> jax.Array:
++        """int32 [..., D / 8] and scales [..., D / group] -> [..., D]."""
++        lead = packed.shape[:-1]
++        w = u32_unpack_i4(packed).astype(jnp.float32)
++        w = w.reshape(*lead, self.num_groups, self.group_size)
++        w = w * scale.astype(jnp.float32)[..., None]
++        return w.reshape(*lead, self.features).astype(self.dtype)
++
++    def apply_jax(self, layer: JaxModule, ids: jax.Array) -> jax.Array:
++        return self._dequant(jnp.take(layer.weight_packed[...], ids, axis=0),
++                             jnp.take(layer.weight_scale[...], ids, axis=0))
++
++    _DECODE_CHUNK = 8192
++
++    def decode(self, layer: JaxModule, x: jax.Array) -> jax.Array:
++        """x @ W.T with W dequantized a vocabulary chunk at a time."""
++        packed, scale = layer.weight_packed[...], layer.weight_scale[...]
++        v = packed.shape[0]
++        c = self._DECODE_CHUNK if v % self._DECODE_CHUNK == 0 else v
++
++        def chunk(args):
++            return jnp.dot(x, self._dequant(*args).T)
++
++        out = jax.lax.map(chunk, (packed.reshape(v // c, c, -1),
++                                  scale.reshape(v // c, c, -1)))
++        return jnp.moveaxis(out, 0, -2).reshape(*x.shape[:-1], v)
++
++
+ WNA16_MOE_SUPPORTED_BACKENDS = [MoEBackend.GMM_EP, MoEBackend.GMM_TP]
+ 
+ # Checkpoint projection name -> its role in the fused expert weights.
+@@ -549,6 +663,9 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
+                 w13_reorder_size=get_mesh_shape_product(
+                     layer.mesh, ShardingAxisName.MLP_TENSOR),
+                 w13_interleave=False,
++                scale_dtype=(jnp.bfloat16 if envs.W4A16_MOE_BF16_SCALES
++                             else jnp.float32),
++                w13_align=1 if envs.W4A16_MOE_NO_PAD else 128,
+             )
+             for name in staged:
+                 delattr(layer, name)
+@@ -562,6 +679,14 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
+         weights = shard_moe_weights(weights,
+                                     moe_backend=layer.moe_backend,
+                                     mesh=layer.mesh)
++        if envs.W4A16_MOE_BF16_SCALES:
++            # [E, groups, 1, N] -> [E, 1, groups, N]. A size-1 dim second
++            # from minor is padded to the bf16 sublane packing, which makes a
++            # bf16 scale as large as a float32 one; the forward swaps back.
++            weights.w13_weight_scale = jnp.swapaxes(weights.w13_weight_scale,
++                                                    1, 2)
++            weights.w2_weight_scale = jnp.swapaxes(weights.w2_weight_scale, 1,
++                                                   2)
+         layer.kernel_gating_upproj_EDF = nnx.Param(weights.w13_weight)
+         layer.kernel_gating_upproj_EDF_weight_scale = nnx.Param(
+             weights.w13_weight_scale)
+@@ -582,12 +707,19 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
+             x_TD,
+             jax.sharding.NamedSharding(layer.mesh,
+                                        P(*layer.activation_ffw_td)))
++        w13_scale = layer.kernel_gating_upproj_EDF_weight_scale[...]
++        w2_scale = layer.kernel_down_proj_EFD_weight_scale[...]
++        if envs.W4A16_MOE_BF16_SCALES:
++            # Stored [E, 1, groups, N] in bf16; gmm_v2 wants [E, groups, 1, N]
++            # and widens to float32 anyway, so do both here, per layer.
++            w13_scale = jnp.swapaxes(w13_scale, 1, 2).astype(jnp.float32)
++            w2_scale = jnp.swapaxes(w2_scale, 1, 2).astype(jnp.float32)
+         weights = FusedMoEWeights(
+             w13_weight=layer.kernel_gating_upproj_EDF[...],
+-            w13_weight_scale=layer.kernel_gating_upproj_EDF_weight_scale[...],
++            w13_weight_scale=w13_scale,
+             w13_bias=None,
+             w2_weight=layer.kernel_down_proj_EFD[...],
+-            w2_weight_scale=layer.kernel_down_proj_EFD_weight_scale[...],
++            w2_weight_scale=w2_scale,
+             w2_bias=None,
+         )
+         return moe_apply(layer, x_TD, router_logits, weights,
+diff --git a/tpu_inference/models/common/model_loader.py b/tpu_inference/models/common/model_loader.py
+index 0717cc455..7b0d08ec5 100644
+--- a/tpu_inference/models/common/model_loader.py
++++ b/tpu_inference/models/common/model_loader.py
+@@ -302,12 +302,33 @@ def _get_nnx_model(
+                 model.load_weights(rng)
+             if hasattr(vllm_config, "pytorch_pooler"):
+                 del vllm_config.pytorch_pooler
+-            jit_model = create_jit_model(
+-                model,
+-                use_qwix_on_abstract_model=should_apply_qwix_on_abstract_model)
++            if envs.EMBED_INT8_GROUP:
++                _quantize_token_embedding(model, envs.EMBED_INT8_GROUP)
++            if (envs.SKIP_IDENTITY_MODEL_JIT
++                    and not vllm_config.additional_config.get("quantization")):
++                # create_jit_model only applies Qwix; with none configured
++                # the loaded model is already the result.
++                logger.info("Skipping the identity jit over the loaded model")
++                jit_model = model
++            else:
++                jit_model = create_jit_model(
++                    model,
++                    use_qwix_on_abstract_model=should_apply_qwix_on_abstract_model)
+     return jit_model
+ 
+ 
++def _quantize_token_embedding(model: nnx.Module, group: int) -> None:
++    """EMBED_INT8_GROUP: store every `embed_tokens` JaxEmbed as int8."""
++    from tpu_inference.layers.jax.embed import JaxEmbed
++    for path, module in nnx.iter_graph(model):
++        if (isinstance(module, JaxEmbed) and path
++                and path[-1] == "embed_tokens"
++                and module.quant_method is None):
++            module.quantize_int8(group)
++            logger.info("%s stored as int8, group %d",
++                        ".".join(map(str, path)), group)
++
++
+ def _not_support(*args, **kwargs):
+     raise NotImplementedError("The action on this path is not supported yet.")
+ 
+diff --git a/tpu_inference/models/jax/gemma4.py b/tpu_inference/models/jax/gemma4.py
+index 1ea3a1566..fcb896901 100644
+--- a/tpu_inference/models/jax/gemma4.py
++++ b/tpu_inference/models/jax/gemma4.py
+@@ -50,6 +50,15 @@ from tpu_inference.models.jax.utils.weight_utils import (
+ 
+ logger = init_logger(__name__)
+ 
++
++def _text_config(hf_config):
++    """The text config of a multimodal Gemma4Config, or a text-only config itself.
++
++    A checkpoint with the towers removed ships `model_type: gemma4_text`, which
++    vLLM loads as Gemma4TextConfig with no `text_config` attribute.
++    """
++    return getattr(hf_config, "text_config", hf_config)
++
+ init_fn = nnx.initializers.uniform()
+ 
+ 
+@@ -512,7 +521,7 @@ class Gemma4DecoderLayer(JaxModule):
+                  decode_query_size: int = 1,
+                  enable_return_routed_experts: bool = False,
+                  prefix: str = ""):
+-        text_config: Gemma4TextConfig = config.hf_config.text_config
++        text_config: Gemma4TextConfig = _text_config(config.hf_config)
+         rms_norm_eps = text_config.rms_norm_eps
+         hidden_size = text_config.hidden_size
+ 
+@@ -756,7 +765,7 @@ class Gemma4Model(JaxModule):
+                  prefix: str = "model") -> None:
+         model_config = vllm_config.model_config
+         hf_config = model_config.hf_config
+-        text_config = hf_config.text_config
++        text_config = _text_config(hf_config)
+         vocab_size = model_config.get_vocab_size()
+         dtype = model_config.dtype
+         rms_norm_eps = text_config.rms_norm_eps
+@@ -815,11 +824,12 @@ class Gemma4Model(JaxModule):
+             # the same shape — explicit permute_dims=(0,1) suppresses the
+             # default 2D-transpose that load_nnx_param_from_reshaped_torch
+             # applies when permute_dims is None.
+-            self.embed_tokens_per_layer.weight.set_metadata(
+-                "weight_loader",
+-                partial(load_nnx_param_from_reshaped_torch,
+-                        permute_dims=(0, 1),
+-                        param_name=prefix + ".embed_tokens_per_layer.weight"))
++            if self.embed_tokens_per_layer.quant_method is None:
++                self.embed_tokens_per_layer.weight.set_metadata(
++                    "weight_loader",
++                    partial(load_nnx_param_from_reshaped_torch,
++                            permute_dims=(0, 1),
++                            param_name=prefix + ".embed_tokens_per_layer.weight"))
+             # per_layer_model_projection: H -> L*P. ColumnParallelLinear
+             # with gather_output=True in vllm; we replicate output.
+             self.per_layer_model_projection = JaxEinsum(
+@@ -1042,20 +1052,37 @@ class Gemma4ForCausalLM(JaxModule, LoadableWithIterator):
+ 
+         # Gemma 4: soft-capping in the final logits.
+         self.final_logit_softcapping = getattr(
+-            model_config.hf_config.text_config, "final_logit_softcapping",
++            _text_config(model_config.hf_config), "final_logit_softcapping",
+             None)
+ 
+         if not model_config.hf_config.tie_word_embeddings:
+             if self.language_model.is_last_rank:
+                 vocab_size = model_config.get_vocab_size()
+-                hidden_size = model_config.hf_config.text_config.hidden_size
+-                self.lm_head = JaxLmHead(
+-                    hidden_size=hidden_size,
+-                    vocab_size=vocab_size,
+-                    dtype=model_config.dtype,
+-                    rngs=rng,
+-                    prefix="lm_head",
+-                )
++                hidden_size = _text_config(model_config.hf_config).hidden_size
++                quant_config = vllm_config.quant_config
++                if getattr(quant_config, "quantizes",
++                           lambda _: False)("lm_head"):
++                    # A checkpoint that quantizes the untied head (int4
++                    # lm_head) needs a layer the quant config dispatches on.
++                    self.lm_head = JaxEinsum(
++                        "TD,DV->TV",
++                        (hidden_size, vocab_size),
++                        bias_shape=None,
++                        param_dtype=model_config.dtype,
++                        kernel_init=nnx.with_partitioning(
++                            init_fn, (None, "model")),
++                        rngs=rng,
++                        quant_config=quant_config,
++                        prefix="lm_head",
++                    )
++                else:
++                    self.lm_head = JaxLmHead(
++                        hidden_size=hidden_size,
++                        vocab_size=vocab_size,
++                        dtype=model_config.dtype,
++                        rngs=rng,
++                        prefix="lm_head",
++                    )
+             else:
+                 self.lm_head = PPMissingLayer()
+ 

@@ -315,6 +315,7 @@ One category, strictly: how the tensors are stored. Not how they were produced, 
 | *(omitted)* | The reference instruction-tuned release, full precision | `google/gemma-4-E2B-it` |
 | `w4a16` | 4-bit weights, 16-bit activations — the encoding of Google's QAT releases | `google/gemma-4-E2B-it-qat-w4a16-ct` |
 | `w8a8` | 8-bit integer weights and 8-bit activations quantized per token at run time (compressed-tensors W8A8, `int-quantized`) | `xbill9/gemma-4-E2B-it-qat-w8a8-int8` |
+| `w4a16emb4` | `w4a16`, with the vocabulary tables (`embed_tokens`, per-layer embeddings, an untied `lm_head`) also stored int4. `w4a16` alone leaves them bf16, which on E2B is most of the checkpoint | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` |
 | `q4_0`, `q8_0` | GGUF / llama.cpp block quant, named exactly as the file does | `gemma-4-E2B-it-Q4_0.gguf` |
 | `int8`, `int4`, `fp8` | Numeric format, where nothing more specific applies | |
 | `awq`, `gptq` | PTQ methods that define their own on-disk packing | |
@@ -435,6 +436,7 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-q4_0` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-q4_0-unquantized` | `q4_0` |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-w4a16` | TPU Queued Resource | vLLM in Docker | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the `-ct` container is not part of the slot |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-w8a8` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-1 | `xbill9/gemma-4-E2B-it-qat-w8a8-int8` | `w8a8` — int8 W8A8 built from the QAT weights; `w8a8` rather than `int8`, which would also describe weight-only int8 |
+| `~/gemma4-dev/tpu-vllm-v5e1-2b-w4a16emb4` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-1 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` | `w4a16emb4` — the QAT W4A16 repack with its embedding tables and `lm_head` int4 too, text only |
 | `~/gemma4-dev/tpu-vllm-v5p1-2b` | **GCE instance** (not the TPU API) | vLLM in Docker | v5p, 1 chip (`ct5p-hightpu-1t-tpu`) | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v6e1-2b` | TPU Queued Resource | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v6e8-2b` | TPU flex-start VM | vLLM in Docker | v6e-8 | `gemma-4-E2B-it` | — |
