@@ -897,7 +897,10 @@ CPU KL divergence above reproduces to every printed digit on a different build a
 (`-ngl 99`) it holds as well: mean KLD 0.054244 → 0.001485, same top token 87.21% → 98.09%.
 Resident VRAM falls by 99 MiB (the `token_embd` Q6_K → Q4_0 difference, 1341.78 → 1242.78 MiB), and
 tg128 is **1.093-1.100x** in all four passes of an ABBA run, with pp512 unchanged. Evidence in
-`benchmarks/runs/2026-09-29-exact-gguf-1650ti/`.
+`benchmarks/runs/2026-09-29-exact-gguf-1650ti/`. v2 (`per_layer_model_proj` at Q4_0, `419db9a6…`) also rebuilds
+bit-identically there. On CUDA it is **1.016-1.019x v1 on decode and 1.2-1.9% on prefill** in all four
+ABBA passes (1.11-1.12x Google's file), where the i7-1360P's CPU saw no stable difference. Its KLD
+ties v1's (0.00168 vs 0.00148). Evidence in `benchmarks/runs/2026-09-29-exact-gguf-v2-1650ti/`.
 
 **The `E` prefix is load-bearing.** E4B is *not* a 4B dense model — 4.5B effective, 8.0B total. Reading
 `E4B` as "4B" understates its weights by roughly 2x, which is the difference between fitting a 16 GB

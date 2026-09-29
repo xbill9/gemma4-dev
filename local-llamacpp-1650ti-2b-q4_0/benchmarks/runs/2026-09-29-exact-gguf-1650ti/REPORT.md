@@ -54,13 +54,22 @@ checked against the Hub) and the rebuild from `google/gemma-4-E2B-it-qat-q4_0-un
    | `nvidia-smi` process total | 1614 MiB | 1514 MiB |
 
    99.0 MiB is `token_embd` 330.3 MB → 226.5 MB, the only resident tensor whose type changed.
-5. **Greedy chat: one CUDA-only divergence, and it is not the file's.** Five prompts, thinking off
-   (`serve/chat-*.json`). On this machine's CPU, bf16, Google's file and the rebuild give identical
-   answers, as they did on the i7-1360P. On CUDA, Google's file gives the same answers; the rebuild
-   gives the same four and indents the Python answer with four spaces instead of two. The
-   rebuild's CPU answer matches bf16, so the flip comes from the CUDA backend (it quantizes
-   activations for its Q4_0 matmuls) and not from the weights. Its CUDA KLD is the lowest of the four
-   columns above.
+5. **Greedy chat: five prompts are too few to rank files.** Five prompts, thinking off, 200 tokens
+   (`serve/chat-*.json`), compared with bf16 on this machine's CPU over the full text. The first
+   character that differs from bf16, per prompt, is:
+
+   | | Canberra | 17×23 | reverse | moons | French (long) |
+   |---|---|---|---|---|---|
+   | Google, CPU | = | = | = | = | char 192 |
+   | exact, CPU | = | = | = | = | = |
+   | Google, CUDA | = | = | = | = | char 202 |
+   | exact, CUDA | = | = | char 35 (4-space indent, not 2) | = | char 475 |
+
+   The rebuild matches bf16 exactly on the CPU, so its CUDA flips come from the CUDA backend (it
+   quantizes activations for its Q4_0 matmuls) rather than from the weights. Its CUDA KLD is still
+   the lowest of the four columns above. KLD is the measurement to rank files by, not these five
+   prompts. (An earlier draft of this finding compared only the first 160 characters and said that
+   Google's file matched everywhere; it does not.)
 
 ## Not changed
 

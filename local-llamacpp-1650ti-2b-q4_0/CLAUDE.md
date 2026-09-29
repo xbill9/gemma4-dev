@@ -21,6 +21,8 @@ devices.
 `benchmarks/runs/2026-09-29-exact-gguf-1650ti` rebuilt `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`
 bit-identically on this machine and compared it with Google's file on the card: tg128 1.10x in
 all four ABBA passes, pp512 unchanged, 99 MiB less VRAM, KLD vs bf16 0.054 → 0.0015 on CUDA.
+v2 (`...-exact-gguf-v2-1650ti`, `per_layer_model_proj` also Q4_0) is 1.11-1.12x on decode and
++1.2-1.9% on prefill here, with 118 MiB less VRAM than Google's file. It is the file to adopt if this pair moves.
 `tpu.env` still serves Google's file, because this rig is one arm of a pair. Switching it means
 switching `local-llamacpp-cpu-2b-q4_0` too, and neither arm's older runs would pair with the result.
 
