@@ -25,7 +25,7 @@ serve() {  # label, extra args...
     sleep 10
   done
   echo "$label: healthy after $(( $(date +%s)-t0 ))s"
-  (cd "$here" && python3 demo_c1.py "$label")
+  (cd "$here" && python3 demo_c1.py "$label" ${HARNESS_ARGS:-})
   kill $pid; while kill -0 $pid 2>/dev/null; do sleep 2; done; sleep 5
 }
 

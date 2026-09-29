@@ -1,9 +1,10 @@
 """Single-user interactive latency on the T4: TTFT, TPOT and spec-decode acceptance.
 
-    python3 demo_c1.py LABEL [--url http://127.0.0.1:8000] [--max-tokens 256]
+    python3 demo_c1.py LABEL [--url http://127.0.0.1:8000] [--max-tokens 256] [--temperature T|default]
 
 Sends each prompt below once, sequentially (c=1), as a streamed chat completion at
-temperature 0, after two untimed warmups. Real chat prompts on purpose: random
+temperature 0 (or T; `default` sends none, so the server applies the checkpoint's
+generation_config, as ~/bin/ask-t4 does), after two untimed warmups. Real chat prompts on purpose: random
 tokens (`vllm bench serve --dataset-name random`) make a draft model's acceptance
 look far worse than it is on the text a demo produces. Acceptance comes from the
 server's /metrics counters, differenced across the timed requests only.
@@ -50,12 +51,15 @@ def metrics(url):
     return out
 
 
-def one(url, model, prompt, max_tokens):
-    body = json.dumps({
+def one(url, model, prompt, max_tokens, temperature=0.0):
+    req = {
         "model": model, "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": max_tokens, "temperature": 0, "stream": True,
+        "max_tokens": max_tokens, "stream": True,
         "stream_options": {"include_usage": True},
-    }).encode()
+    }
+    if temperature is not None:
+        req["temperature"] = temperature
+    body = json.dumps(req).encode()
     req = urllib.request.Request(url + "/v1/chat/completions", body, {"Content-Type": "application/json"})
     t0 = time.perf_counter()
     first = None
@@ -79,19 +83,21 @@ def main():
     ap.add_argument("label")
     ap.add_argument("--url", default="http://127.0.0.1:8000")
     ap.add_argument("--max-tokens", type=int, default=256)
+    ap.add_argument("--temperature", default="0")
     a = ap.parse_args()
+    temp = None if a.temperature == "default" else float(a.temperature)
     with urllib.request.urlopen(a.url + "/v1/models", timeout=10) as r:
         model = json.load(r)["data"][0]["id"]
     for p in PROMPTS[:2]:
         one(a.url, model, p, 32)
     m0 = metrics(a.url)
-    rows = [dict(prompt=p, **one(a.url, model, p, a.max_tokens)) for p in PROMPTS]
+    rows = [dict(prompt=p, **one(a.url, model, p, a.max_tokens, temp)) for p in PROMPTS]
     m1 = metrics(a.url)
     d = {k: m1.get(k, 0) - m0.get(k, 0) for k in m1}
     drafts = d.get("vllm:spec_decode_num_draft_tokens_total", 0)
     acc = d.get("vllm:spec_decode_num_accepted_tokens_total", 0)
     summ = {
-        "label": a.label, "model": model, "n": len(rows),
+        "label": a.label, "model": model, "n": len(rows), "temperature": a.temperature,
         "median_ttft_ms": statistics.median(r["ttft_ms"] for r in rows),
         "median_tpot_ms": statistics.median(r["tpot_ms"] for r in rows),
         "decode_tok_s": 1e3 / statistics.median(r["tpot_ms"] for r in rows),
