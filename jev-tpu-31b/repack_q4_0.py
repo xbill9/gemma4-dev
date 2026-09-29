@@ -51,7 +51,9 @@ GROUP = 32
 PACK = 8
 REL_TOL = 2.0 ** -7
 
-LINEAR = re.compile(r"^model\.language_model\.layers\.(\d+)\.(self_attn\.[qkvo]_proj|mlp\.(gate|up|down)_proj)\.weight$")
+# Per-layer-embedding (PLE) projections exist on E2B/E4B; QAT puts them on the grid too.
+LINEAR = re.compile(r"^model\.language_model\.(?:layers\.\d+\.)?(?P<kind>self_attn\.[qkvo]_proj|mlp\.(?:gate|up|down)_proj"
+                    r"|per_layer_input_gate|per_layer_projection|per_layer_model_projection)\.weight$")
 EXPERTS = re.compile(r"^model\.language_model\.layers\.(\d+)\.experts\.(gate_up_proj|down_proj)$")
 LAYER = re.compile(r"^model\.language_model\.layers\.(\d+)\.")
 # 2-D weights of modules that compressed-tensors' "Linear" target would match but
@@ -258,16 +260,30 @@ def repack(src, out_dir, workers):
             weight_map.update({t[0]: fname for t in shard})
             shard, size, n = [], 0, n + 1
     for name in sorted(rest):
-        arr = np.asarray(ck[name].raw(name))
-        if size + arr.nbytes > 4 << 30:
+        tag = ck[name].header[name]["dtype"]
+        entries = [(name, tag, np.asarray(ck[name].raw(name)))]
+        if LINEAR.match(name) and tag == "BF16":
+            ents, bad = quantized_entries(name[: -len(".weight")], entries[0][2])
+            if ents:
+                entries = ents
+            else:
+                kept[name] = bad
+                ignored.append(name[: -len(".weight")])
+        nbytes = sum(e[2].nbytes for e in entries)
+        if size + nbytes > 4 << 30:
             flush()
-        shard.append((name, ck[name].header[name]["dtype"], arr))
-        size += arr.nbytes
+        shard += entries
+        size += nbytes
     flush()
 
-    # Modules compressed-tensors would target as Linear but that stay bf16.
+    # Modules compressed-tensors would target as Linear but that stay bf16: the known ones, and
+    # any other 2-D language-model weight left unquantized (a loader treats an unlisted Linear
+    # as W4A16 and rejects its bf16 weight).
     for name in ck:
-        if len(ck[name].header[name]["shape"]) == 2 and KEEP_LINEAR.search(name):
+        if len(ck[name].header[name]["shape"]) != 2 or not name.endswith(".weight"):
+            continue
+        if KEEP_LINEAR.search(name) or (
+                ".language_model." in name and "embed" not in name and name in weight_map):
             ignored.append(name[: -len(".weight")])
     ignored = sorted(set(ignored)) + ["lm_head"]
 
@@ -310,7 +326,7 @@ def repack(src, out_dir, workers):
 def _kind(name):
     m = LINEAR.match(name)
     if m:
-        return m.group(2)
+        return m.group("kind")
     m = EXPERTS.match(name)
     return "experts." + m.group(2) if m else None
 

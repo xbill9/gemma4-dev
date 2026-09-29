@@ -121,5 +121,23 @@ class EndToEnd(unittest.TestCase):
             self.assertEqual(report["quantized"]["experts.gate_up_proj"]["groups_level_mismatch"], 0)
 
 
+
+class LinearNames(unittest.TestCase):
+    def test_ple_projections_are_quantized_modules(self):
+        for name, kind in [
+            ("model.language_model.layers.3.per_layer_input_gate.weight", "per_layer_input_gate"),
+            ("model.language_model.layers.3.per_layer_projection.weight", "per_layer_projection"),
+            ("model.language_model.per_layer_model_projection.weight", "per_layer_model_projection"),
+            ("model.language_model.layers.0.self_attn.q_proj.weight", "self_attn.q_proj"),
+            ("model.language_model.layers.12.mlp.down_proj.weight", "mlp.down_proj"),
+        ]:
+            self.assertEqual(rp._kind(name), kind, name)
+
+    def test_embeddings_and_norms_are_not(self):
+        for name in ["model.language_model.embed_tokens_per_layer.weight",
+                     "model.language_model.layers.0.input_layernorm.weight",
+                     "model.vision_tower.encoder.layers.0.mlp.up_proj.linear.weight"]:
+            self.assertIsNone(rp._kind(name), name)
+
 if __name__ == "__main__":
     unittest.main()
