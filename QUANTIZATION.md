@@ -460,6 +460,43 @@ because the QAT w4a16 export leaves the PLE at bf16 — one tensor, 56.5% of tha
 **Cost of learning this: an 8.32 GB download and a torch downgrade** — vLLM 0.28.0 pins
 `torch==2.13.0` exactly, so it and a torch nightly are mutually exclusive.
 
+### vLLM 0.29 CAN quantize the PLE at construction, and E2B's is already on the QAT grid
+
+**This supersedes the "quantization does not change it" line above, for vLLM >= 0.29.** MEASURED
+2026-09-29 on `gpu-vllm-t4-2b` (vLLM 0.29.0, T4). The construction-time mechanism the GGUF note says
+"does not exist here" now does: `compressed_tensors_embedding.py` adds
+`CompressedTensorsEmbeddingWNA16Int`, a 2-8 bit INT, group- or channel-scaled embedding that stores
+`weight_packed` int32 `[vocab, dim / 8]` + `weight_scale` `[vocab, dim / group]` and dequantizes only
+the gathered rows in a Triton kernel. `Gemma4Model` builds `embed_tokens_per_layer` with
+`quant_config`, and `CompressedTensorsConfig.get_quant_method` hands any `VocabParallelEmbedding`
+that a config group matches **by layer name** to it (a `"Linear"` target does not match it). So the
+PLE is allocated packed; the bf16 table never exists on the device. Nothing in vLLM needs patching.
+
+**E2B's PLE is QAT data.** Range-read from `google/gemma-4-E2B-it-qat-q4_0-unquantized`: every sampled
+group of 32 along a row lies on a 4-bit grid — PLE 6,720 / 6,720, `embed_tokens` 1,152 / 1,152 — and
+the same test on bf16 `google/gemma-4-E2B-it` passes **0 / 6,720** and 0 / 1,152. Packing the full
+table found **0 of 73,400,320 groups off-grid**. The llama.cpp GGUF's Q6_K for this tensor is a
+file-format convention, not a sign it was left off the grid.
+
+`jev-tpu-31b/ple_int4.py` packs it (step recovery via `repack_q4_0.quantize`, group 32, bf16 scales)
+and adds a config group targeting `re:.*embed_tokens_per_layer$`. On the T4, same flags as the
+bf16-PLE build, warm compile cache (`gpu-vllm-t4-2b/evidence/2026-09-29-ple-int4.txt`):
+
+| | PLE bf16 | PLE int4 |
+| :--- | ---: | ---: |
+| checkpoint | 6.11 GiB | **2.96 GiB** |
+| model loading | 6.33 GiB | **3.19 GiB** |
+| KV cache | 711,539 tokens | **1,062,334 tokens** |
+| decode, one stream | 81.6 tok/s | 81.2 tok/s |
+| greedy, 8 prompts x 160 tokens | — | 7 token-identical, 1 diverges at token 55 |
+
+**Residency, not speed** — the same result `ple_bits=4` gave on the JAX port, for the same reason
+(the table is gathered, never streamed). The 26.2% of values that are not bit-identical differ
+through the bf16 scale, at most 0.78% of the group's peak; the scales (0.003-0.91) convert to fp16
+exactly, so the T4's fp16 parameters add nothing. **Consequence for the 4 GiB card above:** the
+construction-time OOM was the bf16 table, and at 3.19 GiB loaded E2B is now within reach of a
+3.64 GiB 1650 Ti on paper. Not tried — activations and KV must also fit.
+
 `wNa16` is w4a16 — exactly the format of Google's QAT releases
 (`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). A **second, independent** failure hits the QAT exports:
 `k_norm.weight` "missing" for layers 15-34. Upstream:
