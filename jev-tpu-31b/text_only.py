@@ -5,7 +5,7 @@
 SRC_DIR is a `repack_q4_0.py` output (or any Gemma 4 `Gemma4ForConditionalGeneration`
 checkpoint). OUT_DIR gets a text-only `Gemma4ForCausalLM` checkpoint:
 
-- every tensor under `model.{vision_tower,audio_tower,embed_vision,embed_audio}.`
+- every tensor under `model.{vision_tower,vision_embedder,audio_tower,embed_vision,embed_audio}.`
   is dropped; every other tensor is copied byte for byte, names unchanged
   (vLLM's Gemma4ForCausalLM maps `model.language_model.*` itself);
 - config.json becomes the source `text_config` (model_type `gemma4_text`) plus the
@@ -29,7 +29,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from repack_q4_0 import open_checkpoint, write_safetensors  # noqa: E402
 
-TOWER = re.compile(r"^model\.(vision_tower|audio_tower|embed_vision|embed_audio)\.")
+TOWER = re.compile(r"^model\.(vision_tower|vision_embedder|audio_tower|embed_vision|embed_audio)\.")  # 12B: vision_embedder
 SKIP_FILES = {"config.json", "model.safetensors.index.json", "processor_config.json",
               "repack_report.json"}
 
