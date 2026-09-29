@@ -17,7 +17,14 @@ llama.cpp was rebuilt from clean on 2026-09-22 after the host moved to Debian si
 `llama-server --list-devices` shows `CUDA0` (3732 MiB), and the CPU arm shows no
 devices.
 
-**NEWEST: `benchmarks/runs/2026-09-22-paired-sweep-1650ti`**, the re-run on
+**2026-09-29: the exact Q4_0 re-pack, measured here but NOT adopted.**
+`benchmarks/runs/2026-09-29-exact-gguf-1650ti` rebuilt `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`
+bit-identically on this machine and compared it with Google's file on the card: tg128 1.10x in
+all four ABBA passes, pp512 unchanged, 99 MiB less VRAM, KLD vs bf16 0.054 → 0.0015 on CUDA.
+`tpu.env` still serves Google's file, because this rig is one arm of a pair. Switching it means
+switching `local-llamacpp-cpu-2b-q4_0` too, and neither arm's older runs would pair with the result.
+
+**NEWEST PAIRED RUN: `benchmarks/runs/2026-09-22-paired-sweep-1650ti`**, the re-run on
 `f95b0d9` in ABBA order (CPU, GPU, GPU, CPU) with a temperature-gated cooldown
 before every pass and identical flags except `-ngl` (`-t 6 -tb 12` on both).
 32/32 cells: GPU **4.14x** decode, **3.42x** prefill, **3.62x** end-to-end. The

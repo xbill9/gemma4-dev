@@ -891,6 +891,14 @@ the native build. With the embeddings at Q4_0,
 property of Google's Q6_K file. Published as `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`; build script
 and evidence in the rig's `benchmarks/runs/2026-09-29-exact-gguf-i71360p/`.
 
+**REPRODUCED 2026-09-29 on `local-llamacpp-1650ti-2b-q4_0`** (i7-10750H + GTX 1650 Ti, llama.cpp
+`f95b0d9`). The rebuild on a second machine is **bit-identical** (same SHA-256 `25f21f14…`), and the
+CPU KL divergence above reproduces to every printed digit on a different build and CPU. On CUDA
+(`-ngl 99`) it holds as well: mean KLD 0.054244 → 0.001485, same top token 87.21% → 98.09%.
+Resident VRAM falls by 99 MiB (the `token_embd` Q6_K → Q4_0 difference, 1341.78 → 1242.78 MiB), and
+tg128 is **1.093-1.100x** in all four passes of an ABBA run, with pp512 unchanged. Evidence in
+`benchmarks/runs/2026-09-29-exact-gguf-1650ti/`.
+
 **The `E` prefix is load-bearing.** E4B is *not* a 4B dense model — 4.5B effective, 8.0B total. Reading
 `E4B` as "4B" understates its weights by roughly 2x, which is the difference between fitting a 16 GB
 accelerator and not.
