@@ -1,0 +1,153 @@
+{
+  "endpoint": {
+    "name": "gemma-4-e2b-qat-g6",
+    "url": "http://localhost:8000",
+    "container": "vllm-g6"
+  },
+  "started": "2026-09-29T19:51:57.197235+00:00",
+  "finished": "2026-09-29T19:54:08.618133+00:00",
+  "settings": {
+    "short": 16,
+    "long": 512,
+    "decode_repeats": 5,
+    "load_tokens": 256,
+    "concurrency": [
+      1,
+      4,
+      16
+    ],
+    "load_repeats": 2,
+    "temperature": 0.0
+  },
+  "load_facts": {
+    "vllm_version": "0.30.0",
+    "weights_gib": "8.01",
+    "load_seconds": "45.816665",
+    "kv_cache_tokens": "873,318",
+    "max_concurrency_at_max_len": "106.61",
+    "quantization": "compressed-tensors"
+  },
+  "decode": {
+    "wall_16_median": 0.16,
+    "wall_512_median": 4.878,
+    "wall_512_min": 4.863,
+    "wall_512_max": 4.89,
+    "decode_tokens_per_second": 105.1,
+    "per_call_fixed_cost_seconds": 0.008,
+    "samples_per_length": 5
+  },
+  "load": {
+    "1": {
+      "aggregate_tokens_per_second_median": 104.85,
+      "batch_wall_seconds_median": 2.442,
+      "batches": [
+        {
+          "wall": 2.443,
+          "tokens": 256,
+          "tokens_per_second": 104.8
+        },
+        {
+          "wall": 2.44,
+          "tokens": 256,
+          "tokens_per_second": 104.9
+        }
+      ]
+    },
+    "4": {
+      "aggregate_tokens_per_second_median": 410.85,
+      "batch_wall_seconds_median": 2.492,
+      "batches": [
+        {
+          "wall": 2.492,
+          "tokens": 1024,
+          "tokens_per_second": 411.0
+        },
+        {
+          "wall": 2.493,
+          "tokens": 1024,
+          "tokens_per_second": 410.7
+        }
+      ]
+    },
+    "16": {
+      "aggregate_tokens_per_second_median": 1485.9,
+      "batch_wall_seconds_median": 2.756,
+      "batches": [
+        {
+          "wall": 2.755,
+          "tokens": 4096,
+          "tokens_per_second": 1486.7
+        },
+        {
+          "wall": 2.758,
+          "tokens": 4096,
+          "tokens_per_second": 1485.1
+        }
+      ]
+    }
+  },
+  "server_throughput_during_load": {
+    "lines": 9,
+    "peak_tokens_per_second": 409.6
+  },
+  "quality": {
+    "correct": 37,
+    "total": 40,
+    "by_kind": {
+      "mul": {
+        "correct": 15,
+        "total": 15
+      },
+      "add": {
+        "correct": 12,
+        "total": 15
+      },
+      "cap": {
+        "correct": 10,
+        "total": 10
+      }
+    },
+    "answers": {
+      "mul-0": "1512",
+      "mul-1": "2079",
+      "mul-2": "5628",
+      "mul-3": "8640",
+      "mul-4": "3528",
+      "mul-5": "4588",
+      "mul-6": "1716",
+      "mul-7": "585",
+      "mul-8": "637",
+      "mul-9": "2310",
+      "mul-10": "7920",
+      "mul-11": "3920",
+      "mul-12": "6020",
+      "mul-13": "312",
+      "mul-14": "2736",
+      "add-0": "547",
+      "add-1": "652",
+      "add-2": "942",
+      "add-3": "1227",
+      "add-4": "926",
+      "add-5": "118",
+      "add-6": "726",
+      "add-7": "655",
+      "add-8": "819",
+      "add-9": "-285",
+      "add-10": "597",
+      "add-11": "1271",
+      "add-12": "534",
+      "add-13": "882",
+      "add-14": "1010",
+      "cap-Australia": "Canberra",
+      "cap-Canada": "Ottawa",
+      "cap-Brazil": "Bras\u00edlia",
+      "cap-Turkey": "Ankara",
+      "cap-Nigeria": "Abuja",
+      "cap-Switzerland": "Bern",
+      "cap-Pakistan": "Islamabad",
+      "cap-New Zealand": "Wellington",
+      "cap-Morocco": "Rabat",
+      "cap-Vietnam": "Hanoi"
+    }
+  }
+}

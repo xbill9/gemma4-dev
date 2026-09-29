@@ -1,0 +1,10 @@
+RIG_NAME=gpu-vllm-g6-2b-w4a16
+AWS_REGION=us-east-2
+INSTANCE_TYPE=g6.xlarge
+VLLM_IMAGE=vllm/vllm-openai:v0.30.0
+MAX_MODEL_LEN=8192
+GPU_MEMORY_UTILIZATION=0.90
+MAX_NUM_SEQS=
+EXTRA_VLLM_ARGS=
+MODEL=google/gemma-4-E2B-it-qat-w4a16-ct
+SERVE_FLAGS=--model google/gemma-4-E2B-it-qat-w4a16-ct --host 0.0.0.0 --port 8000 --dtype bfloat16 --kv-cache-dtype auto --tensor-parallel-size 1 --gpu-memory-utilization 0.90 --max-model-len 8192
