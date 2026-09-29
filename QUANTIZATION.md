@@ -136,6 +136,15 @@ of the same class:
 - **Quantizing costs memory while it runs.** `quantize_ple_table` upcasts to float32 and needs >15 GiB
   of host RSS on E2B; the destination is allocated before the source is freed unless explicitly
   released. **The load-time peak, not the steady state, sets the floor.**
+- **A cold torch.compile is counted as activation, and vLLM sizes the KV cache from it once.**
+  MEASURED 2026-09-29 on `gpu-vllm-t4-2b` (vLLM 0.29.0, T4, E2B W4A16 text-only, identical flags):
+  a start that compiles from scratch (~117 s) profiles **4.67 GiB** peak activation and gets **224,728**
+  KV tokens; the next start loads the AOT cache (1.5 s) and profiles **0.31 GiB**, **711,539** tokens —
+  3.2x the KV from a restart. The KV pool is fixed for the life of the process, so the first start
+  after any change serves undersized until restarted. **The compile cache is keyed on the model
+  identifier**, so a new `MODEL_NAME` (or the same weights under a local path, then a Hub id) is a cold
+  compile every time. Restart once before reading any capacity figure off the log.
+  `gpu-vllm-t4-2b/evidence/2026-09-29-cold-compile-kv.txt`.
 
 **So the order of operations for a new rig is:** match the compute dtype to the chip → size the model
 against transients rather than weights → choose the coarsest quantization that reaches that residency
@@ -615,6 +624,15 @@ a 33.55 GB chip.
 GGUF v3, `general.architecture = gemma4`, **541 tensors**, 49 KV pairs, and the full E2B shape is intact —
 `attention.shared_kv_layers=20`, `sliding_window=512`, mixed `key_length=512` / `key_length_swa=256`,
 `embedding_length_per_layer_input=256`. Dtype histogram: **Q4_0 ×275, F32 ×263, Q6_K ×2, F16 ×1**.
+
+**The main file is text only; the towers are all in the mmproj.** Re-read 2026-09-29 by tensor name:
+`gemma-4-E2B_q4_0-it.gguf` holds no `v.*`, `a.*` or `mm.*` tensor, while the mmproj holds the vision
+tower (`v.blk.*`, 656 tensors), the audio tower (`a.blk.*`, 744) and the `mm.*` projectors. Leaving
+`--mmproj` off in llama.cpp is therefore the GGUF equivalent of vLLM's `--language-model-only`. The
+Q6_K pair is the two embedding tables (`per_layer_token_embd`, `token_embd`) and the lone F16 is
+`per_layer_model_proj`. **The metadata does not say QAT**: `general.base_model` names plain
+`google/gemma-4-E2B-it` and `general.name` is `Hf`; the repo name and the norm match below are the
+evidence, not the file.
 
 **It is the same QAT weights as `-q4_0-unquantized`, proven rather than assumed.** Four F32 norm tensors
 read out of the GGUF are bit-identical to the bf16 tensors in the `-unquantized` repo:

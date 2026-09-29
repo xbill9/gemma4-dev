@@ -785,6 +785,32 @@ measured 8.97 GiB on a v5e-1 and 9.257 GB on a T4G against 10.2 GB here). **For 
 treat the bf16 column as a ceiling and the int4 column as a floor** — the error runs in opposite
 directions, so a plan that survives both is safe and one that needs the int4 figure to be exact is not.
 
+### The E2B repack, and its text-only build: the towers are 0.88 GiB of it
+
+`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct` (revision `da64116`) is `-qat-q4_0-unquantized` repacked by
+`jev-tpu-31b/repack_q4_0.py`. **MEASURED 2026-09-29** from its safetensors headers, 7.00 GiB:
+
+| group | GiB | % | stored |
+| :--- | ---: | ---: | :--- |
+| `embed_tokens_per_layer` (PLE) | 4.375 | 62.5% | BF16 |
+| decoder layers | 0.977 | 14.0% | int4 packed + BF16 norms |
+| `embed_tokens` (tied `lm_head`) | 0.750 | 10.7% | BF16 |
+| audio tower | 0.563 | 8.0% | BF16 |
+| vision tower + `embed_vision` / `embed_audio` | 0.320 | 4.6% | BF16 |
+
+**`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text`** (commit `92b99ae`, public) is the same checkpoint
+with every `model.{vision_tower,audio_tower,embed_vision,embed_audio}.*` tensor dropped (1,411
+tensors) by `jev-tpu-31b/text_only.py`: 1,092 tensors, **6.11 GiB** (6,559,356,230 B), every one
+byte-identical to the source, config = the source `text_config` with
+`architectures: ["Gemma4ForCausalLM"]` and `ignore: ["lm_head"]`. vLLM's `Gemma4ForCausalLM` maps
+`model.language_model.*` itself, so no tensor is renamed.
+
+On `gpu-vllm-t4-2b` (vLLM 0.29.0) it loads with `MarlinLinearKernel` in **6.33 GiB** and, once the
+compile cache is warm, holds **711,539** KV tokens against 707,617 for the multimodal repack under
+`--language-model-only` — the towers were already skipped there, so the win is on disk and in the
+download, not on the GPU. **The PLE is still 4.375 GiB of BF16 and is now 72% of the file**; it is
+the only large lever left, and `QUANTIZATION.md` records why vLLM cannot offload it.
+
 ### On llama.cpp, 58% of the E2B GGUF never reaches the accelerator
 
 **MEASURED 2026-09-03 on `local-llamacpp-1650ti-2b-q4_0`** (GTX 1650 Ti, 4096 MiB). This is a
