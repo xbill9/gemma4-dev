@@ -60,6 +60,22 @@ What set those, from the two earlier runs:
 - **The compiled model is 3.92 GiB of "overlays"** for the dense 12B (1.15 for the 26B). With the KV cache filled to the 0.85 cap (5.78 GiB, 18,048 tokens) the compile needed 17.60 GiB (`2026-09-28-12b-v5e1`), hence the block cap. 40 blocks is what the suite and the load test need; about 90 would fit.
 - **Compiling eight buckets did not finish in an hour**: host memory grew about 7 GB per 5 minutes, filled RAM and 21 GB of swap (`2026-09-28-12b2-v5e1`). Four buckets peaked at about 40 GB plus 9 GB of swap.
 
+## E2B int8 W8A8 on one v5e chip: from the QAT weights it is the best E2B build (2026-09-29)
+
+int8 W8A8 (int8 weights with a per-channel scale, activations quantized to int8 per token) runs v5e's native int8 x int8 -> int32 path. `patches/lowmem.diff` adds it to the JAX compressed-tensors path, which only knew fp8 W8A8. Two checkpoints, both text-only through `Gemma4ForCausalLM`, same flags as the bf16 baseline (`GMM_V2_TILE_VMEM_FRACTION=0.85`, `MIN_TOKEN_BUCKET=64`, `--max-num-batched-tokens 512`, `--gpu-memory-utilization 0.80`):
+
+- `glenic/gemma-4-E2B-it-W8A8-INT8`: llm-compressor round-to-nearest from the original bf16 model.
+- `gemma-4-E2B-it-qat-w8a8-int8` (local, bucket `jev-tpu-31b/models/`): made by `../jev-tpu-31b/w8a8_from_qat.py` from `google/gemma-4-E2B-it-qat-q4_0-unquantized`; the int8 values sit within 0.6-1.7% (mean ~0.8%) of the QAT values.
+
+| E2B, one v5e chip | suite | tok/s at 1 / 4 / 16 | first-token latency |
+|---|---:|---|---:|
+| bf16 (`2026-09-29-w8a8-v5e1`) | 0.683 | 144 / 560 / 2,008 | 12.6 ms |
+| W4A16 QAT repack (`2026-09-29-e2br-v5e1`) | 0.678 | 136 / 532 / 1,906 | 16.2 ms |
+| W8A8, glenic (`2026-09-29-w8a8b-v5e1`) | 0.670 | 220 / 842 / 2,876 | 10.7 ms |
+| **W8A8 from QAT** (`2026-09-29-qatw8-v5e1`) | **0.686** | **220 / 841 / 2,872** | **10.4 ms** |
+
+Paired record for record (`results/2026-09-29-qatw8-v5e1-VS-*.md`), W8A8 from QAT against bf16 +0.003 (−0.007 to +0.013), against glenic's W8A8 +0.015 (+0.005 to +0.026), against the W4A16 repack +0.007 (+0.000 to +0.015). glenic's W8A8 against bf16: −0.012 (−0.020 to −0.004). So the int8 activations cost nothing measurable here; glenic's loss is its rounding of the original bf16 weights. On E2B the W4A16 repack is slightly slower than bf16: its 4-bit linears are a small part of a model whose embeddings stay bf16, and the unpacking costs more than the bytes it saves.
+
 ## E2B and E4B QAT W4A16 repacks on one v5e chip (2026-09-29)
 
 [`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct) and [`xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct), repacked from the `-qat-q4_0-unquantized` exports with `../jev-tpu-31b/repack_q4_0.py`, which now also quantizes the per-layer-embedding projections (E2B 58,650,624 groups, E4B 124,149,760, none off the source grid). Each served alone (`2026-09-29-e2br-v5e1`, `-e4br-v5e1`); Google's `-qat-w4a16-ct` served in `2026-09-29-e2b-v5e1` and `-e4b-v5e1` with the same flags. Suite, paired record for record (`results/2026-09-29-e*r-v5e1-VS-*.md`):
