@@ -357,7 +357,7 @@ index 5e06525ff..547252c1d 100644
              _check_w4a16_layout(scheme, weight_quant, self._ct, prefix)
              if isinstance(layer, JaxMergedColumnParallelLinear):
 diff --git a/tpu_inference/layers/jax/quantization/fp8.py b/tpu_inference/layers/jax/quantization/fp8.py
-index 1a74e4176..70e753287 100644
+index 1a74e4176..68a27cf11 100644
 --- a/tpu_inference/layers/jax/quantization/fp8.py
 +++ b/tpu_inference/layers/jax/quantization/fp8.py
 @@ -57,6 +57,11 @@ class Fp8TensorwiseLinearMethod(QuantizeMethodBase,
@@ -372,16 +372,29 @@ index 1a74e4176..70e753287 100644
      def __init__(self, layer: JaxEinsum, linear_config: QuantLinearConfig):
          common_fp8.Fp8LinearMethod.__init__(self, linear_config)
  
-@@ -85,7 +90,7 @@ class Fp8TensorwiseLinearMethod(QuantizeMethodBase,
+@@ -83,10 +88,17 @@ class Fp8TensorwiseLinearMethod(QuantizeMethodBase,
  
-         layer.weight = create_param(rngs,
-                                     shape=self.kernel_shape,
+         out_features = sum(self.linear_config.output_sizes)
+ 
+-        layer.weight = create_param(rngs,
+-                                    shape=self.kernel_shape,
 -                                    dtype=jnp.float8_e4m3fn,
-+                                    dtype=self.WEIGHT_DTYPE,
-                                     sharding=self.weight_sharding)
+-                                    sharding=self.weight_sharding)
++        if jnp.issubdtype(self.WEIGHT_DTYPE, jnp.integer):
++            # create_param's default initializer is float-only; the loader
++            # overwrites the placeholder anyway.
++            layer.weight = nnx.Param(jnp.zeros(self.kernel_shape,
++                                               self.WEIGHT_DTYPE),
++                                     out_sharding=self.weight_sharding)
++        else:
++            layer.weight = create_param(rngs,
++                                        shape=self.kernel_shape,
++                                        dtype=self.WEIGHT_DTYPE,
++                                        sharding=self.weight_sharding)
  
          layer.weight.set_metadata(
-@@ -207,6 +212,17 @@ class Fp8TensorwiseMergedLinearMethod(Fp8TensorwiseLinearMethod):
+             'weight_loader',
+@@ -207,6 +219,17 @@ class Fp8TensorwiseMergedLinearMethod(Fp8TensorwiseLinearMethod):
                                param_name=layer.prefix + ".weight_scale"))
  
  
