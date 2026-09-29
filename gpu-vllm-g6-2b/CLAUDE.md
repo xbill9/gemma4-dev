@@ -15,6 +15,12 @@ slot, the runtime slot **and the actual GPU** with them. See **Measurement**.
 > Triton's 512-wide tile fits Ada unpatched. Anything NOT marked MEASURED below is still
 > arithmetic or inherited.
 
+> **SETTINGS CHANGED 2026-09-29, after that run.** `tpu.env` now matches the sagemaker-gemma
+> SageMaker runs and the `gpu-vllm-g6-*` siblings forked that day: `vllm/vllm-openai:v0.30.0`,
+> `MAX_MODEL_LEN` 8192, `MAX_NUM_SEQS` unset (vLLM's default; 8 capped a 16-parallel run),
+> `AWS_REGION` us-east-2, and a new `EXTRA_VLLM_ARGS`. The 2026-08-30 numbers were measured
+> with v0.28.0, 16,384 and 8, so they are not a measurement of the current settings.
+
 ## Why this rig exists
 
 **It is the runtime control for `gpu-jax-g6-2b`.** That rig MEASURED **48.3–48.5 tok/s** on

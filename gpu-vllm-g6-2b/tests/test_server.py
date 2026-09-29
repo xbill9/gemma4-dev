@@ -23,10 +23,13 @@ accident.
 import asyncio
 import base64
 import filecmp
+import os
+import shlex
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -44,18 +47,26 @@ class ToolCatalogTests(unittest.TestCase):
 
     def test_catalog(self):
         expected = {
-            "create_g6_instance", "list_g6_instances", "start_g6_instance",
-            "stop_g6_instance", "terminate_g6_instance", "verify_gpu_arch",
-            "get_install_progress", "get_vllm_logs", "get_endpoint",
-            "verify_model_health", "query_model", "save_hf_token",
-            "check_g6_quotas", "get_deployment_config", "get_help",
+            "create_g6_instance",
+            "list_g6_instances",
+            "start_g6_instance",
+            "stop_g6_instance",
+            "terminate_g6_instance",
+            "verify_gpu_arch",
+            "get_install_progress",
+            "get_vllm_logs",
+            "get_endpoint",
+            "verify_model_health",
+            "query_model",
+            "save_hf_token",
+            "check_g6_quotas",
+            "get_deployment_config",
+            "get_help",
         }
         self.assertEqual(set(self.tools), expected)
 
     def test_annotations(self):
-        destructive = {
-            name for name, tool in self.tools.items() if tool.annotations.destructive_hint
-        }
+        destructive = {name for name, tool in self.tools.items() if tool.annotations.destructive_hint}
         self.assertEqual(destructive, {"stop_g6_instance", "terminate_g6_instance"})
         for name, tool in self.tools.items():
             self.assertTrue(tool.title, name)
@@ -73,9 +84,7 @@ class ToolCatalogTests(unittest.TestCase):
         text = (ROOT / ".codex" / "config.toml").read_text()
         marker = f"[mcp_servers.{server.RIG_NAME}.tools."
         gated = {
-            line[len(marker):].rstrip("]").strip()
-            for line in text.splitlines()
-            if line.startswith(marker)
+            line[len(marker) :].rstrip("]").strip() for line in text.splitlines() if line.startswith(marker)
         }
         self.assertTrue(gated, "no tools are gated at all")
         self.assertTrue(
@@ -128,9 +137,7 @@ class G6TopologyTests(unittest.TestCase):
         self.assertEqual(server._vcpu_count("g6.xlarge"), 4)
         self.assertEqual(server._vcpu_count("g6.2xlarge"), 8)
         self.assertEqual(server._vcpu_count("g6.48xlarge"), 192)
-        self.assertNotEqual(
-            server._vcpu_count("g6.xlarge"), server._host_memory_gb("g6.xlarge") // 2
-        )
+        self.assertNotEqual(server._vcpu_count("g6.xlarge"), server._host_memory_gb("g6.xlarge") // 2)
 
     def test_tensor_parallel_follows_gpu_count(self):
         self.assertEqual(server._tensor_parallel_size("g6.xlarge"), 1)
@@ -210,10 +217,11 @@ class AdaConstraintTests(unittest.TestCase):
         #   curl -s https://hub.docker.com/v2/repositories/vllm/vllm-openai/tags/\
         #     ?page_size=100 | grep <tag>
         # Note there is NO v0.27.2 of any kind; releases go v0.27.1 -> v0.28.0.
-        published = {"v0.28.0"}
+        published = {"v0.28.0", "v0.30.0"}
         tag = server.VLLM_IMAGE.split(":", 1)[1].split("@", 1)[0]
         self.assertIn(
-            tag, published,
+            tag,
+            published,
             f"{tag} is not in the set of image tags verified to exist on Docker Hub. "
             "If it is a real new release, verify it resolves and add it here -- do NOT "
             "widen this back into a blocklist.",
@@ -259,9 +267,7 @@ class UserDataTests(unittest.TestCase):
         # THEIR VALUES -- so without this the token lands in the console log.
         text = server._user_data("google/gemma-4-E2B-it", "g6.xlarge")
         self.assertIn("set +x", text)
-        self.assertLess(
-            text.index("set +x"), text.index("secretsmanager"), "set +x must precede the fetch"
-        )
+        self.assertLess(text.index("set +x"), text.index("secretsmanager"), "set +x must precede the fetch")
 
     def test_multi_gpu_size_gets_tp4(self):
         text = server._user_data("google/gemma-4-E2B-it", "g6.12xlarge")
@@ -275,9 +281,7 @@ class UserDataTests(unittest.TestCase):
             self.assertNotIn("mkswap -q", server._user_data("m", size))
 
     def assertShellParses(self, text):
-        proc = subprocess.run(
-            ["bash", "-n", "/dev/stdin"], input=text, text=True, capture_output=True
-        )
+        proc = subprocess.run(["bash", "-n", "/dev/stdin"], input=text, text=True, capture_output=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
 
@@ -324,9 +328,7 @@ class DeploymentConfigTests(unittest.TestCase):
     def test_gp3_throughput_satisfies_the_iops_rule(self):
         """gp3 requires throughput <= IOPS * 0.25, enforced at run-instances
         time -- so violating it fails a LAUNCH, not just a disk."""
-        self.assertLessEqual(
-            server.ROOT_VOLUME_THROUGHPUT_MBPS, server.ROOT_VOLUME_IOPS * 0.25
-        )
+        self.assertLessEqual(server.ROOT_VOLUME_THROUGHPUT_MBPS, server.ROOT_VOLUME_IOPS * 0.25)
 
     def test_config_tags_with_rig_name(self):
         result = run(server.get_deployment_config())
@@ -337,20 +339,14 @@ class DeploymentConfigTests(unittest.TestCase):
         self.assertNotIn("MarketType=spot", run(server.get_deployment_config(spot=False)))
 
     def test_config_rejects_non_g6(self):
-        self.assertTrue(
-            run(server.get_deployment_config(instance_type="g5g.2xlarge")).startswith("❌")
-        )
-        self.assertFalse(
-            run(server.get_deployment_config(instance_type="g6.xlarge")).startswith("❌")
-        )
+        self.assertTrue(run(server.get_deployment_config(instance_type="g5g.2xlarge")).startswith("❌"))
+        self.assertFalse(run(server.get_deployment_config(instance_type="g6.xlarge")).startswith("❌"))
 
 
 class RepoHygieneTests(unittest.TestCase):
     def test_shell_scripts_parse(self):
         for script in ("project-setup.sh", "init.sh", "set_env.sh"):
-            proc = subprocess.run(
-                ["bash", "-n", str(ROOT / script)], capture_output=True, text=True
-            )
+            proc = subprocess.run(["bash", "-n", str(ROOT / script)], capture_output=True, text=True)
             self.assertEqual(proc.returncode, 0, f"{script}: {proc.stderr}")
 
     def test_tpu_env_agrees_with_server_defaults(self):
@@ -372,18 +368,13 @@ class RepoHygieneTests(unittest.TestCase):
         self.assertEqual(values["DLAMI_SSM_PARAMETER"], server.DLAMI_SSM_PARAMETER)
         self.assertEqual(values["DLAMI_NAME"], server.DLAMI_NAME)
         self.assertEqual(int(values["ROOT_VOLUME_GB"]), server.ROOT_VOLUME_GB)
-        self.assertEqual(
-            int(values["ROOT_VOLUME_THROUGHPUT_MBPS"]), server.ROOT_VOLUME_THROUGHPUT_MBPS
-        )
+        self.assertEqual(int(values["ROOT_VOLUME_THROUGHPUT_MBPS"]), server.ROOT_VOLUME_THROUGHPUT_MBPS)
         self.assertEqual(int(values["ROOT_VOLUME_IOPS"]), server.ROOT_VOLUME_IOPS)
-        self.assertEqual(
-            int(values["TENSOR_PARALLEL_SIZE"]), server._gpu_count(server.INSTANCE_TYPE)
-        )
+        self.assertEqual(int(values["TENSOR_PARALLEL_SIZE"]), server._gpu_count(server.INSTANCE_TYPE))
 
     def test_no_turing_or_aarch64_key_survived_the_fork(self):
         text = (ROOT / "tpu.env").read_text()
-        for key in ("TORCH_CUDA_ARCH_LIST=", "VLLM_REF=", "VLLM_STOCK_IMAGE=",
-                    "CUDA_TOOLKIT_PACKAGE="):
+        for key in ("TORCH_CUDA_ARCH_LIST=", "VLLM_REF=", "VLLM_STOCK_IMAGE=", "CUDA_TOOLKIT_PACKAGE="):
             self.assertNotIn(f"\n{key}", text, f"{key} survived the fork as live config")
 
     def test_rig_name_matches_directory(self):
@@ -408,16 +399,18 @@ class RepoHygieneTests(unittest.TestCase):
         deliberately EXPLAIN the fork, and prose about `g5g` is the documentation
         working rather than a stale value. Only live config is checked.
         """
-        for rel in (".mcp.json", ".claude-plugin/plugin.json", ".codex/config.toml",
-                    ".claude/settings.local.json"):
+        for rel in (
+            ".mcp.json",
+            ".claude-plugin/plugin.json",
+            ".codex/config.toml",
+            ".claude/settings.local.json",
+        ):
             path = ROOT / rel
             if not path.is_file():  # .mcp.json and settings.local.json are gitignored
                 continue
             text = path.read_text()
             self.assertIn(server.RIG_NAME, text, rel)
-            live = "\n".join(
-                line for line in text.splitlines() if not line.lstrip().startswith("#")
-            )
+            live = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
             self.assertNotIn("g5g", live, f"{rel} still names the sibling rig in live config")
 
     def test_benchmarks_carries_no_other_rigs_runs(self):
@@ -460,6 +453,36 @@ class RepoHygieneTests(unittest.TestCase):
                     filecmp.cmp(ROOT / source, ROOT / prefix / "mcp" / source, shallow=False),
                     f"{prefix}/mcp/{source} is stale — run `make skill`",
                 )
+
+
+class ForkServingTests(unittest.TestCase):
+    """Settings that make this rig comparable with the sagemaker-gemma runs."""
+
+    def test_max_num_seqs_is_omitted_when_unset(self):
+        with mock.patch.object(server, "MAX_NUM_SEQS", ""):
+            self.assertNotIn("--max-num-seqs", server._serve_flags(server.MODEL_NAME, "g6.xlarge"))
+        with mock.patch.object(server, "MAX_NUM_SEQS", "4"):
+            self.assertIn("--max-num-seqs 4", server._serve_flags(server.MODEL_NAME, "g6.xlarge"))
+
+    def test_extra_args_are_shell_quoted_one_by_one(self):
+        arg = "--limit-mm-per-prompt '{\"image\":0}'"
+        with mock.patch.object(server, "EXTRA_VLLM_ARGS", arg):
+            flags = server._serve_flags(server.MODEL_NAME, "g6.xlarge")
+        self.assertIn("--limit-mm-per-prompt '{\"image\":0}'", flags)
+        self.assertEqual(shlex.split(flags)[-2:], ["--limit-mm-per-prompt", '{"image":0}'])
+
+    def test_tpu_env_agrees_on_the_fork_settings(self):
+        values = dict(
+            line.partition("=")[::2]
+            for line in (ROOT / "tpu.env").read_text().splitlines()
+            if line and not line.startswith("#") and "=" in line
+        )
+        self.assertEqual(values["MAX_NUM_SEQS"], server.MAX_NUM_SEQS)
+        self.assertEqual(values["EXTRA_VLLM_ARGS"], server.EXTRA_VLLM_ARGS)
+        self.assertEqual(values["MAX_MODEL_LEN"], str(server.MAX_MODEL_LEN))
+        self.assertEqual(values["GPU_MEMORY_UTILIZATION"], server.GPU_MEMORY_UTILIZATION)
+        if not (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION")):
+            self.assertEqual(values["AWS_REGION"], server.AWS_REGION)
 
 
 if __name__ == "__main__":

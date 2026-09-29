@@ -28,14 +28,15 @@ Gemma 4's heterogeneous head dims (sliding 256, global 512) force a Triton
 attention path whose 512-wide tile wants ~96 KiB of shared memory per block,
 against Turing's hard 64 KiB — which is what that unlanded patch works around.
 **Ada raises the per-block limit to ~99 KiB**, so the tile is expected to fit
-unpatched. NOT VERIFIED ON HARDWARE: this rig has served nothing. It is the first
-thing to check, and `ATTENTION_BACKEND` below is the knob.
+unpatched. VERIFIED ON HARDWARE 2026-08-30: it fits unpatched. `ATTENTION_BACKEND`
+below is the knob.
 """
 
 import asyncio
 import base64
 import logging
 import os
+import shlex
 import time
 
 import httpx
@@ -71,7 +72,7 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
 WRITE = ToolAnnotations(destructiveHint=False)
 DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
 
-AWS_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+AWS_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION", "us-east-2")
 AWS_PROFILE = os.getenv("AWS_PROFILE")
 MODEL_NAME = os.getenv("MODEL_NAME", "google/gemma-4-E2B-it")
 INSTANCE_TYPE = os.getenv("INSTANCE_TYPE", "g6.xlarge")
@@ -107,8 +108,12 @@ KV_CACHE_DTYPE = os.getenv("KV_CACHE_DTYPE", "auto")
 # which. UNVERIFIED ON HARDWARE.
 ATTENTION_BACKEND = os.getenv("VLLM_ATTENTION_BACKEND", "")
 GPU_MEMORY_UTILIZATION = os.getenv("GPU_MEMORY_UTILIZATION", "0.90")
-MAX_MODEL_LEN = int(os.getenv("MAX_MODEL_LEN", "16384"))
-MAX_NUM_SEQS = int(os.getenv("MAX_NUM_SEQS", "8"))
+MAX_MODEL_LEN = int(os.getenv("MAX_MODEL_LEN", "8192"))
+# Empty means vLLM's own default, which is what the SageMaker runs these rigs are
+# compared against used. The parent pinned 8, which caps a 16-parallel test.
+MAX_NUM_SEQS = os.getenv("MAX_NUM_SEQS", "")
+# Extra vLLM flags, shell-quoted into start.sh one argument at a time.
+EXTRA_VLLM_ARGS = os.getenv("EXTRA_VLLM_ARGS", "")
 
 # THE STOCK IMAGE IS THE IMAGE. On x86_64 + SM 8.9 both axes are covered by the
 # published amd64 manifest, so there is nothing to build and VLLM_IMAGE is the
@@ -140,7 +145,7 @@ MAX_NUM_SEQS = int(os.getenv("MAX_NUM_SEQS", "8"))
 #
 # So the floor is a floor on THE FIX, not on that literal string. v0.28.0
 # (2026-08-26) is the newest release and is above it.
-VLLM_IMAGE = os.getenv("VLLM_IMAGE", "vllm/vllm-openai:v0.28.0")
+VLLM_IMAGE = os.getenv("VLLM_IMAGE", "vllm/vllm-openai:v0.30.0")
 
 # AWS publishes the x86_64 GPU DLAMI as a public SSM parameter. Prefer it: it is
 # single-valued and authoritative, where a describe-images name filter is a fuzzy
@@ -307,7 +312,9 @@ def _serve_flags(model: str, instance_type: str) -> str:
         f"--dtype {DTYPE} --kv-cache-dtype {KV_CACHE_DTYPE} "
         f"--tensor-parallel-size {_tensor_parallel_size(instance_type)} "
         f"--gpu-memory-utilization {GPU_MEMORY_UTILIZATION} "
-        f"--max-model-len {MAX_MODEL_LEN} --max-num-seqs {MAX_NUM_SEQS}"
+        f"--max-model-len {MAX_MODEL_LEN}"
+        + (f" --max-num-seqs {MAX_NUM_SEQS}" if MAX_NUM_SEQS else "")
+        + (" " + " ".join(shlex.quote(a) for a in shlex.split(EXTRA_VLLM_ARGS)) if EXTRA_VLLM_ARGS else "")
     )
 
 
@@ -354,7 +361,7 @@ fi
     # the variable and can treat "" as a selection rather than falling through to
     # its own dispatch, which is exactly the silent-misconfiguration shape this
     # tree keeps getting bitten by.
-    backend_env = f'  -e VLLM_ATTENTION_BACKEND={ATTENTION_BACKEND} \\\n' if ATTENTION_BACKEND else ""
+    backend_env = f"  -e VLLM_ATTENTION_BACKEND={ATTENTION_BACKEND} \\\n" if ATTENTION_BACKEND else ""
 
     return f"""#!/usr/bin/env bash
 set -euxo pipefail
@@ -920,9 +927,7 @@ async def check_g6_quotas() -> str:
         lines = [f"### G-family quotas in `{AWS_REGION}`", "", "| Quota | vCPUs |", "| --- | --- |"]
         for code, label in wanted.items():
             try:
-                result = await _call(
-                    quotas.get_service_quota, ServiceCode="ec2", QuotaCode=code
-                )
+                result = await _call(quotas.get_service_quota, ServiceCode="ec2", QuotaCode=code)
                 lines.append(f"| {label} | {int(result['Quota']['Value'])} |")
             except ClientError as exc:
                 lines.append(f"| {label} | unavailable ({exc.response['Error']['Code']}) |")
@@ -956,9 +961,11 @@ Serving `{MODEL_NAME}` with vLLM on **EC2 G6** — x86_64 host, NVIDIA **L4** GP
 | Root volume | {ROOT_VOLUME_GB} GB gp3 @ {ROOT_VOLUME_THROUGHPUT_MBPS} MiB/s, {ROOT_VOLUME_IOPS} IOPS |
 | Managed-by tag | `{MANAGED_BY}` |
 
-**THIS RIG HAS SERVED NOTHING.** Forked from `gpu-vllm-g5g-2b` 2026-08-28. Every
-claim below is arithmetic or inherited from a sibling; none of it is measured
-here. `benchmarks/` is deliberately empty.
+**SERVED 2026-08-30** (E2B bf16, vLLM 0.28.0, `g6.2xlarge` spot, us-east-1d):
+the published image covers SM 8.9 and the Triton tile fits Ada unpatched, which
+settles the two open questions below. Settings were aligned with the
+sagemaker-gemma runs on 2026-09-29 (vLLM 0.30.0, 8192 context, vLLM's default
+max-num-seqs, us-east-2); the 2026-08-30 run used the earlier values.
 
 **The constraint that defined the sibling is GONE, and that is the point.** G5g
 needed aarch64 *and* SM 7.5, and the published `vllm/vllm-openai` arm64 manifest

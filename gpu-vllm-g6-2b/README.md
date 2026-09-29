@@ -7,8 +7,12 @@ The rig ships a single-file MCP server (`MCPServer`) exposing a devops agent tha
 capacity with boto3, brings up the model server, and does SRE diagnostics against the
 endpoint.
 
-> **This rig has served nothing.** Forked from [`gpu-vllm-g5g-2b`](../gpu-vllm-g5g-2b) on
-> 2026-08-28. Everything below is arithmetic or inherited from a sibling.
+> **Served 2026-08-30** (vLLM 0.28.0, 16,384 context, `max-num-seqs` 8; see
+> [`benchmarks/runs/2026-08-30-first-serve-g6/`](benchmarks/runs/2026-08-30-first-serve-g6/)).
+> Forked from [`gpu-vllm-g5g-2b`](../gpu-vllm-g5g-2b) on 2026-08-28. **Settings aligned
+> 2026-09-29** with the [sagemaker-gemma](https://github.com/xbill9/sagemaker-gemma) runs:
+> vLLM 0.30.0, 8,192 context, vLLM's default `max-num-seqs`, us-east-2 — the same as its
+> `gpu-vllm-g6-*-w4a16` siblings.
 
 | | |
 | --- | --- |
