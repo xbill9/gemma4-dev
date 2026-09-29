@@ -478,7 +478,7 @@ the same test on bf16 `google/gemma-4-E2B-it` passes **0 / 6,720** and 0 / 1,152
 table found **0 of 73,400,320 groups off-grid**. The llama.cpp GGUF's Q6_K for this tensor is a
 file-format convention, not a sign it was left off the grid.
 
-`jev-tpu-31b/ple_int4.py` packs it (step recovery via `repack_q4_0.quantize`, group 32, bf16 scales)
+`jev-tpu-31b/embed_int4.py` packs it (step recovery via `repack_q4_0.quantize`, group 32, bf16 scales)
 and adds a config group targeting `re:.*embed_tokens_per_layer$`. On the T4, same flags as the
 bf16-PLE build, warm compile cache (`gpu-vllm-t4-2b/evidence/2026-09-29-ple-int4.txt`):
 
@@ -496,6 +496,37 @@ through the bf16 scale, at most 0.78% of the group's peak; the scales (0.003-0.9
 exactly, so the T4's fp16 parameters add nothing. **Consequence for the 4 GiB card above:** the
 construction-time OOM was the bf16 table, and at 3.19 GiB loaded E2B is now within reach of a
 3.64 GiB 1650 Ti on paper. Not tried — activations and KV must also fit.
+
+**`embed_tokens` is on the grid too, and packing it — with an untied int4 `lm_head` — is a
+speed win, not only residency.** vLLM ties `lm_head` by copying `.weight`
+(`UnquantizedEmbeddingMethod.tie_weights`), which a packed embedding does not have, so a quantized
+`embed_tokens` must be untied: `embed_int4.py --embed-tokens` sets `tie_word_embeddings: false`,
+writes the same levels and scales a second time as `lm_head`, and targets it with `re:^lm_head$`
+(a `ParallelLMHead` that a config group matches runs as a compressed-tensors linear, here Marlin).
+The model was trained tied, so both copies hold the trained values. Same T4, same flags, warm
+cache (`gpu-vllm-t4-2b/evidence/2026-09-29-embed-int4.txt`, published as
+`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4`):
+
+| | all embeddings bf16 | PLE int4 | PLE + `embed_tokens` + `lm_head` int4 |
+| :--- | ---: | ---: | ---: |
+| checkpoint | 6.11 GiB | 2.96 GiB | **2.64 GiB** |
+| model loading | 6.33 GiB | 3.19 GiB | **2.86 GiB** |
+| KV cache | 711,539 | 1,062,334 | **1,099,362 tokens** |
+| decode, one stream | 81.6 tok/s | 81.2 tok/s | **109.7 tok/s (+34%)** |
+| greedy, 8 x 160 tokens | — | 7 / 8 identical | **8 / 8 identical** |
+
+**+34% is larger than the JAX port's `int8_lm_head` (+2.3% on a T4G)**, from cutting the one
+full-vocab matmul from 0.75 GiB of fp16 to 0.21 GiB of int4 per token; vLLM on the T4 is further
+toward bandwidth-bound than that port was. Not yet measured above one stream.
+
+**fp16 scales are a small real gain, and only if the step is chosen right.** On a fp16 runtime the
+kernel's fp32 product is rounded to fp16, and every bf16 source value is exact in fp16, so the
+target is to reproduce it. Storing the least-squares step straight at fp16 is *worse* than bf16
+(29% of values exact against 73.8%): the refinement drifts off the grid step and bf16's coarser
+rounding happens to snap it back. Choosing per group among the grid step, the refined step and the
+refined step rounded through bf16 (all exact in fp16) gives 74.3% exact and a worst error of 1.25
+bf16 ulps of the source against 1.50. **The remaining ~26% is the source's own bf16 rounding** of
+`step x level` — 99.9% of mismatches are within one ulp — so no stored step removes it.
 
 `wNa16` is w4a16 — exactly the format of Google's QAT releases
 (`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). A **second, independent** failure hits the QAT exports:

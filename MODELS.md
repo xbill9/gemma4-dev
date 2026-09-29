@@ -813,9 +813,12 @@ the only large lever left, and `QUANTIZATION.md` records why vLLM cannot offload
 
 **It can be quantized instead, losslessly in the levels.** E2B's PLE table and `embed_tokens` are on
 the QAT 4-bit grid (group 32 along each row; 0 of 73,400,320 PLE groups off it, against 0 of 6,720
-sampled groups *on* it in the bf16 base model). Packed int4 by `jev-tpu-31b/ple_int4.py`, the PLE is
+sampled groups *on* it in the bf16 base model). Packed int4 by `jev-tpu-31b/embed_int4.py`, the PLE is
 **1.230 GiB** with scales and the text-only checkpoint **2.96 GiB**; vLLM 0.29 loads it in 3.19 GiB.
-Details and the T4 measurement in `QUANTIZATION.md`, "vLLM 0.29 CAN quantize the PLE".
+Packing `embed_tokens` as well, with `lm_head` untied as an int4 copy
+(`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4`), gives **2.64 GiB** on disk and 2.86 GiB
+loaded — every large E2B tensor 4-bit, so for this build weights/4 is roughly right again. Details
+and the T4 measurement in `QUANTIZATION.md`, "vLLM 0.29 CAN quantize the PLE".
 
 ### On llama.cpp, 58% of the E2B GGUF never reaches the accelerator
 
