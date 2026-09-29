@@ -183,7 +183,13 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-pytorch-g6-2b | 1 | 1 |
 | gpu-vllm-g4dn-2b | 0 | 1 |
 | gpu-vllm-g5g-2b | 1 | 6 |
+| gpu-vllm-g6-12b-w4a16 | 0 | 0 |
+| gpu-vllm-g6-26b-w4a16 | 0 | 0 |
 | gpu-vllm-g6-2b | 1 | 1 |
+| gpu-vllm-g6-2b-w4a16 | 0 | 0 |
+| gpu-vllm-g6-31b-w4a16 | 0 | 0 |
+| gpu-vllm-g6-4b | 0 | 0 |
+| gpu-vllm-g6-4b-w4a16 | 0 | 0 |
 | gpu-vllm-l4-12b-w4a16 | 0 | 4 |
 | gpu-vllm-l4-26b-w4a16 | 0 | 2 |
 | gpu-vllm-l4-2b-w4a16 | 0 | 1 |

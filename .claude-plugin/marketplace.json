@@ -67,6 +67,36 @@
       "description": "EC2 G6 DevOps for the vLLM Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution, SM 8.9 verification, and SRE diagnostics via the gpu-vllm-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9). Forked from gpu-vllm-g5g-2b 2026-08-28, and the fork REMOVES that rig's reason for existing: G6 is x86_64 and SM 8.9, both carried by the published amd64 image, so there is no from-source build, no CUDA toolkit, no Rust and no Triton patch. Exists as the runtime control for gpu-jax-g6-2b on identical silicon. Has served nothing."
     },
     {
+      "name": "gpu-vllm-g6-4b",
+      "source": "./gpu-vllm-g6-4b",
+      "description": "EC2 G6 DevOps for vLLM 0.30.0 serving google/gemma-4-E4B-it (Gemma 4 E4B) on one NVIDIA L4 (Ada, SM 8.9): instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution and SRE diagnostics via the gpu-vllm-g6-4b MCP server. The raw-EC2 counterpart of a sagemaker-gemma SageMaker run, with matching vLLM version and settings. Forked from gpu-vllm-g6-2b 2026-09-29. Has served nothing."
+    },
+    {
+      "name": "gpu-vllm-g6-2b-w4a16",
+      "source": "./gpu-vllm-g6-2b-w4a16",
+      "description": "EC2 G6 DevOps for vLLM 0.30.0 serving google/gemma-4-E2B-it-qat-w4a16-ct (Gemma 4 E2B) on one NVIDIA L4 (Ada, SM 8.9): instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution and SRE diagnostics via the gpu-vllm-g6-2b-w4a16 MCP server. The raw-EC2 counterpart of a sagemaker-gemma SageMaker run, with matching vLLM version and settings. Forked from gpu-vllm-g6-2b 2026-09-29. Has served nothing."
+    },
+    {
+      "name": "gpu-vllm-g6-4b-w4a16",
+      "source": "./gpu-vllm-g6-4b-w4a16",
+      "description": "EC2 G6 DevOps for vLLM 0.30.0 serving google/gemma-4-E4B-it-qat-w4a16-ct (Gemma 4 E4B) on one NVIDIA L4 (Ada, SM 8.9): instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution and SRE diagnostics via the gpu-vllm-g6-4b-w4a16 MCP server. The raw-EC2 counterpart of a sagemaker-gemma SageMaker run, with matching vLLM version and settings. Forked from gpu-vllm-g6-2b 2026-09-29. Has served nothing."
+    },
+    {
+      "name": "gpu-vllm-g6-12b-w4a16",
+      "source": "./gpu-vllm-g6-12b-w4a16",
+      "description": "EC2 G6 DevOps for vLLM 0.30.0 serving google/gemma-4-12B-it-qat-w4a16-ct (Gemma 4 12B) on one NVIDIA L4 (Ada, SM 8.9): instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution and SRE diagnostics via the gpu-vllm-g6-12b-w4a16 MCP server. The raw-EC2 counterpart of a sagemaker-gemma SageMaker run, with matching vLLM version and settings. Forked from gpu-vllm-g6-2b 2026-09-29. Has served nothing."
+    },
+    {
+      "name": "gpu-vllm-g6-26b-w4a16",
+      "source": "./gpu-vllm-g6-26b-w4a16",
+      "description": "EC2 G6 DevOps for vLLM 0.30.0 serving xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct (Gemma 4 26B A4B) on one NVIDIA L4 (Ada, SM 8.9): instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution and SRE diagnostics via the gpu-vllm-g6-26b-w4a16 MCP server. The raw-EC2 counterpart of a sagemaker-gemma SageMaker run, with matching vLLM version and settings. Forked from gpu-vllm-g6-2b 2026-09-29. Has served nothing."
+    },
+    {
+      "name": "gpu-vllm-g6-31b-w4a16",
+      "source": "./gpu-vllm-g6-31b-w4a16",
+      "description": "EC2 G6 DevOps for vLLM 0.30.0 serving google/gemma-4-31B-it-qat-w4a16-ct (Gemma 4 31B) on one NVIDIA L4 (Ada, SM 8.9): instance lifecycle, G-family quotas, x86_64 GPU DLAMI resolution and SRE diagnostics via the gpu-vllm-g6-31b-w4a16 MCP server. The raw-EC2 counterpart of a sagemaker-gemma SageMaker run, with matching vLLM version and settings. Forked from gpu-vllm-g6-2b 2026-09-29. Has served nothing."
+    },
+    {
       "name": "gpu-vllm-mi300x-2b",
       "source": "./gpu-vllm-mi300x-2b",
       "description": "AMD MI300X DevOps for the vLLM Gemma 4 E2B rig: DigitalOcean droplet lifecycle (no create/destroy, by design), rocm-smi diagnostics that parse output rather than trust an exit code, image vetting that catches the newest vendor build being unable to load Gemma 4 at all, serving deployment with the gemma4 reasoning and tool-call parsers, and text/thinking/tool-calling/vision verification via the gpu-vllm-mi300x-2b MCP server. Serves google/gemma-4-E2B-it on one Instinct MI300X (gfx942, 191.69 GiB) reached through AMD Developer Cloud. The first AMD rig in this monorepo; added 2026-09-16."
