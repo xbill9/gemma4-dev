@@ -1,6 +1,6 @@
 # jev-tpu-v5e1
 
-Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28); and the 12B QAT W4A16 repack, which serves with a smaller patch and scores level with bf16 (2026-09-29). **For one user or a few agents on this chip, use the 12B repack.** See the sections below.
+Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28); and the 12B QAT W4A16 repack, which serves with a smaller patch and scores level with bf16 (2026-09-29). The E2B and E4B QAT repacks (2026-09-29) are level with bf16 too, 1.3–2.4 points over Google's exports. **For one user or a few agents on this chip, use the 12B repack.** See the sections below.
 
 ## Status and next steps (2026-09-28)
 
@@ -59,6 +59,24 @@ What set those, from the two earlier runs:
 
 - **The compiled model is 3.92 GiB of "overlays"** for the dense 12B (1.15 for the 26B). With the KV cache filled to the 0.85 cap (5.78 GiB, 18,048 tokens) the compile needed 17.60 GiB (`2026-09-28-12b-v5e1`), hence the block cap. 40 blocks is what the suite and the load test need; about 90 would fit.
 - **Compiling eight buckets did not finish in an hour**: host memory grew about 7 GB per 5 minutes, filled RAM and 21 GB of swap (`2026-09-28-12b2-v5e1`). Four buckets peaked at about 40 GB plus 9 GB of swap.
+
+## E2B and E4B QAT W4A16 repacks on one v5e chip (2026-09-29)
+
+[`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct) and [`xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct), repacked from the `-qat-q4_0-unquantized` exports with `../jev-tpu-31b/repack_q4_0.py`, which now also quantizes the per-layer-embedding projections (E2B 58,650,624 groups, E4B 124,149,760, none off the source grid). Each served alone (`2026-09-29-e2br-v5e1`, `-e4br-v5e1`); Google's `-qat-w4a16-ct` served in `2026-09-29-e2b-v5e1` and `-e4b-v5e1` with the same flags. Suite, paired record for record (`results/2026-09-29-e*r-v5e1-VS-*.md`):
+
+| | bf16 | Google `-w4a16-ct`, v5e | repack, v5e | repack − bf16 | repack − Google |
+|---|---:|---:|---:|---|---|
+| E2B | 0.685 (same v5e chip) | 0.655 | **0.678** | −0.006 (−0.016 to +0.003) | **+0.024 (+0.014 to +0.034)** |
+| E4B | 0.731 (v6e; does not fit v5e) | 0.716 | **0.729** | −0.002 (−0.008 to +0.005) | **+0.013 (+0.007 to +0.020)** |
+
+| one v5e chip | E2B repack | E2B Google | E4B repack | E4B Google |
+|---|---:|---:|---:|---:|
+| weights resident | 6.42 GiB | 7.17 GiB | 8.90 GiB | 10.15 GiB |
+| first-token latency, median | 16.2 ms | 16.0 ms | 30.9 ms | 31.4 ms |
+| output tok/s at 1 / 4 / 16 | 136 / 532 / 1,906 | — | 75 / 291 / 1,012 | — |
+| boot, uncached | 872 s | 917 s | 1,187 s | 1,218 s |
+
+Google's E2B and E4B exports also store a bf16 `lm_head.weight` byte-identical to `embed_tokens` although the config ties them: 0.75 and 1.25 GiB, which vLLM loads, and which is exactly the resident difference. Settings: as the 12B (`GMM_V2_TILE_VMEM_FRACTION=0.85`, `MIN_TOKEN_BUCKET=64`, `--max-num-batched-tokens 512`, 40 GB swap) but `--gpu-memory-utilization 0.80` and no block cap; that is what the 2026-09-27 E2B and E4B W4A16 arms lacked. The first repacks (`2026-09-29-e2b-v5e1`, `-e4b-v5e1`, repack arms) failed to load because the PLE projections were bf16 but not on the ignore list.
 
 ## 26B W4A16 on one v5e chip: serves (2026-09-28)
 
