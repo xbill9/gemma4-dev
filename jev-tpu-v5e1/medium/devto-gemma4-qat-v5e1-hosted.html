@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 QAT on One TPU v5e: What Runs and What Doesn't</title>
+  <meta name="description" content="Google&#x27;s quantization-aware-trained Gemma 4 weights, repacked into int4 and int8 formats vLLM serves on TPU, on one v5e chip. What runs: every size from E2B to 26B, level with bf16 through 12B, up to 2.4 points above Google&#x27;s own 4-bit exports at the same speed, and 12B at 675 output tokens per second. What doesn&#x27;t: bf16 above E2B, 31B in any build, and 26B past a 2,176-token context." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to repacking Google's
+quantization-aware-trained (QAT) Gemma 4 weights for vLLM and serving
+them on one Google Cloud TPU v5e chip, with every build scored for
+classification, math, tool calling, throughput and long prompts. Every
+per-record output, log and script is committed.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-v5e1-qat-cover.955039d5.jpg" alt="Gemma 4 QAT on One TPU v5e: What Runs and What Doesn&#x27;t" /></figure>
+<p>On one v5e chip the repacked QAT builds serve every Gemma 4 size from
+E2B to 26B. Through 12B they read level with bf16 on a 3,880-record
+classification suite, they score up to 2.4 points above Google's own
+4-bit exports at the same speed, and they make 12B the largest model on
+the chip: 11.31 GiB of weights, 675 output tokens per second at 16
+requests, 0.964 on GSM8K and 0.955 on BFCL tool calling.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-v5e1">https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-v5e1</a></p>
+<hr />
+<h4 id="why-repack">Why Repack?</h4>
+<p>One TPU v5e chip (<code>v5litepod-1</code>) has 15.75 GiB of HBM.
+Gemma 4 E4B at bf16 is 14.9 GiB and 12B is 22.4 GiB, so everything above
+E2B needs 4-bit or 8-bit weights on this chip.</p>
+<p>Google trained 4-bit versions of every Gemma 4 size and publishes the
+trained values as "unquantized" bf16 checkpoints
+(<code>-qat-q4_0-unquantized</code>). Every group of 32 weights in them
+already sits on a 16-level grid. A repack stores those values in a
+format vLLM serves, without re-rounding them:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-gemma4-qat-v5e1-table-1.png"
+alt="Table: Build, What is stored" /></p>
+<p>v5e multiplies int8 by int8 natively, which makes the int8 builds the
+fast ones on this chip.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Google Cloud project with TPU v5e flex-start quota in
+<code>us-west4-a</code>, and the <code>gcloud</code> CLI logged in</li>
+<li>A Cloud Storage bucket for checkpoints and results</li>
+<li>A Hugging Face token in Secret Manager as <code>hf-token</code></li>
+<li>A clone:
+<code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+</ul>
+<hr />
+<h4 id="step-1--repack-the-qat-weights">Step 1 — Repack the QAT
+Weights</h4>
+<p>The 4-bit repack recovers each group's trained step and stores the
+group as int4, so every value keeps its trained place on the grid:</p>
+<pre class="bash"><code>huggingface-cli download google/gemma-4-12B-it-qat-q4_0-unquantized \
+  --local-dir ~/models/gemma-4-12B-it-qat-q4_0-unquantized
+python3 ../jev-tpu-31b/repack_q4_0.py repack ~/models/gemma-4-12B-it-qat-q4_0-unquantized \
+  ~/models/gemma-4-12B-it-qat-q4_0-w4a16-ct</code></pre>
+<p>The int8 builds take the same QAT values to int8 per channel with
+<code>../jev-tpu-31b/w8a8_from_qat.py</code>. The published builds are
+on Hugging Face under <code>xbill9/gemma-4-*-it-qat-*</code>.</p>
+<p>Serving them on the TPU backend uses three additions to vLLM's
+<code>tpu_inference</code>, in <code>jev-tpu-v5e1/patches/</code>: an
+int8 W8A8 method on the JAX path, int4 embedding tables that stay packed
+on the chip and unpack only the rows a step reads, and an int4
+<code>lm_head</code>.</p>
+<hr />
+<h4 id="step-2--serve-on-one-v5e-chip">Step 2 — Serve on One v5e
+Chip</h4>
+<p>Each run is a flex-start queued resource that boots, applies the
+patches to the pinned vLLM image, serves a list of builds one after
+another and uploads every result:</p>
+<pre class="bash"><code>gcloud alpha compute tpus queued-resources create jev-tpu-v5e1-$RUN --zone us-west4-a \
+  --accelerator-type v5litepod-1 --runtime-version v2-alpha-tpuv5-lite \
+  --node-id jev-tpu-v5e1-$RUN-node \
+  --provisioning-model flex-start --max-run-duration 4h --valid-until-duration 2h \
+  --metadata jev-code=&lt;bundle&gt;.tgz,jev-run=$RUN,jev-qr=jev-tpu-v5e1-$RUN \
+  --metadata-from-file startup-script=tpu/startup_quant.sh,jev-arms=arms.txt,jev-patches=patches.txt</code></pre>
+<p>One line per build names the checkpoint, what to measure and its
+serving flags:</p>
+<pre class="text"><code>/work/models/gemma-4-12B-it-qat-w8a8-int8-emb4=12b-w8a8-emb4=read+load+gen=tools,gmu=0.92
+READY /work/models/gemma-4-12B-it-qat-w8a8-int8-emb4 after 405s</code></pre>
+<hr />
+<h4 id="what-fits-on-one-v5e-chip">What Fits on One v5e Chip?</h4>
+<p>The suite is 3,880 public records from Bespoke Labs' benchmark set,
+paired record for record against bf16 (points, 95% range). Throughput is
+output tokens per second at 1, 4 and 16 parallel requests:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-gemma4-qat-v5e1-table-2.png"
+alt="Table: Build, Suite vs bf16, Output tok/s" /></p>
+<p>Every build through 12B is level with bf16; the 26B repack reads 1.1
+points below it. E4B, 12B and 26B at bf16 do not fit this chip, so their
+bf16 references ran on v6e.</p>
+<p>12B <code>w8a8emb4</code> holds 11.31 GiB of weights and gives the KV
+cache the rest:</p>
+<pre class="text"><code>TPU KV cache size: 9,728 tokens, Maximum concurrency for 4,096 tokens per request: 2.38x</code></pre>
+<p>The 26B mixture-of-experts repack serves at 13.58 GiB with a
+2,176-token cache.</p>
+<hr />
+<h4 id="repacks-against-googles-4-bit-exports">Repacks Against Google's
+4-Bit Exports</h4>
+<p>Google's <code>-qat-w4a16-ct</code> exports re-round every group of
+the QAT weights. The repack keeps them, and reads the suite higher:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-gemma4-qat-v5e1-table-3.png"
+alt="Table: Size, Google export, Repack, Difference" /></p>
+<p>Served one after the other on the same VM, the two run at the same
+speed:</p>
+<pre class="text"><code>e2b-google load at concurrency 16: 1910.8 tok/s, range 1884.7 to 1910.8
+e2b-repack load at concurrency 16: 1910.2 tok/s, range 1878.3 to 1910.9</code></pre>
+<p>At 16 requests: E4B 1,020 against 1,009 and 12B 392 against 388.</p>
+<hr />
+<h4 id="step-3--score-math-and-tool-calls">Step 3 — Score Math and Tool
+Calls</h4>
+<p><code>gen_eval.py</code> scores two tasks against the served model,
+in code:</p>
+<pre class="bash"><code>JEV_GEN_MAX_TOKENS=2048 python3 gen_eval.py run http://localhost:8000 &quot;$MODEL&quot; gsm8k out/gsm8k.jsonl
+python3 gen_eval.py run http://localhost:8000 &quot;$MODEL&quot; bfcl_simple out/bfcl_simple.jsonl
+12b-w8a8-emb4 gsm8k: {&quot;task&quot;: &quot;gsm8k&quot;, &quot;max_tokens&quot;: 2048, &quot;n&quot;: 1319, &quot;right&quot;: 1272, &quot;accuracy&quot;: 0.9644, &quot;errors&quot;: 0, &quot;truncated&quot;: 4, &quot;wall_s&quot;: 584.8}</code></pre>
+<ul>
+<li><strong>GSM8K</strong>: all 1,319 test problems, zero-shot chain of
+thought, greedy, right when the final number matches.</li>
+<li><strong>BFCL v3 simple</strong>: 400 records, one tool offered,
+served with <code>--tool-call-parser gemma4</code>, right when the call
+has the right name and accepted arguments.</li>
+</ul>
+<hr />
+<h4 id="how-do-they-do-on-math-and-tool-calls">How Do They Do on Math
+and Tool Calls?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-gemma4-qat-v5e1-table-4.png"
+alt="Table: Build, GSM8K, BFCL" /></p>
+<p>Tool calling holds at every size: every E2B repack is within 1.3
+points of bf16. On GSM8K the E2B repacks trail bf16 by 0.9 to 2.0
+points, and the QAT weights themselves, stored at bf16, trail by 1.3
+(−2.7 to 0.0), so the repack adds at most 0.8 to what QAT training left.
+At E2B the 4-bit repack holds math best. E4B and 12B have no bf16
+reference for these tasks on this chip.</p>
+<hr />
+<h4 id="int8-from-the-qat-weights-or-from-bf16">Int8 From the QAT
+Weights, or From bf16?</h4>
+<p>A third-party int8 build rounded directly from the bf16 release uses
+the same format and runs at the same speed. Built from the QAT weights
+instead, int8 reads the suite 1.5 points higher at E2B (+0.5 to +2.6).
+At 12B it scores 7.2 points higher on BFCL (0.955 against 0.882): the
+build rounded from bf16 writes string arguments wrapped in extra quote
+marks in 16 of the 400 records, and the QAT build writes none.</p>
+<hr />
+<h4 id="step-4--long-prompts">Step 4 — Long Prompts</h4>
+<p><code>w4a16_client.py loadlong</code> streams requests with prompts
+of about 3,600 tokens and a unique prefix on each, so none is served
+from cache:</p>
+<pre class="text"><code>12b-w8a8-emb4 long 3584 at concurrency 16: 3611 prompt tokens, 94.7 out tok/s, 1430.0 total tok/s, ttft 21.96 s</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-gemma4-qat-v5e1-table-5.png"
+alt="Table: Build, Output tok/s at 16 requests, Median first token" /></p>
+<p>E2B <code>w8a8emb4</code> stays 1.38x bf16 with long prompts and
+answers sooner. At 12B the cache holds about two such requests at
+once.</p>
+<hr />
+<h4 id="mag_right-tip-an-fp8-kv-cache-doubles-12bs-room">🔎 Tip: An fp8
+KV Cache Doubles 12B's Room</h4>
+<p><code>--kv-cache-dtype fp8</code> stores the cache at one byte per
+value:</p>
+<pre class="text"><code>TPU KV cache size: 18,944 tokens, Maximum concurrency for 4,096 tokens per request: 4.62x</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-gemma4-qat-v5e1-table-6.png"
+alt="Table: 12B w8a8emb4, 16 requests, bf16 cache, fp8 cache" /></p>
+<p>A single request runs at the same speed with either cache. The fp8
+cache costs 0.7 suite points and holds GSM8K and BFCL.</p>
+<hr />
+<h4 id="what-doesnt-run">What Doesn't Run</h4>
+<ul>
+<li><strong>E4B and 12B at bf16.</strong> At 14.9 and 22.4 GiB they
+leave no room on a 15.75 GiB chip; their 4-bit and 8-bit repacks
+run.</li>
+<li><strong>31B in any build.</strong> Its 4-bit repack takes 19.04 GiB
+of HBM on its own.</li>
+<li><strong>26B past a 2,176-token context.</strong> With int4
+vocabulary tables it still takes 13.72 GiB of weights, and a 3,072-token
+cache failed to compile (<code>CompileTimeHbmOom</code>) and a
+2,560-token cache failed to load.</li>
+<li><strong>fp8 weights, at speed.</strong> 12B fp8 runs and scores
+level with int8, at 518 output tokens per second against 624 for int8
+with the same bf16 tables: v5e has no fp8 compute and converts the
+weights before each multiply.</li>
+</ul>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/medium/img/devto-gemma4-qat-v5e1-table-7.png"
+alt="Table: Size, Build, Suite, GSM8K, BFCL, tok/s at 16" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For the most capable model on one v5e chip, 12B
+<code>w8a8emb4</code>, with <code>--kv-cache-dtype fp8</code> when many
+long prompts arrive at once. It has its own serving directory,
+<code>tpu-vllm-v5e1-12b-w8a8emb4</code>, with an MCP server, and serves
+there at 57 / 216 / 713 output tokens per second. For E4B,
+<code>w8a8emb4</code>. For E2B, <code>w8a8</code> for speed, or the
+<code>q4w4a16</code> repack for math closest to bf16.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<p>Each run deletes its own queued resource when its last build
+finishes:</p>
+<pre class="bash"><code>gcloud alpha compute tpus queued-resources list --zone us-west4-a</code></pre>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find what Google's QAT Gemma 4
+weights can do on one TPU v5e chip. The key to the solution was
+repacking the QAT values into int4 and int8 formats without re-rounding
+them, and three additions to vLLM's TPU backend. The results were:</p>
+<ul>
+<li>🟢 The repacks serve every Gemma 4 size from E2B to 26B on one v5e
+chip, level with bf16 on the suite through 12B</li>
+<li>🟢 12B <code>w8a8emb4</code> fits at 11.31 GiB and serves 675 output
+tokens per second, with 0.964 on GSM8K and 0.955 on BFCL</li>
+<li>🟢 The repacks read the suite up to 2.4 points above Google's 4-bit
+exports, at the same speed</li>
+<li>🟢 int8 from the QAT weights beats int8 rounded from bf16: +1.5
+suite points at E2B, +7.2 BFCL points at 12B</li>
+<li>🟢 An fp8 KV cache doubles 12B's cache to 18,944 tokens and its
+long-prompt throughput by 1.65x</li>
+<li>⚠️ On GSM8K the E2B builds trail bf16 by 0.9 to 2.0 points, most of
+it from QAT training itself</li>
+<li>⚠️ 26B serves with a 2,176-token context and reads 1.1 points below
+bf16</li>
+<li>❌ E4B and 12B at bf16 and 31B in any build do not fit one v5e
+chip</li>
+</ul>
+<p>Scope: every build ran on one TPU v5e chip (<code>v5litepod-1</code>,
+flex-start) in us-west4-a, vLLM <code>0.29.1rc1.dev468+g0b7f11a1e</code>
+at <code>vllm/vllm-tpu@sha256:19a1a052…</code> with the three patches in
+<code>jev-tpu-v5e1/patches/</code>, one run per build. The E4B, 12B and
+26B bf16 suite references ran on v6e, and E4B and 12B have no bf16
+reference for GSM8K or BFCL. Throughput is the median of three passes of
+256 output tokens. Pairings are record for record, and a difference
+counts only when its 95% range excludes zero. The repacked checkpoints
+are unofficial and derived from Google's release under Apache 2.0. Parts
+of the analysis and writing were done with AI assistance (Claude); every
+figure comes from the committed output files.</p>
+<p>The strategy for serving Google's QAT Gemma 4 on one TPU v5e chip was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Code, patches, per-record results and logs: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-v5e1">https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-v5e1</a></li>
+<li>The 12B serving directory: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/tpu-vllm-v5e1-12b-w8a8emb4">https://github.com/xbill9/gemma4-dev/tree/main/tpu-vllm-v5e1-12b-w8a8emb4</a></li>
+<li>12B int8 with int4 tables: <a
+href="https://huggingface.co/xbill9/gemma-4-12B-it-qat-w8a8-int8-emb4">https://huggingface.co/xbill9/gemma-4-12B-it-qat-w8a8-int8-emb4</a></li>
+<li>12B 4-bit repack: <a
+href="https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct">https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct</a></li>
+<li>Google's QAT source checkpoints: <a
+href="https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-unquantized">https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-unquantized</a></li>
+<li>Google's QAT announcement: <a
+href="https://blog.google/innovation-and-ai/technology/developers-tools/quantization-aware-training-gemma-4/">https://blog.google/innovation-and-ai/technology/developers-tools/quantization-aware-training-gemma-4/</a></li>
+<li>GSM8K: <a
+href="https://github.com/openai/grade-school-math">https://github.com/openai/grade-school-math</a></li>
+<li>Berkeley Function Calling Leaderboard: <a
+href="https://huggingface.co/datasets/gorilla-llm/Berkeley-Function-Calling-Leaderboard">https://huggingface.co/datasets/gorilla-llm/Berkeley-Function-Calling-Leaderboard</a></li>
+<li>Bespoke Labs public suite: <a
+href="https://github.com/bespokelabsai/nimble/blob/0e67403/docs/PUBLIC_BENCHMARKS.md">https://github.com/bespokelabsai/nimble/blob/0e67403/docs/PUBLIC_BENCHMARKS.md</a></li>
+<li>vLLM TPU documentation: <a
+href="https://docs.vllm.ai/projects/tpu/en/latest/">https://docs.vllm.ai/projects/tpu/en/latest/</a></li>
+<li>Cloud TPU v5e: <a
+href="https://cloud.google.com/tpu/docs/v5e">https://cloud.google.com/tpu/docs/v5e</a></li>
+</ul>
+</body>
+</html>
