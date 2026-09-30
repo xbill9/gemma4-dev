@@ -10,7 +10,8 @@ rather than quantizing, and any off-grid group aborts the run.
 
 What it packs:
 
-- always, `embed_tokens_per_layer` (the PLE table of the E sizes);
+- `embed_tokens_per_layer` (the PLE table of the E sizes), wherever it exists;
+  12B, 26B and 31B have none, so there --embed-tokens is required;
 - with --embed-tokens, `embed_tokens` too. vLLM ties `lm_head` by copying
   `.weight`, which a packed embedding does not have, so this unties them:
   `tie_word_embeddings` becomes false and the same levels and scales are
@@ -164,7 +165,12 @@ def main():
 
     index = json.load(open(os.path.join(a.src, "model.safetensors.index.json")))["weight_map"]
     ck = open_checkpoint(a.src)
-    tables = [PLE] + ([EMBED] if a.embed_tokens else [])
+    # 12B, 26B and 31B have no per-layer embeddings, so the PLE table is packed
+    # only where it exists; there, --embed-tokens is the whole point.
+    has_ple = any(n.endswith(f".{PLE}.weight") for n in index)
+    tables = ([PLE] if has_ple else []) + ([EMBED] if a.embed_tokens else [])
+    if not tables:
+        sys.exit("no per-layer embedding table here: pass --embed-tokens")
     names = {}
     for t in tables:
         found = [n for n in index if n.endswith(f".{t}.weight")]
