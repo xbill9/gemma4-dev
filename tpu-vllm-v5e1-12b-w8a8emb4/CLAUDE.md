@@ -251,8 +251,10 @@ there.
 
 No benchmark artifacts were carried over from the fork. This checkpoint's measurements on v5e
 (`2026-09-29-12b-v5e1`, `2026-09-30-12bctx*-v5e1`) were made with the `../jev-tpu-v5e1` runner and live in
-`../jev-tpu-v5e1/results/`; README.md has the table. This rig itself has not provisioned yet. New runs from
-this rig go under `benchmarks/runs/<date>-<what>-<hw>/` per the root `CLAUDE.md`.
+`../jev-tpu-v5e1/results/`; README.md has the table. This rig first provisioned and served its own checkpoint on
+2026-09-30 (`benchmarks/runs/2026-09-30-rig-boot-v5e1`): 57 / 216 / 713 output tok/s at 1 / 4 / 16, within 1.3% of
+the sweep. It leaves `--max-num-seqs` at vLLM's 256, so it compiles 44 programs to the sweep's 20 (512 s against
+237). New runs from this rig go under `benchmarks/runs/<date>-<what>-<hw>/` per the root `CLAUDE.md`.
 
 `AGENTS.md` in this directory is maintained by a different tool and overlaps with this file — if you change a
 convention here, check whether it needs the same change there. It has already drifted on two points: it claims

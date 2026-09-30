@@ -602,16 +602,28 @@ trap"). Each row's runs are in the rig named `tpu-vllm-v5e1-<size>-<slot 5>`; th
 | E4B | `q4w4a16` | 0.729 (−0.2, −0.8 to +0.5) | 75 / 291 / 1,012 |
 | E4B | `q4w4a16emb4` | 0.730 (−0.1, −0.7 to +0.6) | 79 / 308 / 1,064 |
 | E4B | `w8a8` | 0.727 (−0.4, −1.1 to +0.3) | 119 / 459 / 1,590 |
+| E4B | `w8a8rtn` (rounded from bf16) | 0.730 (−0.1, −0.7 to +0.5) | 119 / 459 / 1,597 |
 | E4B | **`w8a8emb4`** | 0.728 (−0.3, −1.0 to +0.5) | 133 / 509 / 1,747 |
 | E4B | `fp8` | 0.733 (+0.2, −0.4 to +1.0) | 99 / 382 / 1,349 |
 | 12B | `q4w4a16` | 0.758 (−0.1, −0.7 to +0.5) | 33 / 127 / 388 |
 | 12B | `q4w4a16emb4` | 0.762 (+0.2, −0.4 to +0.8) | 35 / 127 / 407 |
 | 12B | `w8a8` | 0.757 (−0.2, −1.0 to +0.5) | 53 / 201 / 624 |
+| 12B | `w8a8rtn` (rounded from bf16) | 0.752 (−0.7, −1.4 to −0.1) | 53 / 201 / 623 |
+| 12B | `fp8` | 0.757 (−0.3, −0.9 to +0.4) | 43 / 165 / 518 |
 | 12B | **`w8a8emb4`** | 0.761 (+0.1, −0.6 to +0.8) | 57 / 219 / 675 |
 
-- **The source of the int8 values decides accuracy, the int8 activations do not.** `w8a8` and
-  `w8a8rtn` are the same format at the same speed; taken from the QAT weights the build scores 1.5 points
-  higher (+0.5 to +2.6, paired directly), level with bf16, where rounding the bf16 release loses 1.2.
+- **Where the int8 values come from matters at E2B and on 12B tool calling; the int8 activations never
+  do.** `w8a8` and `w8a8rtn` are the same format at the same speed at every size. At E2B the build from the
+  QAT weights scores 1.5 suite points higher (+0.5 to +2.6, paired directly), level with bf16, where rounding
+  the bf16 release loses 1.2. At E4B the two are level (rounded against QAT +0.3, −0.4 to +1.1) and both
+  match bf16. At 12B the suite gap is not significant (−0.5, −1.3 to +0.2), but the
+  rounded build loses 0.7 to bf16 (−1.4 to −0.1) and **7.2 points on BFCL tool calling** (next section).
+  The rounded E4B and 12B builds (`glenic/*-W8A8-INT8`) store a bf16 `lm_head` byte-identical to their tied
+  `embed_tokens`; the JAX path loads it (1.88 GiB at 12B, enough to not fit), so they were served with it
+  removed by `jev-tpu-v5e1/strip_tied_head.py`, which changes no served value.
+- **fp8 W8A8 buys nothing at 12B either**: suite and GSM8K level with `w8a8emb4`, 17% slower than `w8a8`
+  at the same file size (518 against 624 tok/s at 16), because v5e converts the weights before every
+  multiply.
 - **`w8a8emb4` is the fastest build at every size**, 1.7x bf16's output at E2B for one request (243 against
   144), and level with bf16 on the suite at E4B and 12B. At E2B the int4 tables cost 0.9 points against
   `w8a8` with bf16 tables (−1.6 to −0.1). 12B `w8a8emb4` is 11.31 GiB of weights, the largest model
@@ -622,6 +634,40 @@ trap"). Each row's runs are in the rig named `tpu-vllm-v5e1-<size>-<slot 5>`; th
   `w8a8emb4` at `--gpu-memory-utilization 0.92` (bound by its 11.31 GiB of weights), 13,824 beside
   `q4w4a16emb4` at 0.72 (bound by a 3.92 GB compile allocation; at 0.76 it failed with 3.73 GB free).
   336 KiB/token (`MODELS.md`, §12B).
+
+### Generation and tool calling on one v5e chip: where the suite and the tasks disagree
+
+MEASURED 2026-09-30, same image and patches. GSM8K is all 1,319 test problems, zero-shot chain of thought,
+greedy, a 2,048-token answer limit (3 or fewer answers cut off per build), scored by the final number.
+BFCL is the 400 records of BFCL v3 simple: one tool offered, `--tool-call-parser gemma4`, scored by name and
+arguments with BFCL's AST rules (reimplemented in `jev-tpu-v5e1/gen_eval.py`, checked against all 400
+reference answers). Paired record for record, 95% range from 10,000 bootstrap resamples; comparison files are
+`jev-tpu-v5e1/results/2026-09-30-*-GEN*.md`.
+
+| Build | GSM8K | vs reference | BFCL | vs reference |
+| :--- | ---: | :--- | ---: | :--- |
+| E2B bf16 | 0.910 | reference | 0.928 | reference |
+| E2B `q4_0` (QAT, stored bf16) | 0.897 | −1.3 (−2.7 to 0.0) | 0.922 | −0.5 |
+| E2B `q4w4a16` | 0.901 | −0.9 (−2.2 to +0.4) | 0.920 | −0.7 |
+| E2B `w8a8` | 0.889 | **−2.0 (−3.4 to −0.8)** | 0.915 | −1.3 |
+| E2B `w8a8emb4` | 0.895 | **−1.4 (−2.8 to −0.1)** | 0.920 | −0.7 |
+| E4B `q4w4a16` | 0.934 | reference (bf16 does not fit) | 0.910 | reference |
+| E4B `w8a8emb4` | 0.940 | +0.6 (−0.2 to +1.4) | 0.912 | +0.3 |
+| 12B `w8a8emb4` | 0.964 | reference (bf16 does not fit) | 0.955 | reference |
+| 12B `q4w4a16emb4` | 0.958 | −0.7 (−1.4 to 0.0) | 0.948 | −0.7 |
+| 12B `fp8` | 0.961 | −0.4 (−1.1 to +0.3) | 0.945 | −1.0 (−2.2 to +0.3) |
+| 12B `w8a8rtn` | 0.956 | **−0.8 (−1.7 to −0.1)** | **0.882** | **−7.2 (−10.0 to −4.8)** |
+
+- **E2B: every build from the QAT weights trails bf16 on GSM8K by 1 to 2 points** while matching it on the
+  suite. The QAT weights alone account for most of it (−1.3); quantizing them costs no more than 0.8 against
+  QAT bf16, with every range crossing zero. The two int8 builds, where both steps add up, are the ones with a
+  significant loss. The 4-bit repack holds GSM8K best.
+- **12B `w8a8rtn` fails tool calls the QAT build gets right** (30 against 1): in 16 records it wraps string
+  arguments in literal quote characters, which the parser passes through, and with those unwrapped it still
+  trails by 3 points. The suite showed no significant difference between the two.
+- **A 768-token answer limit measures answer length.** At 768, QAT-derived E2B builds were cut off 74 to 86
+  times against bf16's 53, which widened every E2B gap (QAT bf16 −1.9 there, −1.3 at 2,048).
+- **No bf16 E4B or 12B reference exists for these tasks**: neither fits v5e, and the v6e run was not made.
 
 ### Speculative decoding with Gemma 4's MTP drafters (E2B, v5e)
 
@@ -1084,6 +1130,15 @@ is a size coincidence worth re-checking on a chip with different vector widths.
 Extrapolating the pattern (2 bytes -> dim 2, 1 byte -> dim 4, both 32,768 B/block/layer), **4-bit KV
 should land at dim 8 and the same byte count — a third 1.000x.** That is a prediction, not a measurement,
 but after fp8 it is the default expectation.
+
+**2026-09-30: fp8 KV doubles capacity for 12B on the pinned image.** On `v5litepod-1` at
+`vllm/vllm-tpu@sha256:19a1a052…` with `jev-tpu-v5e1`'s patches, 12B `w8a8emb4` at
+`--gpu-memory-utilization 0.92` held **18,944 KV tokens with `--kv-cache-dtype fp8` against 9,728 with the
+default bf16** (both from the boot logs), so the 1.000x above does not hold there. It differs in both image and
+model size from the 2026-08-07 measurement, and which of the two changed the layout is not established. Measured
+effect (`tpu-vllm-v5e1-12b-w8a8emb4/README.md`): output tok/s at 16 requests of about 3,600 tokens 157 against
+95, first token 13.3 s against 22.0 s; one request unchanged; suite −0.7 (−1.3 to −0.1), GSM8K and BFCL level.
+Read the KV token count from the boot log before relying on either result for another image or size.
 
 ## The verification rule
 

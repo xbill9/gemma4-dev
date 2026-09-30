@@ -17,3 +17,6 @@ lists; they cover two cells, so they stay with the sweep.
 No suite; see each run's `README.md`.
 
 - [`2026-09-29-e4b-v5e1`](benchmarks/runs/2026-09-29-e4b-v5e1/)
+- [`2026-09-30-fillE-e4b-repack-v5e1`](benchmarks/runs/2026-09-30-fillE-e4b-repack-v5e1/): GSM8K 0.923 (768-token limit); BFCL 0.910
+- [`2026-09-30-gen2048b2-e4b-repack-v5e1`](benchmarks/runs/2026-09-30-gen2048b2-e4b-repack-v5e1/): GSM8K 0.934 (2,048-token limit); BFCL 0.910
+- [`2026-09-30-gspeedb-e4b-repack-v5e1`](benchmarks/runs/2026-09-30-gspeedb-e4b-repack-v5e1/): output tok/s at 1 / 4 / 16: 75 / 291 / 1,009

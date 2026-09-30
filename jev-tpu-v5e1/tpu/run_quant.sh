@@ -8,10 +8,16 @@
 # compile cache lives on the host (seeded from gs when metadata jev-xla-seed names a prefix,
 # and uploaded under jev-xla-save when that is set).
 # Metadata jev-arms, when set, replaces the default arm list: space-separated
-# <model>=<tag>=<mode>, mode one of read (the label read), load (fixed-length throughput via
-# w4a16_client.py) or both, and an optional fourth field naming extra serve flags: override
+# <model>=<tag>=<mode>, mode a +-joined list of read (the label read), load (fixed-length throughput via
+# w4a16_client.py), long (the same with long, never-cached prompts: loadlong, at each length in
+# metadata jev-long-input, default "1024 3584") and gen (gen_eval.py: GSM8K and BFCL simple; metadata
+# jev-gen-max-tokens sets GSM8K's answer limit, default 768), or
+# both (read+load); and an optional fourth field, comma-separated serve flags: override
 # (--hf-overrides to Gemma4ForCausalLM), override-nolimit (the same, without
-# --limit-mm-per-prompt) or kv-bf16 (--kv-cache-dtype bfloat16; v6e picks fp8 by itself, v5e is unmeasured). Metadata jev-patches, when set, replaces the list of diffs applied
+# --limit-mm-per-prompt), kv-bf16 (--kv-cache-dtype bfloat16; v6e picks fp8 by itself, v5e is unmeasured),
+# tools (--enable-auto-tool-choice --tool-call-parser gemma4, which gen's BFCL task needs),
+# gmu=<x>, mml=<n> and blocks=<n> (--gpu-memory-utilization, --max-model-len,
+# --num-gpu-blocks-override for this arm only; they follow jev-serve-args, so they win). Metadata jev-patches, when set, replaces the list of diffs applied
 # (default: kvshare.diff wna16.diff; 12B loads with the override instead of unified.diff). Metadata jev-tp sets the tensor-parallel size
 # for every arm (default 1). Metadata jev-gcs-models, when set, names
 # space-separated gs:// checkpoint directories copied to /opt/jev-tpu/models/<basename>, which
@@ -24,7 +30,8 @@
 # concurrencies the load mode runs at. Metadata jev-boot-timeout sets each arm's boot budget in seconds (default 3600). Host memory is sampled every 30 s
 # into logs/<tag>.hostmem.txt while an arm boots, and the kernel's OOM-killer lines are kept on failure.
 # Results and logs go to gs://$BUCKET/jev-tpu-v5e1/<run-prefix>/ as each arm finishes; the VM
-# deletes its queued resource (metadata jev-qr) at the end.
+# deletes its queued resource (metadata jev-qr) at the end, or itself as a Compute Engine instance
+# (metadata jev-self-delete=instance, the v6e path).
 set -u
 PREFIX="$1"
 BUCKET=aisprint-491218-bucket
@@ -46,7 +53,14 @@ save_cache() {
 }
 finish() {
   log "DONE: $1"; save_cache; sync_up
-  local qr; qr=$(attr jev-qr) || { log "no jev-qr metadata: leaving the node up, delete it by hand"; exit 0; }
+  local qr
+  if ! qr=$(attr jev-qr); then
+    # A Compute Engine TPU VM (v6e) has no queued resource; metadata jev-self-delete=instance deletes it.
+    if [ "$(attr jev-self-delete)" = instance ]; then
+      sync_up; gcloud compute instances delete "$(hostname)" --zone "$ZONE" --quiet >> $LOG 2>&1; exit 0
+    fi
+    log "no jev-qr metadata: leaving the node up, delete it by hand"; exit 0
+  fi
   gcloud alpha compute tpus queued-resources delete "$qr" --zone "$ZONE" --force --quiet --async >> $LOG 2>&1
   sync_up; exit 0
 }
@@ -92,7 +106,11 @@ if GCS_MODELS=$(attr jev-gcs-models); then
 fi
 
 if SWAP=$(attr jev-swap-gb); then
-  { fallocate -l ${SWAP}G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile; } >> $LOG 2>&1
+  # Never let the swap file fill the disk: copied checkpoints can already hold most of it, and with the
+  # disk full nothing can be written, including the log upload, so the run ends with no record at all.
+  FREE=$(df -BG --output=avail / | tail -1 | tr -dc 0-9)
+  if [ "$SWAP" -gt $(( FREE - 10 )) ]; then log "swap capped at $(( FREE - 10 ))G (asked ${SWAP}G, ${FREE}G free)"; SWAP=$(( FREE - 10 )); fi
+  [ "$SWAP" -gt 0 ] && { fallocate -l ${SWAP}G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile; } >> $LOG 2>&1
   log "swap: $(free -g | awk '/^Swap:/{print $2}') GiB; disk free: $(df -h / | awk 'NR==2{print $4}')"
 fi
 
@@ -158,20 +176,47 @@ PY
 
 try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nolimit|kv-bf16]
   local model=$1 tag=$2 mode=${3:-read} flags=${4:-} extra=() mm
+  has() { [[ "+$mode+" == *"+$1+"* ]]; }
   mm='{"image":0,"audio":0,"video":0}'
-  case "$flags" in
-    override) extra=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}') ;;
-    override-nolimit) extra=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}'); mm= ;;
-    kv-bf16) extra=(--kv-cache-dtype bfloat16) ;;
-  esac
-  extra+=($SERVE_ARGS)
+  local arm_args=()
+  for f in ${flags//,/ }; do  # comma-separated; per-arm flags go after jev-serve-args, so they win
+    case "$f" in
+      override) extra+=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}') ;;
+      override-nolimit) extra+=(--hf-overrides '{"architectures":["Gemma4ForCausalLM"]}'); mm= ;;
+      kv-bf16) extra+=(--kv-cache-dtype bfloat16) ;;
+      tools) arm_args+=(--enable-auto-tool-choice --tool-call-parser gemma4) ;;
+      gmu=*) arm_args+=(--gpu-memory-utilization "${f#gmu=}") ;;
+      mml=*) arm_args+=(--max-model-len "${f#mml=}") ;;
+      blocks=*) arm_args+=(--num-gpu-blocks-override "${f#blocks=}") ;;
+      *) log "unknown arm flag $f" ;;
+    esac
+  done
+  extra+=($SERVE_ARGS "${arm_args[@]}")
   log "serving $model as $tag ($mode${flags:+, $flags})"
   ( while :; do echo "$(date -u +%T) $(free -m | awk '/^Mem:/{print "used",$3,"avail",$7} /^Swap:/{print "swap_used",$3}' | tr '\n' ' ')"; sleep 30; done ) > $L/$tag.hostmem.txt 2>&1 &
   local memlog=$!
   if MM_LIMIT=$mm bash $W/tpu/serve.sh "$model" "${extra[@]}" >> $LOG 2>&1; then
     log "$(tail -1 $LOG)"
-    if [ "$mode" != load ]; then full_run "$model" "$tag"; fi
-    if [ "$mode" != read ]; then
+    [ "$mode" = both ] && mode=read+load
+    if has read; then full_run "$model" "$tag"; fi
+    if has gen; then
+      for task in gsm8k bfcl_simple; do
+        JEV_GEN_MAX_TOKENS=$(attr jev-gen-max-tokens || echo 768) \
+          python3 $W/gen_eval.py run http://localhost:8000 "$model" $task $W/results/$PREFIX-$tag-gen/$task.jsonl > $L/$tag.gen-$task.json 2>> $LOG
+        log "$tag $task: $(cat $L/$tag.gen-$task.json)"
+      done
+      sync_up
+    fi
+    if has long; then
+      for n in $(attr jev-long-input || echo "1024 3584"); do  # metadata jev-long-input: prompt lengths in tokens
+        for c in $(attr jev-load-conc || echo 16); do
+          JEV_LOAD_INPUT_TOKENS=$n JEV_LOAD_CONCURRENCY=$c python3 $W/tpu/w4a16_client.py loadlong "$model" $L/$tag.long$n.c$c.json > /dev/null 2>> $LOG
+          log "$tag long $n at concurrency $c: $(python3 -c "import json;d=json.load(open('$L/$tag.long$n.c$c.json'));print(d['prompt_tokens_per_request'],'prompt tokens,',d['output_tok_per_s'],'out tok/s,',d['total_tok_per_s'],'total tok/s, ttft',d['ttft_median_s'],'s')" 2>&1)"
+        done
+      done
+      sync_up
+    fi
+    if has load; then
       for c in $(attr jev-load-conc || echo 16); do  # metadata jev-load-conc: space-separated concurrencies
         JEV_LOAD_CONCURRENCY=$c python3 $W/tpu/w4a16_client.py load "$model" $L/$tag.load.c$c.json > /dev/null 2>&1
         log "$tag load at concurrency $c: $(python3 -c "import json;d=json.load(open('$L/$tag.load.c$c.json'));print(d['output_tok_per_s'],'tok/s, range',d['output_tok_per_s_min'],'to',d['output_tok_per_s_max'])" 2>&1)"
@@ -183,6 +228,8 @@ try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nol
     log "$tag host memory at the end: $(tail -1 $L/$tag.hostmem.txt); kernel OOM lines: $(wc -l < $L/$tag.oom.txt)"
   fi
   kill $memlog 2>/dev/null
+  # serve.sh names the boot log by checkpoint, so a later arm serving the same one overwrites it: keep this arm's.
+  cp "$L/$(echo "$model" | tr '/' '_').boot.log" "$L/$tag.boot.log" 2>/dev/null
   # Speculative-decoding counters (acceptance) are only in the server log; keep them.
   docker logs vllm 2>&1 | grep -iE 'spec.?decod|acceptance|draft' > $L/$tag.spec.txt || true
   docker rm -f vllm >/dev/null 2>&1; rm -rf /dev/shm/hf; sync_up

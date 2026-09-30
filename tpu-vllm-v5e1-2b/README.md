@@ -5,6 +5,16 @@ This project functions as an expert TPU SRE and DevOps Engineer, specialized in 
 
 This project provides an automated DevOps/SRE assistant that leverages **Gemma 4 models self-hosted via vLLM on Cloud TPUs**. It bridges Google Cloud Logging with a private inference endpoint to analyze infrastructure issues and suggest remediations.
 
+### Measured 2026-09-30 (generation, tool calling, long prompts)
+
+One `v5litepod-1`, runner `../jev-tpu-v5e1` (`benchmarks/runs/2026-09-30-*`). GSM8K is all 1,319 test problems, greedy, scored by the final number; BFCL is the 400 records of BFCL v3 simple, one tool, scored by name and arguments.
+
+| | GSM8K, 2,048-token limit | GSM8K, 768-token limit | BFCL |
+|---|---:|---:|---:|
+| E2B bf16 (this checkpoint) | 0.910 | 0.894 | 0.928 |
+
+Long prompts, output tok/s at 1 / 16 requests (unique prefix per request, so the prefix cache serves none): about 1,000 tokens 139 / 1,521; about 3,600 tokens 130 / 906, 1.10 s to first token at 16. This is the bf16 reference the E2B builds pair against in `../jev-tpu-v5e1/results/2026-09-30-gen2048a-v5e1-GEN-VS-BF16.md`.
+
 ## Current Deployment
 *   **Model:** `google/gemma-4-E2B-it` on TPU v5e-1 (v5litepod).
 *   **Endpoint:** discovered at runtime — the agent finds the `ACTIVE` Queued Resource,

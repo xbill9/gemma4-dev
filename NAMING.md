@@ -507,11 +507,14 @@ Three things that trip people up:
 | `~/gemma4-dev/gce-vllm-v6e4-26b` | **Compute Engine instance** (`ct6e-standard-4t`) | vLLM | v6e-4 | `google/gemma-4-26B-A4B-it` | — — **artifact rig**, a repack-sweep cell from `jev-tpu-31b`, see below |
 | `~/gemma4-dev/gce-vllm-v6e4-26b-q4w4a16` | **Compute Engine instance** (`ct6e-standard-4t`) | vLLM | v6e-4 | `/work/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct` | `q4w4a16` — **artifact rig**, a repack-sweep cell from `jev-tpu-31b`, see below |
 | `~/gemma4-dev/gpu-vllm-l4-26b-q4w4a16` | NVIDIA L4, host not recorded | vLLM | l4 | `/work/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct` | `q4w4a16` — **artifact rig**, a repack-sweep cell from `jev-tpu-31b`, see below |
+| `~/gemma4-dev/tpu-vllm-v5e1-12b-fp8` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-12B-it-qat-q4_0-fp8-text` | `fp8` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-12b-q4w4a16` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-12B-it-qat-q4_0-w4a16-ct` | `q4w4a16` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-12b-q4w4a16emb4` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-12B-it-qat-q4_0-w4a16-ct-text-emb4` | `q4w4a16emb4` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-12b-w4a16` | TPU Queued Resource | vLLM | v5e-1 | `google/gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-12b-w8a8` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-12B-it-qat-w8a8-int8` | `w8a8` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
+| `~/gemma4-dev/tpu-vllm-v5e1-12b-w8a8rtn` | TPU Queued Resource | vLLM | v5e-1 | `glenic/gemma-4-12B-it-W8A8-INT8` | `w8a8rtn` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below. Served with its stored `lm_head`, byte-identical to the tied `embed_tokens`, removed (`jev-tpu-v5e1/strip_tied_head.py`); no served value changes |
 | `~/gemma4-dev/tpu-vllm-v5e1-26b-q4w4a16` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct` | `q4w4a16` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
+| `~/gemma4-dev/tpu-vllm-v5e1-26b-q4w4a16emb4` | TPU Queued Resource | vLLM | v5e-1 | `xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct-text-emb4` | `q4w4a16emb4` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-fp8` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-E2B-it-qat-q4_0-fp8-text` | `fp8` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-fp8emb4` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-E2B-it-qat-q4_0-fp8-text-emb4` | `fp8emb4` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-q4w4a16` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct` | `q4w4a16` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
@@ -524,6 +527,7 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-vllm-v5e1-4b-w4a16` | TPU Queued Resource | vLLM | v5e-1 | `google/gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-4b-w8a8` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-E4B-it-qat-w8a8-int8` | `w8a8` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
 | `~/gemma4-dev/tpu-vllm-v5e1-4b-w8a8emb4` | TPU Queued Resource | vLLM | v5e-1 | `/work/models/gemma-4-E4B-it-qat-w8a8-int8-emb4` | `w8a8emb4` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below |
+| `~/gemma4-dev/tpu-vllm-v5e1-4b-w8a8rtn` | TPU Queued Resource | vLLM | v5e-1 | `glenic/gemma-4-E4B-it-W8A8-INT8` | `w8a8rtn` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below. Served with its stored `lm_head`, byte-identical to the tied `embed_tokens`, removed (`jev-tpu-v5e1/strip_tied_head.py`); no served value changes |
 | `~/gemma4-dev/tpu-pytorch-v5e1-2b` | TPU | PyTorch / `torch_xla` | v5e-1 | 2B | — |
 | `~/gemma4-dev/tpu-pytorch-v5e1-12b` | TPU | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | **`w4a16` — name stale, see below** |
 | `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |

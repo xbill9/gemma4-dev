@@ -20,3 +20,5 @@ No suite; see each run's `README.md`.
 - [`2026-09-30-12bctx4-v5e1`](benchmarks/runs/2026-09-30-12bctx4-v5e1/)
 - [`2026-09-30-12bctx6-v5e1`](benchmarks/runs/2026-09-30-12bctx6-v5e1/)
 - [`2026-09-30-12bctx7-v5e1`](benchmarks/runs/2026-09-30-12bctx7-v5e1/)
+- [`2026-09-30-gen2048c-12b-emb4-v5e1`](benchmarks/runs/2026-09-30-gen2048c-12b-emb4-v5e1/): GSM8K 0.958 (2,048-token limit); BFCL 0.948
+- [`2026-09-30-long12b-12b-emb4-v5e1`](benchmarks/runs/2026-09-30-long12b-12b-emb4-v5e1/): 1,047-token prompts at 16: 192 tok/s, first token 2.46 s; 3,611-token prompts at 16: 68 tok/s, first token 23.18 s; GSM8K 0.951 (768-token limit); BFCL 0.948

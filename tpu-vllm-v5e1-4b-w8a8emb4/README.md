@@ -17,3 +17,5 @@ lists; they cover two cells, so they stay with the sweep.
 No suite; see each run's `README.md`.
 
 - [`2026-09-29-speed-v5e1`](benchmarks/runs/2026-09-29-speed-v5e1/)
+- [`2026-09-30-gen2048b2-e4b-w8a8-emb4-v5e1`](benchmarks/runs/2026-09-30-gen2048b2-e4b-w8a8-emb4-v5e1/): GSM8K 0.940 (2,048-token limit); BFCL 0.912
+- [`2026-09-30-longb-e4b-w8a8-emb4-v5e1`](benchmarks/runs/2026-09-30-longb-e4b-w8a8-emb4-v5e1/): 1,043-token prompts at 16: 1,231 tok/s, first token 0.40 s; 3,645-token prompts at 16: 649 tok/s, first token 1.43 s; GSM8K 0.922 (768-token limit); BFCL 0.910

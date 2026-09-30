@@ -48,6 +48,10 @@ Nothing here needs to change except the expectation. `supported_quantization` in
 passes platform validation; only the per-layer scheme is missing. If a `wNa16` scheme lands in
 either backend, this rig serves it with no config change.
 
+### Measured 2026-09-30 (throughput)
+
+Served beside the E2B QAT repack on the same VM (`benchmarks/runs/2026-09-30-gspeedb-e2b-google-v5e1`): output tok/s at 1 / 4 / 16 requests 136.6 / 532.3 / 1,911 against the repack's 136.5 / 532.1 / 1,910. The repack's 2.4-point suite lead costs no speed.
+
 ## Current Deployment
 *   **Model:** `google/gemma-4-E2B-it-qat-w4a16-ct` on TPU v5e-1 (v5litepod).
 *   **Endpoint:** discovered at runtime — the agent finds the `ACTIVE` Queued Resource,

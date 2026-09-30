@@ -27,6 +27,17 @@ So what this rig measures is **QAT weight quality at bf16 serving cost** against
 sibling `tpu-vllm-v5e1-2b`. If the wNa16 schemes ever land, this is the rig to point at a real
 4-bit checkpoint — the name is already correct for it.
 
+### Measured 2026-09-30 (generation and tool calling)
+
+Google's QAT weights with no quantization applied. Paired against E2B bf16 on the same chip (`../jev-tpu-v5e1/results/2026-09-30-gen2048a-v5e1-GEN-VS-BF16.md`):
+
+| | this checkpoint | E2B bf16 | difference (95% range) |
+|---|---:|---:|---|
+| GSM8K, 2,048-token limit | 0.897 | 0.910 | −1.3 (−2.7 to 0.0) |
+| BFCL | 0.922 | 0.928 | −0.5 |
+
+At a 768-token limit the gap was −1.9 (−3.3 to −0.5); 86 of its answers were cut off there against bf16's 53. Every quantized E2B build made from these weights stays within 0.8 points of this checkpoint on GSM8K.
+
 ## Current Deployment
 *   **Model:** `google/gemma-4-E2B-it-qat-q4_0-unquantized` on TPU v5e-1 (v5litepod).
 *   **Endpoint:** discovered at runtime — the agent finds the `ACTIVE` Queued Resource,

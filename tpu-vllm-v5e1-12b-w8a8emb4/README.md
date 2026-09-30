@@ -56,6 +56,21 @@ pulls the pinned image, applies them, commits `vllm-tpu-w8a8emb4:patched`, and s
 `MIN_TOKEN_BUCKET=64`, `GMM_V2_TILE_VMEM_FRACTION=0.85`, `--gpu-memory-utilization 0.92`,
 `--max-model-len 8192` and `--max_num_batched_tokens 512`, and waits up to 60 minutes for readiness.
 
+### Measured 2026-09-30
+
+**This rig served its own checkpoint** (`benchmarks/runs/2026-09-30-rig-boot-v5e1`): ready 17 minutes after the queued resource was created, 11.31 GiB of weights, 9,728 KV tokens, 57.0 / 215.7 / 713.4 output tok/s at 1 / 4 / 16 measured on the VM, within 1.3% of the sweep. Compile took 512 s against the sweep's 237 s because this rig leaves `--max-num-seqs` at vLLM's 256 (44 programs against 20).
+
+**Generation and tool calling**: GSM8K 0.964 at a 2,048-token limit, BFCL 0.955. No bf16 12B fits this chip and the v6e reference was not run, so these have no bf16 pairing. Against the other 12B builds on this chip (`../jev-tpu-v5e1/results/2026-09-30-gen2048b2-v5e1-GEN-VS-12B-W8A8-EMB4.md`): int4 + int4 tables −0.7 on GSM8K (−1.4 to 0.0), fp8 −0.4, and W8A8 rounded from bf16 (glenic) −0.8 on GSM8K (−1.7 to −0.1) and **−7.2 on BFCL** (−10.0 to −4.8), 16 of its failures being string arguments wrapped in literal quotes.
+
+**Long prompts** are bound by the KV cache. Output tok/s at 16 requests, and time to first token:
+
+| KV cache | tokens | ~1,000-token prompts | ~3,600-token prompts |
+|---|---:|---:|---|
+| bf16 (default) | 9,728 | 244 | 95, 22.0 s |
+| fp8 (`--kv-cache-dtype fp8`) | 18,944 | 330 | 157, 13.3 s |
+
+At one request the two match (55 and 54 tok/s). The fp8 cache costs 0.7 suite points (0.754 against 0.761, −1.3 to −0.1, `../jev-tpu-v5e1/results/2026-09-30-fillF-v5e1-KVFP8-VS-KVBF16.md`) and leaves GSM8K (−0.1) and BFCL (−0.7) level. Use it for many long prompts at once; keep bf16 otherwise.
+
 ## Current Deployment
 *   **Model:** `xbill9/gemma-4-12B-it-qat-w8a8-int8-emb4` on TPU v5e-1 (v5litepod).
 *   **Endpoint:** discovered at runtime — the agent finds the `ACTIVE` Queued Resource,

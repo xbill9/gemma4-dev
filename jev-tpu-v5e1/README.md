@@ -1,8 +1,40 @@
 # jev-tpu-v5e1
 
-Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28); and the 12B QAT W4A16 repack, which serves with a smaller patch and scores level with bf16 (2026-09-29). The E2B and E4B QAT repacks (2026-09-29) are level with bf16 too, 1.3–2.4 points over Google's exports. **For one user or a few agents on this chip, use the 12B repack.** See the sections below.
+Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28); and the 12B QAT W4A16 repack, which serves with a smaller patch and scores level with bf16 (2026-09-29). The E2B and E4B QAT repacks (2026-09-29) are level with bf16 too, 1.3–2.4 points over Google's exports. **For one user or a few agents on this chip, use 12B W8A8 with int4 vocabulary tables**, and add `--kv-cache-dtype fp8` for many long prompts at once (2026-09-30, below). See the sections below.
 
 **Where the results live (2026-09-30).** This tree is a repack sweep harness. Each scored arm is filed in the rig named for its chip and exact checkpoint, under `<rig>/benchmarks/runs/`; `results/` keeps a relative symlink at every old arm path, so the scripts and comparison files here still resolve, and `../benchmarks/sweep-moves.json` maps each path. This tree's cells: `../tpu-vllm-v5e1-12b-q4w4a16`, `../tpu-vllm-v5e1-12b-q4w4a16emb4`, `../tpu-vllm-v5e1-12b-w4a16`, `../tpu-vllm-v5e1-12b-w8a8`, `../tpu-vllm-v5e1-12b-w8a8emb4`, `../tpu-vllm-v5e1-26b-q4w4a16`, `../tpu-vllm-v5e1-2b`, `../tpu-vllm-v5e1-2b-fp8`, `../tpu-vllm-v5e1-2b-fp8emb4`, `../tpu-vllm-v5e1-2b-q4_0`, `../tpu-vllm-v5e1-2b-q4w4a16`, `../tpu-vllm-v5e1-2b-q4w4a16emb4`, `../tpu-vllm-v5e1-2b-q4w4a16ple4`, `../tpu-vllm-v5e1-2b-w4a16`, `../tpu-vllm-v5e1-2b-w8a8`, `../tpu-vllm-v5e1-2b-w8a8emb4`, `../tpu-vllm-v5e1-2b-w8a8rtn`, `../tpu-vllm-v5e1-4b-fp8`, `../tpu-vllm-v5e1-4b-q4w4a16`, `../tpu-vllm-v5e1-4b-q4w4a16emb4`, `../tpu-vllm-v5e1-4b-w4a16`, `../tpu-vllm-v5e1-4b-w8a8`, `../tpu-vllm-v5e1-4b-w8a8emb4`. Runs with no suite are filed the same way, by checkpoint. Run-wide logs of runs that span several cells, and the paired comparisons, stay here.
+
+## Generation, tool calling, long prompts and the remaining builds (2026-09-30)
+
+Written before the runs: `PREREGISTRATION.md`, sections 1 to 8 (section 7, the v6e bf16 reference, was cancelled for capacity). New tools: `gen_eval.py` (GSM8K and BFCL simple, scored in code), `gen_compare.py` (paired, bootstrap range), `build_gen_set.py` (the records, pinned by hash), `tpu/w4a16_client.py loadlong` (long prompts, a unique prefix on every request, streamed), `strip_tied_head.py`, and `file_sweep_runs.py` (files a finished run into its rigs). Every arm is filed in its rig; comparison files are `results/2026-09-30-*-VS-*.md` and `results/2026-09-30-*-GEN*.md`.
+
+**GSM8K and BFCL** (2,048-token GSM8K limit; `../QUANTIZATION.md`, "Generation and tool calling on one v5e chip", has the full table):
+
+| | GSM8K | BFCL |
+|---|---|---|
+| E2B bf16 | 0.910 | 0.928 |
+| E2B W8A8 from QAT | 0.889, **−2.0** (−3.4 to −0.8) | 0.915, −1.3 |
+| E2B QAT bf16 | 0.897, −1.3 (−2.7 to 0.0) | 0.922, −0.5 |
+| E2B 4-bit repack | 0.901, −0.9 (−2.2 to +0.4) | 0.920, −0.7 |
+| E4B W8A8 + int4 tables | 0.940, +0.6 against the E4B repack | 0.912 |
+| 12B W8A8 + int4 tables | 0.964 | 0.955 |
+| 12B W8A8 rounded from bf16 (glenic) | 0.956, **−0.8** against the row above | **0.882, −7.2** (−10.0 to −4.8) |
+
+- E2B's builds from the QAT weights lose 1 to 2 points on GSM8K that the suite did not show; the QAT weights carry most of it, and quantizing them costs no more than 0.8 on top. E4B and 12B have no bf16 reference for these tasks.
+- The 12B build rounded from bf16 wraps string arguments in literal quotes in 16 BFCL records; the QAT build never does.
+- A 768-token GSM8K limit cut off QAT-derived E2B answers more often than bf16's, so the 2,048-token results are the ones to use; the 768-token ones are `results/2026-09-30-longb-v5e1-GEN768-VS.md`.
+
+**Long prompts**, output tok/s at 16 requests of about 3,600 tokens (time to first token): E2B bf16 906 (1.10 s), E2B W8A8 1,183 (0.85 s), E2B W8A8 + int4 tables 1,249 (0.82 s), E4B W8A8 + int4 tables 649 (1.43 s), 12B W8A8 + int4 tables 95 (22.0 s), 12B int4 + int4 tables 69 (23.2 s), **12B W8A8 + int4 tables with an fp8 KV cache 157 (13.3 s)**. The fp8 cache holds 18,944 tokens against 9,728 and costs 0.7 suite points; GSM8K and BFCL are level.
+
+**Remaining builds on this chip:**
+
+- Google's 4-bit exports run at the repacks' speed at every size, measured on the same VM: E2B 1,911 against 1,910, E4B 1,020 against 1,009, 12B 392 against 388 tok/s at 16.
+- 12B fp8: suite and GSM8K level with W8A8, 17% slower (518 against 624 tok/s at 16).
+- Rounded int8 against int8 from QAT: E2B −1.5 on the suite, E4B level, 12B −0.5 on the suite (not significant) and −7.2 on BFCL.
+- 26B: 31 / 102 / 201 tok/s at 1 / 4 / 16 (2,176-token KV cap). With int4 tables it scores the same (0.755), runs 228 at 16, and takes 13.72 GiB of weights against 13.58, so its context stays at 2,176 tokens: 3,072 and 2,560 failed.
+- The E2B text-only repack scores what the full repack does (0.678 both). The Hugging Face copy `xbill9/gemma-4-E2B-it-qat-w8a8-ct-text-emb4` scores level with the measured `w8a8emb4` (0.673 against 0.677) but changes the answer on about 200 of 3,880 records, so it holds different values.
+
+Harness changes after these runs: `run_quant.sh` caps swap at free disk less 10 GB (a 40 GB swap file on top of 42 GB of copied checkpoints filled one VM's disk and it deleted itself with no log), keeps a boot log per arm (two arms serving one checkpoint shared a file), and deletes a Compute Engine TPU VM through `jev-self-delete=instance`.
 
 ## Status and next steps (2026-09-28)
 

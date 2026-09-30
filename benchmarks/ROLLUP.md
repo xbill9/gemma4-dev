@@ -125,6 +125,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-pytorch-g5g-2b | `2026-09-01-concurrency-torch-g5g` | 4 | 1 | 0 | yes | **no** |
 | gpu-pytorch-g6-2b | `2026-08-29-first-serve-g6` | 5 | 1 | 0 | yes | **no** |
 | gpu-vllm-g4dn-2b | `2026-08-30-first-serve-g4dn` | 4 | 2 | 0 | **no** | **no** |
+| gpu-vllm-g4dn-2b-w4a16 | `2026-09-30-sagemaker-match-g4dn` | 11 | 1 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-08-12-first-serve-g5g` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-08-14-rust-frontend-g5g` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-08-31-boot-32gib-g5g` | 3 | 1 | 0 | yes | **no** |
@@ -208,20 +209,38 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e4-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
+| tpu-vllm-v5e1-12b-fp8 | `2026-09-30-fillA-12b-fp8-v5e1` | 40 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-fp8 | `2026-09-30-gen2048b2-12b-fp8-v5e1` | 8 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-q4w4a16 | `2026-09-28-12b3-12b-repack-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16 | `2026-09-30-g12speedb-12b-repack-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-29-12b-12b-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx3-v5e1` | 12 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx4-v5e1` | 12 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx6-v5e1` | 12 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx7-v5e1` | 14 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-gen2048c-12b-emb4-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-long12b-12b-emb4-v5e1` | 14 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-w4a16 | `2026-09-27-w4a16-v5e1` | 3 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-w4a16 | `2026-09-28-12b3-12b-google-v5e1` | 32 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w4a16 | `2026-09-30-g12speedb-12b-google-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-w8a8 | `2026-09-30-12bgap-12b-w8a8-v5e1` | 36 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-29-12b-12b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-12bctx1-v5e1` | 12 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-12bctx2-v5e1` | 12 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-12bctx5-v5e1` | 14 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-fillF-12b-w8a8-emb4-kvfp8-v5e1` | 43 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-gen2048c-12b-w8a8-emb4-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-long12b-12b-w8a8-emb4-v5e1` | 14 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-rig-boot-v5e1` | 12 | 9 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8rtn | `2026-09-30-fillA-12b-w8a8rtn-v5e1` | 40 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8rtn | `2026-09-30-gen2048b2-12b-w8a8rtn-v5e1` | 8 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-26b-q4w4a16 | `2026-09-28-lowmem7-26b-lowmem-v5e1` | 32 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-26b-q4w4a16 | `2026-09-30-fillD-26b-repack-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-26b-q4w4a16emb4 | `2026-09-30-fillC-26b-emb4-ctx-v5e1` | 5 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-26b-q4w4a16emb4 | `2026-09-30-fillC-26b-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-26b-q4w4a16emb4 | `2026-09-30-fillG-26b-emb4-ctx8k-v5e1` | 5 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-26b-q4w4a16emb4 | `2026-09-30-fillG2-26b-emb4-ctx2560-v5e1` | 5 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-26b-q4w4a16emb4 | `2026-09-30-fillG2-26b-emb4-ctx3k-v5e1` | 4 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-08-06-vllm-sweep-v5e1` | 28 | 13 | 0 | yes | yes |
@@ -233,6 +252,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b | `2026-09-29-mtpbf-v5e1` | 13 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b | `2026-09-29-mtpg2-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b | `2026-09-29-w8a8-e2b-bf16-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b | `2026-09-30-gen2048a-e2b-bf16-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b | `2026-09-30-longb-e2b-bf16-v5e1` | 14 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 1 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b-fp8 | `2026-09-29-e2c-e2b-fp8-v5e1` | 35 | 0 | 0 | **no** | **no** |
@@ -241,12 +262,18 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b-q4_0 | `2026-09-29-e2c-e2b-qat-bf16-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4_0 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4_0 | `2026-09-29-mtpq-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4_0 | `2026-09-30-fillE-e2b-qat-bf16-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4_0 | `2026-09-30-gen2048a-e2b-qat-bf16-v5e1` | 8 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-e2b-v5e1` | 4 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-e2br-e2b-repack-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-mtpg2-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-mtpq-v5e1` | 4 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-w8a8-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-30-fillB-e2b-w4a16text-v5e1` | 33 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-30-fillE-e2b-repack-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-30-gen2048a-e2b-repack-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-30-gspeedb-e2b-repack-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-e4a-e2b-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-e4a-v5e1` | 2 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-emb4-e2b-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
@@ -259,26 +286,39 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w4a16 | `2026-09-27-w4a16-v5e1` | 2 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w4a16 | `2026-09-29-e2b-e2b-google-v5e1` | 32 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w4a16 | `2026-09-30-gspeedb-e2b-google-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-mtpg2-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-mtpq-v5e1` | 4 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-qatw8-e2b-qat-w8a8-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8 | `2026-09-30-gen2048a-e2b-qat-w8a8-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8 | `2026-09-30-longb-e2b-qat-w8a8-v5e1` | 14 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-29-e4a-e2b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-29-w8e4-e2b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-30-fillB-e2b-w8a8-emb4-hf-v5e1` | 33 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-30-gen2048a-e2b-w8a8-emb4-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-30-longb-e2b-w8a8-emb4-v5e1` | 14 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8rtn | `2026-09-29-w8a8-v5e1` | 4 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-w8a8rtn | `2026-09-29-w8a8b-e2b-w8a8-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-fp8 | `2026-09-29-e4b-e4b-fp8-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-q4w4a16 | `2026-09-29-e4b-v5e1` | 4 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-q4w4a16 | `2026-09-29-e4br-e4b-repack-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16 | `2026-09-30-fillE-e4b-repack-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16 | `2026-09-30-gen2048b2-e4b-repack-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16 | `2026-09-30-gspeedb-e4b-repack-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-q4w4a16emb4 | `2026-09-29-e4a-v5e1` | 4 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-q4w4a16emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-q4w4a16emb4 | `2026-09-30-e4bemb4-e4b-emb4-v5e1` | 36 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w4a16 | `2026-09-27-w4a16-v5e1` | 2 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w4a16 | `2026-09-29-e4b-e4b-google-v5e1` | 32 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w4a16 | `2026-09-30-gspeedb-e4b-google-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w8a8 | `2026-09-29-e4b-e4b-w8a8-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-29-e4a-e4b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-30-gen2048b2-e4b-w8a8-emb4-v5e1` | 8 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-30-longb-e4b-w8a8-emb4-v5e1` | 14 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w8a8rtn | `2026-09-30-fillB-e4b-w8a8rtn-v5e1` | 36 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v6e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v6e1-2b | `2026-08-06-vllm-sweep-v5e1` | 16 | 13 | 0 | yes | yes |
@@ -324,6 +364,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-pytorch-g5g-2b | 4 | 5 |
 | gpu-pytorch-g6-2b | 1 | 1 |
 | gpu-vllm-g4dn-2b | 0 | 1 |
+| gpu-vllm-g4dn-2b-w4a16 | 0 | 1 |
 | gpu-vllm-g5g-2b | 1 | 6 |
 | gpu-vllm-g6-12b-w4a16 | 0 | 0 |
 | gpu-vllm-g6-26b-q4w4a16 | 0 | 0 |
@@ -363,29 +404,33 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-2b | 1 | 1 |
 | tpu-pytorch-v6e1-2b | 1 | 1 |
 | tpu-pytorch-v6e4-2b | 1 | 1 |
-| tpu-vllm-v5e1-12b-q4w4a16 | 0 | 1 |
-| tpu-vllm-v5e1-12b-q4w4a16emb4 | 0 | 5 |
-| tpu-vllm-v5e1-12b-w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-12b-fp8 | 0 | 2 |
+| tpu-vllm-v5e1-12b-q4w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | 0 | 7 |
+| tpu-vllm-v5e1-12b-w4a16 | 0 | 3 |
 | tpu-vllm-v5e1-12b-w8a8 | 0 | 1 |
-| tpu-vllm-v5e1-12b-w8a8emb4 | 0 | 4 |
-| tpu-vllm-v5e1-26b-q4w4a16 | 0 | 1 |
-| tpu-vllm-v5e1-2b | 1 | 13 |
+| tpu-vllm-v5e1-12b-w8a8emb4 | 0 | 8 |
+| tpu-vllm-v5e1-12b-w8a8rtn | 0 | 2 |
+| tpu-vllm-v5e1-26b-q4w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-26b-q4w4a16emb4 | 0 | 5 |
+| tpu-vllm-v5e1-2b | 1 | 15 |
 | tpu-vllm-v5e1-2b-fp8 | 0 | 1 |
 | tpu-vllm-v5e1-2b-fp8emb4 | 0 | 2 |
-| tpu-vllm-v5e1-2b-q4_0 | 0 | 3 |
-| tpu-vllm-v5e1-2b-q4w4a16 | 0 | 6 |
+| tpu-vllm-v5e1-2b-q4_0 | 0 | 5 |
+| tpu-vllm-v5e1-2b-q4w4a16 | 0 | 10 |
 | tpu-vllm-v5e1-2b-q4w4a16emb4 | 0 | 6 |
 | tpu-vllm-v5e1-2b-q4w4a16ple4 | 0 | 4 |
-| tpu-vllm-v5e1-2b-w4a16 | 0 | 2 |
-| tpu-vllm-v5e1-2b-w8a8 | 0 | 4 |
-| tpu-vllm-v5e1-2b-w8a8emb4 | 0 | 3 |
+| tpu-vllm-v5e1-2b-w4a16 | 0 | 3 |
+| tpu-vllm-v5e1-2b-w8a8 | 0 | 6 |
+| tpu-vllm-v5e1-2b-w8a8emb4 | 0 | 6 |
 | tpu-vllm-v5e1-2b-w8a8rtn | 0 | 2 |
 | tpu-vllm-v5e1-4b-fp8 | 0 | 1 |
-| tpu-vllm-v5e1-4b-q4w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-4b-q4w4a16 | 0 | 5 |
 | tpu-vllm-v5e1-4b-q4w4a16emb4 | 0 | 3 |
-| tpu-vllm-v5e1-4b-w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-4b-w4a16 | 0 | 3 |
 | tpu-vllm-v5e1-4b-w8a8 | 0 | 1 |
-| tpu-vllm-v5e1-4b-w8a8emb4 | 0 | 2 |
+| tpu-vllm-v5e1-4b-w8a8emb4 | 0 | 4 |
+| tpu-vllm-v5e1-4b-w8a8rtn | 0 | 1 |
 | tpu-vllm-v5p1-2b | 0 | 0 |
 | tpu-vllm-v6e1-2b | 1 | 8 |
 | tpu-vllm-v6e8-2b | 1 | 1 |

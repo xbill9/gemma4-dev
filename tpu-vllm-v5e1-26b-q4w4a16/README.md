@@ -11,3 +11,9 @@ Slot 5, `q4w4a16`: W4A16 holding the QAT Q4_0 grid exactly (xbill9 repack of `-q
 Suite accuracy is the share of the 3,880-record public suite read correctly, computed by the sweep's
 `quant_compare.py`. Differences against bf16 are in the paired comparisons each run's `README.md`
 lists; they cover two cells, so they stay with the sweep.
+
+## Other runs
+
+No suite; see each run's `README.md`.
+
+- [`2026-09-30-fillD-26b-repack-v5e1`](benchmarks/runs/2026-09-30-fillD-26b-repack-v5e1/): output tok/s at 1 / 4 / 16: 31 / 102 / 201

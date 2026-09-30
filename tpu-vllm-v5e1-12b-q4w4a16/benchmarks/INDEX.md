@@ -16,3 +16,4 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
 | `2026-09-28-12b3-12b-repack-v5e1` | 35 | 0 | 0 | **no** |
+| `2026-09-30-g12speedb-12b-repack-v5e1` | 7 | 0 | 0 | **no** |

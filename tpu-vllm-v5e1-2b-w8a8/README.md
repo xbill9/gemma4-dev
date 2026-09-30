@@ -50,6 +50,19 @@ pulls the pinned image, applies them, commits `vllm-tpu-w8a8:patched`, and serve
 `MIN_TOKEN_BUCKET=64`, `GMM_V2_TILE_VMEM_FRACTION=0.85`, `--gpu-memory-utilization 0.80` and
 `--max_num_batched_tokens 512`. Boot to ready is about 5 minutes.
 
+### Measured 2026-09-30 (generation, tool calling, long prompts)
+
+Paired against E2B bf16 and E2B QAT bf16 on the same chip (`../jev-tpu-v5e1/results/2026-09-30-gen2048a-v5e1-GEN-VS-BF16.md`):
+
+| | this checkpoint | vs E2B bf16 (95% range) | vs QAT bf16 (95% range) |
+|---|---:|---|---|
+| GSM8K, 2,048-token limit | 0.889 | **−2.0** (−3.4 to −0.8) | −0.8 (−2.0 to +0.5) |
+| BFCL | 0.915 | −1.3 | −0.7 |
+
+The suite read level with bf16 (+0.3); GSM8K does not. The loss sits in the QAT weights (QAT bf16 −1.3) and in the int8 rounding on top (−0.8); neither step is significant alone, the two together are. Only 3 answers hit the 2,048-token limit.
+
+Long prompts, output tok/s at 1 / 16 requests: about 1,000 tokens 210 / 2,097; about 3,600 tokens 194 / 1,183, 0.85 s to first token at 16 (bf16: 139 / 1,521 and 130 / 906).
+
 ## Current Deployment
 *   **Model:** `xbill9/gemma-4-E2B-it-qat-w8a8-int8` on TPU v5e-1 (v5litepod).
 *   **Endpoint:** discovered at runtime — the agent finds the `ACTIVE` Queued Resource,

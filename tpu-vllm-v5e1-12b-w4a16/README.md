@@ -17,3 +17,4 @@ lists; they cover two cells, so they stay with the sweep.
 No suite; see each run's `README.md`.
 
 - [`2026-09-27-w4a16-v5e1`](benchmarks/runs/2026-09-27-w4a16-v5e1/)
+- [`2026-09-30-g12speedb-12b-google-v5e1`](benchmarks/runs/2026-09-30-g12speedb-12b-google-v5e1/): output tok/s at 1 / 4 / 16: 33 / 130 / 392
