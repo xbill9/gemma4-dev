@@ -13,8 +13,12 @@ changing anything.
 
 ## Measured
 
-Nothing yet. E4B's KV costs 56 KiB/token against E2B's 18
-([`MODELS.md`](../MODELS.md)), so none of the parent's numbers carry over.
+One sweep, [`2026-09-30-emb4-sweep-e4b-t4`](benchmarks/runs/2026-09-30-emb4-sweep-e4b-t4/REPORT.md):
+the parent's harness and prompts, drafter off, 3 repeats, worst-cell cv 1.4%. E4B
+delivers 0.53-0.56x the E2B build's output throughput at 512-token prompts and
+0.74-0.77x at 4096, peaking at 131 tok/s against E2B's 240. E4B's KV costs 56
+KiB/token against E2B's 18 ([`MODELS.md`](../MODELS.md)), so the parent's memory
+numbers do not carry over.
 
 ## Serving
 

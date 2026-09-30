@@ -1,0 +1,11 @@
+2026-09-30T13:56:55+00:00
+name, driver_version, memory.total [MiB], clocks.max.sm [MHz], clocks.max.memory [MHz], power.limit [W]
+Tesla T4, 615.71.09, 15360 MiB, 1590 MHz, 5001 MHz, 70.00 W
+vllm 0.29.0 torch 2.13.0+cu130 transformers 5.17.0 triton 3.7.1
+served xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4 max_model_len 16384
+INFO 09-30 13:55:22 [api_utils.py:286] non-default args: {'host': '127.0.0.1', 'model': 'xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4', 'dtype': 'float16', 'max_model_len': 16384, 'gpu_memory_utilization': 0.9, 'language_model_only': True, 'max_num_seqs': 8}
+INFO 09-30 13:56:21 [model_runner.py:404] Model loading took 4.54 GiB memory and 28.102574 seconds
+INFO 09-30 13:56:30 [monitor.py:53] torch.compile took 4.72 s in total
+INFO 09-30 13:56:35 [kv_cache_utils.py:2032] GPU KV cache size: 310,499 tokens, Maximum concurrency for 16,384 tokens per request: 18.95x
+INFO 09-30 13:56:38 [gpu_worker.py:860] Free memory on device (14.48/14.58 GiB) on startup. Desired GPU memory utilization is (0.9, 13.12 GiB). Actual usage is 4.71 GiB for consumed memory (weights + non-torch), 0.32 GiB for peak activation, and 0.01 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=8517133517` (7.93 GiB) to fit into requested memory, or `--kv
+INFO 09-30 13:56:41 [core.py:361] init engine (profile, create kv cache, warmup model) took 19.32 s (compilation: 4.72 s)

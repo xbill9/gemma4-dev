@@ -1,0 +1,7 @@
+# Server restart before resume.sh, 2026-09-30 (drafter off: SPECULATIVE_MODEL= ./vllm-t4 start)
+2026-09-30T14:48:52+00:00
+/usr/bin/python3.13 -m vllm.entrypoints.openai.api_server --model xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4 --host 127.0.0.1 --port 8000 --dtype float16 --kv-cache-dtype auto --tensor-parallel-size 1 --gpu-memory-utilization 0.90 --max-model-len 16384 --max-num-seqs 8 --language-model-only 
+(EngineCore pid=80424) INFO 09-30 14:38:24 [model_runner.py:404] Model loading took 4.54 GiB memory and 60.328974 seconds
+(EngineCore pid=80424) INFO 09-30 14:38:36 [gpu_worker.py:640] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.9000 is equivalent to --gpu-memory-utilization=0.8913 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9087. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=80424) INFO 09-30 14:38:36 [kv_cache_utils.py:2032] GPU KV cache size: 310,499 tokens, Maximum concurrency for 16,384 tokens per request: 18.95x
+(EngineCore pid=80424) INFO 09-30 14:38:43 [core.py:361] init engine (profile, create kv cache, warmup model) took 18.64 s (compilation: 2.01 s)

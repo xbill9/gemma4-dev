@@ -1,0 +1,624 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-30-emb4-sweep-e4b-t4",
+    "date": "2026-09-30",
+    "operator": "xbill",
+    "source": "benchmarks/runs/2026-09-30-emb4-sweep-e4b-t4/",
+    "notes": "Three repeats per cell with the same prompt seeds as gpu-vllm-t4-2b-w4a16's 2026-09-29-emb4-sweep-t4 (E2B), so every cell sends the prompts that run did; slot 4 is the only difference. Served without the drafter, as that run was. Each cell reports its median-throughput repeat; raw.repeats carries the spread. REPORT.md's table is the mean of the three (results.csv, aggregate.py). c=16 exceeds --max-num-seqs 8, so its extra requests queue. The first pass died during 4096/c=4 rep 2; the server was restarted with the same flags (clearing the prefix cache that cell had filled) and resume.sh ran the ten remaining cells. See REPORT.md."
+  },
+  "hardware": {
+    "accelerator": "nvidia-t4",
+    "chips": 1,
+    "hbm_gb_per_chip": 16,
+    "machine_type": "n1-standard-2",
+    "host": {
+      "cloud": "gcp",
+      "zone": "us-west2-b",
+      "provisioning": "on-demand"
+    }
+  },
+  "model": {
+    "id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+    "family": "gemma-4",
+    "parameters_b": 4,
+    "weights_dtype": "int4",
+    "quantization": "compressed-tensors W4A16, group 32; embed_tokens, PLE table and untied lm_head int4",
+    "max_model_len": 16384,
+    "architecture_notes": "Google's QAT q4_0 weights repacked to compressed-tensors on the exact QAT grid, text only (Gemma4ForCausalLM). E4B: 4.5B effective, 8.0B total. Model loading 4.54 GiB, KV cache 310,499 tokens on the warm start (evidence/setup.txt)."
+  },
+  "software": {
+    "engine": "vllm",
+    "version": "0.29.0",
+    "backend": "cuda (torch 2.13.0+cu130, triton 3.7.1, TRITON_ATTN, Turing tile clamp applied)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "serve",
+      "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+      "--host",
+      "127.0.0.1",
+      "--dtype",
+      "float16",
+      "--kv-cache-dtype",
+      "auto",
+      "--gpu-memory-utilization",
+      "0.9",
+      "--max-model-len",
+      "16384",
+      "--max-num-seqs",
+      "8",
+      "--language-model-only"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "vllm bench serve",
+      "dataset": "random",
+      "output_len": 128,
+      "runs_per_point": 3,
+      "notes": "--ignore-eos --temperature 0 --num-warmups 2; sweep.sh."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.3543,
+        "output_tok_per_s": 45.34,
+        "total_tok_per_s": 226.72,
+        "ttft_ms": {
+          "mean": 360.31,
+          "median": 401.04,
+          "p99": 409.43
+        },
+        "tpot_ms": {
+          "mean": 19.38,
+          "median": 19.35,
+          "p99": 19.96
+        },
+        "itl_ms": {
+          "mean": 19.38,
+          "median": 19.43,
+          "p99": 21.04
+        },
+        "per_stream_tok_per_s": 51.67,
+        "raw": {
+          "date": "20260930-151053",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 8,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 1,
+          "duration": 22.582705437002005,
+          "completed": 8,
+          "failed": 0,
+          "total_input_tokens": 4096,
+          "total_output_tokens": 1024,
+          "request_throughput": 0.3542533919293795,
+          "request_goodput": null,
+          "output_throughput": 45.344434166960575,
+          "total_token_throughput": 226.72217083480285,
+          "max_output_tokens_per_s": 53.0,
+          "max_concurrent_requests": 2,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 360.30947949984693,
+          "median_ttft_ms": 401.0355405007431,
+          "std_ttft_ms": 111.88726042005453,
+          "p99_ttft_ms": 409.42953784091515,
+          "mean_tpot_ms": 19.384705706681242,
+          "median_tpot_ms": 19.35473980317804,
+          "std_tpot_ms": 0.34243358621674597,
+          "p99_tpot_ms": 19.960334320736205,
+          "mean_itl_ms": 19.38470821947188,
+          "median_itl_ms": 19.43044449944864,
+          "std_itl_ms": 0.710968840698224,
+          "p99_itl_ms": 21.03579329886998,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              44.47,
+              45.34,
+              46.05
+            ],
+            "cv_pct": 1.43
+          }
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.8059,
+        "output_tok_per_s": 103.15,
+        "total_tok_per_s": 515.75,
+        "ttft_ms": {
+          "mean": 1208.21,
+          "median": 1544.3,
+          "p99": 1569.47
+        },
+        "tpot_ms": {
+          "mean": 29.55,
+          "median": 27.69,
+          "p99": 36.82
+        },
+        "itl_ms": {
+          "mean": 29.55,
+          "median": 27.49,
+          "p99": 29.39
+        },
+        "per_stream_tok_per_s": 36.12,
+        "raw": {
+          "date": "20260930-151136",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 16,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 4,
+          "duration": 19.85467354999855,
+          "completed": 16,
+          "failed": 0,
+          "total_input_tokens": 8192,
+          "total_output_tokens": 2048,
+          "request_throughput": 0.8058556067269697,
+          "request_goodput": null,
+          "output_throughput": 103.14951766105212,
+          "total_token_throughput": 515.7475883052606,
+          "max_output_tokens_per_s": 152.0,
+          "max_concurrent_requests": 8,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 1208.2098255632445,
+          "median_ttft_ms": 1544.301613499556,
+          "std_ttft_ms": 473.8992085384439,
+          "p99_ttft_ms": 1569.4685611015302,
+          "mean_tpot_ms": 29.55299761171816,
+          "median_tpot_ms": 27.685928401576422,
+          "std_tpot_ms": 3.656859698695515,
+          "p99_tpot_ms": 36.82455290823624,
+          "mean_itl_ms": 29.55299999410014,
+          "median_itl_ms": 27.48812400022871,
+          "std_itl_ms": 46.81455323831005,
+          "p99_itl_ms": 29.385134701878997,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              101.67,
+              103.15,
+              103.95
+            ],
+            "cv_pct": 0.92
+          }
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.0162,
+        "output_tok_per_s": 130.07,
+        "total_tok_per_s": 650.37,
+        "ttft_ms": {
+          "mean": 2115.38,
+          "median": 2327.43,
+          "p99": 3101.74
+        },
+        "tpot_ms": {
+          "mean": 45.26,
+          "median": 42.41,
+          "p99": 59.98
+        },
+        "itl_ms": {
+          "mean": 45.26,
+          "median": 37.81,
+          "p99": 61.66
+        },
+        "per_stream_tok_per_s": 23.58,
+        "raw": {
+          "date": "20260930-151230",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 32,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 8,
+          "duration": 31.49000685699866,
+          "completed": 32,
+          "failed": 0,
+          "total_input_tokens": 16384,
+          "total_output_tokens": 4096,
+          "request_throughput": 1.0161953963782002,
+          "request_goodput": null,
+          "output_throughput": 130.07301073640963,
+          "total_token_throughput": 650.3650536820481,
+          "max_output_tokens_per_s": 224.0,
+          "max_concurrent_requests": 16,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 2115.382686467683,
+          "median_ttft_ms": 2327.427539497876,
+          "std_ttft_ms": 836.1567870592784,
+          "p99_ttft_ms": 3101.739536216628,
+          "mean_tpot_ms": 45.26295873548643,
+          "median_tpot_ms": 42.41287925197673,
+          "std_tpot_ms": 6.934666980322259,
+          "p99_tpot_ms": 59.978177016524775,
+          "mean_itl_ms": 45.26296104108772,
+          "median_itl_ms": 37.80582350009354,
+          "std_itl_ms": 87.24466704150066,
+          "p99_itl_ms": 61.66400647263798,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              129.55,
+              130.07,
+              130.09
+            ],
+            "cv_pct": 0.19
+          }
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.0222,
+        "output_tok_per_s": 130.84,
+        "total_tok_per_s": 654.19,
+        "ttft_ms": {
+          "mean": 8686.39,
+          "median": 9486.83,
+          "p99": 10544.69
+        },
+        "tpot_ms": {
+          "mean": 47.51,
+          "median": 48.64,
+          "p99": 59.42
+        },
+        "itl_ms": {
+          "mean": 47.51,
+          "median": 37.47,
+          "p99": 416.87
+        },
+        "per_stream_tok_per_s": 20.56,
+        "raw": {
+          "date": "20260930-142808",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 64,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 16,
+          "duration": 62.61170940900047,
+          "completed": 64,
+          "failed": 0,
+          "total_input_tokens": 32768,
+          "total_output_tokens": 8192,
+          "request_throughput": 1.0221730184993154,
+          "request_goodput": null,
+          "output_throughput": 130.83814636791237,
+          "total_token_throughput": 654.1907318395619,
+          "max_output_tokens_per_s": 224.0,
+          "max_concurrent_requests": 23,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 8686.387672609499,
+          "median_ttft_ms": 9486.829423000017,
+          "std_ttft_ms": 2510.194629613974,
+          "p99_ttft_ms": 10544.693922185252,
+          "mean_tpot_ms": 47.50639571333555,
+          "median_tpot_ms": 48.63802266140917,
+          "std_tpot_ms": 5.477550402382976,
+          "p99_tpot_ms": 59.41965364699809,
+          "mean_itl_ms": 47.50639794303163,
+          "median_itl_ms": 37.474347998795565,
+          "std_itl_ms": 94.23128407219032,
+          "p99_itl_ms": 416.8722884677117,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              130.59,
+              130.84,
+              130.85
+            ],
+            "cv_pct": 0.09
+          }
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 4096,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.087,
+        "output_tok_per_s": 11.13,
+        "total_tok_per_s": 367.43,
+        "ttft_ms": {
+          "mean": 7622.02,
+          "median": 8649.06,
+          "p99": 8939.81
+        },
+        "tpot_ms": {
+          "mean": 30.5,
+          "median": 30.41,
+          "p99": 31.26
+        },
+        "itl_ms": {
+          "mean": 30.5,
+          "median": 30.51,
+          "p99": 32.12
+        },
+        "per_stream_tok_per_s": 32.88,
+        "raw": {
+          "date": "20260930-143017",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 8,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 1,
+          "duration": 91.96761625000363,
+          "completed": 8,
+          "failed": 0,
+          "total_input_tokens": 32768,
+          "total_output_tokens": 1024,
+          "request_throughput": 0.08698714097637258,
+          "request_goodput": null,
+          "output_throughput": 11.13435404497569,
+          "total_token_throughput": 367.4336834841978,
+          "max_output_tokens_per_s": 34.0,
+          "max_concurrent_requests": 2,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 7622.024892623813,
+          "median_ttft_ms": 8649.058384002274,
+          "std_ttft_ms": 2825.2269516366455,
+          "p99_ttft_ms": 8939.809331104698,
+          "mean_tpot_ms": 30.49857269095409,
+          "median_tpot_ms": 30.40978075195893,
+          "std_tpot_ms": 0.41977587623862445,
+          "p99_tpot_ms": 31.261849086187983,
+          "mean_itl_ms": 30.49857534152959,
+          "median_itl_ms": 30.50954950231244,
+          "std_itl_ms": 0.8075498130149125,
+          "p99_itl_ms": 32.119064698781585,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              11.13,
+              11.13,
+              11.15
+            ],
+            "cv_pct": 0.08
+          }
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 4096,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.0975,
+        "output_tok_per_s": 12.48,
+        "total_tok_per_s": 411.89,
+        "ttft_ms": {
+          "mean": 15765.33,
+          "median": 17510.44,
+          "p99": 25972.99
+        },
+        "tpot_ms": {
+          "mean": 198.6,
+          "median": 200.62,
+          "p99": 272.38
+        },
+        "itl_ms": {
+          "mean": 198.6,
+          "median": 65.81,
+          "p99": 5814.43
+        },
+        "per_stream_tok_per_s": 4.98,
+        "raw": {
+          "date": "20260930-151922",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 16,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 4,
+          "duration": 164.08250367899745,
+          "completed": 16,
+          "failed": 0,
+          "total_input_tokens": 65536,
+          "total_output_tokens": 2048,
+          "request_throughput": 0.09751192016975542,
+          "request_goodput": null,
+          "output_throughput": 12.481525781728694,
+          "total_token_throughput": 411.8903507970469,
+          "max_output_tokens_per_s": 64.0,
+          "max_concurrent_requests": 5,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 15765.328828813836,
+          "median_ttft_ms": 17510.44160099991,
+          "std_ttft_ms": 6251.82008621502,
+          "p99_ttft_ms": 25972.99463720119,
+          "mean_tpot_ms": 198.59534323129304,
+          "median_tpot_ms": 200.61632318504238,
+          "std_tpot_ms": 54.36941732484368,
+          "p99_tpot_ms": 272.3793036807229,
+          "mean_itl_ms": 198.59534577214552,
+          "median_itl_ms": 65.81078749877634,
+          "std_itl_ms": 795.9886939715697,
+          "p99_itl_ms": 5814.434422443519,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              12.46,
+              12.48,
+              12.52
+            ],
+            "cv_pct": 0.2
+          }
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 4096,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.0981,
+        "output_tok_per_s": 12.55,
+        "total_tok_per_s": 414.21,
+        "ttft_ms": {
+          "mean": 22170.33,
+          "median": 20497.44,
+          "p99": 60313.83
+        },
+        "tpot_ms": {
+          "mean": 467.01,
+          "median": 496.47,
+          "p99": 586.03
+        },
+        "itl_ms": {
+          "mean": 467.01,
+          "median": 112.02,
+          "p99": 5840.63
+        },
+        "per_stream_tok_per_s": 2.01,
+        "raw": {
+          "date": "20260930-152522",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 32,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 8,
+          "duration": 326.32800944899645,
+          "completed": 32,
+          "failed": 0,
+          "total_input_tokens": 131072,
+          "total_output_tokens": 4096,
+          "request_throughput": 0.09806084391600915,
+          "request_goodput": null,
+          "output_throughput": 12.551788021249171,
+          "total_token_throughput": 414.2090047012226,
+          "max_output_tokens_per_s": 72.0,
+          "max_concurrent_requests": 9,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 22170.327149999594,
+          "median_ttft_ms": 20497.440277998976,
+          "std_ttft_ms": 12460.992060543846,
+          "p99_ttft_ms": 60313.829327113424,
+          "mean_tpot_ms": 467.014374112455,
+          "median_tpot_ms": 496.4726243622032,
+          "std_tpot_ms": 113.7184809431813,
+          "p99_tpot_ms": 586.0252592487442,
+          "mean_itl_ms": 467.0143768031467,
+          "median_itl_ms": 112.02089049766073,
+          "std_itl_ms": 1258.1625516577421,
+          "p99_itl_ms": 5840.62893508999,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              12.53,
+              12.55,
+              12.6
+            ],
+            "cv_pct": 0.23
+          }
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 4096,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.0969,
+        "output_tok_per_s": 12.4,
+        "total_tok_per_s": 409.23,
+        "ttft_ms": {
+          "mean": 93967.2,
+          "median": 101037.65,
+          "p99": 141818.13
+        },
+        "tpot_ms": {
+          "mean": 503.06,
+          "median": 519.19,
+          "p99": 587.07
+        },
+        "itl_ms": {
+          "mean": 503.06,
+          "median": 112.04,
+          "p99": 5840.66
+        },
+        "per_stream_tok_per_s": 1.93,
+        "raw": {
+          "date": "20260930-153658",
+          "endpoint_type": "vllm",
+          "backend": "vllm",
+          "label": null,
+          "model_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "tokenizer_id": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+          "num_prompts": 64,
+          "request_rate": "inf",
+          "burstiness": 1.0,
+          "max_concurrency": 16,
+          "duration": 660.595727549,
+          "completed": 64,
+          "failed": 0,
+          "total_input_tokens": 262144,
+          "total_output_tokens": 8192,
+          "request_throughput": 0.09688224935613556,
+          "request_goodput": null,
+          "output_throughput": 12.400927917585351,
+          "total_token_throughput": 409.23062128031654,
+          "max_output_tokens_per_s": 72.0,
+          "max_concurrent_requests": 18,
+          "rtfx": 0.0,
+          "mean_ttft_ms": 93967.20281668763,
+          "median_ttft_ms": 101037.64724499706,
+          "std_ttft_ms": 23262.678650334015,
+          "p99_ttft_ms": 141818.1279280888,
+          "mean_tpot_ms": 503.064770413996,
+          "median_tpot_ms": 519.1884388936961,
+          "std_tpot_ms": 90.35379696971954,
+          "p99_tpot_ms": 587.0652600448254,
+          "mean_itl_ms": 503.06477286208093,
+          "median_itl_ms": 112.04342099881615,
+          "std_itl_ms": 1303.7070209921994,
+          "p99_itl_ms": 5840.6609569275315,
+          "repeats": {
+            "n": 3,
+            "output_tok_per_s": [
+              12.4,
+              12.4,
+              12.44
+            ],
+            "cv_pct": 0.15
+          }
+        }
+      }
+    ]
+  }
+}

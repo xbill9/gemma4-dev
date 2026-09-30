@@ -9,10 +9,10 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| _none_ | | | | | |
+| `2026-09-30-emb4-sweep-e4b-t4.json` | xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4 | nvidia-t4×1 | on-demand | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
-| _none_ | | | | |
+| `2026-09-30-emb4-sweep-e4b-t4` | 61 | 0 | 0 | yes |

@@ -12,8 +12,11 @@ Google's E4B QAT weights to compressed-tensors W4A16, text only, with the PLE ta
 `embed_tokens` and an untied `lm_head` packed int4 as well. 4.58 GB on the Hub
 (4.26 GiB). `tpu.env` holds the lineage.
 
-**STATUS 2026-09-30: forked, nothing served or measured as E4B.** Every E4B figure
-in this rig is read off the Hub or labelled ARITHMETIC. The host facts below
+**STATUS 2026-09-30: served and swept once.** `benchmarks/runs/2026-09-30-emb4-sweep-e4b-t4`
+is the parent's harness and seeds against this checkpoint, drafter off: 0.53-0.56x the
+E2B build's output throughput at 512-token prompts, 0.74-0.77x at 4096, peak 131 tok/s.
+Engine log: model loading 4.54 GiB, KV 310,499 tokens at the parent's flags. Other E4B
+figures here are read off the Hub or labelled ARITHMETIC. The host facts below
 (filesystems, swap, interpreters, Turing clamp) are the parent's, measured on this
 same VM, and still hold.
 
@@ -29,8 +32,8 @@ against this rig. Only the two host-setup evidence files came along.
 **Do not size this rig from E2B.** @MODELS.md: E4B's KV is **56 KiB/token against
 E2B's 18** (24 cached layers and 2 KV heads, against 15 and 1), and the weights are
 ~1.6x the parent's. The arithmetic in `tpu.env` still has ~8 GiB of KV left at the
-parent's flags — enough for 8 x 16,384 — but that is arithmetic until the engine
-log says otherwise.
+parent's flags — enough for 8 x 16,384 — and the engine log agrees: 310,499 KV tokens
+(`benchmarks/runs/2026-09-30-emb4-sweep-e4b-t4/evidence/setup.txt`).
 
 **Three rigs share one GPU and port 8000** — this one, `gpu-vllm-t4-2b-w4a16` and
 `gpu-vllm-t4-2b` — and none sees another's process; each `server.py` tracks only
@@ -40,7 +43,8 @@ defaults to the E2B rig: use this rig's `./vllm-t4`, or set
 
 **This rig's `vllm-t4` passes the drafter**, which the parent's in-rig copy did not
 (only `~/bin/vllm-t4` did). The drafter is Google's E4B assistant; 3 draft tokens is
-the E2B knee, unmeasured here.
+the E2B knee, unmeasured here. A real environment variable overrides `tpu.env`:
+`SPECULATIVE_MODEL= ./vllm-t4 start` serves without it, as random-prompt sweeps should.
 
 ## `repack/` — the tools that built the checkpoint
 
