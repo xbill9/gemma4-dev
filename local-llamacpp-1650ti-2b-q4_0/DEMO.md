@@ -20,7 +20,7 @@ Keep a second terminal running `watch -n1 nvidia-smi` for step 3.
 ask What is the capital of Australia? One sentence.
 ```
 
-The whole answer is back in about 0.4 s (rehearsed 2026-09-29: 0.39 s end to end); longer ones
+The whole answer is back in about 0.4 s (rehearsed 2026-09-29: 0.39 s end to end; 2026-09-30: 0.32 s); longer ones
 stream at ~75–80 tok/s. Point out that it runs on a 4 GB laptop GPU with no cloud involved.
 
 ## 2. Pipe it real work (1 min)
@@ -30,13 +30,13 @@ git -C ~/gemma4-dev log --oneline -12 | ask summarize what this project has been
 git -C ~/gemma4-dev show --stat --format='%s%n%n%b' HEAD | ask write a one-line summary of this commit
 ```
 
-About 5 s and 4 s in rehearsal. Keep the input small: the context is 8192 tokens, and prompt
+About 4 s each in rehearsal (2026-09-30: 4.3 s and 4.5 s; 2026-09-29: 5 s and 4 s). Keep the input small: the context is 8192 tokens, and prompt
 processing runs at ~345 tok/s, so a 4,000-token paste is ~12 s of silence before the first word.
 Do not pipe `git diff` of a benchmark commit; it can overflow the context outright.
 
 ## 3. The footprint (30 s)
 
-Switch to the `nvidia-smi` terminal: about 1.5 GB of 4 GB in use (1491 MiB in rehearsal), and
+Switch to the `nvidia-smi` terminal: about 1.5 GB of 4 GB in use (1491 MiB in rehearsal, 1501 MiB on 2026-09-30), and
 30–40 W while it answers. Then:
 
 ```
@@ -67,7 +67,8 @@ ask -T Which is larger, 9.11 or 9.9? Explain.
 ```
 
 The dimmed reasoning streams first, then the answer. It's off by default because it delays the
-answer: in rehearsal this question spent ~700 characters thinking before the first word. The
+answer: in rehearsal this question spent 700–1,100 characters thinking before the first word, and
+8.8 s end to end on 2026-09-30. The
 reasoning only shows when `ask` is writing to a terminal.
 
 ## 6. The story behind the file (1 min, optional)
