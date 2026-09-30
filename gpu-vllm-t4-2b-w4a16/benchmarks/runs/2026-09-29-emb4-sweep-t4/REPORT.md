@@ -79,4 +79,24 @@ the three, so the memory saving shows up as headroom, not throughput.
 
 `sweep.sh` (the harness), `aggregate.py` (labels discovered, otherwise as in the
 2026-09-18 run), `results.csv`, `emb4/*.json` (raw `--save-result`), `emb4/*.log`,
-`sweep.out`, `evidence/setup.txt`.
+`sweep.out`, `evidence/setup.txt`. `build_report.py` writes the schema report,
+`../../reports/2026-09-29-emb4-sweep-t4.json`, from `emb4/` only.
+
+## `w8a8/` — a partial run, not part of these results
+
+`w8a8/` and `sweep-w8a8.out` are the same harness against
+`xbill9/gemma-4-E2B-it-qat-w8a8-ct-text-emb4` (int8 weights and activations, the same
+int4 embeddings), **rep 1 only, stopped by hand during 4096/c=4** because W8A8 was
+slower than emb4 in every cell completed:
+
+| input | c | W8A8 out tok/s (1 rep) | emb4 out tok/s (mean of 3) |
+| ---: | ---: | ---: | ---: |
+| 512 | 1 | 45.67 | 85.28 |
+| 512 | 4 | 125.94 | 183.08 |
+| 512 | 8 | 181.25 | 239.64 |
+| 512 | 16 | 182.89 | 237.08 |
+| 4096 | 1 | 12.94 | 15.03 |
+
+One repeat, so the W8A8 column carries no spread. **Do not re-run `aggregate.py` as
+it stands**: it discovers every label directory, so it would now add single-repeat
+`w8a8` rows to `results.csv` beside the three-repeat `emb4` ones.

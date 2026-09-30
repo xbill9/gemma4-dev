@@ -20,8 +20,13 @@ vLLM 0.29.0, `--dtype float16 --gpu-memory-utilization 0.90 --max-model-len 1638
 | xbill9 `-text` (bf16 embeddings) | 6.33 GiB | 711,539 | 81.6 tok/s |
 | **xbill9 `-text-emb4` (served)** | **2.86 GiB** | **1,099,362** | **109.7 tok/s** |
 
-Single-stream only; there is no concurrency sweep for this rig yet. Evidence in
-[`evidence/`](evidence/).
+Evidence in [`evidence/`](evidence/). A concurrency sweep of the served build
+(input {512, 4096} x c {1, 4, 8, 16}, 3 repeats, the same prompts as the parent
+rig's bf16 and QAT runs) is in
+[`benchmarks/runs/2026-09-29-emb4-sweep-t4/`](benchmarks/runs/2026-09-29-emb4-sweep-t4/REPORT.md):
+239.6 output tok/s at 512/c=8, +11% over Google's QAT export and 1.46x bf16.
+Speculative decoding with Google's drafter at c=1 is in
+[`benchmarks/runs/2026-09-29-specdec-c1-t4/`](benchmarks/runs/2026-09-29-specdec-c1-t4/).
 
 ## How the checkpoint was built
 

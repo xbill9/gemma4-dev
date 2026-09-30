@@ -44,6 +44,7 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.19.1.dev3+rocm7.13.… | 2-D (2ctx × 3conc) | 6,579 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
 | `2026-09-22-paired-sweep-1650ti` | google/gemma-4-E2B-it-qat-q4_0-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 60 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
 | `2026-09-22-paired-sweep-cpu` | google/gemma-4-E2B-it-qat-q4_0-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 16 | — | 1.1 | ok | local-llamacpp-cpu-2b-q4_0 |
+| `2026-09-29-emb4-sweep-t4` | xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 | nvidia-t4×1 | on-demand / gcp | vllm 0.29.0 | 2-D (2ctx × 4conc) | 238 | — | 1.1 | ok | gpu-vllm-t4-2b-w4a16 |
 | `2026-09-29-paired-sweep-1650ti` | xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 66 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
 | `2026-09-29-paired-sweep-cpu` | xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 16 | — | 1.1 | ok | local-llamacpp-cpu-2b-q4_0 |
 
@@ -107,8 +108,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-bf16` | 18 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | 19 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b | `2026-09-18-qat-vs-bf16-t4` | 107 | 0 | 0 | yes | **no** |
-| gpu-vllm-t4-2b-w4a16 | `2026-09-29-emb4-sweep-t4` | 66 | 0 | 0 | yes | **no** |
-| gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 14 | 9 | 0 | **no** | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-09-29-emb4-sweep-t4` | 67 | 0 | 0 | yes | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 15 | 9 | 0 | **no** | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
@@ -212,7 +213,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-4b-w4a16 | 0 | 1 |
 | gpu-vllm-mi300x-2b | 7 | 8 |
 | gpu-vllm-t4-2b | 0 | 1 |
-| gpu-vllm-t4-2b-w4a16 | 0 | 2 |
+| gpu-vllm-t4-2b-w4a16 | 1 | 2 |
 | local-jax-cpu-2b | 0 | 1 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 10 |
 | local-llamacpp-1650ti-4b-q4_0 | 0 | 1 |

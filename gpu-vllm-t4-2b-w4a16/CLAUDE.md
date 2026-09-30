@@ -14,8 +14,11 @@ untied `lm_head` packed int4 as well. `tpu.env` holds the full lineage.
 **STATUS 2026-09-29: serving and measured**, vLLM 0.29.0. Warm compile cache,
 `tpu.env` flags: model loading **2.86 GiB**, KV cache **1,099,362 tokens**, decode
 **109.7 tok/s** at c=1, 8 of 8 greedy outputs token-identical to the
-bf16-embedding build. `evidence/2026-09-29-embed-int4.txt`. One stream only —
-**no concurrency sweep yet**; do not quote a batched number from this rig.
+bf16-embedding build. `evidence/2026-09-29-embed-int4.txt`. **Concurrency sweep
+2026-09-29** (`benchmarks/runs/2026-09-29-emb4-sweep-t4/`, schema report in
+`benchmarks/reports/`): 8 cells, 3 repeats, worst-cell cv 2.5%, 239.6 tok/s at
+512/c=8. Its bf16 and QAT comparison cells are the parent's 2026-09-18 run, so the
+comparison is three variables at once — `REPORT.md` says which.
 
 **Forked from `gpu-vllm-t4-2b` on 2026-09-29**, which had been serving 4-bit
 builds under a bare `-2b` name — a claim of the bf16 reference weights under
