@@ -1,7 +1,7 @@
 ---
-title: "Repacked QAT Gemma 4 on One TPU v5e: 12B Serves at 675 Tokens per Second"
+title: "Gemma 4 QAT on One TPU v5e: What Runs and What Doesn't"
 published: false
-description: "Google's quantization-aware-trained Gemma 4 weights, repacked into int4 and int8 formats vLLM serves on TPU. On one v5e chip the repacks serve every size from E2B to 26B, read the suite level with bf16 through 12B, score up to 2.4 points above Google's own 4-bit exports at the same speed, and put 12B on the chip at 11.31 GiB and 675 output tokens per second."
+description: "Google's quantization-aware-trained Gemma 4 weights, repacked into int4 and int8 formats vLLM serves on TPU, on one v5e chip. What runs: every size from E2B to 26B, level with bf16 through 12B, up to 2.4 points above Google's own 4-bit exports at the same speed, and 12B at 675 output tokens per second. What doesn't: bf16 above E2B, 31B in any build, and 26B past a 2,176-token context."
 tags: gemma, googlecloud, machinelearning, llm
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/jev-tpu-v5e1/devto-v5e1-qat-cover.955039d5.jpg
 ---
@@ -209,6 +209,15 @@ A single request runs at the same speed with either cache. The fp8 cache costs 0
 
 ---
 
+#### What Doesn't Run
+
+- **E4B and 12B at bf16.** At 14.9 and 22.4 GiB they leave no room on a 15.75 GiB chip; their 4-bit and 8-bit repacks run.
+- **31B in any build.** Its 4-bit repack takes 19.04 GiB of HBM on its own.
+- **26B past a 2,176-token context.** With int4 vocabulary tables it still takes 13.72 GiB of weights, and a 3,072-token cache failed to compile (`CompileTimeHbmOom`) and a 2,560-token cache failed to load.
+- **fp8 weights, at speed.** 12B fp8 runs and scores level with int8, at 518 output tokens per second against 624 for int8 with the same bf16 tables: v5e has no fp8 compute and converts the weights before each multiply.
+
+---
+
 #### Compare and Contrast
 
 | Size | Build | Suite | GSM8K | BFCL | tok/s at 16 |
@@ -249,6 +258,7 @@ The goal of this article was to find what Google's QAT Gemma 4 weights can do on
 - 🟢 An fp8 KV cache doubles 12B's cache to 18,944 tokens and its long-prompt throughput by 1.65x
 - ⚠️ On GSM8K the E2B builds trail bf16 by 0.9 to 2.0 points, most of it from QAT training itself
 - ⚠️ 26B serves with a 2,176-token context and reads 1.1 points below bf16
+- ❌ E4B and 12B at bf16 and 31B in any build do not fit one v5e chip
 
 Scope: every build ran on one TPU v5e chip (`v5litepod-1`, flex-start) in us-west4-a, vLLM `0.29.1rc1.dev468+g0b7f11a1e` at `vllm/vllm-tpu@sha256:19a1a052…` with the three patches in `jev-tpu-v5e1/patches/`, one run per build. The E4B, 12B and 26B bf16 suite references ran on v6e, and E4B and 12B have no bf16 reference for GSM8K or BFCL. Throughput is the median of three passes of 256 output tokens. Pairings are record for record, and a difference counts only when its 95% range excludes zero. The repacked checkpoints are unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
