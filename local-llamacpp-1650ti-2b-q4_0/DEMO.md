@@ -12,7 +12,7 @@ gpu start          # starts the server and checks it's really the GPU one
 ask -q "hi"        # warm-up, so the model file is already in memory
 ```
 
-Keep a second terminal running `watch -n1 nvidia-smi` for step 3.
+Keep a second terminal running `nvtop` for step 3.
 
 ## 1. It's instant (30 s)
 
@@ -38,7 +38,7 @@ overflow the context outright.
 
 ## 3. The footprint (30 s)
 
-Switch to the `nvidia-smi` terminal: about 1.5 GB of 4 GB in use (1491 MiB in rehearsal, 1501 MiB on
+Switch to the `nvtop` terminal: about 1.5 GB of 4 GB in use (1491 MiB in rehearsal, 1501 MiB on
 2026-09-30), and 30–40 W while it answers. Then:
 
 ```
