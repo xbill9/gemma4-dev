@@ -107,6 +107,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-bf16` | 18 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | 19 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b | `2026-09-18-qat-vs-bf16-t4` | 107 | 0 | 0 | yes | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-09-29-emb4-sweep-t4` | 66 | 0 | 0 | yes | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 14 | 9 | 0 | **no** | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
@@ -115,8 +117,10 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-22-paired-sweep-1650ti` | 12 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-exact-gguf-1650ti` | 26 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-exact-gguf-v2-1650ti` | 16 | 1 | 0 | yes | **no** |
+| local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ngram-spec-1650ti` | 17 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-paired-sweep-1650ti` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ple-offload-1650ti` | 6 | 0 | 0 | yes | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 13 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-22-paired-sweep-cpu` | 12 | 0 | 0 | yes | **no** |
@@ -208,9 +212,10 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-4b-w4a16 | 0 | 1 |
 | gpu-vllm-mi300x-2b | 7 | 8 |
 | gpu-vllm-t4-2b | 0 | 1 |
-| gpu-vllm-t4-2b-w4a16 | 0 | 0 |
+| gpu-vllm-t4-2b-w4a16 | 0 | 2 |
 | local-jax-cpu-2b | 0 | 1 |
-| local-llamacpp-1650ti-2b-q4_0 | 6 | 9 |
+| local-llamacpp-1650ti-2b-q4_0 | 6 | 10 |
+| local-llamacpp-1650ti-4b-q4_0 | 0 | 1 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-i71360p-2b-q4_0 | 0 | 2 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |

@@ -58,6 +58,10 @@ host's thermal caveat recorded in the CPU twin's `CLAUDE.md`. The three older ru
 are at `95ef7fc` and are not pairable with anything newer. **Nothing on record is
 pairable with a run made on `f95b0d9`** except 2026-09-22, which re-ran both arms.
 
+**E4B PARALLEL, 2026-09-30: `local-llamacpp-1650ti-4b-q4_0`** serves an exact Q4_0 E4B rebuild on this
+card with this binary and these flags, on the same port 8080. It holds 2848 MiB, so **the two rigs cannot
+serve at the same time** — stop this one first. Its numbers are its own; see its `CLAUDE.md`.
+
 ## This rig is one arm of a control
 
 `local-llamacpp-cpu-2b-q4_0` is the other arm: the same GGUF served by the same

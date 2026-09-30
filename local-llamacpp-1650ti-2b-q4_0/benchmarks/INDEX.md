@@ -27,5 +27,6 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-22-paired-sweep-1650ti` | 12 | 0 | 0 | yes |
 | `2026-09-29-exact-gguf-1650ti` | 26 | 1 | 0 | yes |
 | `2026-09-29-exact-gguf-v2-1650ti` | 16 | 1 | 0 | yes |
+| `2026-09-29-ngram-spec-1650ti` | 17 | 1 | 0 | yes |
 | `2026-09-29-paired-sweep-1650ti` | 13 | 0 | 0 | yes |
 | `2026-09-29-ple-offload-1650ti` | 6 | 0 | 0 | yes |
