@@ -137,8 +137,11 @@ launch() {
   [ "`rigval LANGUAGE_MODEL_ONLY`" = true ] && mmflag=--language-model-only
 
   # Optional: both set turns on the Gemma 4 drafter (see the rig's tpu.env).
-  specmodel=`rigval SPECULATIVE_MODEL`
-  specn=`rigval NUM_SPECULATIVE_TOKENS`
+  # A real environment variable wins, as it does everywhere else in this tree:
+  # `SPECULATIVE_MODEL= ./vllm-t4 start` serves without it (sweeps on random
+  # prompts, where draft acceptance means nothing).
+  specmodel=${SPECULATIVE_MODEL-`rigval SPECULATIVE_MODEL`}
+  specn=${NUM_SPECULATIVE_TOKENS-`rigval NUM_SPECULATIVE_TOKENS`}
   set --
   [ -n "$specmodel" ] && [ -n "$specn" ] && \
     set -- --speculative-config "{\"model\":\"$specmodel\",\"num_speculative_tokens\":$specn}"
