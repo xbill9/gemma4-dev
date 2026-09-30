@@ -1,0 +1,20 @@
+# captured 2026-09-30T14:32:19-04:00 on yoga9i, /home/xbill/gemma4-dev/local-llamacpp-1650ti-2b-q4_0
+$ python3 inspect_gguf.py /home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf
+gemma-4-E2B-it-q4_0-exact.gguf
+  tensors:  541
+  total:    2.605 GB
+
+  largest tensors:
+      1321.2 MB  per_layer_token_embd.weight  Q4_0    [8960, 262144]  <- LAZY, host-resident
+       226.5 MB  token_embd.weight            Q4_0    [1536, 262144]
+        10.6 MB  blk.34.ffn_up.weight         Q4_0    [1536, 12288]
+        10.6 MB  blk.34.ffn_gate.weight       Q4_0    [1536, 12288]
+        10.6 MB  blk.34.ffn_down.weight       Q4_0    [12288, 1536]
+        10.6 MB  blk.33.ffn_up.weight         Q4_0    [1536, 12288]
+
+  lazy (never on GPU):        1.321 GB  (51% of file)
+  must be resident:           1.283 GB = 1.20 GiB
+
+  by tensor type (the slot-5 token is q4_0; the file mostly is not):
+    Q4_0      2.603 GB  (100.0%)
+    F32       0.001 GB  ( 0.0%)
