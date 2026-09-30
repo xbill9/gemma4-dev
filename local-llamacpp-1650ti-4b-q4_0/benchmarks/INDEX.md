@@ -9,11 +9,14 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
+| `2026-09-30-concurrency-1650ti.json` | xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ok | — |
 | `2026-09-30-paired-sweep-1650ti.json` | xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
+| `2026-09-30-concurrency-1650ti` | 38 | 0 | 0 | yes |
 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes |
 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes |
+| `2026-09-30-suite-e2b-vs-e4b-1650ti` | 2 | 0 | 0 | **no** |

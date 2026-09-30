@@ -59,8 +59,16 @@ before attributing a number to either rig.
 E4B runs at **~0.49x E2B's decode on the GPU and ~0.51x on the CPU**, matching the 2.0x resident bytes.
 The CPU arm drifted −8% between its passes, so a single-order run misstates the ratio by 4–5% here.
 
+## Concurrency — MEASURED 2026-09-30
+
+`benchmarks/runs/2026-09-30-concurrency-1650ti`, every level cooled first. **16 slots is the ceiling**:
+each slot gets its own 1024-cell sliding-window KV (40 MiB/slot on E4B), so `-c 32768 --parallel 32`
+fails to allocate and `--parallel 16` holds 3568 MiB of 4096. Long prompts (512/128) plateau at
+**~30.8 tok/s (1.53x)** with TTFT doubling per doubling of `c`; short prompts (128/512) reach
+**88.9 tok/s at c=8 (2.52x)**. No bimodal levels (worst spread 7.3%), unlike E2B's 2026-09-08 run.
+
 ## Not known yet
 
-KLD on CUDA, any concurrency run, the quality of thinking-on output (the paired sweep ran thinking on but measured only speed),
+KLD on CUDA, the quality of thinking-on output (the paired sweep ran thinking on but measured only speed),
 and anything above 8192 context. `DEMO.md` did not come across: the rehearsed
 demo is the E2B rig's.

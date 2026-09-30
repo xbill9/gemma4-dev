@@ -1,0 +1,92 @@
+{
+  "rig": "local-llamacpp-1650ti-4b-q4_0",
+  "attestation": {
+    "serving": true,
+    "port": 8080,
+    "pid": 275142,
+    "exe": "/home/xbill/llama.cpp/build/bin/llama-server",
+    "exe_sha256": "9f2a8b0b6ed5365dcc87e4f682fa0ca067f8df0e3f44a5bf4678872b7b5081f2",
+    "device": "gpu",
+    "gpu_libs": [
+      "ggml-cuda",
+      "libcublas",
+      "libcuda",
+      "libcudart"
+    ],
+    "n_gpu_layers": 99,
+    "cuda_visible_devices": "0",
+    "model_arg": "/home/xbill/models/gemma-4-E4B-it-qat-q4_0-exact/gemma-4-E4B-it-q4_0-exact.gguf",
+    "threads": "6",
+    "threads_batch": "12",
+    "ctx_size": "16384",
+    "argv": [
+      "/home/xbill/llama.cpp/build/bin/llama-server",
+      "-lv",
+      "4",
+      "-m",
+      "/home/xbill/models/gemma-4-E4B-it-qat-q4_0-exact/gemma-4-E4B-it-q4_0-exact.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "99",
+      "-c",
+      "16384",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "6",
+      "-tb",
+      "12",
+      "--parallel",
+      "16",
+      "--reasoning",
+      "off",
+      "--metrics"
+    ]
+  },
+  "device": "gpu",
+  "build_id": null,
+  "model": "xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf",
+  "health": {
+    "status": "ok"
+  },
+  "mode": "concurrency",
+  "shape": {
+    "input": 128,
+    "output": 512
+  },
+  "prompt_mode": "unique",
+  "concurrency": [
+    {
+      "concurrency": 4,
+      "status": "ok",
+      "requests": 4,
+      "requests_ok": 4,
+      "output_tokens_total": 1613,
+      "output_tokens_per_second": 76.061,
+      "duration_s": 21.207,
+      "ttft_ms_median": 3757.43,
+      "ttft_ms_p99": 3757.84,
+      "tpot_ms_median": 42.771,
+      "per_stream_tps_median": 23.381,
+      "repeats": 3,
+      "output_tps_min": 73.607,
+      "output_tps_max": 76.318,
+      "output_tps_spread_pct": 3.7
+    }
+  ],
+  "summary": {
+    "levels": [
+      4
+    ],
+    "peak_output_tokens_per_second": 76.061,
+    "peak_at_concurrency": 4,
+    "scaling_1_to_peak": null
+  }
+}

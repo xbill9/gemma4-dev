@@ -47,6 +47,7 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-09-29-emb4-sweep-t4` | xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 | nvidia-t4×1 | on-demand / gcp | vllm 0.29.0 | 2-D (2ctx × 4conc) | 238 | — | 1.1 | ok | gpu-vllm-t4-2b-w4a16 |
 | `2026-09-29-paired-sweep-1650ti` | xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 66 | — | 1.1 | ok | local-llamacpp-1650ti-2b-q4_0 |
 | `2026-09-29-paired-sweep-cpu` | xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 16 | — | 1.1 | ok | local-llamacpp-cpu-2b-q4_0 |
+| `2026-09-30-concurrency-1650ti` | xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b318-f95b0d9 | 2-D (2ctx × 5conc) | 89 | — | 1.1 | ok | local-llamacpp-1650ti-4b-q4_0 |
 | `2026-09-30-paired-sweep-1650ti` | xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 33 | — | 1.1 | ok | local-llamacpp-1650ti-4b-q4_0 |
 | `2026-09-30-paired-sweep-cpu` | xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 8 | — | 1.1 | ok | local-llamacpp-cpu-4b-q4_0 |
 
@@ -123,8 +124,10 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ngram-spec-1650ti` | 17 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-paired-sweep-1650ti` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ple-offload-1650ti` | 6 | 0 | 0 | yes | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-concurrency-1650ti` | 38 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 2 | 0 | 0 | **no** | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-22-paired-sweep-cpu` | 12 | 0 | 0 | yes | **no** |
@@ -221,7 +224,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-t4-4b-w4a16 | 0 | 0 |
 | local-jax-cpu-2b | 0 | 1 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 10 |
-| local-llamacpp-1650ti-4b-q4_0 | 1 | 2 |
+| local-llamacpp-1650ti-4b-q4_0 | 2 | 4 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-cpu-4b-q4_0 | 1 | 1 |
 | local-llamacpp-i71360p-2b-q4_0 | 0 | 2 |

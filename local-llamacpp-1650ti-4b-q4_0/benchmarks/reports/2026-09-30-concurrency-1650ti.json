@@ -1,0 +1,285 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-30-concurrency-1650ti",
+    "date": "2026-09-30",
+    "source": "local-llamacpp-1650ti-4b-q4_0",
+    "notes": "Concurrency sweep, two shapes on one server: long 512 in / 128 out and short 128 in / 512 out, concurrency 1,2,4,8,16, 3 repeats per level. Every level ran only after a >=60 s cooldown with the CPU package <=50 C and the GPU <=45 C (driver.log). Server -c 16384 --parallel 16 (1024 tokens per slot). 32 slots does NOT fit on E4B: llama.cpp allocates each slot its own 1024-cell sliding-window KV (40 MiB/slot), so -c 32768 --parallel 32 failed to allocate 1280 MiB (probe/). Prompt cache VERIFIED defeated: prompt_tokens_cached_total 0 of 65,830. Thinking ON per request (sweep.py asks for it). Arm attested gpu, sha256 9f2a8b0b6ed5365d, model the E4B exact file. llama.cpp f95b0d9, -t 6 -tb 12. Not comparable to the E2B rig's 2026-09-03/09-08 concurrency runs as a model comparison: those were on 95ef7fc, -t 4, without cooldown gating (09-03) and with -c 32768 --parallel 32 (09-03)."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+    "chips": 1,
+    "hbm_gb_per_chip": 4.294,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "TU117, compute capability 7.5, NO tensor cores. Max-Q thermal envelope shared with the CPU package."
+    }
+  },
+  "model": {
+    "id": "xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf",
+    "family": "gemma-4",
+    "parameters_b": 7.46,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 1024,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes; sweep.py counts both. Gemma 4 E4B (4.5B effective, 8.0B total; llama.cpp reports 7.46B). Exact rebuild: every weight matrix Q4_0 (both embeddings and per_layer_model_proj included), 2.2 MB of F32 norms otherwise. per_layer_token_embd (1.59 GB, 38% of the file) is TENSOR_READ_LAZY."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b318-f95b0d9",
+    "backend": "CUDA",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-m",
+      "/home/xbill/models/gemma-4-E4B-it-qat-q4_0-exact/gemma-4-E4B-it-q4_0-exact.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "99",
+      "-c",
+      "16384",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "6",
+      "-tb",
+      "12",
+      "--parallel",
+      "16",
+      "--metrics"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py --concurrency (byte-identical to the CPU arm's)",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 3,
+      "notes": "Two shapes; input_len/output_len are per cell. decode-source auto -> stream. prompt_mode unique. output_tok_per_s is aggregate over all streams."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 20.091,
+        "per_stream_tok_per_s": 38.297,
+        "ttft_ms": {
+          "median": 3132.61,
+          "p99": 3132.61
+        },
+        "tpot_ms": {
+          "median": 26.111
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.6,
+          "min": 20.013,
+          "max": 20.138
+        }
+      },
+      {
+        "concurrency": 2,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 26.378,
+        "per_stream_tok_per_s": 35.151,
+        "ttft_ms": {
+          "median": 6176.37,
+          "p99": 6175.89
+        },
+        "tpot_ms": {
+          "median": 28.449
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.9,
+          "min": 26.37,
+          "max": 26.603
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 28.985,
+        "per_stream_tok_per_s": 22.928,
+        "ttft_ms": {
+          "median": 12239.69,
+          "p99": 12260.13
+        },
+        "tpot_ms": {
+          "median": 43.614
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.2,
+          "min": 28.93,
+          "max": 28.998
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 30.817,
+        "per_stream_tok_per_s": 14.172,
+        "ttft_ms": {
+          "median": 24452.63,
+          "p99": 24489.25
+        },
+        "tpot_ms": {
+          "median": 70.56
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 7.3,
+          "min": 28.904,
+          "max": 31.017
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 30.389,
+        "per_stream_tok_per_s": 6.738,
+        "ttft_ms": {
+          "median": 48902.75,
+          "p99": 49130.02
+        },
+        "tpot_ms": {
+          "median": 148.408
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 0.4,
+          "min": 30.352,
+          "max": 30.464
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 35.323,
+        "per_stream_tok_per_s": 38.547,
+        "ttft_ms": {
+          "median": 1108.96,
+          "p99": 1108.96
+        },
+        "tpot_ms": {
+          "median": 25.942
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 1.0,
+          "min": 35.09,
+          "max": 35.441
+        }
+      },
+      {
+        "concurrency": 2,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 60.418,
+        "per_stream_tok_per_s": 35.767,
+        "ttft_ms": {
+          "median": 1957.1,
+          "p99": 1956.96
+        },
+        "tpot_ms": {
+          "median": 27.959
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 4.4,
+          "min": 58.388,
+          "max": 60.93
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 76.061,
+        "per_stream_tok_per_s": 23.381,
+        "ttft_ms": {
+          "median": 3757.43,
+          "p99": 3757.84
+        },
+        "tpot_ms": {
+          "median": 42.771
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 3.7,
+          "min": 73.607,
+          "max": 76.318
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 88.909,
+        "per_stream_tok_per_s": 14.475,
+        "ttft_ms": {
+          "median": 7325.88,
+          "p99": 7326.89
+        },
+        "tpot_ms": {
+          "median": 69.087
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 1.7,
+          "min": 87.735,
+          "max": 89.254
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 128,
+        "output_len": 512,
+        "status": "ok",
+        "output_tok_per_s": 87.264,
+        "per_stream_tok_per_s": 6.909,
+        "ttft_ms": {
+          "median": 15511.11,
+          "p99": 15651.45
+        },
+        "tpot_ms": {
+          "median": 144.734
+        },
+        "raw": {
+          "repeats": 3,
+          "spread_pct": 2.0,
+          "min": 86.164,
+          "max": 87.91
+        }
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 3.585,
+    "weights_gib": 2.435,
+    "kv_bytes_per_token": 57344,
+    "notes": "MEASURED 2026-09-30 at -c 16384 --parallel 16 (probe/alloc-c16384-p16.log): CUDA0 model 2493.32 MiB, KV 256 MiB full-attention (4 layers x 1024 cells x 16 seqs) + 640 MiB sliding (20 layers x 1024 cells x 16 seqs), compute 103.02 MiB; nvidia-smi 3568 MiB of 4096. The sliding-window KV scales with slots, not with context: 40 MiB per slot."
+  }
+}
