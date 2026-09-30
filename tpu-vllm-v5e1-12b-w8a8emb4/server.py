@@ -217,7 +217,7 @@ async def _get_node_ip(node_id: str) -> Optional[str]:
 async def get_secret(secret_id: str = HF_SECRET_ID) -> Optional[str]:
     """Retrieves a secret from Secret Manager."""
     rc, stdout, stderr = await run_command(
-        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}"]
+        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}", f"--project={PROJECT_ID}"]
     )
     if rc == 0:
         return stdout.strip()
