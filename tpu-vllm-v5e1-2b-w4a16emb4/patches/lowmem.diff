@@ -475,7 +475,7 @@ index 1a74e4176..68a27cf11 100644
      """Block-wise Fp8 method for JAX Linear layer."""
  
 diff --git a/tpu_inference/layers/jax/quantization/wna16.py b/tpu_inference/layers/jax/quantization/wna16.py
-index e6ccc5f66..41924d9c8 100644
+index e6ccc5f66..a34684b2c 100644
 --- a/tpu_inference/layers/jax/quantization/wna16.py
 +++ b/tpu_inference/layers/jax/quantization/wna16.py
 @@ -45,6 +45,7 @@ from flax import nnx
@@ -506,10 +506,15 @@ index e6ccc5f66..41924d9c8 100644
              output_sizes = self.linear_config.output_sizes
              n_shards = self.linear_config.n_shards
              if len(output_sizes) > 1 and n_shards > 1:
-@@ -332,6 +337,115 @@ class WNA16MergedLinearMethod(WNA16LinearMethod):
+@@ -332,6 +337,128 @@ class WNA16MergedLinearMethod(WNA16LinearMethod):
                                                [None] * n_proj)
  
  
++def _pad_columns(x: jax.Array, multiple: int) -> jax.Array:
++    pad = -x.shape[-1] % multiple
++    return jnp.pad(x, ((0, 0), (0, pad))) if pad else x
++
++
 +class WNA16EmbedMethod(QuantizeMethodBase):
 +    """Symmetric int4 embedding table, for ``JaxEmbed``.
 +
@@ -586,6 +591,12 @@ index e6ccc5f66..41924d9c8 100644
 +            raise TypeError(f"{self.prefix}.weight_scale is {scale.dtype}.")
 +        for name in _CHECKPOINT_PARAMS:
 +            delattr(layer, name)
++        # Rows a multiple of 128 lanes wide: gathering more than one row of
++        # a narrower int32 table reads the whole table on v5e (E2B per-layer
++        # table, 1120 words: 4.2 ms at any id count; padded to 1152: 0.06 ms).
++        with cpu_mesh_context():
++            packed = _pad_columns(packed, 128)
++            scale = _pad_columns(scale, 128)
 +        layer.weight_packed = nnx.Param(shard_put(packed, ()))
 +        layer.weight_scale = nnx.Param(shard_put(scale, ()))
 +        self._processed = True
@@ -594,6 +605,8 @@ index e6ccc5f66..41924d9c8 100644
 +    def _dequant(self, packed: jax.Array, scale: jax.Array) -> jax.Array:
 +        """int32 [..., D / 8] and scales [..., D / group] -> [..., D]."""
 +        lead = packed.shape[:-1]
++        packed = packed[..., :self.features // _PACK_FACTOR]
++        scale = scale[..., :self.num_groups]
 +        w = u32_unpack_i4(packed).astype(jnp.float32)
 +        w = w.reshape(*lead, self.num_groups, self.group_size)
 +        w = w * scale.astype(jnp.float32)[..., None]
@@ -622,7 +635,7 @@ index e6ccc5f66..41924d9c8 100644
  WNA16_MOE_SUPPORTED_BACKENDS = [MoEBackend.GMM_EP, MoEBackend.GMM_TP]
  
  # Checkpoint projection name -> its role in the fused expert weights.
-@@ -549,6 +663,9 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
+@@ -549,6 +676,9 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
                  w13_reorder_size=get_mesh_shape_product(
                      layer.mesh, ShardingAxisName.MLP_TENSOR),
                  w13_interleave=False,
@@ -632,7 +645,7 @@ index e6ccc5f66..41924d9c8 100644
              )
              for name in staged:
                  delattr(layer, name)
-@@ -562,6 +679,14 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
+@@ -562,6 +692,14 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
          weights = shard_moe_weights(weights,
                                      moe_backend=layer.moe_backend,
                                      mesh=layer.mesh)
@@ -647,7 +660,7 @@ index e6ccc5f66..41924d9c8 100644
          layer.kernel_gating_upproj_EDF = nnx.Param(weights.w13_weight)
          layer.kernel_gating_upproj_EDF_weight_scale = nnx.Param(
              weights.w13_weight_scale)
-@@ -582,12 +707,19 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
+@@ -582,12 +720,19 @@ class WNA16FusedMoEMethod(QuantizeMethodBase):
              x_TD,
              jax.sharding.NamedSharding(layer.mesh,
                                         P(*layer.activation_ffw_td)))
@@ -812,4 +825,65 @@ index 1ea3a1566..fcb896901 100644
 +                    )
              else:
                  self.lm_head = PPMissingLayer()
+ 
+diff --git a/tpu_inference/models/jax/gemma4_mtp.py b/tpu_inference/models/jax/gemma4_mtp.py
+index 990ae1f78..b187f4d36 100644
+--- a/tpu_inference/models/jax/gemma4_mtp.py
++++ b/tpu_inference/models/jax/gemma4_mtp.py
+@@ -412,6 +412,11 @@ class Gemma4MultiTokenPredictor(JaxModule):
+         text_config = draft_config.text_config
+         self.config = text_config
+         dtype = vllm_config.model_config.dtype
++        # vllm_config.quant_config is the target's. The assistant checkpoints
++        # are bf16, so a quantized target must not make the drafter expect
++        # packed or int8 weights.
++        quant_config = (vllm_config.quant_config if getattr(
++            draft_config, "quantization_config", None) else None)
+ 
+         self.hidden_size = text_config.hidden_size
+         self.backbone_hidden_size = getattr(draft_config,
+@@ -426,7 +431,7 @@ class Gemma4MultiTokenPredictor(JaxModule):
+             param_dtype=dtype,
+             embedding_init=nnx.with_partitioning(init_fn, ("model", None)),
+             rngs=rng,
+-            quant_config=vllm_config.quant_config,
++            quant_config=quant_config,
+             prefix=prefix + ".embed_tokens",
+         )
+ 
+@@ -436,7 +441,7 @@ class Gemma4MultiTokenPredictor(JaxModule):
+             use_bias=False,
+             param_dtype=dtype,
+             rngs=rng,
+-            quant_config=vllm_config.quant_config,
++            quant_config=quant_config,
+             prefix=prefix + ".pre_projection",
+         )
+ 
+@@ -446,7 +451,7 @@ class Gemma4MultiTokenPredictor(JaxModule):
+             use_bias=False,
+             param_dtype=dtype,
+             rngs=rng,
+-            quant_config=vllm_config.quant_config,
++            quant_config=quant_config,
+             prefix=prefix + ".post_projection",
+         )
+ 
+@@ -459,7 +464,7 @@ class Gemma4MultiTokenPredictor(JaxModule):
+                 rng=rng,
+                 mesh=mesh,
+                 kv_cache_dtype=vllm_config.cache_config.cache_dtype,
+-                quant_config=vllm_config.quant_config,
++                quant_config=quant_config,
+                 prefix=f"{prefix}.layers.{layer_index}",
+             ),
+         )
+@@ -470,7 +475,7 @@ class Gemma4MultiTokenPredictor(JaxModule):
+             param_dtype=dtype,
+             scale_init=nnx.with_partitioning(init_fn, (None, )),
+             rngs=rng,
+-            quant_config=vllm_config.quant_config,
++            quant_config=quant_config,
+             prefix=prefix + ".norm",
+         )
  

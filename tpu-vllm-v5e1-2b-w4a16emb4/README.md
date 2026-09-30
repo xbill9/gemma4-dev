@@ -28,12 +28,14 @@ on real rows, 90–92% of values are bit-identical to the bf16 source and the re
 Slot 5 is `w4a16emb4`: `w4a16` names the linears as the sibling does, and `emb4` records that the
 embedding tables and `lm_head` are int4 as well, the one thing that makes this artifact different.
 
-### On this chip
+### On this chip (2026-09-29)
 
-Not yet measured. The same checkpoint on one Tesla T4 (vLLM 0.29.0, from the model card) loads in
-2.86 GiB against 6.33 GiB for the `-text` build and decodes 34% faster, because `lm_head` runs as
-an int4 linear. The E2B W4A16 repack on v5e was slightly slower than bf16 while its embeddings
-stayed bf16 (`../tpu-vllm-v5e1-2b-w8a8/README.md`); here they are int4 too.
+One `v5litepod-1`, runner `../jev-tpu-v5e1` at `--max-model-len 2048`: weights 2.66 GiB on the chip,
+578,944 KV tokens (1.61x the W4A16 repack's), suite 0.681 against bf16's 0.683 (−0.2, −1.2 to +0.7),
+**150 / 583 / 2,067 output tok/s at 1 / 4 / 16 requests** against bf16's 144 / 560 / 2,008. That
+needs the tables padded to 128 columns (in `patches/lowmem.diff`); unpadded, the lookup read the
+whole table every step and the model decoded at 85 tok/s. The W8A8 + int4-table build of the same
+model runs at 243 / 923 / 3,086 (`../jev-tpu-v5e1/README.md`).
 
 ### Why it needs a patched image
 

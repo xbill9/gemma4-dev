@@ -63,7 +63,7 @@ TOWERS = re.compile(r"^model\.(vision_tower|vision_embedder|embed_vision|audio_t
 KEEP_LINEAR = re.compile(r"(router\.proj|vision_tower\..*|embed_vision\..*)\.weight$")
 
 _DTYPES = {"BF16": (np.uint16, 2), "F16": (np.float16, 2), "F32": (np.float32, 4),
-           "I32": (np.int32, 4), "I64": (np.int64, 8), "U8": (np.uint8, 1)}
+           "I32": (np.int32, 4), "I64": (np.int64, 8), "U8": (np.uint8, 1), "I8": (np.int8, 1)}
 
 
 # ---- bf16 as raw uint16 bits (numpy has no bfloat16) -----------------------

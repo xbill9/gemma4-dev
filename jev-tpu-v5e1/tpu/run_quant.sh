@@ -183,6 +183,8 @@ try_model() {  # try_model <model> <tag> [read|load|both] [override|override-nol
     log "$tag host memory at the end: $(tail -1 $L/$tag.hostmem.txt); kernel OOM lines: $(wc -l < $L/$tag.oom.txt)"
   fi
   kill $memlog 2>/dev/null
+  # Speculative-decoding counters (acceptance) are only in the server log; keep them.
+  docker logs vllm 2>&1 | grep -iE 'spec.?decod|acceptance|draft' > $L/$tag.spec.txt || true
   docker rm -f vllm >/dev/null 2>&1; rm -rf /dev/shm/hf; sync_up
 }
 

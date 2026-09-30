@@ -31,6 +31,55 @@ Next:
 
 Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` or this README, add `patches/` from `gs://aisprint-491218-bucket/jev-tpu-31b/inputs/tp4fix3-54532225.tgz`, name it by content hash, upload to `gs://aisprint-491218-bucket/jev-tpu-v5e1/inputs/`. `tests/` stays out because `run_quant.sh` runs pytest from a `/tests` mount where the scoring tests cannot import `score.py`.
 
+## Every QAT build of E2B, E4B and 12B on one v5e chip (2026-09-29)
+
+Suite (3,880 records) paired record for record against bf16 (E2B on v5e; E4B and 12B on v6e,
+where bf16 fits); output tok/s at 1 / 4 / 16 requests, same flags throughout. Runs:
+`results/2026-09-29-{e2c,e4a,e4b-v5e1b,12b,speed,mtp*}-v5e1*`.
+
+| Model | Build | Weights on chip | Suite (vs bf16, 95% range) | tok/s |
+|---|---|---:|---|---|
+| 12B | emb4 (int4 linears and vocabulary tables) | 6.86 GiB | 0.762 (+0.2, −0.4 to +0.8) | 35 / 127 / 407 |
+| 12B | **W8A8 + int4 embeddings** | 11.31 GiB | **0.761 (+0.1, −0.6 to +0.8)** | **57 / 219 / 675** |
+| E4B | W8A8 | — | 0.727 (−0.4, −1.1 to +0.3) | 119 / 459 / 1,590 |
+| E4B | fp8 | — | 0.733 (+0.2, −0.4 to +1.0) | 99 / 382 / 1,349 |
+| E4B | **W8A8 + int4 embeddings** | — | **0.728 (−0.3, −1.0 to +0.5)** | **133 / 509 / 1,747** |
+| E4B | emb4 | — | not scored | 79 / 308 / 1,019 |
+| E2B | QAT bf16 (`-qat-q4_0-unquantized`) | — | 0.681 (−0.2) | 144 / 560 / 2,007 |
+| E2B | ple4 (int4 per-layer table only) | — | 0.680 (−0.2) | 137 / 533 / 1,910 |
+| E2B | emb4 | 2.66 GiB | 0.681 (−0.2) | 150 / 583 / 2,067 |
+| E2B | **W8A8 + int4 embeddings** | 3.43 GiB | 0.677 (−0.6, −1.5 to +0.4) | **243 / 923 / 3,086** |
+| E2B | fp8 | — | **0.670 (−1.3, −2.2 to −0.3)** | 182 / 703 / 2,453 |
+| E2B | fp8 + int4 embeddings | — | 0.677 (−0.6) | 203 / 781 / 2,644 |
+
+- **W8A8 linears with int4 vocabulary tables is the best build at every size**: the fastest, level
+  with bf16 on the suite, and half the size of W8A8 with bf16 tables. At 12B it is the biggest
+  model this chip serves: 11.31 GiB of weights, compiled with 2.08 GiB free, ready in 781 s. Both
+  12B builds ran with the 40-block KV cap of the earlier 12B run.
+- **fp8 is storage-only on v5e** and is the one build with a measurable accuracy loss (E2B).
+- **The int4 tables must be 128 columns wide.** Gathering more than one row of an int32 table whose
+  rows are not a multiple of 128 reads the whole table: 4.2 ms per step for the E2B per-layer table,
+  flat in the number of ids, against 0.06 ms padded (`tpu/lookup_bench.py`). Unpadded, E2B emb4
+  decoded at 85 tok/s and E4B emb4 ran out of HBM compiling.
+- **The int4 `lm_head` runs through gmm_v2 at 1.7-3.2x the bf16 head** (`tpu/lm_head_bench.py`).
+
+### Speculative decoding (Gemma 4 MTP, 4 draft tokens), E2B
+
+| Target + drafter | 1 req | 4 req | 16 req | Mean acceptance length |
+|---|---:|---:|---:|---:|
+| W8A8, no drafter | 220 | 841 | 2,872 | — |
+| **W8A8 + `google/gemma-4-E2B-it-assistant`** | **395** | 887 | 1,614 | 3.21 |
+| bf16 + `E2B-it-assistant` | 346 | 800 | 1,345 | — |
+| W4A16 repack + `E2B-it-assistant` | 282 | — | 1,275 | 2.49 |
+| bf16 + `-qat-q4_0-unquantized-assistant` | 81 | 320 | 1,149 | 1.97 |
+| W8A8 + `-qat-q4_0-unquantized-assistant` | 99 | 390 | 1,343 | 1.82 |
+
+The drafter gains at one request and loses at 16, where the chip is no longer waiting on memory.
+The QAT assistant is slower than no drafter on every target. The drafter copies the target's bf16
+`embed_tokens`, so it cannot pair with the int4-table builds, and it needs the `gemma4_mtp.py`
+change in `lowmem.diff` to load unquantized beside a quantized target. Load prompts run with
+`ignore_eos`, which may favour acceptance.
+
 ## 12B QAT W4A16 repack on one v5e chip: the model to use here (2026-09-29)
 
 **`2026-09-28-12b3-v5e1`** served [`xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct), the 12B repacked from `google/gemma-4-12B-it-qat-q4_0-unquantized` with `../jev-tpu-31b/repack_q4_0.py` (340,623,360 groups, none off the source grid; card and upload script in `../jev-tpu-31b/hf/12b/`), and `google/gemma-4-12B-it-qat-w4a16-ct` after it on the same chip with the same flags. Suite, paired record for record (`results/2026-09-28-12b3-v5e1-VS-*.md`):
