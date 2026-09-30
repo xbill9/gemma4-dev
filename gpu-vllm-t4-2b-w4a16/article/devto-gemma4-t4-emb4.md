@@ -3,7 +3,7 @@ title: "Gemma 4 on a Tesla T4, Part 3: Int4 Embeddings Serve E2B in 2.86 GiB at 
 published: false
 description: "Google's QAT Gemma 4 E2B keeps its embedding tables in bf16, and on a Tesla T4 they are most of the model. Packing them to int4 on the grid QAT trained them onto cuts model loading from 6.33 to 2.86 GiB, with every greedy test output token-identical, and raises vLLM's output throughput 11-37% over Google's own W4A16 export."
 tags: gemma, vllm, cuda, machinelearning
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/devto-t4-emb4-cover.71f9359a.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/devto-t4-emb4-art.c42232ae.jpg
 ---
 
 This article provides a step by step guide to shrinking Google's quantization-aware-trained (QAT) Gemma 4 E2B to 4-bit weights end to end, embedding tables included, and serving it with vLLM on one Tesla T4 attached to a Compute Engine VM. It compares the result with the bf16 reference and with Google's own W4A16 export on the same card, with the same prompts.
