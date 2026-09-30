@@ -19,4 +19,4 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-30-concurrency-1650ti` | 38 | 0 | 0 | yes |
 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes |
 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes |
-| `2026-09-30-suite-e2b-vs-e4b-1650ti` | 2 | 0 | 0 | **no** |
+| `2026-09-30-suite-e2b-vs-e4b-1650ti` | 8 | 0 | 0 | **no** |
