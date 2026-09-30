@@ -465,9 +465,11 @@ class TestServerCommandMatchesMakefile(unittest.TestCase):
         with patch.object(server, "FLASH_ATTENTION", "1"), \
              patch.object(server, "THREADS", "4"), \
              patch.object(server, "THREADS_BATCH", "8"), \
-             patch.object(server, "PARALLEL_SLOTS", "1"):
+             patch.object(server, "PARALLEL_SLOTS", "1"), \
+             patch.object(server, "REASONING", "off"):
             cmd = server._server_command()
-        for flag, value in (("-fa", "1"), ("-t", "4"), ("-tb", "8"), ("--parallel", "1")):
+        for flag, value in (("-fa", "1"), ("-t", "4"), ("-tb", "8"), ("--parallel", "1"),
+                            ("--reasoning", "off")):
             self.assertEqual(cmd[cmd.index(flag) + 1], value, flag)
 
     def test_context_size_override(self):

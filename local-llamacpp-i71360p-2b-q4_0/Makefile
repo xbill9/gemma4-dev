@@ -84,6 +84,7 @@ serve:
 	  -t $(THREADS) \
 	  -tb $(THREADS_BATCH) \
 	  --parallel $(PARALLEL_SLOTS) \
+	  --reasoning $(REASONING) \
 	  $(if $(filter 1,$(METRICS)),--metrics,)
 
 status:

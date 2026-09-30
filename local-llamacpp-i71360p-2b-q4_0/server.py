@@ -68,6 +68,7 @@ THREADS = os.environ.get("THREADS", "8")
 THREADS_BATCH = os.environ.get("THREADS_BATCH", "8")
 PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
 METRICS = os.environ.get("METRICS", "0")
+REASONING = os.environ.get("REASONING", "off")
 
 # Deliberately not read from the environment. See the module docstring.
 N_GPU_LAYERS = "0"
@@ -283,6 +284,7 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
         "-tb", THREADS_BATCH,
         # llama.cpp splits -c across slots, and its default is more than one.
         "--parallel", PARALLEL_SLOTS,
+        "--reasoning", REASONING,
     ]
     # llama.cpp serves /metrics only when asked; without this it answers 501.
     if METRICS == "1":
