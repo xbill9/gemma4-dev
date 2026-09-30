@@ -228,6 +228,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-cpu-4b-q4_0 | 1 | 1 |
 | local-llamacpp-i71360p-2b-q4_0 | 0 | 2 |
+| local-llamacpp-i71360p-4b-q4_0 | 0 | 0 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
 | local-pytorch-cpu-2b | 0 | 1 |
 | local-vllm-cpu-2b | 0 | 0 |
