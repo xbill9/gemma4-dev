@@ -1,0 +1,14 @@
+Gemma 4 on a Tesla T4, Part 3: Int4 Embeddings Serve E2B in 2.86 GiB at 2.30x bf16
+
+Google's QAT Gemma 4 E2B keeps its embedding tables in bf16, and on a Tesla T4 they are most of the model. Packing them to int4 on the grid QAT trained them onto cuts model loading from 6.33 to 2.86 GiB, with every greedy test output token-identical, and raises vLLM's output throughput 11-37% over Google's own W4A16 export.
+
+What is in it:
+
+- 🟢 Model loading 2.86 GiB against 9.8 GiB for bf16, and 1,099,587 KV tokens against 315,974
+- 🟢 85.28 output tok/s for one 512-token request, 2.30x bf16 and 1.37x Google's QAT W4A16 export
+- 🟢 239.64 tok/s at eight users, 1.46x bf16 and 1.11x the QAT export
+- 🟢 Eight of eight greedy test outputs token-identical to the build with bf16 embeddings
+
+dev.to (Google Developer Experts): https://dev.to/gde/gemma-4-on-a-tesla-t4-part-3-int4-embeddings-serve-e2b-in-286-gib-at-230x-bf16-3kch
+Medium: https://xbill999.medium.com/gemma-4-on-a-tesla-t4-part-3-int4-embeddings-serve-e2b-in-2-86-gib-at-2-30x-bf16-30f927aae097
+Source: https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b-w4a16
