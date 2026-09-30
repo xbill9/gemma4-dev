@@ -1,0 +1,241 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-30-paired-sweep-cpu",
+    "date": "2026-09-30",
+    "source": "local-llamacpp-cpu-4b-q4_0",
+    "notes": "PAIRED A/B, CPU ARM, ABBA. Context sweep at concurrency 1, 4 contexts x 2 output lengths, 3 repeats per pass, TWO passes per arm in ABBA order (CPU, GPU, GPU, CPU) so a linear thermal drift cancels between arms. Each pass started only after a >=120 s cooldown with the CPU package <=50 C and the GPU <=45 C. Figures are the mean of the two passes' per-cell medians; raw min/max span all 6 repeats. BOTH ARMS SERVE THE E4B EXACT Q4_0 GGUF (xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf, SHA-256 5462cc10, 4,215,695,712 B), the first paired run on E4B. Same protocol, harness, prompts, flags and binaries (by sha256) as the E2B pair's 2026-09-29-paired-sweep; the checkpoint is the only planned change. Both arms: llama.cpp f95b0d9, identical flags except -ngl, -t 6 -tb 12. Thinking ON for every request (sweep.py asks for it; server default --reasoning off). Prompt cache verified defeated: 0 of 28,553 prompt tokens cached in every pass. Host: Lenovo Yoga 9 15IMH5, i7-10750H 6C/12T, GTX 1650 Ti Max-Q, one shared thermal envelope; package throttle events rose 115,310 in CPU pass 1, 6,373 in GPU pass 1, 6,980 in GPU pass 2 and 135,858 in CPU pass 2; the package ended the CPU passes at 85 and 88 C. CPU decode drifted -8.1% (median) from pass 1 to pass 2; ABBA cancels it in the ratio. Arm attested from /proc on both passes: device=cpu, exe=/home/xbill/llama.cpp/build-cpu/bin/llama-server, sha256=9c88c7821fcc11a6, model /home/xbill/models/gemma-4-E4B-it-qat-q4_0-exact/gemma-4-E4B-it-q4_0-exact.gguf."
+  },
+  "hardware": {
+    "accelerator": "Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz",
+    "chips": 1,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "6 cores / 12 threads, homogeneous Comet Lake - NO P/E split; SMT siblings pair (0,6)...(5,11). avx2, NO avx_vnni, NO AVX-512. 15 GiB RAM. Lenovo Yoga 9 15IMH5, bare metal. No CPU affinity was set for this run; what that costs is unresolved - the prior llama-bench sweep that put it at 1.61x via E-core stragglers described a hybrid die this machine does not have, and is quarantined. CORRECTED 2026-09-22 (was: 12 cores / 16 threads, hybrid 4P+8E, avx_vnni)."
+    }
+  },
+  "model": {
+    "id": "xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf",
+    "family": "gemma-4",
+    "parameters_b": 7.46,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 8192,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes; sweep.py counts both. Gemma 4 E4B (4.5B effective, 8.0B total; llama.cpp reports 7.46B). Exact rebuild: every weight matrix Q4_0 (both embeddings and per_layer_model_proj included), 2.2 MB of F32 norms otherwise. per_layer_token_embd (1.59 GB, 38% of the file) is TENSOR_READ_LAZY."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b318-f95b0d9",
+    "backend": "CPU (AVX2)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-m",
+      "/home/xbill/models/gemma-4-E4B-it-qat-q4_0-exact/gemma-4-E4B-it-q4_0-exact.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "0",
+      "-c",
+      "8192",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "6",
+      "-tb",
+      "12",
+      "--parallel",
+      "1",
+      "--metrics"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (byte-identical in both arms)",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 6,
+      "notes": "decode-source auto -> stream; llama-server emits no usage.decode_tokens_per_second, so decode is client-side inter-token latency off the SSE stream. Prompts are device-neutral and identical across arms. prompt_mode=unique (per-request nonce first, so the prefix cache cannot hit). 6 = 3 repeats x 2 ABBA passes."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 5.846,
+        "per_stream_tok_per_s": 9.495,
+        "ttft_ms": {
+          "median": 2539.582,
+          "p99": 2942.489
+        },
+        "tpot_ms": {
+          "median": 105.4922
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 8.54,
+          "min": 9.094,
+          "max": 9.905
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 8.017,
+        "per_stream_tok_per_s": 9.311,
+        "ttft_ms": {
+          "median": 2643.62,
+          "p99": 2959.827
+        },
+        "tpot_ms": {
+          "median": 107.5167
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 8.64,
+          "min": 8.942,
+          "max": 9.747
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 2.075,
+        "per_stream_tok_per_s": 9.024,
+        "ttft_ms": {
+          "median": 12393.436,
+          "p99": 14774.455
+        },
+        "tpot_ms": {
+          "median": 111.0211
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 16.77,
+          "min": 7.907,
+          "max": 9.42
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 4.926,
+        "per_stream_tok_per_s": 9.023,
+        "ttft_ms": {
+          "median": 12297.407,
+          "p99": 13169.077
+        },
+        "tpot_ms": {
+          "median": 111.0089
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 9.06,
+          "min": 8.597,
+          "max": 9.415
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 1.183,
+        "per_stream_tok_per_s": 8.838,
+        "ttft_ms": {
+          "median": 23923.283,
+          "p99": 26017.489
+        },
+        "tpot_ms": {
+          "median": 113.3674
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 12.0,
+          "min": 8.172,
+          "max": 9.232
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 3.362,
+        "per_stream_tok_per_s": 8.762,
+        "ttft_ms": {
+          "median": 23982.853,
+          "p99": 26456.219
+        },
+        "tpot_ms": {
+          "median": 114.3817
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 11.24,
+          "min": 8.204,
+          "max": 9.19
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 0.619,
+        "per_stream_tok_per_s": 8.48,
+        "ttft_ms": {
+          "median": 48477.917,
+          "p99": 54261.733
+        },
+        "tpot_ms": {
+          "median": 118.2287
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 21.48,
+          "min": 7.099,
+          "max": 8.92
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 1.974,
+        "per_stream_tok_per_s": 8.287,
+        "ttft_ms": {
+          "median": 50129.227,
+          "p99": 54847.85
+        },
+        "tpot_ms": {
+          "median": 120.8425
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 11.7,
+          "min": 7.646,
+          "max": 8.616
+        }
+      }
+    ]
+  },
+  "memory": {
+    "weights_gib": 2.435,
+    "kv_bytes_per_token": 57344,
+    "notes": "NOT measured on the CPU arm. weights_gib is the file's resident part (everything except the lazy per_layer_token_embd), from the GPU twin's allocation log."
+  }
+}

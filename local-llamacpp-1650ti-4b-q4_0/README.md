@@ -12,6 +12,10 @@ VRAM, with mean KL divergence from bf16 of 0.00103 against Google's 0.0353. Publ
 It fits because the 1.59 GB per-layer embedding table stays in the mmap. See
 `benchmarks/runs/2026-09-30-exact-gguf-e4b-1650ti/REPORT.md`.
 
+**Paired with the CPU arm** [`local-llamacpp-cpu-4b-q4_0`](../local-llamacpp-cpu-4b-q4_0/) on 2026-09-30
+(ABBA, 32/32 cells): GPU **4.20x** decode, **3.84x** prefill, **3.96x** end-to-end. See
+`benchmarks/runs/2026-09-30-paired-sweep-1650ti/REPORT.md`.
+
 | | |
 | --- | --- |
 | Platform | `local` — no control plane; the card is in this machine |

@@ -1,6 +1,6 @@
 """Which binary is answering on the endpoint — measured, not asserted.
 
-THIS RIG IS ONE ARM OF A CONTROL. Its twin, `local-llamacpp-cpu-4b-q4_0`,
+THIS RIG IS ONE ARM OF A CONTROL. Its twin, `local-llamacpp-1650ti-4b-q4_0`,
 serves the same GGUF from the same llama.cpp checkout on the same port, and the
 two are run alternately so that the only difference between their numbers is the
 device. Sharing the port is the point: the endpoint, the harness and the prompts
@@ -36,10 +36,10 @@ import os
 from pathlib import Path
 from typing import Optional
 
-# This rig is the GPU arm. Not configurable: an arm that can be flipped by an env
-# var measures whichever device it happened to find. The CPU twin sets this to
-# "cpu". A test asserts it.
-EXPECTED_DEVICE = "gpu"
+# This rig is the CPU arm. Not configurable, for the same reason `-ngl 0` is not:
+# an arm that can be flipped by an env var measures whichever device it happened
+# to find. The GPU twin sets this to "gpu". A test asserts it.
+EXPECTED_DEVICE = "cpu"
 
 # Substrings that, mapped into a live process, mean work can leave the CPU.
 # Matched against /proc/<pid>/maps, so these are runtime facts.

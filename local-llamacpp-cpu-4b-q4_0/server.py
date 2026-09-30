@@ -1,28 +1,40 @@
-"""Local llama.cpp lifecycle and inference MCP server — GTX 1650 Ti, Gemma 4 E4B q4_0.
+"""Local llama.cpp lifecycle and inference MCP server — CPU only, Gemma 4 E4B q4_0.
 
-THIS IS THE FIRST `local` RIG IN THE TREE, and the shape of it is different from
-every sibling in one way that matters more than any of the code below: there is
-no control plane. The card is in the machine. Nothing here provisions capacity,
-waits for it, discovers an endpoint, or releases anything.
+A `local` rig: there is no control plane. The CPU is in the machine. Nothing here
+provisions capacity, waits for it, discovers an endpoint, or releases anything, so
+the tools that dominate a cloud sibling's server.py — find_tpu,
+create_*_queued_resource, manage_queued_resource, the zone-status skip list —
+are deliberately absent (NAMING.md, "`local` is the absence of a control plane").
 
-So the tools that dominate a sibling's server.py — find_tpu, create_*_queued_resource,
-manage_queued_resource, the zone-status skip list — have no analogue and are
-deliberately absent. If a `find_*` tool ever appears in this file, the rig has the
-wrong name (NAMING.md, "`local` is the absence of a control plane").
+CPU ONLY, AND ENFORCED RATHER THAN CONFIGURED. Retargeted 2026-09-15 from a
+byte-identical copy of local-llamacpp-1650ti-4b-q4_0. `-ngl 0` is hardcoded, the
+child gets an empty CUDA_VISIBLE_DEVICES, and `start_model_server` refuses a
+llama-server binary built with a GPU backend. A CPU number from a process that
+could have offloaded to a GPU is not a CPU number.
 
-What is left is the half that is actually the same everywhere: start the model
-server, check it, ask it something, and report what the hardware is doing.
+MEMORY: per_layer_token_embd (1.32 GB, 50% of the file) is created with
+TENSOR_READ_LAZY in llama.cpp's src/models/gemma4.cpp and served by GET_ROWS out
+of the mmap. On a GPU that decided whether the model fit the card; on a CPU it
+decides how much of the file stays hot in the page cache. --no-mmap breaks the
+mechanism outright either way. See CLAUDE.md.
 
-MEMORY, BECAUSE IT IS THE ONLY REAL CONSTRAINT HERE: the artifact is 2.62 GB on
-disk but only ~1.2 GiB has to be resident, because per_layer_token_embd (1.32 GB,
-50% of the file) is created with TENSOR_READ_LAZY in llama.cpp's
-src/models/gemma4.cpp and served by GET_ROWS out of the mmap. Full offload fits a
-4 GiB card with ~2.3 GiB to spare. Do not "fix" a memory worry by lowering
-N_GPU_LAYERS or passing --no-mmap; the second one breaks the mechanism outright.
-See CLAUDE.md.
+THIS RIG IS ONE ARM OF A CONTROL. `local-llamacpp-1650ti-4b-q4_0` is the other:
+same GGUF, same llama.cpp checkout, same port, same harness, same prompts, run
+alternately so that the device is the only thing that differs. Nothing in an HTTP
+response says which arm answered, so the arm is read off the running process --
+see attest.py, which every status and query path here goes through.
 
-STATUS 2026-09-29: serving the exact Q4_0 GGUF (v2). llama.cpp is rebuilt at f95b0d9
-(Debian sid, gcc 16.2, CUDA 13.4); tpu.env's LLAMA_CPP_COMMIT is authoritative.
+STATUS 2026-09-22: SERVING on llama.cpp f95b0d9, rebuilt from clean after the host
+moved to Debian sid (gcc 16.2, CUDA 13.4). This arm lists no compute devices; the
+GPU arm lists CUDA0.
+
+THE HOST CPU WAS MISIDENTIFIED UNTIL 2026-09-22. This rig documented an i7-1360P
+with a hybrid 4P+8E topology; the machine is a homogeneous 6-core/12-thread
+i7-10750H with no avx_vnni. The 18-cell thread/affinity sweep was interpreted
+through that wrong die and is quarantined -- THREADS/THREADS_BATCH are now derived
+from real topology (6/12) and spot-checked, not swept. The host also throttles hard
+enough that an identical config re-run cold moved 19% on decode, so no absolute
+figure from this rig is quotable without a cooldown protocol.
 """
 
 import asyncio
@@ -57,20 +69,28 @@ LLAMA_SERVER_BIN = os.environ.get("LLAMA_SERVER_BIN", "")
 HOST = os.environ.get("HOST", "127.0.0.1")
 PORT = os.environ.get("PORT", "8080")
 ENDPOINT = os.environ.get("ENDPOINT", f"http://{HOST}:{PORT}")
-N_GPU_LAYERS = os.environ.get("N_GPU_LAYERS", "99")
 CONTEXT_SIZE = os.environ.get("CONTEXT_SIZE", "8192")
 KV_CACHE_TYPE = os.environ.get("KV_CACHE_TYPE", "f16")
 FLASH_ATTENTION = os.environ.get("FLASH_ATTENTION", "1")
-THREADS = os.environ.get("THREADS", "4")
-# Added 2026-09-16 for the control: the CPU twin passes -tb and this arm did not,
-# so the two arms differed by a prefill-thread flag as well as by the device.
-# Prefill runs on the card here, so it should matter little -- "little" is not
-# "identically", and a control does not get to assume which.
-THREADS_BATCH = os.environ.get("THREADS_BATCH", "8")
+# 6 = physical cores, 12 = logical, on this host's i7-10750H. These mirror tpu.env,
+# which is the source of truth; they were 4/8, derived from a 4P+8E die this
+# machine is not. Keep them agreeing with tpu.env.
+THREADS = os.environ.get("THREADS", "6")
+THREADS_BATCH = os.environ.get("THREADS_BATCH", "12")
 PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
 # Thinking on/off/auto for the whole server; tpu.env explains why it is off.
 REASONING = os.environ.get("REASONING", "off")
 METRICS = os.environ.get("METRICS", "0")
+
+# Deliberately not read from the environment. See the module docstring.
+N_GPU_LAYERS = "0"
+
+# ggml backends that would put work on something other than the CPU. A build
+# links one statically (visible to ldd) or ships it as a shared library next to
+# the binary (visible to a directory listing, and dlopen'd at runtime where ldd
+# cannot see it), so both are checked.
+GPU_BACKEND_MARKERS = ("ggml-cuda", "ggml-vulkan", "ggml-sycl", "ggml-hip", "ggml-musa",
+                       "ggml-cann", "ggml-opencl", "ggml-metal", "libcudart", "libcublas")
 
 RUN_DIR = RIG_DIR / "run"
 PID_FILE = RUN_DIR / "llama-server.pid"
@@ -117,13 +137,9 @@ def _read_pid() -> Optional[int]:
     process actually holding the listening socket on PORT.
 
     THE PID FILE ALONE IS NOT ENOUGH, AND IT FAILS IN BOTH DIRECTIONS. It goes
-    stale when a server dies (handled above, since 2026-09-03), and it is simply
-    ABSENT whenever the server was started any other way — which is the normal
-    case here, not an edge one: `make serve` is foreground by design and writes
-    no pid file at all. Before 2026-09-08 that absence was read as "not running",
-    so against a healthy server `model_server_status` returned ❌ and, worse,
-    `stop_model_server` returned "✅ Not running." while the process kept the
-    card. `make status` curls /health directly and disagreed with both.
+    stale when a server dies, and it is simply ABSENT whenever the server was
+    started any other way — which is the normal case here: `make serve` is
+    foreground by design and writes no pid file at all.
     """
     pid = _pidfile_pid()
     if pid is not None:
@@ -134,29 +150,86 @@ def _read_pid() -> Optional[int]:
         return None
 
 
+def _parse_cpulist(text: str) -> list[int]:
+    """Expand a kernel cpulist ("0-7,12") into logical cpu ids."""
+    cpus: list[int] = []
+    for part in text.strip().split(","):
+        if not part:
+            continue
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            cpus.extend(range(int(lo), int(hi) + 1))
+        else:
+            cpus.append(int(part))
+    return cpus
+
+
+def _read_text(path: str) -> str:
+    try:
+        return Path(path).read_text()
+    except OSError:
+        return ""
+
+
+def _cpu_facts() -> dict:
+    """CPU model, SIMD flags, hybrid topology and RAM, read from /proc and /sys."""
+    cpuinfo = _read_text("/proc/cpuinfo")
+    model, flags = "unknown", set()
+    for line in cpuinfo.splitlines():
+        key, _, value = line.partition(":")
+        key = key.strip()
+        if key == "model name" and model == "unknown":
+            model = value.strip()
+        elif key == "flags" and not flags:
+            flags = set(value.split())
+
+    meminfo = {}
+    for line in _read_text("/proc/meminfo").splitlines():
+        key, _, value = line.partition(":")
+        parts = value.split()
+        if parts and parts[0].isdigit():
+            meminfo[key.strip()] = int(parts[0])  # kB
+
+    return {
+        "model": model,
+        "logical": os.cpu_count() or 0,
+        "p_cores": _parse_cpulist(_read_text("/sys/devices/cpu_core/cpus")),
+        "e_cores": _parse_cpulist(_read_text("/sys/devices/cpu_atom/cpus")),
+        "simd": sorted(f for f in flags if f.startswith(("avx", "amx"))),
+        "mem_total_gib": meminfo.get("MemTotal", 0) / 2**20,
+        "mem_available_gib": meminfo.get("MemAvailable", 0) / 2**20,
+    }
+
+
 @mcp.tool()
-async def gpu_status() -> str:
-    """Report the local GPU: name, compute capability, VRAM total/used/free, driver."""
-    rc, out, err = await run_command([
-        "nvidia-smi",
-        "--query-gpu=name,compute_cap,memory.total,memory.used,memory.free,driver_version",
-        "--format=csv,noheader",
-    ], timeout=30)
-    if rc != 0:
-        return f"❌ nvidia-smi failed (rc={rc}): {err.strip() or out.strip()}"
-
-    line = out.strip()
-    body = [f"📡 **GPU** — `{RIG_NAME}`", "", f"```\n{line}\n```", ""]
-
-    # sm_75 is shared with the T4 rigs and the cards are NOT equivalent: the T4 is
-    # TU104 and has tensor cores, TU116/TU117 has none. Say so at the point of use
-    # rather than hoping the reader checks CLAUDE.md.
-    if "1650" in line or "1660" in line:
-        body.append(
-            "⚠️  GTX 16-series (TU116/TU117): compute capability 7.5 but **no tensor "
-            "cores**. Do not compare throughput against the T4-based `g4dn`/`g5g` "
-            "rigs on the strength of a matching compute capability."
-        )
+async def cpu_status() -> str:
+    """Report the local CPU: model, hybrid P/E topology, SIMD flags, RAM total/available."""
+    facts = _cpu_facts()
+    body = [
+        f"📡 **CPU** — `{RIG_NAME}`",
+        "",
+        f"- **Model:** {facts['model']}",
+        f"- **Logical CPUs:** {facts['logical']}",
+    ]
+    if facts["p_cores"] or facts["e_cores"]:
+        body.append(f"- **Hybrid:** {len(facts['p_cores'])} P-core threads, "
+                    f"{len(facts['e_cores'])} E-core threads")
+    body += [
+        f"- **SIMD:** {' '.join(facts['simd']) or 'none reported'}",
+        f"- **RAM:** {facts['mem_available_gib']:.2f} GiB available of {facts['mem_total_gib']:.2f} GiB",
+        f"- **Threads configured:** decode `-t {THREADS}`, prefill `-tb {THREADS_BATCH}` "
+        f"(DERIVED from this host's topology — physical cores for decode, logical for "
+        f"prefill — and spot-checked 2026-09-22, NOT swept)",
+        "- **CPU affinity:** not set. The 2026-09-16 sweep that called it the largest "
+        "lever is QUARANTINED: it described a 4P+8E die this machine is not. Whether "
+        "pinning helps here is open.",
+        "- **Measurement health:** this host throttles hard, and an identical config "
+        "re-run cold moved 19% on decode. Run-to-run drift exceeds every lever measured "
+        "so far — no absolute t/s from this rig is quotable without a cooldown protocol.",
+    ]
+    if not any(f.startswith("avx512") for f in facts["simd"]):
+        body += ["", "⚠️  No AVX-512. llama.cpp takes its AVX2 kernels here; do not compare "
+                     "against a number from an AVX-512 host on the strength of the same build flags."]
     return "\n".join(body)
 
 
@@ -167,7 +240,7 @@ async def model_info() -> str:
     if path is None:
         return "❌ MODEL_PATH is unset. It is set in `tpu.env`, which is the source of truth."
     if not path.exists():
-        return f"❌ Model file not found: `{path}`\n\nSet `MODEL_PATH` in `tpu.env`."
+        return f"❌ Model file not found: `{path}`\n\nRun `make download`, or set `MODEL_PATH` in `tpu.env`."
 
     size_gb = path.stat().st_size / 1e9
     return (
@@ -178,26 +251,47 @@ async def model_info() -> str:
         f"- **Quantization:** every weight matrix is Q4_0, embeddings included — the exact "
         f"rebuild of Google's GGUF on the QAT grid (v2, 2026-09-29). Only 1.1 MB of F32 "
         f"norms is stored otherwise.\n"
-        f"- **Resident on GPU:** 1223.91 MiB of weights (measured). `per_layer_token_embd` "
-        f"(1.32 GB, 50% of the file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out "
-        f"of the mmap.\n\n"
+        f"- **Touched every token:** ~1.2 GiB. `per_layer_token_embd` (1.32 GB, 50% of the "
+        f"file) is `TENSOR_READ_LAZY` and is served by GET_ROWS out of the mmap, a few rows "
+        f"per token.\n\n"
         f"Run `inspect_gguf.py` to re-derive the split from the artifact rather than "
         f"trusting these numbers."
     )
 
 
+async def _gpu_backends(binary: str) -> list[str]:
+    """GPU ggml backends a llama-server binary would load, from its directory and ldd."""
+    found: set[str] = set()
+    bin_dir = Path(binary).resolve().parent
+    try:
+        for entry in bin_dir.iterdir():
+            found.update(m for m in GPU_BACKEND_MARKERS if m in entry.name)
+    except OSError:
+        pass
+    rc, out, _ = await run_command(["ldd", binary], timeout=30)
+    if rc == 0:
+        found.update(m for m in GPU_BACKEND_MARKERS if m in out)
+    return sorted(found)
+
+
+def _server_env() -> dict[str, str]:
+    """The child environment: this process's, with every CUDA device hidden."""
+    return {**os.environ, "CUDA_VISIBLE_DEVICES": ""}
+
+
 def _server_command(context_size: Optional[str] = None) -> list[str]:
     """The llama-server argv. Must carry the same flags as `make serve`.
 
-    A test enforces that parity: on 2026-09-10 this list lacked -fa, -t and
-    --parallel and the MCP-started server came up with 4 slots and 6 threads.
+    A test enforces that parity: on 2026-09-10 the GPU sibling's list lacked -fa,
+    -t and --parallel and the MCP-started server came up with 4 slots and 6
+    threads.
     """
     cmd = [
         LLAMA_SERVER_BIN,
         "-m", MODEL_PATH,
         "--host", HOST,
         "--port", str(PORT),
-        "-ngl", str(N_GPU_LAYERS),
+        "-ngl", N_GPU_LAYERS,
         "-c", str(context_size or CONTEXT_SIZE),
         "-ctk", KV_CACHE_TYPE,
         "-ctv", KV_CACHE_TYPE,
@@ -209,13 +303,9 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
         "--reasoning", REASONING,
     ]
     # llama.cpp serves /metrics only when asked; without this it answers 501.
-    # Operational visibility only — see tpu.env, METRICS, for why it must not
-    # become the benchmark decode source.
     if METRICS == "1":
         cmd.append("--metrics")
-    # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
-    # disabling it forces the 1.32 GB per-layer embedding tensor to be
-    # materialised and turns a comfortable fit into an OOM.
+    # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now".
     return cmd
 
 
@@ -241,22 +331,30 @@ def _spawn_detached(cmd: list[str]) -> int:
     with open(LOG_FILE, "ab") as log:
         proc = subprocess.Popen(
             cmd, stdout=log, stderr=log, stdin=subprocess.DEVNULL,
-            start_new_session=True,
+            start_new_session=True, env=_server_env(),
         )
     return proc.pid
 
 
 @mcp.tool()
 async def start_model_server(context_size: Optional[str] = None) -> str:
-    """Start llama-server on the local GPU. No-op if it is already running."""
+    """Start llama-server on the local CPU. No-op if it is already running."""
     if not LLAMA_SERVER_BIN or not Path(LLAMA_SERVER_BIN).exists():
-        return f"❌ llama-server not found at `{LLAMA_SERVER_BIN}`. Set `LLAMA_SERVER_BIN` in `tpu.env`."
+        return (f"❌ llama-server not found at `{LLAMA_SERVER_BIN}`. Run `make build`, "
+                f"or set `LLAMA_SERVER_BIN` in `tpu.env`.")
     if not MODEL_PATH or not Path(MODEL_PATH).exists():
-        return f"❌ Model not found at `{MODEL_PATH}`. Set `MODEL_PATH` in `tpu.env`."
+        return f"❌ Model not found at `{MODEL_PATH}`. Run `make download`, or set `MODEL_PATH` in `tpu.env`."
 
     existing = _read_pid()
     if existing is not None:
         return f"✅ Already running (pid {existing}) at {ENDPOINT}. Use `stop_model_server` first to restart."
+
+    backends = await _gpu_backends(LLAMA_SERVER_BIN)
+    if backends:
+        return (
+            f"❌ `{LLAMA_SERVER_BIN}` is a GPU build ({', '.join(backends)}). This rig is CPU only. "
+            f"Point `LLAMA_SERVER_BIN` at a `GGML_CUDA=OFF` build — `make build` makes one."
+        )
 
     RUN_DIR.mkdir(exist_ok=True)
     cmd = _server_command(context_size)
@@ -276,10 +374,8 @@ async def stop_model_server() -> str:
     if pid is None:
         PID_FILE.unlink(missing_ok=True)
         return "✅ Not running."
-    # `_read_pid` now also finds a server this process did not start, so this
-    # stops a `make serve` too. It used to return "✅ Not running." at a live
-    # process holding the card — a success message for a teardown that did not
-    # happen, which is the worse half of the 2026-09-08 pid-file bug.
+    # `_read_pid` also finds a server this process did not start, so this stops
+    # a `make serve` too.
     discovered = _pidfile_pid() is None
     try:
         os.kill(pid, signal.SIGTERM)
@@ -287,16 +383,20 @@ async def stop_model_server() -> str:
         return f"❌ Could not signal pid {pid}: {exc}"
     PID_FILE.unlink(missing_ok=True)
     origin = f" — found on port {PORT}, not started through this server" if discovered else ""
-    return f"✅ Sent SIGTERM to llama-server (pid {pid}){origin}. VRAM is released on exit."
+    return f"✅ Sent SIGTERM to llama-server (pid {pid}){origin}. Memory is released on exit."
 
 
 @mcp.tool()
 async def model_server_status() -> str:
     """Check whether llama-server is up, and whether the process serving is THIS arm."""
-    # /health DECIDES, the pid annotates. The endpoint is a known literal here
-    # rather than the end of a QR -> node -> external IP chain, so probing it
-    # costs nothing and it is the actual claim this tool makes. Gating on the pid
-    # first is what made this return ❌ against a healthy server on 2026-09-08.
+    # /health DECIDES whether something is up. Gating on the pid first is what
+    # made the GPU sibling return ❌ against a healthy server on 2026-09-08.
+    #
+    # BUT UP IS NOT THE SAME QUESTION AS OURS. The GPU twin serves the same model
+    # on this same port, and until 2026-09-16 this tool answered ✅ against it --
+    # annotating "not started through this server" while still leading with the
+    # tick. In a control that is the whole failure mode, so the device now
+    # decides the prefix.
     pid = _read_pid()
     if pid is None:
         who = "pid unknown"
@@ -305,9 +405,6 @@ async def model_server_status() -> str:
     else:
         who = f"pid {pid}, found on port {PORT} — not started through this server, so `{LOG_FILE}` may not be its log"
 
-    # UP IS NOT THE SAME QUESTION AS OURS. The CPU twin serves the same model on
-    # this same port -- that shared endpoint is what makes the two comparable --
-    # so the device, read off the live process, decides the prefix.
     try:
         att = attest_port(int(PORT))
     except ValueError:
@@ -347,14 +444,15 @@ async def query_model(prompt: str, max_tokens: int = 1024) -> str:
 
     GEMMA 4 IS A REASONING MODEL AND THIS IS THE SECOND WAY TO GET AN EMPTY
     STRING HERE. llama.cpp routes the thinking block to `reasoning_content` and
-    leaves `content` empty until it closes. MEASURED 2026-09-03: "Name three TPU
-    generations" spent 1274 characters reasoning before writing 22 characters of
-    answer, so at max_tokens=64 the reply is `finish_reason: length` with an
-    EMPTY content and a truncated thought. That reads as a broken deploy and is
-    not one — hence the 1024 default, and the explicit report below.
+    leaves `content` empty until it closes. MEASURED 2026-09-03 on the GPU
+    sibling: "Name three TPU generations" spent 1274 characters reasoning before
+    22 characters of answer. Hence the 1024 default and the explicit report below.
+
+    The 900 s timeout is sized for a CPU, not measured on one: 1024 tokens of
+    thinking at a single-digit decode rate is minutes, not seconds.
     """
-    # The CPU twin serves the same model on this same port, so "did I get a reply"
-    # does not establish which device produced it.
+    # The twin serves the same model on this same port, so "did I get a reply"
+    # does not establish which device produced it. Attest before spending 900 s.
     try:
         wrong_arm = mismatch(attest_port(int(PORT)))
     except ValueError:
@@ -369,7 +467,7 @@ async def query_model(prompt: str, max_tokens: int = 1024) -> str:
         "max_tokens": max_tokens,
     }
     try:
-        async with httpx.AsyncClient(timeout=180) as client:
+        async with httpx.AsyncClient(timeout=900) as client:
             resp = await client.post(f"{ENDPOINT}/v1/chat/completions", json=payload)
         if resp.status_code != 200:
             return f"❌ {resp.status_code} from {ENDPOINT}: {resp.text[:500]}"
@@ -410,7 +508,7 @@ async def query_model(prompt: str, max_tokens: int = 1024) -> str:
 async def attest_arm() -> str:
     """Report which binary is answering on the endpoint, read from /proc — not from config.
 
-    The control's one silent failure: this rig and `local-llamacpp-cpu-4b-q4_0`
+    The control's one silent failure: this rig and `local-llamacpp-1650ti-4b-q4_0`
     serve the same GGUF on the same port, and an HTTP response says nothing about
     which device produced it. Everything below is read off the live process, so a
     disagreement between `tpu.env` and reality shows up rather than being assumed
@@ -453,7 +551,7 @@ async def attest_arm() -> str:
 async def get_help() -> str:
     """List the tools this rig exposes."""
     tools = await mcp.list_tools()
-    lines = [f"📡 **{MCP_SERVER_NAME}** — local llama.cpp rig, GTX 1650 Ti, Gemma 4 E4B q4_0", ""]
+    lines = [f"📡 **{MCP_SERVER_NAME}** — local llama.cpp rig, CPU only, Gemma 4 E4B q4_0", ""]
     for tool in tools:
         lines.append(f"- **{tool.name}** — {(tool.description or '').splitlines()[0]}")
     lines += [

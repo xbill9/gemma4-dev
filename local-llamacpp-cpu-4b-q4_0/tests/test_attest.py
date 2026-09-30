@@ -1,7 +1,7 @@
 """Offline unit tests for arm attestation.
 
 attest.py answers one question — WHICH BINARY IS ANSWERING ON THE PORT — and it
-exists because this rig and `local-llamacpp-cpu-4b-q4_0` are two arms of a
+exists because this rig and `local-llamacpp-1650ti-4b-q4_0` are two arms of a
 control that deliberately share one endpoint. Nothing here touches a real
 process: /proc is faked.
 """
@@ -29,10 +29,10 @@ GPU_MAPS = CPU_MAPS + (
 
 
 class TestExpectedDevice(unittest.TestCase):
-    def test_this_rig_is_the_gpu_arm(self):
-        """Not configurable: an arm that can be flipped by an env var measures
-        whichever device it happened to find."""
-        self.assertEqual(attest.EXPECTED_DEVICE, "gpu")
+    def test_this_rig_is_the_cpu_arm(self):
+        """Not configurable, for the same reason -ngl 0 is not: an arm that can be
+        flipped by an env var measures whichever device it happened to find."""
+        self.assertEqual(attest.EXPECTED_DEVICE, "cpu")
 
     def test_expected_device_is_not_read_from_the_environment(self):
         src = (RIG_DIR / "attest.py").read_text()
@@ -98,11 +98,11 @@ class TestDeviceVerdict(unittest.TestCase):
         self.assertEqual(att["n_gpu_layers"], 99)
         self.assertIsNone(attest.mismatch(att, "gpu"))
 
-    def test_cpu_arm_is_a_mismatch_for_this_rig(self):
-        att = self._attest(CPU_MAPS, ["llama-server", "-ngl", "0"])
+    def test_gpu_arm_is_a_mismatch_for_this_rig(self):
+        att = self._attest(GPU_MAPS, ["llama-server", "-ngl", "99"])
         why = attest.mismatch(att, attest.EXPECTED_DEVICE)
         self.assertIsNotNone(why)
-        self.assertIn("cpu", why)
+        self.assertIn("gpu", why)
 
     def test_cuda_build_with_ngl_zero_is_mixed_not_cpu(self):
         """The case the rig's -ngl 0 alone would not catch: the device is
@@ -128,7 +128,7 @@ class TestNothingServing(unittest.TestCase):
             att = attest.attest_port(8080)
         self.assertFalse(att["serving"])
         self.assertEqual(att["device"], "none")
-        self.assertIn("nothing is serving", attest.mismatch(att, "gpu"))
+        self.assertIn("nothing is serving", attest.mismatch(att, "cpu"))
 
     def test_expected_any_never_mismatches(self):
         with patch.object(attest, "pid_owning_port", return_value=None):

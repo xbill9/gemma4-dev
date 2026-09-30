@@ -1,0 +1,243 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-09-30-paired-sweep-1650ti",
+    "date": "2026-09-30",
+    "source": "local-llamacpp-1650ti-4b-q4_0",
+    "notes": "PAIRED A/B, GPU ARM, ABBA. Context sweep at concurrency 1, 4 contexts x 2 output lengths, 3 repeats per pass, TWO passes per arm in ABBA order (CPU, GPU, GPU, CPU) so a linear thermal drift cancels between arms. Each pass started only after a >=120 s cooldown with the CPU package <=50 C and the GPU <=45 C. Figures are the mean of the two passes' per-cell medians; raw min/max span all 6 repeats. BOTH ARMS SERVE THE E4B EXACT Q4_0 GGUF (xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf, SHA-256 5462cc10, 4,215,695,712 B), the first paired run on E4B. Same protocol, harness, prompts, flags and binaries (by sha256) as the E2B pair's 2026-09-29-paired-sweep; the checkpoint is the only planned change. Both arms: llama.cpp f95b0d9, identical flags except -ngl, -t 6 -tb 12. Thinking ON for every request (sweep.py asks for it; server default --reasoning off). Prompt cache verified defeated: 0 of 28,553 prompt tokens cached in every pass. Host: Lenovo Yoga 9 15IMH5, i7-10750H 6C/12T, GTX 1650 Ti Max-Q, one shared thermal envelope; package throttle events rose 115,310 in CPU pass 1, 6,373 in GPU pass 1, 6,980 in GPU pass 2 and 135,858 in CPU pass 2; the package ended the CPU passes at 85 and 88 C. CPU decode drifted -8.1% (median) from pass 1 to pass 2; ABBA cancels it in the ratio. Arm attested from /proc on both passes: device=gpu, exe=/home/xbill/llama.cpp/build/bin/llama-server, sha256=9f2a8b0b6ed5365d, model /home/xbill/models/gemma-4-E4B-it-qat-q4_0-exact/gemma-4-E4B-it-q4_0-exact.gguf."
+  },
+  "hardware": {
+    "accelerator": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+    "chips": 1,
+    "hbm_gb_per_chip": 4.294,
+    "machine_type": "local workstation",
+    "host": {
+      "notes": "TU117, compute capability 7.5, NO tensor cores. Max-Q thermal envelope shared with the CPU package."
+    }
+  },
+  "model": {
+    "id": "xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf",
+    "family": "gemma-4",
+    "parameters_b": 7.46,
+    "quantization": "q4_0",
+    "kv_cache_dtype": "f16",
+    "max_model_len": 8192,
+    "architecture_notes": "Reasoning model: tokens arrive as reasoning_content until the thinking block closes; sweep.py counts both. Gemma 4 E4B (4.5B effective, 8.0B total; llama.cpp reports 7.46B). Exact rebuild: every weight matrix Q4_0 (both embeddings and per_layer_model_proj included), 2.2 MB of F32 norms otherwise. per_layer_token_embd (1.59 GB, 38% of the file) is TENSOR_READ_LAZY."
+  },
+  "software": {
+    "engine": "llama.cpp",
+    "version": "b318-f95b0d9",
+    "backend": "CUDA",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "-m",
+      "/home/xbill/models/gemma-4-E4B-it-qat-q4_0-exact/gemma-4-E4B-it-q4_0-exact.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "99",
+      "-c",
+      "8192",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "6",
+      "-tb",
+      "12",
+      "--parallel",
+      "1",
+      "--metrics"
+    ]
+  },
+  "throughput": {
+    "workload": {
+      "tool": "sweep.py (byte-identical in both arms)",
+      "input_len": 512,
+      "output_len": 128,
+      "runs_per_point": 6,
+      "notes": "decode-source auto -> stream; llama-server emits no usage.decode_tokens_per_second, so decode is client-side inter-token latency off the SSE stream. Prompts are device-neutral and identical across arms. prompt_mode=unique (per-request nonce first, so the prefix cache cannot hit). 6 = 3 repeats x 2 ABBA passes."
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 22.242,
+        "per_stream_tok_per_s": 39.561,
+        "ttft_ms": {
+          "median": 730.732,
+          "p99": 732.222
+        },
+        "tpot_ms": {
+          "median": 25.2773
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 0.89,
+          "min": 39.448,
+          "max": 39.798
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 94,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 32.718,
+        "per_stream_tok_per_s": 39.047,
+        "ttft_ms": {
+          "median": 737.424,
+          "p99": 740.534
+        },
+        "tpot_ms": {
+          "median": 25.6107
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 0.93,
+          "min": 38.876,
+          "max": 39.24
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 8.21,
+        "per_stream_tok_per_s": 37.905,
+        "ttft_ms": {
+          "median": 3158.774,
+          "p99": 3171.278
+        },
+        "tpot_ms": {
+          "median": 26.3817
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 0.36,
+          "min": 37.841,
+          "max": 37.977
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 516,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 19.835,
+        "per_stream_tok_per_s": 37.787,
+        "ttft_ms": {
+          "median": 3170.437,
+          "p99": 3177.848
+        },
+        "tpot_ms": {
+          "median": 26.4645
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 2.63,
+          "min": 36.885,
+          "max": 37.877
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 4.538,
+        "per_stream_tok_per_s": 37.159,
+        "ttft_ms": {
+          "median": 6298.005,
+          "p99": 6300.896
+        },
+        "tpot_ms": {
+          "median": 26.9117
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 0.68,
+          "min": 37.081,
+          "max": 37.335
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 998,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 13.308,
+        "per_stream_tok_per_s": 37.336,
+        "ttft_ms": {
+          "median": 6295.769,
+          "p99": 6298.855
+        },
+        "tpot_ms": {
+          "median": 26.7841
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 0.9,
+          "min": 37.138,
+          "max": 37.473
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 32,
+        "status": "ok",
+        "output_tok_per_s": 2.444,
+        "per_stream_tok_per_s": 37.014,
+        "ttft_ms": {
+          "median": 12338.557,
+          "p99": 12342.499
+        },
+        "tpot_ms": {
+          "median": 27.0166
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 0.65,
+          "min": 36.875,
+          "max": 37.118
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 1959,
+        "output_len": 128,
+        "status": "ok",
+        "output_tok_per_s": 8.154,
+        "per_stream_tok_per_s": 36.965,
+        "ttft_ms": {
+          "median": 12340.919,
+          "p99": 12355.902
+        },
+        "tpot_ms": {
+          "median": 27.053
+        },
+        "raw": {
+          "repeats": 6,
+          "spread_pct": 0.44,
+          "min": 36.897,
+          "max": 37.059
+        }
+      }
+    ]
+  },
+  "memory": {
+    "usable_hbm_gib": 3.585,
+    "weights_gib": 2.435,
+    "kv_bytes_per_token": 57344,
+    "notes": "MEASURED 2026-09-30 on this file from llama-server's -lv 4 allocation log with the serve flags: CUDA0 model 2493.32 MiB, KV 128 + 40 MiB (4 full layers x 8192 cells, 20 sliding layers capped at the 1024-cell window), compute 110.02 MiB; nvidia-smi 2848 MiB of 4096, 3671 MiB free before load. kv_bytes_per_token is the geometry figure from MODELS.md (56 KiB) and over-predicts llama.cpp's allocation, which grows at 16 KiB/token."
+  }
+}

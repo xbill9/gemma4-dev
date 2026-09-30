@@ -51,8 +51,16 @@ before attributing a number to either rig.
 - Absolute: **tg128 ~39.8 tok/s, pp512 ~173 t/s** — about 0.49x E2B's on this card. Rough ratio, different
   sessions.
 
+## Paired sweep with the CPU arm — MEASURED 2026-09-30
+
+`benchmarks/runs/2026-09-30-paired-sweep-1650ti`: the E2B pair's ABBA protocol against
+`local-llamacpp-cpu-4b-q4_0` (same file, same commit, `-ngl 0`). 32/32 cells. GPU **4.20x** decode,
+**3.84x** prefill, **3.96x** end-to-end — within a few percent of the E2B pair's 4.37 / 3.80 / 3.99.
+E4B runs at **~0.49x E2B's decode on the GPU and ~0.51x on the CPU**, matching the 2.0x resident bytes.
+The CPU arm drifted −8% between its passes, so a single-order run misstates the ratio by 4–5% here.
+
 ## Not known yet
 
-KLD on CUDA, any `sweep.py` or concurrency run,
-thinking-on behaviour, and anything above 8192 context. `DEMO.md` did not come across: the rehearsed
+KLD on CUDA, any concurrency run, the quality of thinking-on output (the paired sweep ran thinking on but measured only speed),
+and anything above 8192 context. `DEMO.md` did not come across: the rehearsed
 demo is the E2B rig's.
