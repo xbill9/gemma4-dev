@@ -284,7 +284,7 @@ loading, KV sizing, or both.
 | Per-layer embeddings (PLE) | yes | yes | **no** | **no** (`hidden_size_per_layer_input=0`) | **no** |
 | `use_double_wide_mlp` | true | — | **false** | **false** | **false** |
 | Dense or sparse | dense | dense | dense | **sparse MoE** | dense |
-| **KV per token, bf16** | **18 KiB** | **56 KiB** | see caution below | ~cheap (see §26B) | — |
+| **KV per token, bf16** | **18 KiB** | **56 KiB** | **336 KiB** allocated on vLLM TPU (see §12B) | ~cheap (see §26B) | — |
 
 Dashes are unrecorded, not "same as E2B". **`num_kv_shared_layers=0` on every size above E4B means the
 KV-sharing logic above simply does not apply to them** — every layer owns its KV.
@@ -406,6 +406,22 @@ vLLM's JAX path all of them need `--hf_overrides '{"architectures": ["Gemma4ForC
 > that to a *window-capped* sliding-layer figure as though both were uncapped rates. The stated
 > 336 KiB/token inherits both errors. Derive KV from this file and confirm against a boot allocation
 > log.
+
+**12B KV on vLLM's TPU path: 336 KiB/token, confirmed against boot logs** (2026-09-30, one v5e chip,
+`tpu-vllm-v5e1-12b-*/benchmarks/runs/2026-09-30-12bctx*`). From the table above, bf16:
+
+```
+40 sliding layers x 8 KV heads x 256 x (K+V) x 2 B  = 320 KiB/token   (unwindowed: tpu_inference turns windows off)
+ 8 full layers    x 1 KV head  x 512 x  K    x 2 B  =   8 KiB/token   if V is not stored
+                                            x (K+V)  =  16 KiB/token   if it is
+```
+
+The boot logs bound the allocation at 333-338 KiB/token (5.11 GiB held 62 blocks of 256 tokens, 4.48
+GiB held 54), which admits 336 and excludes 328: **the allocator stores a V cache for the eight
+`attention_k_eq_v` layers even though V is K.** So 336 is the number to size 12B against on this stack,
+and the rig figure above is right for the allocation, though not for the geometry it claimed. On one
+v5e chip that is 9,728 tokens beside W8A8 + int4 tables and 13,824 beside the int4 build
+(`QUANTIZATION.md`).
 
 ## 26B A4B — sparse MoE, and the odd one out twice over
 

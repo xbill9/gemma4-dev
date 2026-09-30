@@ -86,8 +86,10 @@ before this held 5,120 KV tokens (`--num-gpu-blocks-override 40`). Runs `results
 - **emb4 is bound by its compiled program**, which needs a 3.92 GB allocation on top of weights and KV,
   the same figure as the 12B W4A16 repack. At 0.76 (15,872 tokens) it found 3.73 GB free and failed;
   0.72 leaves 0.46 GiB to spare.
-- **fp8 KV cache does not start on this stack**: vLLM sized 1,185 and 2,840 blocks for the two
-  builds and then refused the 16,384-token request.
+- **fp8 KV cache is untested here without a block override.** Both fp8 runs (`12bctx2`, `12bctx4`)
+  set `--num-gpu-blocks-override` to 128 and 176 blocks of 16 tokens, below the 16,384-token
+  `--max-model-len` they started with, so vLLM refused them (2.75 GiB needed against 0.34 and 0.47 GiB).
+  Before the override it had sized 1,185 and 2,840 blocks.
 
 ### Speculative decoding (Gemma 4 MTP, 4 draft tokens), E2B
 

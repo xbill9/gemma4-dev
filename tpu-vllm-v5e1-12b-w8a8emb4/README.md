@@ -31,7 +31,8 @@ One `v5litepod-1`, runner `../jev-tpu-v5e1`; runs `2026-09-29-12b-v5e1` and `202
 
 12B KV costs 336 KiB per token (boot logs bound it at 333–338; the config geometry with V stored for the eight `attention_k_eq_v` layers). The weights bound the KV cache here: at 0.92 vLLM sizes 38
 256-token blocks and the compiled program fits in the HBM left outside the cap. An fp8 KV cache
-does not start on this stack. Peak host memory while compiling was 13.8 GB, with no swap used.
+is untested: the one attempt also set a block override too small for its 16,384-token context, and
+vLLM refused it for that. Peak host memory while compiling was 13.8 GB, with no swap used.
 
 ### Why it needs a patched image
 

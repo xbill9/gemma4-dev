@@ -118,6 +118,27 @@ vllm-project/tpu-inference#3653 picks tiles that exceed it: 117.62M for a 12B la
 at 128 tokens, which stopped 12B W4A16 from serving, and 115.92M for 31B `down` at 64 tokens in the
 matmul bench. HBM headroom does not help; the tile has to shrink.
 
+**int32 gather trap: a packed table's rows must be a multiple of 128 wide.** Gathering two or more rows
+from an int32 table whose row width is not a multiple of 128 reads the whole table, so a step costs the
+same at 4 ids as at 512. A single-row gather is unaffected. Measured 2026-09-29 on `v5litepod-1`, JAX
+0.11.0, int4 tables packed eight to an int32 (`jev-tpu-v5e1/tpu/lookup_bench.py`; output in
+`tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-09-29-lookup-v5e1/`):
+
+| Table | Unpadded, 4-512 ids | Padded to 128, 4-512 ids | One id, either | Size, unpadded → padded |
+| :--- | ---: | ---: | ---: | ---: |
+| E2B per-layer embeddings | 4.19-4.22 ms | 0.05-0.06 ms | 0.05 ms | 1,260 → 1,344 MiB |
+| E2B `embed_tokens` | 0.87-0.88 ms | 0.05-0.06 ms | 0.05 ms | 216 → 320 MiB |
+| 12B `embed_tokens` | 1.71-1.72 ms | 0.06-0.07 ms | 0.07 ms | 540 → 576 MiB |
+
+Served, the unpadded int4-table builds decoded one request at 85-110 tok/s against 150-243 padded (E2B,
+same chip and flags). Not measured on v6e.
+
+**The int4 `lm_head` through gmm_v2 is 1.7-3.2x the bf16 head, except where it does not compile.** E2B's
+262,144 x 1,536 head on `v5litepod-1` (`jev-tpu-v5e1/tpu/lm_head_bench.py`; output in
+`tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-09-29-lmh-v5e1/`):
+3.21x bf16 at 1 token, 1.87x at 16, 1.68x at 64, relative error 0.32%; at 4 tokens the kernel's tile
+needs 129.07M of VMEM against 128M and fails to compile, the same failure class as the scoped limit above.
+
 ### v6e-1 — 32 GB nominal
 
 Measured on `ct6e-standard-1t` serving E2B under vLLM at 65,536 context. The allocation is recorded in

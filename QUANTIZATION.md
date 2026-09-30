@@ -178,7 +178,8 @@ That list is actively misleading read on its own.
 | compressed-tensors fp8 w8a8 | `layers/jax/quantization/compressed_tensors.py` | yes (needs a pre-quantized ckpt) |
 | compressed-tensors **w4a16 / wNa16** | nowhere on the JAX path in the stock image | **no — `NotImplementedError`**; yes with [#3653](https://github.com/vllm-project/tpu-inference/pull/3653) (merged into `main` 2026-09-27), see "W4A16 on the JAX path" |
 | **mxfp4** (4-bit) | `layers/jax/quantization/mxfp4.py` | **no — MoE-only**, see below |
-| compressed-tensors int8 w8a8, w4a8 fp8, w4a4 nvfp4 | `layers/vllm/.../schemes/` | no — torch path only |
+| compressed-tensors **int8 w8a8** | `layers/vllm/.../schemes/` | no on the stock image; **yes with `jev-tpu-v5e1/patches/lowmem.diff`**, see "int8 W8A8 and int4 vocabulary tables" |
+| compressed-tensors w4a8 fp8, w4a4 nvfp4 | `layers/vllm/.../schemes/` | no — torch path only |
 | AWQ | `layers/vllm/quantization/awq.py` | no — torch path only |
 | GGUF / q4_0 | absent from `QUANTIZATION_METHODS` — **and not a TPU-only gap**, see below | no |
 
@@ -574,6 +575,76 @@ bf16 ulps of the source against 1.50. **The remaining ~26% is the source's own b
 > different sizes and layer geometries from the E2B export the `k_norm` complaint is documented
 > against, so this is corroboration rather than a same-checkpoint reproduction — but the format is
 > demonstrably readable, which leaves the loader as the variable.
+
+### int8 W8A8 and int4 vocabulary tables: measured on one v5e chip
+
+MEASURED 2026-09-29/30 on `v5litepod-1` at `vllm/vllm-tpu@sha256:19a1a052…` with
+`jev-tpu-v5e1/patches/lowmem.diff`, which adds three things to the JAX path: a compressed-tensors
+**int8 W8A8** method (int8 weights per channel, activations quantized per token, v5e's native
+int8 x int8 -> int32), **int4 embedding tables** that stay packed on the chip and unpack only the gathered
+rows, and an **int4 `lm_head`** through gmm_v2. Suite paired record for record against bf16: E2B on the
+same v5e chip, E4B and 12B on one v6e chip because their bf16 builds do not fit v5e. Output tok/s from the
+load test at 1 / 4 / 16 requests, with int4 tables padded to 128 columns (`HARDWARE.md`, "int32 gather
+trap"). Each row's runs are in the rig named `tpu-vllm-v5e1-<size>-<slot 5>`; the slot-5 values are in
+`NAMING.md`.
+
+| Size | Build (slot 5) | Suite (vs bf16, points, 95% range) | Output tok/s at 1 / 4 / 16 |
+| :--- | :--- | :--- | ---: |
+| E2B | bf16 (reference) | 0.683 | 144 / 560 / 2,008 |
+| E2B | `q4_0` (QAT, stored bf16) | 0.681 (−0.2, −1.2 to +0.7) | 144 / 560 / 2,007 |
+| E2B | `q4w4a16ple4` | 0.680 (−0.2, −1.2 to +0.7) | 137 / 533 / 1,910 |
+| E2B | `q4w4a16emb4` | 0.681 (−0.2, −1.2 to +0.7) | 150 / 583 / 2,067 |
+| E2B | `w8a8` (from the QAT weights) | 0.686 (+0.3, −0.7 to +1.3) | 220 / 841 / 2,872 |
+| E2B | `w8a8rtn` (rounded from bf16) | 0.670 (−1.2, −2.0 to −0.4) | 220 / 842 / 2,876 |
+| E2B | **`w8a8emb4`** | 0.677 (−0.6, −1.5 to +0.4) | 243 / 923 / 3,086 |
+| E2B | `fp8` | 0.670 (−1.3, −2.2 to −0.3) | 182 / 702 / 2,453 |
+| E2B | `fp8emb4` | 0.677 (−0.6, −1.6 to +0.4) | 203 / 781 / 2,644 |
+| E4B | `q4w4a16` | 0.729 (−0.2, −0.8 to +0.5) | 75 / 291 / 1,012 |
+| E4B | `q4w4a16emb4` | 0.730 (−0.1, −0.7 to +0.6) | 79 / 308 / 1,064 |
+| E4B | `w8a8` | 0.727 (−0.4, −1.1 to +0.3) | 119 / 459 / 1,590 |
+| E4B | **`w8a8emb4`** | 0.728 (−0.3, −1.0 to +0.5) | 133 / 509 / 1,747 |
+| E4B | `fp8` | 0.733 (+0.2, −0.4 to +1.0) | 99 / 382 / 1,349 |
+| 12B | `q4w4a16` | 0.758 (−0.1, −0.7 to +0.5) | 33 / 127 / 388 |
+| 12B | `q4w4a16emb4` | 0.762 (+0.2, −0.4 to +0.8) | 35 / 127 / 407 |
+| 12B | `w8a8` | 0.757 (−0.2, −1.0 to +0.5) | 53 / 201 / 624 |
+| 12B | **`w8a8emb4`** | 0.761 (+0.1, −0.6 to +0.8) | 57 / 219 / 675 |
+
+- **The source of the int8 values decides accuracy, the int8 activations do not.** `w8a8` and
+  `w8a8rtn` are the same format at the same speed; taken from the QAT weights the build scores 1.5 points
+  higher (+0.5 to +2.6, paired directly), level with bf16, where rounding the bf16 release loses 1.2.
+- **`w8a8emb4` is the fastest build at every size**, 1.7x bf16's output at E2B for one request (243 against
+  144), and level with bf16 on the suite at E4B and 12B. At E2B the int4 tables cost 0.9 points against
+  `w8a8` with bf16 tables (−1.6 to −0.1). 12B `w8a8emb4` is 11.31 GiB of weights, the largest model
+  measured to serve on one v5e chip.
+- **fp8 W8A8 is storage-only here** (`HARDWARE.md`): slower than int8 W8A8 at E2B and E4B, and at E2B the
+  one build with a measurable loss (−1.3). Its int4-table variant scores −0.6 (−1.6 to +0.4).
+- **12B's KV pool is set by what else is on the chip.** At `--max-model-len 8192`: 9,728 tokens beside
+  `w8a8emb4` at `--gpu-memory-utilization 0.92` (bound by its 11.31 GiB of weights), 13,824 beside
+  `q4w4a16emb4` at 0.72 (bound by a 3.92 GB compile allocation; at 0.76 it failed with 3.73 GB free).
+  336 KiB/token (`MODELS.md`, §12B).
+
+### Speculative decoding with Gemma 4's MTP drafters (E2B, v5e)
+
+MEASURED 2026-09-29, same chip and image, `--speculative-config '{"method":"mtp", ..., "num_speculative_tokens":4}'`,
+load test with `ignore_eos` (which may favour acceptance). `lowmem.diff` carries the `gemma4_mtp.py` change
+that lets an unquantized drafter load beside a quantized target. Output tok/s at 1 / 4 / 16 requests, and
+against the same target with no drafter:
+
+| Target | Drafter | tok/s | vs no drafter | Mean acceptance length |
+| :--- | :--- | ---: | ---: | ---: |
+| bf16 | `google/gemma-4-E2B-it-assistant` | 346 / 800 / 1,345 | 2.40x / 1.43x / 0.67x | — |
+| `q4_0` (QAT bf16) | `google/gemma-4-E2B-it-assistant` | 294 / 658 / 1,382 | 2.04x / 1.17x / 0.69x | 2.76 |
+| `w8a8` | `google/gemma-4-E2B-it-assistant` | **395** / 887 / 1,614 | 1.80x / 1.05x / 0.56x | 3.21 |
+| `q4w4a16` | `google/gemma-4-E2B-it-assistant` | 282 / 681 / 1,275 | 2.07x / 1.28x / 0.67x | 2.49 |
+| `q4w4a16ple4` | `google/gemma-4-E2B-it-assistant` | 299 / 664 / 1,276 | 2.19x / 1.25x / 0.67x | 2.65 |
+| bf16 | `…-qat-q4_0-unquantized-assistant` | 81 / 320 / 1,149 | 0.56x / 0.57x / 0.57x | 1.97 |
+| `w8a8` | `…-qat-q4_0-unquantized-assistant` | 99 / 390 / 1,343 | 0.45x / 0.46x / 0.47x | 1.82 |
+| `q4w4a16` | `…-qat-q4_0-unquantized-assistant` | 78 / 307 / 1,074 | 0.57x / 0.58x / 0.56x | 1.95 |
+
+- **The drafter pays at one request and costs at 16**, where the chip is no longer waiting on memory. The
+  fastest single stream measured on this chip is `w8a8` with the `-it-assistant` drafter, 395 tok/s.
+- **The QAT drafter is slower than no drafter on every target**, at every concurrency.
+- **The drafter cannot pair with the int4-table builds**: it copies the target's bf16 `embed_tokens`.
 
 ## The QAT checkpoint formats themselves
 
