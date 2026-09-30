@@ -1,0 +1,298 @@
+Cloud-init v. 26.1-0ubuntu3~26.04.1 running 'init-local' at Wed, 30 Sep 2026 16:09:52 +0000. Up 29.22 seconds.
+Cloud-init v. 26.1-0ubuntu3~26.04.1 running 'init' at Wed, 30 Sep 2026 16:09:55 +0000. Up 32.02 seconds.
+ci-info: ++++++++++++++++++++++++++++++++++++++Net device info+++++++++++++++++++++++++++++++++++++++
+ci-info: +--------+------+-----------------------------+---------------+--------+-------------------+
+ci-info: | Device |  Up  |           Address           |      Mask     | Scope  |     Hw-Address    |
+ci-info: +--------+------+-----------------------------+---------------+--------+-------------------+
+ci-info: |  ens5  | True |         172.31.39.30        | 255.255.240.0 | global | 0a:ff:f9:bf:67:f1 |
+ci-info: |  ens5  | True | fe80::8ff:f9ff:febf:67f1/64 |       .       |  link  | 0a:ff:f9:bf:67:f1 |
+ci-info: |   lo   | True |          127.0.0.1          |   255.0.0.0   |  host  |         .         |
+ci-info: |   lo   | True |           ::1/128           |       .       |  host  |         .         |
+ci-info: +--------+------+-----------------------------+---------------+--------+-------------------+
+ci-info: ++++++++++++++++++++++++++++++Route IPv4 info++++++++++++++++++++++++++++++
+ci-info: +-------+-------------+-------------+-----------------+-----------+-------+
+ci-info: | Route | Destination |   Gateway   |     Genmask     | Interface | Flags |
+ci-info: +-------+-------------+-------------+-----------------+-----------+-------+
+ci-info: |   0   |   0.0.0.0   | 172.31.32.1 |     0.0.0.0     |    ens5   |   UG  |
+ci-info: |   1   |  172.31.0.2 | 172.31.32.1 | 255.255.255.255 |    ens5   |  UGH  |
+ci-info: |   2   | 172.31.32.0 |   0.0.0.0   |  255.255.240.0  |    ens5   |   U   |
+ci-info: |   3   | 172.31.32.1 |   0.0.0.0   | 255.255.255.255 |    ens5   |   UH  |
+ci-info: +-------+-------------+-------------+-----------------+-----------+-------+
+ci-info: +++++++++++++++++++Route IPv6 info+++++++++++++++++++
+ci-info: +-------+-------------+---------+-----------+-------+
+ci-info: | Route | Destination | Gateway | Interface | Flags |
+ci-info: +-------+-------------+---------+-----------+-------+
+ci-info: |   0   |  fe80::/64  |    ::   |    ens5   |   U   |
+ci-info: |   2   |    local    |    ::   |    ens5   |   U   |
+ci-info: |   3   |  multicast  |    ::   |    ens5   |   U   |
+ci-info: +-------+-------------+---------+-----------+-------+
+Cloud-init v. 26.1-0ubuntu3~26.04.1 running 'modules:config' at Wed, 30 Sep 2026 16:09:58 +0000. Up 35.12 seconds.
+Cloud-init v. 26.1-0ubuntu3~26.04.1 running 'modules:final' at Wed, 30 Sep 2026 16:10:23 +0000. Up 60.12 seconds.
++ systemctl enable --now docker
+Synchronizing state of docker.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable docker
++ mkdir -p /opt/vllm-g4dn
+++ date +%s
++ _T0=1790784624
++ stage image-pull-start
+++ date +%s
++ echo '[stage] image-pull-start +0s'
+[stage] image-pull-start +0s
++ docker pull vllm/vllm-openai:v0.30.0
+v0.30.0: Pulling from vllm/vllm-openai
+cf57d2112d89: Pulling fs layer
+0db1731e65c7: Pulling fs layer
+0b3b5bd92824: Pulling fs layer
+7060cfcdc2e7: Pulling fs layer
+c567a87f21d2: Pulling fs layer
+1c8ea55558c7: Pulling fs layer
+e2f3b94fa5cb: Pulling fs layer
+08725c661696: Pulling fs layer
+70f87b6ed43e: Pulling fs layer
+37f38cbce67f: Pulling fs layer
+8d9eafa6ba97: Pulling fs layer
+526d5438c009: Pulling fs layer
+d4819562c6f5: Pulling fs layer
+d6aca52e827f: Pulling fs layer
+72a6c87f05fc: Pulling fs layer
+6eafdbb2831f: Pulling fs layer
+8d3e49ac60ed: Pulling fs layer
+4c9be88c471d: Pulling fs layer
+9de8dd59a787: Pulling fs layer
+c4e0d1789b0e: Pulling fs layer
+b28e8d812378: Pulling fs layer
+469e56fbf4cf: Pulling fs layer
+df21006c3cea: Pulling fs layer
+046662402faa: Pulling fs layer
+0e2088e80f24: Pulling fs layer
+1287aade4630: Pulling fs layer
+e2f3b94fa5cb: Pulling fs layer
+573620a6ecbf: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+8ba2e81f6cfd: Pulling fs layer
+8f7451f008ff: Pulling fs layer
+8fe4c16e900e: Pulling fs layer
+64f463222af7: Pulling fs layer
+ebe179b7baa9: Pulling fs layer
+38df1ab86f60: Pulling fs layer
+51b9a07d42b7: Pulling fs layer
+70f87b6ed43e: Download complete
+0db1731e65c7: Download complete
+c567a87f21d2: Download complete
+cf57d2112d89: Download complete
+37f38cbce67f: Download complete
+e2f3b94fa5cb: Download complete
+08725c661696: Download complete
+8d9eafa6ba97: Download complete
+6eafdbb2831f: Download complete
+0b3b5bd92824: Download complete
+526d5438c009: Download complete
+cf57d2112d89: Pull complete
+c567a87f21d2: Pull complete
+7060cfcdc2e7: Download complete
+8d3e49ac60ed: Download complete
+d6aca52e827f: Download complete
+4c9be88c471d: Download complete
+573620a6ecbf: Download complete
+0b3b5bd92824: Pull complete
+70f87b6ed43e: Pull complete
+0db1731e65c7: Pull complete
+526d5438c009: Pull complete
+c4e0d1789b0e: Download complete
+4f4fb700ef54: Download complete
+9de8dd59a787: Download complete
+df21006c3cea: Download complete
+72a6c87f05fc: Download complete
+046662402faa: Download complete
+8ba2e81f6cfd: Download complete
+8fe4c16e900e: Download complete
+0e2088e80f24: Download complete
+8f7451f008ff: Download complete
+469e56fbf4cf: Download complete
+1287aade4630: Download complete
+469e56fbf4cf: Pull complete
+ebe179b7baa9: Download complete
+38df1ab86f60: Download complete
+64f463222af7: Download complete
+51b9a07d42b7: Download complete
+1c8ea55558c7: Download complete
+b28e8d812378: Download complete
+7060cfcdc2e7: Pull complete
+4f4fb700ef54: Pull complete
+1c8ea55558c7: Pull complete
+8fe4c16e900e: Pull complete
+ebe179b7baa9: Pull complete
+51b9a07d42b7: Pull complete
+e2f3b94fa5cb: Pull complete
+6eafdbb2831f: Pull complete
+37f38cbce67f: Pull complete
+8d9eafa6ba97: Pull complete
+d4819562c6f5: Download complete
+d4819562c6f5: Pull complete
+72a6c87f05fc: Pull complete
+8d3e49ac60ed: Pull complete
+9de8dd59a787: Pull complete
+08725c661696: Pull complete
+046662402faa: Pull complete
+1287aade4630: Pull complete
+573620a6ecbf: Pull complete
+8f7451f008ff: Pull complete
+38df1ab86f60: Pull complete
+64f463222af7: Pull complete
+c4e0d1789b0e: Pull complete
+8ba2e81f6cfd: Pull complete
+b28e8d812378: Pull complete
+4c9be88c471d: Pull complete
+df21006c3cea: Pull complete
+0e2088e80f24: Pull complete
+d6aca52e827f: Pull complete
+Digest: sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90
+Status: Downloaded newer image for vllm/vllm-openai:v0.30.0
+docker.io/vllm/vllm-openai:v0.30.0
++ stage image-pull-done
+++ date +%s
++ echo '[stage] image-pull-done +170s'
+[stage] image-pull-done +170s
++ base64 -d
++ echo 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
++ gunzip
++ echo 22ae922a2251
+++ sed -n 's/^__TARGET__//p'
+++ tail -n 1
+++ docker run --rm --entrypoint python3 vllm/vllm-openai:v0.30.0 -c 'import vllm.v1.attention.ops.triton_unified_attention as m; print("__TARGET__" + m.__file__)'
++ TARGET=/usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_unified_attention.py
++ echo 'triton_unified_attention.py resolves to /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_unified_attention.py'
+triton_unified_attention.py resolves to /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_unified_attention.py
++ case "$TARGET" in
++ stage patch-resolve
+++ date +%s
++ echo '[stage] patch-resolve +191s'
+[stage] patch-resolve +191s
++ docker run --rm --entrypoint cat vllm/vllm-openai:v0.30.0 /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_unified_attention.py
++ TURING_SMEM_BUDGET=60000
++ python3 /opt/vllm-g4dn/patch_triton_turing.py /opt/vllm-g4dn/triton_unified_attention.py
+patch_triton_turing: patched /opt/vllm-g4dn/triton_unified_attention.py
+  function      : unified_attention (lines 807-1194)
+  inserted before line 1002, after the statement ending at line 1001 (If)
+  indent        : 4 spaces
+  stages var    : launch_num_stages (auto-detected as an assignment target)
+  tile reads after the clamp: [1084, 1087, 1187]
+  smem budget   : 60000 B of Turing's 65536 hard limit
++ stage patch-applied
+++ date +%s
++ echo '[stage] patch-applied +191s'
+[stage] patch-applied +191s
++ cat
++ docker build -t vllm-openai:v0.30.0-sm75-patched /opt/vllm-g4dn
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 192B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/vllm/vllm-openai:v0.30.0
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context:
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 45.80kB done
+#4 DONE 0.0s
+
+#5 [1/2] FROM docker.io/vllm/vllm-openai:v0.30.0@sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90
+#5 resolve docker.io/vllm/vllm-openai:v0.30.0@sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90 0.0s done
+#5 DONE 1.4s
+
+#6 [2/2] COPY triton_unified_attention.py /usr/local/lib/python3.12/dist-packages/vllm/v1/attention/ops/triton_unified_attention.py
+#6 DONE 0.1s
+
+#7 exporting to image
+#7 exporting layers 0.1s done
+#7 exporting manifest sha256:29d98358ecc8b988f8e31e015b8f651f6a88c2091fd2e79fa57a04ce3ee5339d 0.0s done
+#7 exporting config sha256:04dc064c45bf8493472994ab88d7f671a58378260b65b80606e006ae712780c6 0.0s done
+#7 exporting attestation manifest sha256:4bc17b2023c02dddd2dcdfeaded65ec19c8b30301a88f91fae9aa1b1630b8b3a 0.0s done
+#7 exporting manifest list sha256:311745b54c8442f4b0a852b40d29eee3923cb64a845fc391e33a95bdd0786702 0.0s done
+#7 naming to docker.io/library/vllm-openai:v0.30.0-sm75-patched
+#7 naming to docker.io/library/vllm-openai:v0.30.0-sm75-patched 0.0s done
+#7 unpacking to docker.io/library/vllm-openai:v0.30.0-sm75-patched 0.1s done
+#7 DONE 0.4s
++ stage image-build-done
+++ date +%s
++ echo '[stage] image-build-done +194s'
+[stage] image-build-done +194s
++ docker run --rm --entrypoint python3 vllm-openai:v0.30.0-sm75-patched -c 'import vllm.v1.attention.ops.triton_unified_attention as m, sys; sys.exit(0 if '\''gpu-vllm-g4dn-2b-w4a16: Turing shared-memory clamp'\'' in open(m.__file__).read() else 1)'
+INFO 09-30 16:13:51 [importing.py:74] Triton is installed but 0 active driver(s) found (expected 1). Disabling Triton to prevent runtime errors.
+INFO 09-30 16:13:51 [importing.py:98] Triton not installed or not compatible; certain GPU-related functions will not be available.
++ stage patch-verified-in-image
+++ date +%s
++ echo '[stage] patch-verified-in-image +209s'
+[stage] patch-verified-in-image +209s
++ cat
++ chmod 700 /opt/vllm-g4dn/start.sh
++ /opt/vllm-g4dn/start.sh
+9bd4912ac5f724731a2cb52510af42de75f6eda9333c0bebbe6de51387a8dd39
++ stage serving-started
+++ date +%s
++ echo '[stage] serving-started +211s'
+[stage] serving-started +211s
++ touch /opt/vllm-g4dn/INSTALL_DONE
++ stage INSTALL_COMPLETE
+++ date +%s
++ echo '[stage] INSTALL_COMPLETE +211s'
+[stage] INSTALL_COMPLETE +211s
+Cloud-init v. 26.1-0ubuntu3~26.04.1 finished at Wed, 30 Sep 2026 16:13:55 +0000. Datasource DataSourceEc2Local.  Up 272.63 seconds
+Generating public/private rsa key pair.
+Your identification has been saved in /etc/ssh/ssh_host_rsa_key
+Your public key has been saved in /etc/ssh/ssh_host_rsa_key.pub
+The key fingerprint is:
+SHA256:w81rQv/+jQDFvDGT7Qs1JqrRCyvH/gHhe42qKuVtdAU root@ip-172-31-39-30
+The key's randomart image is:
++---[RSA 3072]----+
+|                 |
+|        E  o o   |
+|        ..  X =  |
+|       o =.o X . |
+|        S.* o .  |
+|    . .o.X * . . |
+|   o o..B O o .  |
+|  . . o+ = o . o |
+|   ..o..o...o.o .|
++----[SHA256]-----+
+Generating public/private ecdsa key pair.
+Your identification has been saved in /etc/ssh/ssh_host_ecdsa_key
+Your public key has been saved in /etc/ssh/ssh_host_ecdsa_key.pub
+The key fingerprint is:
+SHA256:wFs8E7IN1ToSxagaT0HrangsIAyzYXI16waanUfQBWA root@ip-172-31-39-30
+The key's randomart image is:
++---[ECDSA 256]---+
+|  E+=o+=+.       |
+| . oo=o*...      |
+|=.o +o+.*.       |
+|=O.*o .+oo       |
+|*.o== ..S.       |
+|oo.+.            |
+|o =              |
+| +               |
+|                 |
++----[SHA256]-----+
+Generating public/private ed25519 key pair.
+Your identification has been saved in /etc/ssh/ssh_host_ed25519_key
+Your public key has been saved in /etc/ssh/ssh_host_ed25519_key.pub
+The key fingerprint is:
+SHA256:IE4v1WcwYr8UUsb1M1sOja/UFGiBOHQK/99mcF6a1b0 root@ip-172-31-39-30
+The key's randomart image is:
++--[ED25519 256]--+
+|      =+Boo..o.  |
+|     . O+*..oo . |
+|    o o *.o.* +  |
+|   o + o =   @  o|
+|    o . S . + = =|
+|     .     o * =.|
+|            o BE |
+|             o   |
+|                 |
++----[SHA256]-----+

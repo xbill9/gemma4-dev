@@ -1,0 +1,11 @@
+RIG_NAME=gpu-vllm-g4dn-2b-w4a16
+AWS_REGION=us-east-2
+INSTANCE_TYPE=g4dn.xlarge
+VLLM_IMAGE=vllm/vllm-openai:v0.30.0
+VLLM_PATCHED_IMAGE=vllm-openai:v0.30.0-sm75-patched
+DTYPE=float16
+MAX_MODEL_LEN=8192
+GPU_MEMORY_UTILIZATION=0.90
+MAX_NUM_SEQS=
+MODEL=xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4
+SERVE_FLAGS=--model xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 --host 0.0.0.0 --port 8000 --dtype float16 --kv-cache-dtype auto --tensor-parallel-size 1 --gpu-memory-utilization 0.90 --max-model-len 8192
