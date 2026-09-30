@@ -12,8 +12,8 @@ are **measured there, not here**, and `tpu.env` labels each carried-over number 
 `gemma-4-E4B-it-q4_0-exact.gguf` (SHA-256 `5462cc10…`, 4.22 GB): Google's E4B QAT GGUF metadata byte for
 byte, with every weight matrix, both embedding tables and `per_layer_model_proj` rebuilt as Q4_0 from
 `google/gemma-4-E4B-it-qat-q4_0-unquantized` on the trained grid step. Built by the E2B rig's v2
-`gguf_exact.py`, which needed no change: E4B has the same tensor set. **Not published** — `MODEL_NAME`
-names the repo it would go to. Evidence: `benchmarks/runs/2026-09-30-exact-gguf-e4b-1650ti/`.
+`gguf_exact.py`, which needed no change: E4B has the same tensor set. Published 2026-09-30 as
+`MODEL_NAME`, public. **KLD vs bf16 (CPU): 0.00103 against Google's 0.0353**, top token 98.4% against 90.6%. Evidence: `benchmarks/runs/2026-09-30-exact-gguf-e4b-1650ti/`.
 
 **E4B is not a 4B model.** 4.5B effective, 8.0B total (`@MODELS.md`). llama-bench reports 7.46 B.
 
@@ -53,6 +53,6 @@ before attributing a number to either rig.
 
 ## Not known yet
 
-KLD against bf16 (the bf16 reference is ~16 GB on a 15 GiB host), any `sweep.py` or concurrency run,
+KLD on CUDA, any `sweep.py` or concurrency run,
 thinking-on behaviour, and anything above 8192 context. `DEMO.md` did not come across: the rehearsed
 demo is the E2B rig's.

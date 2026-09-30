@@ -109,7 +109,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | 19 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b | `2026-09-18-qat-vs-bf16-t4` | 107 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-09-29-emb4-sweep-t4` | 67 | 0 | 0 | yes | **no** |
-| gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 15 | 9 | 0 | **no** | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 14 | 9 | 0 | **no** | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
@@ -121,7 +121,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ngram-spec-1650ti` | 17 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-paired-sweep-1650ti` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ple-offload-1650ti` | 6 | 0 | 0 | yes | **no** |
-| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 13 | 1 | 0 | yes | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-22-paired-sweep-cpu` | 12 | 0 | 0 | yes | **no** |

@@ -341,9 +341,11 @@ by more than 3x. On a v5e-1 with int8 weights (~7.5 GiB, leaving ~7.0 GiB of the
 **~131,000 KV tokens**, against E2B's measured 321,376 — so roughly 8 concurrent streams at 16K context,
 not 20.
 
-Not verified against an allocation log yet: this is derived from the published config using the same
-arithmetic that reproduced E2B's measured 18 KiB/token to the byte on two chips. Confirm against
-`GPU KV cache size` on first boot.
+**Geometry confirmed against an allocation log, 2026-09-30** (`local-llamacpp-1650ti-4b-q4_0`, llama.cpp,
+8192 context): 128.00 MiB for 4 full layers × 8192 cells and 40.00 MiB for 20 sliding layers — exactly the
+per-layer figures above. llama.cpp caps the sliding layers at 1024 cells whatever `n_ctx` is, so its total is
+168 MiB rather than 8192 × 56 KiB = 448 MiB; the 56 KiB/token figure still holds for engines that size
+sliding layers at full context. Not yet checked against a vLLM `GPU KV cache size` line.
 
 ## `attention_k_eq_v` — full-attention layers ship no `v_proj`
 

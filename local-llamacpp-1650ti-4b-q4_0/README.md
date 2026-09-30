@@ -7,7 +7,9 @@ only difference.
 
 **Status 2026-09-30: serves.** 2848 MiB of 4096 at `-ngl 99 -c 8192`, **~39.8 tok/s decode, ~173 t/s
 prefill** (llama-bench). The exact rebuild is 1.06x Google's E4B GGUF on decode and 204 MiB smaller in
-VRAM. It fits because the 1.59 GB per-layer embedding table stays in the mmap. See
+VRAM, with mean KL divergence from bf16 of 0.00103 against Google's 0.0353. Published as
+[`xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf`](https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf).
+It fits because the 1.59 GB per-layer embedding table stays in the mmap. See
 `benchmarks/runs/2026-09-30-exact-gguf-e4b-1650ti/REPORT.md`.
 
 | | |
@@ -16,7 +18,7 @@ VRAM. It fits because the 1.59 GB per-layer embedding table stays in the mmap. S
 | Runtime | `llamacpp` — one process, one GGUF named on the command line |
 | Hardware | `1650ti` — TU117, compute capability 7.5, 4096 MiB VRAM |
 | Model | `4b` — `google/gemma-4-E4B-it` (4.5B effective, 8.0B total) |
-| Encoding | `q4_0` — exact rebuild from the QAT unquantized checkpoint |
+| Encoding | `q4_0` — exact rebuild from the QAT unquantized checkpoint, published |
 
 ## Quick start
 

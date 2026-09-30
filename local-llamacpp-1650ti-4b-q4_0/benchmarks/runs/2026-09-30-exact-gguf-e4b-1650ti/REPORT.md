@@ -63,16 +63,37 @@ Five prompts at temperature 0, exact file (`chat-exact.json`): Canberra, 391, a 
 function, Io/Europa/Ganymede, and a coherent three-sentence French Rayleigh-scattering answer. ~37–39 tok/s
 per request. Google's file gave a correct one-sentence TPU answer at 36.7 tok/s.
 
+## Quality: KL divergence against bf16 (`kld/`)
+
+Added the same day, before publishing. `kld/run_kld.sh`: `gguf_exact.py --bf16` builds the reference
+(Google's metadata, the source's bf16 bytes, 14.9 GB), then `llama-perplexity` from
+`~/llama.cpp-f95b0d9` on wikitext-2 test, 16 × 512, **CPU only** (`CUDA_VISIBLE_DEVICES=` empty,
+`-t 6`), so the E2B server stayed up. 11m32 for all three passes on 15 GiB of RAM: the bf16 file
+streams from the page cache.
+
+| | Google | exact |
+|---|---|---|
+| Mean KL divergence | 0.035254 ± 0.000773 | **0.001031 ± 0.000053** |
+| 99th percentile KLD | 0.215774 | 0.008396 |
+| Same top token | 90.637 ± 0.456 % | **98.407 ± 0.196 %** |
+| PPL / PPL(bf16) | 1.081619 ± 0.008910 | 1.025568 ± 0.005199 |
+
+34x lower mean KLD. Google's E4B file is closer to bf16 than its E2B file was (0.035 against 0.054), and
+the exact rebuild lands in the same place as E2B's (0.0010 against 0.0017). Not measured on CUDA.
+
+## Published
+
+`xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf`, public, Apache 2.0, laid out like the E2B repo: the GGUF,
+`gguf_exact.py`, Google's card as `ORIGINAL_README.md`, and `evidence/` (build report, bench, allocation
+logs, chat, KLD logs).
+
 ## NOT DONE
 
-- **KLD against bf16.** The E2B rig measured it (Google 0.054, exact 0.0017). The E4B bf16 reference is
-  ~16 GB of weights against 15 GiB of RAM; not attempted. The quality claim here is only "on the grid,
-  and five greedy answers are right".
-- No `sweep.py` run, no concurrency sweep, no thinking-on check, no context above 8192.
-- Not published to Hugging Face.
+- KLD on CUDA; no `sweep.py` run, no concurrency sweep, no thinking-on check, no context above 8192.
+- Rebuilt on one machine only (E2B's was reproduced bit-identically on two).
 
 ## Files
 
 `gguf_exact.py`, `build.log`, `build_report.json`, `bench_abba.sh` → `bench-abba.md` / `.err`,
-`serve/` (allocation logs, `nvidia-smi` readings, chats, and the E2B server's command line as it was
+`kld/`, `serve/` (allocation logs, `nvidia-smi` readings, chats, and the E2B server's command line as it was
 before it was stopped for this run).
