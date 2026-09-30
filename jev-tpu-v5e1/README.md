@@ -2,6 +2,8 @@
 
 Exploration: the Jev-style label read of Gemma 4 on one TPU v5e chip. Sibling of `../jev-tpu` (unpatched read on one v6e chip) and `../jev-tpu-31b` (the patched W4A16 read on v6e). The read, data, scoring and suite code are copied from `../jev-tpu-31b`, and so are `tpu/serve.sh`, `tpu/run_quant.sh`, `tpu/startup_quant.sh`, `tpu/w4a16_client.py` and `tpu/w4a16_matmul_bench.py`. Runs in: E2B bf16, which served, and the W4A16 arms, none of which served (both 2026-09-27); the 26B W4A16 repack, which serves on one v5e chip with `patches/lowmem.diff` (2026-09-28); and the 12B QAT W4A16 repack, which serves with a smaller patch and scores level with bf16 (2026-09-29). The E2B and E4B QAT repacks (2026-09-29) are level with bf16 too, 1.3–2.4 points over Google's exports. **For one user or a few agents on this chip, use the 12B repack.** See the sections below.
 
+**Where the results live (2026-09-30).** This tree is a repack sweep harness. Each scored arm is filed in the rig named for its chip and exact checkpoint, under `<rig>/benchmarks/runs/`; `results/` keeps a relative symlink at every old arm path, so the scripts and comparison files here still resolve, and `../benchmarks/sweep-moves.json` maps each path. This tree's cells: `../tpu-vllm-v5e1-12b-q4w4a16`, `../tpu-vllm-v5e1-12b-q4w4a16emb4`, `../tpu-vllm-v5e1-12b-w4a16`, `../tpu-vllm-v5e1-12b-w8a8`, `../tpu-vllm-v5e1-12b-w8a8emb4`, `../tpu-vllm-v5e1-26b-q4w4a16`, `../tpu-vllm-v5e1-2b`, `../tpu-vllm-v5e1-2b-fp8`, `../tpu-vllm-v5e1-2b-fp8emb4`, `../tpu-vllm-v5e1-2b-q4_0`, `../tpu-vllm-v5e1-2b-q4w4a16`, `../tpu-vllm-v5e1-2b-q4w4a16emb4`, `../tpu-vllm-v5e1-2b-q4w4a16ple4`, `../tpu-vllm-v5e1-2b-w4a16`, `../tpu-vllm-v5e1-2b-w8a8`, `../tpu-vllm-v5e1-2b-w8a8emb4`, `../tpu-vllm-v5e1-2b-w8a8rtn`, `../tpu-vllm-v5e1-4b-fp8`, `../tpu-vllm-v5e1-4b-q4w4a16`, `../tpu-vllm-v5e1-4b-q4w4a16emb4`, `../tpu-vllm-v5e1-4b-w4a16`, `../tpu-vllm-v5e1-4b-w8a8`, `../tpu-vllm-v5e1-4b-w8a8emb4`. Runs with no suite are filed the same way, by checkpoint. Run-wide logs of runs that span several cells, and the paired comparisons, stay here.
+
 ## Status and next steps (2026-09-28)
 
 **Done: `2026-09-27-v5e1-e2btest`**, E2B bf16 only (`jev-arms`), bundle `e2btest-baf42672.tgz` (this tree plus `patches/` from `../jev-tpu-31b`'s `tp4fix3-54532225.tgz`). Boot 360 s. Paired with `../jev-tpu-31b/results/2026-09-25-followup-e2b-bf16` in `results/2026-09-27-v5e1-e2btest-QUANT.md`: suite 0.685 on both (−0.001, 95% −0.004 to +0.003), every task within a point. `quant_compare.py` heads the columns "bf16" / "4-bit"; there "bf16" is v6e and "4-bit" is v5e. `score.py` writes an empty summary for this run because it only scores autoregressive-plus-diffusion pairs.
@@ -35,16 +37,18 @@ Rebuilding a bundle: tar this tree without `tests/`, `results/`, `__pycache__` o
 
 Suite (3,880 records) paired record for record against bf16 (E2B on v5e; E4B and 12B on v6e,
 where bf16 fits); output tok/s at 1 / 4 / 16 requests, same flags throughout. Runs:
-`results/2026-09-29-{e2c,e4a,e4b-v5e1b,12b,speed,mtp*}-v5e1*`.
+`results/2026-09-29-{e2c,e4a,e4b-v5e1b,12b,speed,mtp*}-v5e1*` and `results/2026-09-30-{12bgap,e4bemb4}-v5e1*`;
+paired comparisons for every arm in `results/2026-09-29-{e2c,e4a,e4b-v5e1b,12b}-v5e1*-QUANT.md`.
 
 | Model | Build | Weights on chip | Suite (vs bf16, 95% range) | tok/s |
 |---|---|---:|---|---|
 | 12B | emb4 (int4 linears and vocabulary tables) | 6.86 GiB | 0.762 (+0.2, −0.4 to +0.8) | 35 / 127 / 407 |
 | 12B | **W8A8 + int4 embeddings** | 11.31 GiB | **0.761 (+0.1, −0.6 to +0.8)** | **57 / 219 / 675** |
+| 12B | W8A8 (bf16 tables) | 12.03 GiB | 0.757 (−0.2, −1.0 to +0.5) | 53 / 201 / 624 |
 | E4B | W8A8 | — | 0.727 (−0.4, −1.1 to +0.3) | 119 / 459 / 1,590 |
 | E4B | fp8 | — | 0.733 (+0.2, −0.4 to +1.0) | 99 / 382 / 1,349 |
 | E4B | **W8A8 + int4 embeddings** | — | **0.728 (−0.3, −1.0 to +0.5)** | **133 / 509 / 1,747** |
-| E4B | emb4 | — | not scored | 79 / 308 / 1,019 |
+| E4B | emb4 | — | 0.730 (−0.1, −0.7 to +0.6) | 79 / 308 / 1,064 |
 | E2B | QAT bf16 (`-qat-q4_0-unquantized`) | — | 0.681 (−0.2) | 144 / 560 / 2,007 |
 | E2B | ple4 (int4 per-layer table only) | — | 0.680 (−0.2) | 137 / 533 / 1,910 |
 | E2B | emb4 | 2.66 GiB | 0.681 (−0.2) | 150 / 583 / 2,067 |
@@ -61,11 +65,14 @@ where bf16 fits); output tok/s at 1 / 4 / 16 requests, same flags throughout. Ru
   rows are not a multiple of 128 reads the whole table: 4.2 ms per step for the E2B per-layer table,
   flat in the number of ids, against 0.06 ms padded (`tpu/lookup_bench.py`). Unpadded, E2B emb4
   decoded at 85 tok/s and E4B emb4 ran out of HBM compiling.
+- **int4 tables are worth 8% of throughput at 12B** (W8A8: 57 / 219 / 675 against 53 / 201 / 624 with
+  bf16 tables) and 0.72 GiB of weights.
 - **The int4 `lm_head` runs through gmm_v2 at 1.7-3.2x the bf16 head** (`tpu/lm_head_bench.py`).
 
 ### 12B context on one v5e chip (2026-09-30)
 
-12B KV costs 338 KiB per token (from the boot logs: 0.0825 GiB per 256-token block). Every 12B run
+12B KV costs 336 KiB per token: the boot logs bound it at 333–338 (5.11 GiB held 62 256-token blocks,
+4.48 GiB held 54), which is the config geometry with a V cache stored for the eight `attention_k_eq_v` layers. Every 12B run
 before this held 5,120 KV tokens (`--num-gpu-blocks-override 40`). Runs `results/2026-09-30-12bctx{1..7}-v5e1*`,
 `--max-model-len 8192` (vLLM then uses 256-token blocks):
 

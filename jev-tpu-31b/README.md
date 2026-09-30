@@ -2,6 +2,8 @@
 
 Exploration: a Jev-style label read of Gemma 4 31B on TPU v6e. Sibling of `../jev-tpu`, which read E2B, E4B, 12B and 26B-A4B on one v6e chip and could not serve any 31B. The read, data and scoring code here are copied from `../jev-tpu`; `nimble_suite/run_suite.py` differs by one recorded field (`PREREGISTRATION.md`, deviations).
 
+**Where the results live (2026-09-30).** This tree is a repack sweep harness. Each scored arm is filed in the rig named for its chip and exact checkpoint, under `<rig>/benchmarks/runs/`; `results/` keeps a relative symlink at every old arm path, so the scripts and comparison files here still resolve, and `../benchmarks/sweep-moves.json` maps each path. This tree's cells: `../gce-vllm-v6e1-12b`, `../gce-vllm-v6e1-12b-q4_0`, `../gce-vllm-v6e1-12b-w4a16`, `../gce-vllm-v6e1-26b-fp8rtn`, `../gce-vllm-v6e1-26b-q4w4a16`, `../gce-vllm-v6e1-2b`, `../gce-vllm-v6e1-2b-w4a16`, `../gce-vllm-v6e1-31b-q4w4a16`, `../gce-vllm-v6e1-31b-w4a16`, `../gce-vllm-v6e1-4b`, `../gce-vllm-v6e1-4b-w4a16`, `../gce-vllm-v6e4-26b`, `../gce-vllm-v6e4-26b-q4w4a16`, `../gpu-vllm-l4-26b-q4w4a16`. Runs with no suite are filed the same way, by checkpoint. Run-wide logs of runs that span several cells, and the paired comparisons, stay here.
+
 ## Status, 2026-09-26: 12B needs no patch; Google's QAT 26B serves on one chip
 
 - **12B serves on the JAX path with `--hf_overrides '{"architectures": ["Gemma4ForCausalLM"]}'`**, so #3654 was closed. bf16, `-qat-w4a16-ct` (with #3653) and `-qat-q4_0-unquantized` all load that way with the same memory and accuracy as the #3654 build (`results/2026-09-26-override-*`, `results/2026-09-26-q4_0-*`; `../QUANTIZATION.md`).

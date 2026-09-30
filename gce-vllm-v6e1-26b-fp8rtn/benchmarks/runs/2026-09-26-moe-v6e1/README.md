@@ -1,0 +1,10 @@
+# 2026-09-26-moe-v6e1
+
+Files from the `2026-09-26-moe-evidence` run of the sweep in `../../../../jev-tpu-31b/` that belong to this
+rig's checkpoint: a run with no suite (context, speculative decoding, speed, kernel benchmark, retest) or an
+arm that did not reach the suite. They sit under `logs/<run log dir>/`, the layout the sweep wrote.
+
+| | |
+|---|---|
+| Checkpoint(s) served | `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic` |
+| Moved | this checkpoint's files; run-wide logs (run.log, patch logs) stayed with the sweep |

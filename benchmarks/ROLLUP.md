@@ -59,7 +59,47 @@ to a complete run if you only read the directory name, so completeness is counte
 | Rig | Run | Files | Result files | Infeasible cells (unshadowed) | REPORT.md | tables.md |
 |---|---|---:|---:|---:|---|---|
 | gce-pytorch-v6e1-2b | `2026-08-29-torchxla-sweep-v6e1` | 2 | 1 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b | `2026-09-24-12b-v6e1` | 33 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b | `2026-09-25-followup-v6e1` | 3 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b | `2026-09-25-w4a16-12b-bf16-v6e1` | 31 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b | `2026-09-26-override-12b-bf16-ovr-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b | `2026-09-26-override-v6e1` | 2 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b | `2026-09-26-q4_0-v6e1` | 3 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b-q4_0 | `2026-09-26-q4_0-12b-q4_0u-ovr-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b-w4a16 | `2026-09-25-followup-v6e1` | 3 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b-w4a16 | `2026-09-25-w4a16-12b-w4a16-v6e1` | 31 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b-w4a16 | `2026-09-26-override-12b-w4a16-ovr-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b-w4a16 | `2026-09-26-q4_0-12b-w4a16-ovr-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-12b-w4a16 | `2026-09-28-pr3660-v6e1` | 5 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-26b-fp8rtn | `2026-09-24-26b-fp8-v6e1` | 33 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-26b-fp8rtn | `2026-09-25-followup-v6e1` | 3 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-26b-fp8rtn | `2026-09-26-moe-v6e1` | 3 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-26b-q4w4a16 | `2026-09-26-kvbf16-26b-q4w4-kvbf16-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-26b-q4w4a16 | `2026-09-26-moe-v6e1` | 2 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-26b-q4w4a16 | `2026-09-26-moe2-26b-q4w4-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-26b-q4w4a16 | `2026-09-26-repack-v6e1` | 5 | 0 | 0 | **no** | **no** |
 | gce-vllm-v6e1-2b | `2026-08-10-gce-flex-v6e1` | 8 | 3 | 0 | yes | **no** |
+| gce-vllm-v6e1-2b | `2026-09-24-e2b-v6e1` | 40 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-2b | `2026-09-25-followup-e2b-bf16-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-2b-w4a16 | `2026-09-25-followup-v6e1` | 3 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-2b-w4a16 | `2026-09-25-w4a16-e2b-w4a16-v6e1` | 31 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-2b-w4a16 | `2026-09-28-pr3660-v6e1` | 5 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-31b-awq | `2026-09-24-sweep-v6e1` | 2 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-31b-q4w4a16 | `2026-09-29-31b-31b-repack-v6e1` | 34 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-31b-w4a16 | `2026-09-24-sweep-v6e1` | 2 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-31b-w4a16 | `2026-09-25-followup-v6e1` | 4 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-31b-w4a16 | `2026-09-25-w4a16-31b-w4a16-v6e1` | 31 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-31b-w4a16 | `2026-09-29-31b-31b-google-v6e1` | 34 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-4b | `2026-09-24-e4b-v6e1` | 33 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-4b | `2026-09-25-followup-e4b-bf16-v6e1` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-4b-w4a16 | `2026-09-25-followup-v6e1` | 3 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-4b-w4a16 | `2026-09-25-w4a16-e4b-w4a16-v6e1` | 31 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e1-4b-w4a16 | `2026-09-28-pr3660-v6e1` | 5 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e4-26b | `2026-09-26-tp4-26b-bf16-v6e4` | 32 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e4-26b-q4w4a16 | `2026-09-26-tp4-v6e4` | 2 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e4-26b-q4w4a16 | `2026-09-27-tp4fix-v6e4` | 8 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e4-26b-q4w4a16 | `2026-09-27-tp4fix2-v6e4` | 8 | 0 | 0 | **no** | **no** |
+| gce-vllm-v6e4-26b-q4w4a16 | `2026-09-27-tp4fix3-26b-q4w4-tp4-v6e4` | 32 | 0 | 0 | **no** | **no** |
 | gce-vllm-v6e8-31b | `2026-08-25-tp4-v6e4-31b-validation` | 3 | 0 | 0 | yes | **no** |
 | gce-vllm-v6e8-31b | `2026-08-26-xprof-tp4-v0260` | 2 | 0 | 0 | **no** | **no** |
 | gke-vllm-v6e1-2b | `2026-08-25-gke-first-provision-v6e1` | 1 | 0 | 0 | **no** | **no** |
@@ -96,6 +136,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-12b-w4a16 | `2026-06-15-vllm-grid-ec2-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-15-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-21-vllm-grid-mtp-cloudrun-l4` | 2 | 0 | 0 | yes | **no** |
+| gpu-vllm-l4-26b-q4w4a16 | `2026-09-26-gpu-l4-26b-q4w4-l4` | 30 | 0 | 0 | **no** | **no** |
+| gpu-vllm-l4-26b-q4w4a16 | `2026-09-26-gpu-l4-l4` | 7 | 0 | 0 | **no** | **no** |
 | gpu-vllm-l4-26b-w4a16 | `2026-06-10-vllm-grid-cloudrun-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-26b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-2b-w4a16 | `2026-07-10-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
@@ -134,7 +176,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-google-vs-v2-cpu` | 5 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-paired-sweep-cpu` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-4b-q4_0 | `2026-09-30-paired-sweep-cpu` | 10 | 0 | 0 | yes | **no** |
-| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 16 | 1 | 0 | yes | **no** |
+| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 17 | 1 | 0 | yes | **no** |
 | local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-v2-i71360p` | 9 | 1 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
@@ -164,6 +206,20 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e4-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
+| tpu-vllm-v5e1-12b-q4w4a16 | `2026-09-28-12b3-12b-repack-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-29-12b-12b-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx3-v5e1` | 12 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx4-v5e1` | 12 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx6-v5e1` | 12 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | `2026-09-30-12bctx7-v5e1` | 14 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w4a16 | `2026-09-27-w4a16-v5e1` | 3 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w4a16 | `2026-09-28-12b3-12b-google-v5e1` | 32 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8 | `2026-09-30-12bgap-12b-w8a8-v5e1` | 36 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-29-12b-12b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-12bctx1-v5e1` | 12 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-12bctx2-v5e1` | 12 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-12b-w8a8emb4 | `2026-09-30-12bctx5-v5e1` | 14 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-26b-q4w4a16 | `2026-09-28-lowmem7-26b-lowmem-v5e1` | 32 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v5e1-2b | `2026-08-06-vllm-sweep-v5e1` | 28 | 13 | 0 | yes | yes |
@@ -171,8 +227,56 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b | `2026-08-07-kv-quant-v5e1` | 15 | 7 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-07-qwix-int8-v5e1` | 4 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `2026-08-09-serving-params-v5e1` | 6 | 2 | 0 | yes | **no** |
+| tpu-vllm-v5e1-2b | `2026-09-27-e2btest-e2b-bf16-v5e1` | 31 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b | `2026-09-29-mtpbf-v5e1` | 13 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b | `2026-09-29-mtpg2-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b | `2026-09-29-w8a8-e2b-bf16-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-a-v6e1` | 7 | 1 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b | `undated-vllm-grid-b-v6e1` | 6 | 0 | 0 | yes | **no** |
+| tpu-vllm-v5e1-2b-fp8 | `2026-09-29-e2c-e2b-fp8-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-fp8emb4 | `2026-09-29-e2c-e2b-fp8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-fp8emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4_0 | `2026-09-29-e2c-e2b-qat-bf16-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4_0 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4_0 | `2026-09-29-mtpq-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-e2b-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-e2br-e2b-repack-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-mtpg2-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-mtpq-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16 | `2026-09-29-w8a8-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-e4a-e2b-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-e4a-v5e1` | 2 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-emb4-e2b-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-lmh-v5e1` | 9 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-lookup-v5e1` | 9 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-e2c-e2b-ple4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-mtpq-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w4a16 | `2026-09-27-w4a16-v5e1` | 2 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w4a16 | `2026-09-29-e2b-e2b-google-v5e1` | 32 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-mtpg2-v5e1` | 7 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-mtpq-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8 | `2026-09-29-qatw8-e2b-qat-w8a8-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-29-e4a-e2b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8emb4 | `2026-09-29-w8e4-e2b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8rtn | `2026-09-29-w8a8-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-w8a8rtn | `2026-09-29-w8a8b-e2b-w8a8-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-fp8 | `2026-09-29-e4b-e4b-fp8-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16 | `2026-09-29-e4b-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16 | `2026-09-29-e4br-e4b-repack-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16emb4 | `2026-09-29-e4a-v5e1` | 4 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-q4w4a16emb4 | `2026-09-30-e4bemb4-e4b-emb4-v5e1` | 36 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w4a16 | `2026-09-27-w4a16-v5e1` | 2 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w4a16 | `2026-09-29-e4b-e4b-google-v5e1` | 32 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w8a8 | `2026-09-29-e4b-e4b-w8a8-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-29-e4a-e4b-w8a8-emb4-v5e1` | 35 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v6e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v6e1-2b | `2026-08-06-vllm-sweep-v5e1` | 16 | 13 | 0 | yes | yes |
@@ -191,7 +295,20 @@ to a complete run if you only read the directory name, so completeness is counte
 | gce-pytorch-v6e1-2b | 0 | 1 |
 | gce-vllm-v5e1-2b | 0 | 0 |
 | gce-vllm-v5p1-2b | 0 | 0 |
-| gce-vllm-v6e1-2b | 0 | 1 |
+| gce-vllm-v6e1-12b | 0 | 6 |
+| gce-vllm-v6e1-12b-q4_0 | 0 | 1 |
+| gce-vllm-v6e1-12b-w4a16 | 0 | 5 |
+| gce-vllm-v6e1-26b-fp8rtn | 0 | 3 |
+| gce-vllm-v6e1-26b-q4w4a16 | 0 | 4 |
+| gce-vllm-v6e1-2b | 0 | 3 |
+| gce-vllm-v6e1-2b-w4a16 | 0 | 3 |
+| gce-vllm-v6e1-31b-awq | 0 | 1 |
+| gce-vllm-v6e1-31b-q4w4a16 | 0 | 1 |
+| gce-vllm-v6e1-31b-w4a16 | 0 | 4 |
+| gce-vllm-v6e1-4b | 0 | 2 |
+| gce-vllm-v6e1-4b-w4a16 | 0 | 3 |
+| gce-vllm-v6e4-26b | 0 | 1 |
+| gce-vllm-v6e4-26b-q4w4a16 | 0 | 4 |
 | gce-vllm-v6e8-2b | 0 | 0 |
 | gce-vllm-v6e8-31b | 0 | 2 |
 | gke-vllm-v6e1-2b | 1 | 1 |
@@ -207,13 +324,14 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-g4dn-2b | 0 | 1 |
 | gpu-vllm-g5g-2b | 1 | 6 |
 | gpu-vllm-g6-12b-w4a16 | 0 | 0 |
-| gpu-vllm-g6-26b-w4a16 | 0 | 0 |
+| gpu-vllm-g6-26b-q4w4a16 | 0 | 0 |
 | gpu-vllm-g6-2b | 1 | 1 |
 | gpu-vllm-g6-2b-w4a16 | 0 | 1 |
 | gpu-vllm-g6-31b-w4a16 | 0 | 0 |
 | gpu-vllm-g6-4b | 0 | 0 |
 | gpu-vllm-g6-4b-w4a16 | 0 | 0 |
 | gpu-vllm-l4-12b-w4a16 | 0 | 4 |
+| gpu-vllm-l4-26b-q4w4a16 | 0 | 2 |
 | gpu-vllm-l4-26b-w4a16 | 0 | 2 |
 | gpu-vllm-l4-2b-w4a16 | 0 | 1 |
 | gpu-vllm-l4-31b-w4a16 | 0 | 2 |
@@ -243,7 +361,29 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-2b | 1 | 1 |
 | tpu-pytorch-v6e1-2b | 1 | 1 |
 | tpu-pytorch-v6e4-2b | 1 | 1 |
-| tpu-vllm-v5e1-2b | 1 | 9 |
+| tpu-vllm-v5e1-12b-q4w4a16 | 0 | 1 |
+| tpu-vllm-v5e1-12b-q4w4a16emb4 | 0 | 5 |
+| tpu-vllm-v5e1-12b-w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-12b-w8a8 | 0 | 1 |
+| tpu-vllm-v5e1-12b-w8a8emb4 | 0 | 4 |
+| tpu-vllm-v5e1-26b-q4w4a16 | 0 | 1 |
+| tpu-vllm-v5e1-2b | 1 | 13 |
+| tpu-vllm-v5e1-2b-fp8 | 0 | 1 |
+| tpu-vllm-v5e1-2b-fp8emb4 | 0 | 2 |
+| tpu-vllm-v5e1-2b-q4_0 | 0 | 3 |
+| tpu-vllm-v5e1-2b-q4w4a16 | 0 | 6 |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | 0 | 6 |
+| tpu-vllm-v5e1-2b-q4w4a16ple4 | 0 | 4 |
+| tpu-vllm-v5e1-2b-w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-2b-w8a8 | 0 | 4 |
+| tpu-vllm-v5e1-2b-w8a8emb4 | 0 | 3 |
+| tpu-vllm-v5e1-2b-w8a8rtn | 0 | 2 |
+| tpu-vllm-v5e1-4b-fp8 | 0 | 1 |
+| tpu-vllm-v5e1-4b-q4w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-4b-q4w4a16emb4 | 0 | 3 |
+| tpu-vllm-v5e1-4b-w4a16 | 0 | 2 |
+| tpu-vllm-v5e1-4b-w8a8 | 0 | 1 |
+| tpu-vllm-v5e1-4b-w8a8emb4 | 0 | 2 |
 | tpu-vllm-v5p1-2b | 0 | 0 |
 | tpu-vllm-v6e1-2b | 1 | 8 |
 | tpu-vllm-v6e8-2b | 1 | 1 |
