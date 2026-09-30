@@ -1,4 +1,4 @@
-# gpu-vllm-t4-4b-w4a16
+# gpu-vllm-t4-4b-q4w4a16emb4
 
 vLLM on one NVIDIA Tesla T4 already attached to a Compute Engine VM, serving
 Gemma 4 E4B as **4-bit weights end to end**:

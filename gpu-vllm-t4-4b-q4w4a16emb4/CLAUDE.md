@@ -1,4 +1,4 @@
-# CLAUDE.md — gpu-vllm-t4-4b-w4a16
+# CLAUDE.md — gpu-vllm-t4-4b-q4w4a16emb4
 
 Guidance for working inside this rig. The siblings are not layers; nothing is
 imported across a rig boundary. Read this file before changing anything.
@@ -17,9 +17,12 @@ in this rig is read off the Hub or labelled ARITHMETIC. The host facts below
 (filesystems, swap, interpreters, Turing clamp) are the parent's, measured on this
 same VM, and still hold.
 
-**Forked from `gpu-vllm-t4-2b-w4a16` on 2026-09-30. Slot 4 is the only slot that
+**Forked from `gpu-vllm-t4-2b-w4a16` on 2026-09-30. Model size is the only thing that
 differs**: same GPU, runtime, encoding and serving flags, so the pair is a
-model-size A/B. The parent's E2B measurements (`benchmarks/runs/`, `evidence/`,
+model-size A/B. The names also differ in slot 5: this rig was created as
+`gpu-vllm-t4-4b-w4a16` and renamed the same day under `NAMING.md`'s fifth slot-5 rule
+(the repack keeps the QAT grid, so it is `q4w4a16emb4`, not Google's `w4a16`), while
+the parent keeps `w4a16` because published articles link to it. The parent's E2B measurements (`benchmarks/runs/`, `evidence/`,
 `article/`) were deliberately not copied — `benchmarks/rollup.py` would count them
 against this rig. Only the two host-setup evidence files came along.
 
@@ -33,7 +36,7 @@ log says otherwise.
 `gpu-vllm-t4-2b` — and none sees another's process; each `server.py` tracks only
 its own `run/vllm.pid`. Stop one before starting another. `~/bin/vllm-t4` still
 defaults to the E2B rig: use this rig's `./vllm-t4`, or set
-`VLLM_T4_RIG=~/gemma4-dev/gpu-vllm-t4-4b-w4a16`.
+`VLLM_T4_RIG=~/gemma4-dev/gpu-vllm-t4-4b-q4w4a16emb4`.
 
 **This rig's `vllm-t4` passes the drafter**, which the parent's in-rig copy did not
 (only `~/bin/vllm-t4` did). The drafter is Google's E4B assistant; 3 draft tokens is
@@ -220,9 +223,9 @@ admits every unknown-bad one. A test pins this.
   `.gitignore`.
 - Read **`MemAvailable`, never `MemFree`**.
 - **Never a single `df`.** Disk is measured per target path. This host is the reason.
-- `.claude-plugin/` and `.codex/` register the MCP server as `gpu-vllm-t4-4b-w4a16`
+- `.claude-plugin/` and `.codex/` register the MCP server as `gpu-vllm-t4-4b-q4w4a16emb4`
   (the directory name — `RIG_NAME` is derived from it). No `skills/` yet; if one is
-  added its name must be `gpu-vllm-t4-4b-w4a16-management`, because `make
+  added its name must be `gpu-vllm-t4-4b-q4w4a16emb4-management`, because `make
   skill-install` does `rm -rf` on its destination.
 
 ## Canonical root references

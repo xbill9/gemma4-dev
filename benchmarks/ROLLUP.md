@@ -339,7 +339,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-2b | 7 | 8 |
 | gpu-vllm-t4-2b | 0 | 1 |
 | gpu-vllm-t4-2b-w4a16 | 1 | 2 |
-| gpu-vllm-t4-4b-w4a16 | 0 | 0 |
+| gpu-vllm-t4-4b-q4w4a16emb4 | 0 | 0 |
 | local-jax-cpu-2b | 0 | 1 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 10 |
 | local-llamacpp-1650ti-4b-q4_0 | 2 | 4 |

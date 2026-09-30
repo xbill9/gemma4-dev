@@ -45,7 +45,7 @@ GB = 10**9
 class TestRigIdentity(unittest.TestCase):
     def test_rig_name_matches_directory(self):
         self.assertEqual(server.RIG_NAME, RIG_DIR.name)
-        self.assertEqual(server.RIG_NAME, "gpu-vllm-t4-4b-w4a16")
+        self.assertEqual(server.RIG_NAME, "gpu-vllm-t4-4b-q4w4a16emb4")
 
     def test_server_name_defaults_to_rig_name(self):
         self.assertEqual(server.MCP_SERVER_NAME, server.RIG_NAME)

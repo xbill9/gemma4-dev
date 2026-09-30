@@ -1,4 +1,4 @@
-# gpu-vllm-t4-4b-w4a16 — vLLM on the T4 attached to this Compute Engine VM, Gemma 4 E4B.
+# gpu-vllm-t4-4b-q4w4a16emb4 — vLLM on the T4 attached to this Compute Engine VM, Gemma 4 E4B.
 #
 # There are no provisioning targets and none is owed: the GPU is already here.
 # `make serve` is the whole of what `make deploy` means in the EC2 siblings, and
@@ -17,7 +17,7 @@ all: help
 
 help:
 	@echo "=============================================================="
-	@echo " gpu-vllm-t4-4b-w4a16 — vLLM on one attached Tesla T4 (SM 7.5)"
+	@echo " gpu-vllm-t4-4b-q4w4a16emb4 — vLLM on one attached Tesla T4 (SM 7.5)"
 	@echo "=============================================================="
 	@echo "  make capacity     - CAN this host install and serve? run first"
 	@echo "  make arch         - does the installed build have SM 7.5 kernels?"

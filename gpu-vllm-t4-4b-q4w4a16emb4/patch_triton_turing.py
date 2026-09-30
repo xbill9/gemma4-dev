@@ -88,7 +88,7 @@ import sys
 # capability < 8` blocks, the second halving the tiles again to 16 and reporting
 # success. Match on the shared sentinel; record provenance in the marker.
 SENTINEL = "Turing shared-memory clamp"
-MARKER = "# gpu-vllm-t4-4b-w4a16: Turing shared-memory clamp"
+MARKER = "# gpu-vllm-t4-4b-q4w4a16emb4: Turing shared-memory clamp"
 
 # Headroom under the hard 65,536. The kernel's accumulators and Triton's pipeline
 # buffers are not counted by the tile arithmetic below, so budgeting the full
