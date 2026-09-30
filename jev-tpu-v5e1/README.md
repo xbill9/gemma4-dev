@@ -63,6 +63,25 @@ where bf16 fits); output tok/s at 1 / 4 / 16 requests, same flags throughout. Ru
   decoded at 85 tok/s and E4B emb4 ran out of HBM compiling.
 - **The int4 `lm_head` runs through gmm_v2 at 1.7-3.2x the bf16 head** (`tpu/lm_head_bench.py`).
 
+### 12B context on one v5e chip (2026-09-30)
+
+12B KV costs 338 KiB per token (from the boot logs: 0.0825 GiB per 256-token block). Every 12B run
+before this held 5,120 KV tokens (`--num-gpu-blocks-override 40`). Runs `results/2026-09-30-12bctx{1..7}-v5e1*`,
+`--max-model-len 8192` (vLLM then uses 256-token blocks):
+
+| Build | Setting | KV tokens | tok/s at 1 / 4 / 16 | Ready after |
+|---|---|---:|---|---:|
+| **W8A8 + int4 embeddings** | `--gpu-memory-utilization 0.92`, no block override | **9,728** | **57 / 217 / 723** | 421 s |
+| emb4 | `--gpu-memory-utilization 0.72`, no block override | **13,824** | 35 / 105 / 433 | 2,507 s |
+
+- **W8A8 + int4 tables is bound by its weights** (11.31 GiB): at 0.92, vLLM's own 38 blocks leave
+  enough outside the cap for its compiled program.
+- **emb4 is bound by its compiled program**, which needs a 3.92 GB allocation on top of weights and KV,
+  the same figure as the 12B W4A16 repack. At 0.76 (15,872 tokens) it found 3.73 GB free and failed;
+  0.72 leaves 0.46 GiB to spare.
+- **fp8 KV cache does not start on this stack**: vLLM sized 1,185 and 2,840 blocks for the two
+  builds and then refused the 16,384-token request.
+
 ### Speculative decoding (Gemma 4 MTP, 4 draft tokens), E2B
 
 | Target + drafter | 1 req | 4 req | 16 req | Mean acceptance length |
