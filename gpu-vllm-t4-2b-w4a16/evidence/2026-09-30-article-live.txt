@@ -1,0 +1,19 @@
+# Live checks of the running -emb4 server, captured verbatim 2026-09-30 for the Part 3 article.
+# This server was started by ./vllm-t4 from tpu.env, so it serves WITH the drafter
+# (--speculative-config {"model":"google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant","num_speculative_tokens":3}, read from ps).
+
+$ date -u; ./vllm-t4 status
+Wed Sep 30 12:40:25 UTC 2026
+✅ Serving at http://127.0.0.1:8000 (pid 18273).
+
+VRAM 13581 MiB, 15360 MiB, 0 %
+
+$ curl -s http://127.0.0.1:8000/v1/models   # id and max_model_len, extracted with python3 -c 'import json'
+xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4	16384
+
+$ curl -s http://127.0.0.1:8000/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4","messages":[{"role":"user","content":"What does the HTTP status code 418 mean? One sentence."}],"temperature":0,"max_tokens":60}'   # content and usage, extracted with python3 -c 'import json'
+The HTTP status code 418, "I'm a teapot," is a humorous error code indicating that the server refuses to brew coffee because it is a teapot and not a coffee maker.
+{"prompt_tokens": 24, "total_tokens": 65, "completion_tokens": 41, "prompt_tokens_details": null, "completion_tokens_details": null}
+
+$ nvidia-smi --query-gpu=name,memory.used,memory.total,power.draw,power.limit --format=csv,noheader
+Tesla T4, 13581 MiB, 15360 MiB, 52.01 W, 70.00 W

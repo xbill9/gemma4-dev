@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 on a Tesla T4, Part 3: Int4 Embeddings Serve E2B in 2.86 GiB at 2.30x bf16</title>
+  <meta name="description" content="Google&#x27;s QAT Gemma 4 E2B keeps its embedding tables in bf16, and on a Tesla T4 they are most of the model. Packing them to int4 on the grid QAT trained them onto cuts model loading from 6.33 to 2.86 GiB, with every greedy test output token-identical, and raises vLLM&#x27;s output throughput 11-37% over Google&#x27;s own W4A16 export." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to shrinking Google's
+quantization-aware-trained (QAT) Gemma 4 E2B to 4-bit weights end to
+end, embedding tables included, and serving it with vLLM on one Tesla T4
+attached to a Compute Engine VM. It compares the result with the bf16
+reference and with Google's own W4A16 export on the same card, with the
+same prompts.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-t4-emb4-cover.71f9359a.jpg" alt="Gemma 4 on a Tesla T4, Part 3: Int4 Embeddings Serve E2B in 2.86 GiB at 2.30x bf16" /></figure>
+<p>The int4-embedding build loads in 2.86 GiB against 9.8 GiB for bf16,
+holds 1,099,587 tokens of KV cache against 315,974, and serves 85.28
+output tokens per second to a single 512-token request against bf16's
+37.04. All eight greedy test prompts produce the same tokens as the
+build with bf16 embeddings.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b-w4a16">https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b-w4a16</a></p>
+<hr />
+<h4 id="why-measure-this">Why Measure This?</h4>
+<p><a
+href="https://dev.to/gde/gemma-4-on-a-tesla-t4-qat-weights-decode-179x-faster-than-bf16-2fi4">Part
+1</a> served Gemma 4 E2B on a T4 and found Google's QAT W4A16 checkpoint
+decodes 1.79x faster than bf16 for one user. <a
+href="https://dev.to/gde/gemma-4-on-a-tesla-t4-part-2-the-minimum-gce-vm-and-a-script-to-drive-it-3gk1">Part
+2</a> built the smallest VM that runs it and the script that drives
+it.</p>
+<p>The QAT checkpoint quantizes the linear layers. Its embedding tables
+stay bf16, and E2B has two:</p>
+<ul>
+<li><code>embed_tokens_per_layer</code>, the per-layer embedding (PLE)
+table that gives the E-series models their small active size:
+<strong>4.375 GiB</strong></li>
+<li><code>embed_tokens</code>, the token embedding, which Gemma ties to
+the output layer: <strong>0.750 GiB</strong></li>
+</ul>
+<p>Together they are 5.1 of the 6.11 GiB text-only checkpoint. The
+output layer also runs once per generated token over the whole
+262,144-token vocabulary, so at bf16 it is one of the largest reads in
+every decode step.</p>
+<p>QAT trained those tables too. Every sampled group of 32 values in
+both tables sits on the same 4-bit grid as the linear layers, and no
+group does in the bf16 base model. So the tables can be stored as int4
+with no new quantization error.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>The Compute Engine VM from Part 2: <code>n1-standard-2</code> (2
+vCPU, 7.80 GB RAM), one Tesla T4, <code>us-west2-b</code>, a 16 GB
+swapfile on the data disk</li>
+<li>vLLM 0.29.0 with the Turing attention patch from Part 1 applied and
+verified</li>
+<li>Python 3 with <code>numpy</code> for the repack; no PyTorch is
+needed for it</li>
+<li><code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+</ul>
+<hr />
+<h4 id="step-1--repack-the-linear-layers-and-drop-the-towers">Step 1 —
+Repack the Linear Layers and Drop the Towers</h4>
+<p><code>google/gemma-4-E2B-it-qat-q4_0-unquantized</code> stores bf16
+values that already sit on a 4-bit grid in groups of 32. The repack
+recovers each group's grid step and writes compressed-tensors W4A16. A
+second script drops the vision and audio towers and sets the
+architecture to <code>Gemma4ForCausalLM</code>, leaving every other
+tensor byte-identical.</p>
+<pre class="bash"><code>cd gemma4-dev/gpu-vllm-t4-2b-w4a16
+python3 repack/repack_q4_0.py repack SRC OUT
+python3 repack/text_only.py OUT OUT-text</code></pre>
+<p>The intermediate is published as <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text">xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text</a>:
+6.11 GiB, int4 linears, bf16 embeddings.</p>
+<hr />
+<h4 id="step-2--pack-the-embedding-tables">Step 2 — Pack the Embedding
+Tables</h4>
+<pre class="bash"><code>python3 repack/embed_int4.py OUT-text OUT-text-emb4 --embed-tokens</code></pre>
+<p><code>embed_int4.py</code> packs the PLE table and, with
+<code>--embed-tokens</code>, the token embedding. It aborts on any group
+that is off the grid.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-1.png"
+alt="Table: Table, bf16, int4" /></p>
+<p>vLLM ties the output layer by copying the embedding's
+<code>.weight</code>, and a packed embedding has none. So the script
+unties them and writes the same levels and scales a second time as
+<code>lm_head</code>, which vLLM runs as an int4 linear. The model was
+trained tied, so both copies hold the trained values.</p>
+<p>The result is <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4">xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</a>.</p>
+<hr />
+<h4 id="step-3--store-the-scales-as-fp16">Step 3 — Store the Scales as
+fp16</h4>
+<p>Each group of 32 carries one scale, the grid step. The T4 computes in
+fp16, and fp16 has three more mantissa bits than bf16, so an fp16 scale
+reproduces more of the source values exactly:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-2.png"
+alt="Table: Table, bf16 scales: bit-identical, fp16 scales: bit-identical" /></p>
+<p>The remaining mismatches are within one bf16 unit in the last place
+for 99.9% of values. They come from the source's own bf16 rounding of
+step times level. fp16 is the script's default.</p>
+<hr />
+<h4 id="step-4--serve-it">Step 4 — Serve It</h4>
+<p><code>tpu.env</code> names the checkpoint and every serving flag, and
+<code>vllm-t4</code> reads it:</p>
+<pre class="bash"><code>./vllm-t4 start</code></pre>
+<p>The engine log from the sweep's server start:</p>
+<pre class="plaintext"><code>served xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 max_model_len 16384
+Model loading took 2.86 GiB memory and 19.400900 seconds
+torch.compile took 1.03 s in total
+GPU KV cache size: 1,099,587 tokens, Maximum concurrency for 16,384 tokens per request: 67.11x</code></pre>
+<p>vLLM loads the packed tables through
+<code>CompressedTensorsEmbeddingWNA16Int</code> and logs
+<code>Using MarlinLinearKernel for CompressedTensorsWNA16</code> for the
+int4 linear layers. The flags are the ones from Part 1:
+<code>--dtype float16 --gpu-memory-utilization 0.9 --max-model-len 16384 --max-num-seqs 8 --language-model-only</code>.</p>
+<p>🔎 Tip: restart once after changing the model. The first start
+compiles from scratch and profiles a larger activation peak, which
+leaves a smaller KV cache: 980,210 tokens on the cold start against
+1,099,362 on the warm one.</p>
+<hr />
+<h4 id="step-5--check-it-serves">Step 5 — Check It Serves</h4>
+<pre class="bash"><code>./vllm-t4 status
+curl -s http://127.0.0.1:8000/v1/chat/completions -H &quot;Content-Type: application/json&quot; \
+  -d &#39;{&quot;model&quot;:&quot;xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4&quot;,&quot;messages&quot;:[{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;What does the HTTP status code 418 mean? One sentence.&quot;}],&quot;temperature&quot;:0,&quot;max_tokens&quot;:60}&#39; \
+  | python3 -c &quot;import json,sys; d=json.load(sys.stdin); print(d[&#39;choices&#39;][0][&#39;message&#39;][&#39;content&#39;]); print(json.dumps(d[&#39;usage&#39;]))&quot;
+✅ Serving at http://127.0.0.1:8000 (pid 18273).
+ 
+VRAM 13581 MiB, 15360 MiB, 0 %
+ 
+The HTTP status code 418, &quot;I&#39;m a teapot,&quot; is a humorous error code indicating that the server refuses to brew coffee because it is a teapot and not a coffee maker.
+{&quot;prompt_tokens&quot;: 24, &quot;total_tokens&quot;: 65, &quot;completion_tokens&quot;: 41, &quot;prompt_tokens_details&quot;: null, &quot;completion_tokens_details&quot;: null}</code></pre>
+<p>The 13,581 MiB is vLLM's reservation at
+<code>--gpu-memory-utilization 0.9</code>; the KV cache fills whatever
+the weights leave.</p>
+<hr />
+<h4 id="what-the-engine-allocates">What the Engine Allocates</h4>
+<p>Four builds of the same model, same flags, warm compile cache:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-3.png"
+alt="Table: Build, Model loading, KV cache" /></p>
+<p>The two Google builds were served as multimodal checkpoints, so their
+figures include the vision and audio towers.</p>
+<p>At this serving shape, eight sequences of up to 16,384 tokens, no
+build's KV cache binds. The freed memory is headroom for more concurrent
+sequences or longer contexts.</p>
+<hr />
+<h4 id="does-it-produce-the-same-text">Does It Produce the Same
+Text?</h4>
+<p>Eight prompts, 160 tokens each, greedy decoding, against the build
+with bf16 embeddings:</p>
+<pre class="plaintext"><code>PROMPT: What is the capital of France? Answer in one word.
+SAME TOKENS: True
+PROMPT: List the first ten prime numbers, comma separated.
+SAME TOKENS: True
+PROMPT: What does the HTTP status code 418 mean?
+SAME TOKENS: True</code></pre>
+<p>All eight are token-identical. A build that packs only the PLE table,
+with bf16 scales, matched seven of eight and diverged at token 55 of the
+HTTP 418 answer. That is a spot check of fidelity; no accuracy benchmark
+was run on either build.</p>
+<hr />
+<h4 id="single-stream-decode">Single-Stream Decode</h4>
+<p>One request at a time, 256 output tokens:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-4.png"
+alt="Table: Build, Decode, c=1" /></p>
+<p>Packing the PLE table saves 3.14 GiB and changes nothing about speed:
+each token looks up one row of it per layer. The speedup comes from the
+output layer. At one token per step, decode on the T4 is limited by how
+many bytes it reads, and the output layer is a full read of a
+262,144-row matrix on every token, 0.75 GiB at fp16 and 0.21 GiB at
+int4.</p>
+<hr />
+<h4 id="the-sweep">The Sweep</h4>
+<p><code>vllm bench serve</code>, random prompts of 512 and 4096 tokens,
+128 output tokens, concurrency 1 to 16, three repeats per cell, greedy.
+Every cell uses the same prompt seeds as Part 1's bf16 and QAT runs, so
+all three builds answer the same prompts. The largest run-to-run
+variation in any cell is 2.5%.</p>
+<hr />
+<h4 id="512-token-prompts">512-Token Prompts</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-5.png"
+alt="Table: c, bf16 out tok/s, QAT out tok/s, emb4 out tok/s, emb4 vs QAT, emb4 vs bf16" /></p>
+<p>The gain is largest for one user and shrinks with concurrency. At c=1
+each decode step reads every weight to produce one token, so the output
+layer is a large share of the step. At c=8 the same read produces eight
+tokens and attention over eight sequences grows, so the output layer's
+share is smaller.</p>
+<p>c=16 exceeds <code>--max-num-seqs 8</code>, so the extra requests
+wait in the queue: throughput stays at the c=8 value and time to first
+token absorbs the wait.</p>
+<hr />
+<h4 id="4096-token-prompts">4096-Token Prompts</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-6.png"
+alt="Table: c, bf16 out tok/s, QAT out tok/s, emb4 out tok/s, emb4 vs QAT" /></p>
+<p>A 4096-token prompt takes about 7.1 seconds to its first token on all
+three builds. That time is compute over the prompt, which int4
+embeddings do not change, so long prompts gain 3-7%. The 3% at c=4 and
+above is larger than those cells' run-to-run variation, which is 0.2% or
+less.</p>
+<hr />
+<h4 id="mag_right-tip-w8a8-is-slower-on-the-t4">🔎 Tip: W8A8 Is Slower
+on the T4</h4>
+<p>The same benchmark ran a W8A8 build, int8 weights and activations
+with the same int4 embeddings, for one repeat over five cells:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-7.png"
+alt="Table: input, c, W8A8 out tok/s, emb4 out tok/s" /></p>
+<p>W4A16 is faster in every cell. Decode on this card is bound by bytes
+read, and 4-bit weights read half the bytes of 8-bit ones.</p>
+<hr />
+<h4 id="mag_right-tip-googles-drafter-for-one-user">🔎 Tip: Google's
+Drafter for One User</h4>
+<p>Google publishes a small assistant model for speculative decoding
+with the QAT target,
+<code>google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant</code>. vLLM
+serves it as method <code>gemma4_mtp</code>:</p>
+<pre class="bash"><code>--speculative-config &#39;{&quot;model&quot;:&quot;google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant&quot;,&quot;num_speculative_tokens&quot;:3}&#39;</code></pre>
+<p>Twenty real chat prompts, one at a time, median time per output
+token:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-8.png"
+alt="Table: Setting, Time per token, Drafts accepted" /></p>
+<p>With greedy decoding, three draft tokens make decode 1.35x faster,
+and every one of the twenty prompts is faster. At the checkpoint's own
+sampling settings (temperature 1.0, top-k 64, top-p 0.95) the gain drops
+to 1.13x at the same acceptance, because sampling with the drafter costs
+extra on the T4. Startup takes about 4.5 minutes instead of 90 seconds.
+Three of the twenty greedy answers differ in length from the plain
+engine's. These are one run per setting, measured at one user; the gain
+under concurrency is unmeasured.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-9.png"
+alt="Table: One Tesla T4, bf16, Google QAT W4A16, QAT, int4 embeddings" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For text serving on a T4, the int4-embedding build: it is the fastest
+at every cell measured, and its KV cache is 3.48x the size of bf16's.
+For images or audio, Google's QAT W4A16 export, which keeps the towers
+and is still 1.31x bf16 at eight users. bf16 is the reference to measure
+against.</p>
+<hr />
+<h4 id="what-does-it-cost">What Does It Cost?</h4>
+<p>The VM's compute is $0.5241 an hour at us-west2 on-demand list
+prices: the T4, two vCPUs and 7.5 GiB of RAM. At the measured 512-token,
+eight-user throughput, by arithmetic:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-t4-2b-w4a16/article/medium/img/devto-gemma4-t4-emb4-table-10.png"
+alt="Table: Build, Output tok/s, Per million output tokens" /></p>
+<p>This assumes the VM runs at that load around the clock, and excludes
+disks, sustained-use discounts and egress.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<pre class="bash"><code>./vllm-t4 stop
+✅ Sent SIGTERM to vLLM (pid 14977). VRAM is released on exit.</code></pre>
+<p>Stopping vLLM frees the GPU. The VM and its T4 bill by the hour while
+the VM runs; stop the VM to stop the charge. The swapfile stays on the
+data disk and <code>vllm-t4 start</code> turns it back on.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to serve Gemma 4 E2B on a Tesla T4 with
+every weight at 4 bits. The key to the solution was that QAT trained the
+embedding tables onto the same 4-bit grid as the linear layers, so
+packing them adds no error, and untying the output layer lets vLLM run
+it as an int4 linear. The results were:</p>
+<ul>
+<li>🟢 Model loading 2.86 GiB against 9.8 GiB for bf16, and 1,099,587 KV
+tokens against 315,974</li>
+<li>🟢 85.28 output tok/s for one 512-token request, 2.30x bf16 and
+1.37x Google's QAT W4A16 export</li>
+<li>🟢 239.64 tok/s at eight users, 1.46x bf16 and 1.11x the QAT
+export</li>
+<li>🟢 Eight of eight greedy test outputs token-identical to the build
+with bf16 embeddings</li>
+<li>⚠️ 3-7% gain on 4096-token prompts, where prompt processing sets the
+rate</li>
+<li>🟢 Google's drafter adds 1.35x for one user with greedy decoding,
+1.13x with default sampling</li>
+<li>❌ W8A8 is slower than W4A16 on the T4 in every cell measured</li>
+<li>⚠️ Text only: the vision and audio towers are dropped</li>
+</ul>
+<p>Scope: one Tesla T4 on one <code>n1-standard-2</code> VM in
+<code>us-west2-b</code>, vLLM 0.29.0, torch 2.13.0+cu130, three repeats
+per sweep cell. The bf16 and QAT cells are Part 1's 2026-09-18 run with
+the same host, flags, benchmark script and prompt seeds; the
+int4-embedding cells were measured 2026-09-29. That comparison changes
+three things at once: the exact-grid repack, int4 embeddings with an
+int4 output layer, and text only. The single-stream table isolates the
+embeddings. Fidelity was spot-checked on eight prompts and no accuracy
+benchmark was run. The W8A8 and drafter figures are one run per
+setting.</p>
+<p>The strategy for using MCP for Tesla T4 deployment and benchmarking
+was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>The int4-embedding checkpoint: <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4">https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</a></li>
+<li>The bf16-embedding intermediate: <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text">https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text</a></li>
+<li>Code, repack scripts, sweep and logs: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b-w4a16">https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-t4-2b-w4a16</a></li>
+<li>Google's QAT source checkpoint: <a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized">https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized</a></li>
+<li>Google's QAT W4A16 export: <a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-w4a16-ct">https://huggingface.co/google/gemma-4-E2B-it-qat-w4a16-ct</a></li>
+<li>Google's drafter: <a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant">https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant</a></li>
+<li>The bf16 reference: <a
+href="https://huggingface.co/google/gemma-4-E2B-it">https://huggingface.co/google/gemma-4-E2B-it</a></li>
+<li>Part 1: <a
+href="https://dev.to/gde/gemma-4-on-a-tesla-t4-qat-weights-decode-179x-faster-than-bf16-2fi4">https://dev.to/gde/gemma-4-on-a-tesla-t4-qat-weights-decode-179x-faster-than-bf16-2fi4</a></li>
+<li>Part 2: <a
+href="https://dev.to/gde/gemma-4-on-a-tesla-t4-part-2-the-minimum-gce-vm-and-a-script-to-drive-it-3gk1">https://dev.to/gde/gemma-4-on-a-tesla-t4-part-2-the-minimum-gce-vm-and-a-script-to-drive-it-3gk1</a></li>
+<li>vLLM speculative decoding: <a
+href="https://docs.vllm.ai/en/latest/features/speculative_decoding/">https://docs.vllm.ai/en/latest/features/speculative_decoding/</a></li>
+</ul>
+</body>
+</html>

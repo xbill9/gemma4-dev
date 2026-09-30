@@ -1,0 +1,46 @@
+# ARITHMETIC, not measurement: every derived figure in the Part 3 article, with its inputs.
+# Written 2026-09-30. Inputs are cited by file; nothing here was re-measured.
+
+## Ratios from the sweep (benchmarks/runs/2026-09-29-emb4-sweep-t4/REPORT.md, mean of 3 repeats)
+512/c=1  emb4 / bf16 = 85.28 / 37.04   = 2.30x
+512/c=1  emb4 / QAT  = 85.28 / 62.27   = 1.37x  (+37%)
+512/c=8  emb4 / bf16 = 239.64 / 164.62 = 1.46x
+512/c=8  emb4 / QAT  = 239.64 / 215.91 = 1.11x  (+11%)
+4096/c=1 emb4 / QAT  = 15.03 / 14.00   = 1.07x  (+7%)
+
+## Single-stream check (evidence/2026-09-29-embed-int4.txt)
+decode 109.7 / 81.6 = 1.34x   (-text-emb4 over -text, both f16/bf16 scales as listed there)
+model loading 6.33 - 2.86 = 3.47 GiB freed
+checkpoint 6.11 / 2.64 = 2.31x smaller
+
+## Memory (REPORT.md "Memory" table)
+model loading bf16 / emb4 = 9.8 / 2.86 = 3.43x
+KV tokens emb4 / bf16 = 1,099,587 / 315,974 = 3.48x
+
+## Speculative decoding (benchmarks/runs/2026-09-29-specdec-c1-t4/*.json summaries)
+greedy:  baseline 9.945 ms TPOT / k=3 7.364 ms = 1.35x
+sampled: baseline-sampled 9.821 ms / demo-sampled-spec3 8.699 ms = 1.13x
+spec3 rows vs baseline rows: 20 of 20 prompts lower TPOT; 3 of 20 differ in token count.
+
+## Cost per million output tokens at list price
+# compute/hour 0.5241 USD (GPU + 2 vCPU + 7.5 GiB RAM, us-west2 on-demand) from
+# ../gpu-vllm-t4-2b/evidence/2026-09-22-gce-t4-vm-pricing.txt. Excludes disks, discounts, egress.
+# Assumes the VM runs at the 512/c=8 load continuously.
+bf16  164.62 tok/s = 0.5926 M tok/h -> 0.5241 / 0.5926 = $0.88 per M output tokens
+QAT   215.91 tok/s = 0.7773 M tok/h -> 0.5241 / 0.7773 = $0.67
+emb4  239.64 tok/s = 0.8627 M tok/h -> 0.5241 / 0.8627 = $0.61
+
+## Added for the article text
+PLE table saving 4.375 - 1.230 = 3.145 GiB (embed-int4.txt); model loading 6.33 - 3.19 = 3.14 GiB (-text vs -text-ple4)
+PLE + embed_tokens bf16 = 4.375 + 0.750 = 5.125 GiB of the 6.11 GiB -text checkpoint
+QAT / bf16 at 512/c=8 = 215.91 / 164.62 = 1.31x
+
+## Rounding of the speculative-decoding summaries (median_tpot_ms, acceptance_rate) as the article prints them
+baseline            9.945 ms -> 9.9 ms
+spec2               7.921 ms -> 7.9 ms, 0.476 -> 48%
+spec3               7.364 ms -> 7.4 ms, 0.378 -> 38%
+spec4               7.301 ms -> 7.3 ms, 0.315 -> 32%
+spec6               7.536 ms -> 7.5 ms, 0.229 -> 23%
+baseline-sampled    9.821 ms -> 9.8 ms
+demo-sampled-spec3  8.699 ms -> 8.7 ms, 0.3696 -> 37%
+startup: ab.out "baseline: healthy after 90s", "spec3: healthy after 281s" (about 4.5 min)
