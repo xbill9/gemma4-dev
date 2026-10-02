@@ -9,6 +9,10 @@ A single-file MCP server (`server.py`, MCPServer) that acts as a devops agent fo
 out to `gcloud` and talk HTTP to the vLLM OpenAI-compatible endpoint on port 8000. This rig is used for
 **live demos** — prefer changes that keep the demo working over broad refactors.
 
+## Image
+
+Boots on the pinned `vllm/vllm-tpu@sha256:19a1a052…` with `patches/` applied as `vllm-tpu-w4a16:patched` (`wna16.diff` for the W4A16 linears, `kvshare.diff` for the KV-shared layers the QAT export omits); `vllm/vllm-tpu:nightly` exits at model load on this checkpoint (upstream #3225). **On v5e-1 it does not yet reach serving** (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e1`): at `--gpu-memory-utilization` 0.90 the compiled program does not fit beside the KV pool in HBM (short by 20 MiB), hence `GPU_MEMORY_UTILIZATION=0.80`; at 0.80 the host OOM killer stopped the engine during compilation (35.1 GiB resident on the 48 GiB host). The serving v5e-1 rigs on this image use `--max_num_batched_tokens 512` with `MIN_TOKEN_BUCKET=64`.
+
 ## Commands
 
 ```
@@ -51,7 +55,7 @@ Source of truth either way: `grep -n "^@mcp.tool" server.py`.
 
 **`startup_script_template.sh` is consumed by `str.format()`.** Placeholders are `{project_id}`, `{zone}`,
 `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`, `{max_num_batched_tokens}`,
-`{limit_mm_per_prompt}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
+`{limit_mm_per_prompt}`, `{vllm_base_image}`, `{vllm_serve_image}`, `{patches_b64}`, `{gpu_memory_utilization}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
 `${VAR}`, a JSON literal — raises at format time and breaks the deploy. Escape as `{{` / `}}`.
 
 **The startup script fetches the HF token itself; never add a `{hf_token}` placeholder back.** The rendered

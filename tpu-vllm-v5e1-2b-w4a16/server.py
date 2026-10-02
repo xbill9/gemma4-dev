@@ -1,10 +1,13 @@
 import asyncio
+import base64
+import io
 import json
 import logging
 import os
 import re
 import shlex
 import sys
+import tarfile
 import tempfile
 import time
 from typing import NamedTuple, Optional
@@ -108,8 +111,20 @@ LOCAL_DOCKER_IMAGE = os.getenv("LOCAL_DOCKER_IMAGE", "")
 # Serving parameters. Both deployment paths (the boot-time startup script and
 # manage_vllm_docker) read these, so a container recreated by hand serves the same
 # config the queued resource booted with.
-VLLM_IMAGE = "vllm/vllm-tpu:nightly"
+# Google's QAT exports omit k_proj, v_proj and k_norm for the 20 KV-shared layers (15-34);
+# vllm/vllm-tpu:nightly allocates and requires them on every layer and exits at model load
+# (upstream tpu-inference #3225). The rig serves on this pinned digest with patches/ applied
+# in patches/ORDER (kvshare.diff builds no K/V weights for KV-shared layers); the patches are
+# written against this digest, so it is pinned. The VM applies them at boot and serves the
+# result under a local tag.
+VLLM_BASE_IMAGE = "vllm/vllm-tpu@sha256:19a1a0526476f902eb83e1057f3d8938f35b457dd7716a30e9ab4f7bee90d507"
+VLLM_SERVE_IMAGE = "vllm-tpu-w4a16:patched"
+PATCH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "patches")
 MAX_MODEL_LEN = os.getenv("MAX_MODEL_LEN", "16384")
+# On one v5e chip the compiled program needs HBM outside the KV-cache cap: at vLLM's default 0.90
+# the KV pool left 1.13 GiB free and loading jit_run_model_impl asked for 1.15 GiB (RESOURCE_EXHAUSTED,
+# benchmarks/runs/2026-10-02-rig-boot-patched-v5e1). 0.80 is the value the patched v5e-1 rigs use.
+GPU_MEMORY_UTILIZATION = os.getenv("GPU_MEMORY_UTILIZATION", "0.80")
 MAX_NUM_BATCHED_TOKENS = os.getenv("MAX_NUM_BATCHED_TOKENS", "4096")
 LIMIT_MM_PER_PROMPT = os.getenv("LIMIT_MM_PER_PROMPT", '{"image":4,"audio":1}')
 
@@ -200,12 +215,25 @@ async def _get_node_ip(node_id: str) -> Optional[str]:
 async def get_secret(secret_id: str = HF_SECRET_ID) -> Optional[str]:
     """Retrieves a secret from Secret Manager."""
     rc, stdout, stderr = await run_command(
-        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}"]
+        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}", f"--project={PROJECT_ID}"]
     )
     if rc == 0:
         return stdout.strip()
     logger.error(f"Failed to access secret {secret_id} via gcloud (exit code {rc}): {stderr}")
     return None
+
+
+def _patches_b64() -> str:
+    """patches/ORDER and the diffs it names, as a base64 tar.gz for the startup script.
+
+    Base64 has no braces, so it passes through the template's str.format() unescaped.
+    """
+    order = open(os.path.join(PATCH_DIR, "ORDER")).read().split()
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for name in ["ORDER"] + order:
+            tar.add(os.path.join(PATCH_DIR, name), arcname=name)
+    return base64.b64encode(buf.getvalue()).decode()
 
 
 async def _get_formatted_startup_script(model_name: str, zone: str = ZONE) -> str:
@@ -225,8 +253,12 @@ async def _get_formatted_startup_script(model_name: str, zone: str = ZONE) -> st
             hf_secret_id=HF_SECRET_ID,
             tensor_parallel_size=TENSOR_PARALLEL_SIZE,
             max_model_len=MAX_MODEL_LEN,
+            gpu_memory_utilization=GPU_MEMORY_UTILIZATION,
             max_num_batched_tokens=MAX_NUM_BATCHED_TOKENS,
             limit_mm_per_prompt=LIMIT_MM_PER_PROMPT,
+            vllm_base_image=VLLM_BASE_IMAGE,
+            vllm_serve_image=VLLM_SERVE_IMAGE,
+            patches_b64=_patches_b64(),
         )
     except Exception as e:
         logger.error(f"Error formatting startup script: {e}")
@@ -246,6 +278,7 @@ def _vllm_serve_flags(mm_limit: Optional[str] = None) -> str:
     return (
         f"--max-model-len {MAX_MODEL_LEN} "
         f"--tensor-parallel-size {TENSOR_PARALLEL_SIZE} "
+        f"--gpu-memory-utilization {GPU_MEMORY_UTILIZATION} "
         f"--disable_chunked_mm_input "
         f"--max_num_batched_tokens {MAX_NUM_BATCHED_TOKENS} "
         f"--limit-mm-per-prompt {mm_limit} "
@@ -609,23 +642,25 @@ async def save_hf_token(token: str) -> str:
 
 @mcp.tool()
 async def get_vllm_deployment_config(service_name: str = RESOURCE_ID, model_name: str = MODEL_NAME) -> str:
-    """Generates the gcloud command for a single-host TPU v5e vLLM deployment."""
-    # The token is read on the VM at runtime — never interpolated into the returned text.
-    # The whole startup script is one single-quoted argument, so the JSON value has to be
-    # double-quoted and backslash-escaped rather than single-quoted.
-    escaped_mm = '"' + LIMIT_MM_PER_PROMPT.replace('"', '\\"') + '"'
+    """Generates the gcloud command for a single-host TPU v5e vLLM deployment.
+
+    The checkpoint serves only on the patched image, which the rendered startup script builds
+    at boot, so the command passes that script (written to a local file) rather than an inline
+    docker run. The token is read on the VM at runtime — never interpolated into the script.
+    """
+    script = await _get_formatted_startup_script(model_name)
+    path = os.path.join(tempfile.gettempdir(), f"{service_name}-startup.sh")
+    with open(path, "w") as f:
+        f.write(script)
     cmd = (
         f"gcloud alpha compute tpus tpu-vm create {service_name} \\\n"
         f"  --accelerator-type={ACCELERATOR_TYPE} \\\n"
         f"  --version={TPU_RUNTIME_VERSION} \\\n"
         f"  --zone={ZONE} \\\n"
         f"  --project={PROJECT_ID} \\\n"
-        f"  --metadata=startup-script='#!/bin/bash\\n"
-        f"docker run -t --rm --name vllm-gemma4 --privileged --net=host "
-        f"-v /dev/shm:/dev/shm --shm-size 10gb "
-        f"-e HF_HOME=/dev/shm "
-        f"-e HF_TOKEN=$(gcloud secrets versions access latest --secret={HF_SECRET_ID}) "
-        f"{VLLM_IMAGE} vllm serve {model_name} {_vllm_serve_flags(mm_limit=escaped_mm)}'"
+        f"  --metadata-from-file=startup-script={path}\n"
+        f"# {path} pulls {VLLM_BASE_IMAGE}, applies patches/ as {VLLM_SERVE_IMAGE}, "
+        f"and serves {model_name} with: {_vllm_serve_flags()}"
     )
     return cmd
 
@@ -649,7 +684,9 @@ spec:
     spec:
       containers:
       - name: vllm-container
-        image: vllm/vllm-tpu:nightly
+        # {MODEL_NAME} needs patches/ applied to this image's tpu_inference
+        # (see startup_script_template.sh); build and push that image for GKE first.
+        image: {VLLM_BASE_IMAGE}
         resources:
           limits:
             google.com/tpu: "{TENSOR_PARALLEL_SIZE}"
@@ -1024,13 +1061,13 @@ async def manage_vllm_docker(resource_id: str = RESOURCE_ID, action: str = "star
             "(no ACTIVE queued resource and no standalone TPU VM by that name)."
         )
 
-    # Same image and serve flags the boot-time startup script uses, so a container
-    # recreated here matches what the queued resource originally booted with.
+    # Same patched image (built on the VM at boot) and serve flags the startup script
+    # uses, so a container recreated here matches what the queued resource booted with.
     docker_run_cmd = (
         f"sudo docker run --name vllm-gemma4 --privileged --net=host -d "
         f"-v /dev/shm:/dev/shm --shm-size 10gb "
         f"-e HF_HOME=/dev/shm -e HF_TOKEN=$(gcloud secrets versions access latest --secret={HF_SECRET_ID}) "
-        f"{VLLM_IMAGE} vllm serve {MODEL_NAME} {_vllm_serve_flags()}"
+        f"{VLLM_SERVE_IMAGE} vllm serve {MODEL_NAME} {_vllm_serve_flags()}"
     )
 
     commands = {
@@ -1524,7 +1561,7 @@ async def run_vllm_benchmark(
         "sudo docker run --rm --privileged --net=host "
         "-v /dev/shm:/dev/shm --shm-size 10gb "
         "-e HF_TOKEN=$(gcloud secrets versions access latest --secret=hf-token) "
-        f"vllm/vllm-tpu:nightly {benchmark_cmd}"
+        f"{VLLM_BASE_IMAGE} {benchmark_cmd}"
     )
     remote_cmd = docker_cmd
     if save_result:

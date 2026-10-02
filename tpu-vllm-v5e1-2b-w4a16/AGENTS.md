@@ -59,6 +59,7 @@ offline and mock cloud, subprocess, and network boundaries.
 
 ## Deployment invariants and hazards
 
+- Boots on the pinned `vllm/vllm-tpu@sha256:19a1a052…` with `patches/` applied as `vllm-tpu-w4a16:patched` (`wna16.diff` for the W4A16 linears, `kvshare.diff` for the KV-shared layers the QAT export omits); `vllm/vllm-tpu:nightly` exits at model load on this checkpoint (upstream #3225). **On v5e-1 it does not yet reach serving** (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e1`): at `--gpu-memory-utilization` 0.90 the compiled program does not fit beside the KV pool in HBM (short by 20 MiB), hence `GPU_MEMORY_UTILIZATION=0.80`; at 0.80 the host OOM killer stopped the engine during compilation (35.1 GiB resident on the 48 GiB host). The serving v5e-1 rigs on this image use `--max_num_batched_tokens 512` with `MIN_TOKEN_BUCKET=64`. Do not switch back to `:nightly`.
 - A v5e-1 is a single chip, so the correct default tensor parallel size is `1`. Older documentation and some
   Makefile examples incorrectly show `4`.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-1`, the Flex-start runtime version is
@@ -73,7 +74,7 @@ offline and mock cloud, subprocess, and network boundaries.
   queued resource's node to a TPU VM of that name, then to whichever node is confirmed serving vLLM.
 - `startup_script_template.sh` is rendered with Python `str.format()`. Its supported placeholders are
   `{project_id}`, `{zone}`, `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`,
-  `{max_num_batched_tokens}`, and `{limit_mm_per_prompt}`. Escape every other literal brace as `{{` or `}}`,
+  `{max_num_batched_tokens}`, `{limit_mm_per_prompt}`, `{vllm_base_image}`, `{vllm_serve_image}`, `{patches_b64}`, `{gpu_memory_utilization}`. Escape every other literal brace as `{{` or `}}`,
   including shell `${VAR}` and JSON braces, or deployment rendering will fail.
 - There is deliberately no `{hf_token}` placeholder. The rendered script is uploaded as instance metadata, so
   it fetches `hf-token` from Secret Manager at boot using the VM's own credentials instead. The VM service

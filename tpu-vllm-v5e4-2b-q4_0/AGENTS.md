@@ -62,9 +62,10 @@ offline and mock cloud, subprocess, and network boundaries.
 - A v5e-4 is four chips on one host, so the correct default tensor parallel size is `4`. A `1` or `1x1` here
   is copy-paste from the v5e-1 sibling, `../tpu-vllm-v5e1-2b-q4_0`. E2B's single KV head does not shard, so
   every chip holds the whole KV cache.
-- Flex-start `v5litepod-4` was accepted in `us-west4-a` on 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`), but the container then
-  exited at model load: `vllm/vllm-tpu:nightly` as pulled that day (`sha256:106a30b6…`) reports `k_norm` weights
-  of the KV-shared layers not initialized from checkpoint, at TP=4 and at TP=1. The rig does not serve as committed.
+- Flex-start `v5litepod-4` was accepted in `us-west4-a` on 2026-10-02. The rig serves on the pinned
+  `vllm/vllm-tpu@sha256:19a1a052…` with `patches/` applied at boot as `vllm-tpu-q4_0:patched`: 202.2 / 716.4 / 1,514.4
+  output tok/s at 1 / 4 / 16 requests (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e4`). `vllm/vllm-tpu:nightly`
+  exits at model load on this checkpoint (`k_norm` of the KV-shared layers, upstream #3225); do not switch back to it.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-4`, the Flex-start runtime version is
   `v2-alpha-tpuv5-lite`, and `--type=v5litepod --topology=2x2` is the tpu-vm form. Use "v5e-4" in prose only,
   never as a gcloud argument.
@@ -77,7 +78,7 @@ offline and mock cloud, subprocess, and network boundaries.
   queued resource's node to a TPU VM of that name, then to whichever node is confirmed serving vLLM.
 - `startup_script_template.sh` is rendered with Python `str.format()`. Its supported placeholders are
   `{project_id}`, `{zone}`, `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`,
-  `{max_num_batched_tokens}`, and `{limit_mm_per_prompt}`. Escape every other literal brace as `{{` or `}}`,
+  `{max_num_batched_tokens}`, `{limit_mm_per_prompt}`, `{vllm_base_image}`, `{vllm_serve_image}`, `{patches_b64}`. Escape every other literal brace as `{{` or `}}`,
   including shell `${VAR}` and JSON braces, or deployment rendering will fail.
 - There is deliberately no `{hf_token}` placeholder. The rendered script is uploaded as instance metadata, so
   it fetches `hf-token` from Secret Manager at boot using the VM's own credentials instead. The VM service

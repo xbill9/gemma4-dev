@@ -5,48 +5,34 @@ This project functions as an expert TPU SRE and DevOps Engineer, specialized in 
 
 This project provides an automated DevOps/SRE assistant that leverages **Gemma 4 models self-hosted via vLLM on Cloud TPUs**. It bridges Google Cloud Logging with a private inference endpoint to analyze infrastructure issues and suggest remediations.
 
-## What this rig is for: an expected failure
+## What this rig serves
 
 This rig serves **`google/gemma-4-E2B-it-qat-w4a16-ct`** — genuine 4-bit weights with 16-bit
 activations, packaged in a compressed-tensors container. Unlike its sibling
-[`tpu-vllm-v5e1-2b-q4_0`](../tpu-vllm-v5e1-2b-q4_0/), whose `-unquantized` checkpoint is bf16 on
-disk, **these tensors really are 4-bit, and the current stack cannot load them.**
+[`../tpu-vllm-v5e1-2b-q4_0`](../tpu-vllm-v5e1-2b-q4_0/), whose `-unquantized` checkpoint is bf16 on disk, **these tensors really are 4-bit**.
 
 Slot 5 is `w4a16`, not `w4a16-ct`: per [NAMING.md](../NAMING.md#slot-5--encoding-optional),
 compressed-tensors is the *container*, not the encoding, and a hyphen inside a slot would break
 parsing. The container is recorded in `MODEL_NAME`, which spells it in full.
 
-### Where it refuses
+### The image
 
-Verified by reading `tpu-inference` @ `0425df5` on 2026-08-07. The dispatch reaches a real
-compressed-tensors code path — further than a GGUF file gets — then raises:
+The rig serves on the pinned `vllm/vllm-tpu@sha256:19a1a052…` with `patches/` applied at boot, in `patches/ORDER`,
+as `vllm-tpu-w4a16:patched` (`startup_script_template.sh`). Two of the patches carry this checkpoint:
 
-```
-tpu_inference/layers/vllm/quantization/compressed_tensors/compressed_tensors.py:149
-    raise NotImplementedError(
-        "No compressed-tensors compatible scheme was found for layer {layer_name}.")
-```
+- `wna16.diff` adds the W4A16 linear method on the JAX path. Upstream `tpu-inference` @ `0425df5` (read 2026-08-07)
+  had no integer wNa16 scheme on either backend (`compressed_tensors.py:149` raises `NotImplementedError` on the vLLM
+  backend; the JAX backend carries `TODO: w4a8 / wNa16 schemes need their own JAX methods`).
+- `kvshare.diff` builds no K/V weights for the 20 KV-shared layers (15-34). Google's QAT export omits their
+  `k_proj`, `v_proj` and `k_norm`; `vllm/vllm-tpu:nightly` as pulled 2026-10-02 (`sha256:106a30b6…`) requires them
+  on every layer and exits at model load (upstream tpu-inference #3225).
 
-That line is the fall-through after the four schemes that *are* implemented: nvfp4 (W4A4 and
-NVFP4A16), fp8-W4A8, fp8-W8A8, and int8-W8A8. There is no integer wNa16 scheme in
-`.../compressed_tensors/schemes/`. The JAX backend stops at the same wall one step earlier, and
-says so in a comment:
+The patches are written against that digest, so it is pinned. Moving to a newer image means re-checking that
+`patches/` still applies and that the checkpoint loads.
 
-```
-tpu_inference/layers/jax/quantization/compressed_tensors.py:145
-    # TODO: w4a8 / wNa16 schemes need their own JAX methods (not yet ported).
-```
+### Booted 2026-10-02 on the patched image: does not yet reach serving
 
-So the useful output of this rig today is **the traceback and how far the load got**, not
-throughput. Run it with `DISABLE_VLLM_SERVER=true` and load the model directly so the raise is
-visible, rather than buried in server startup.
-
-### When this starts working
-
-Nothing here needs to change except the expectation. `supported_quantization` in
-`tpu_inference/platforms/tpu_platform.py:112` already lists `compressed-tensors`, so the checkpoint
-passes platform validation; only the per-layer scheme is missing. If a `wNa16` scheme lands in
-either backend, this rig serves it with no config change.
+Two boots through `create_tpu_queued_resource` (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e1`). The checkpoint loads on the patched image (weights 7.17 GiB). At vLLM's default `--gpu-memory-utilization` 0.90 the KV pool left 1.13 GiB of HBM free and loading the compiled program asked for 1.15 GiB (`RESOURCE_EXHAUSTED`), so the rig sets `GPU_MEMORY_UTILIZATION=0.80`. At 0.80 the host's OOM killer stopped the engine during compilation (35.1 GiB resident on the 48 GiB host, model files also in `/dev/shm`). The v5e-4 sibling serves this checkpoint on the same image (`../tpu-vllm-v5e4-2b-w4a16/benchmarks/runs/2026-10-02-rig-boot-patched-v5e4`). The patched v5e-1 rigs that serve cap `--max_num_batched_tokens` at 512 with `MIN_TOKEN_BUCKET=64` to keep compile host memory down; this rig keeps 4096.
 
 ### Measured 2026-09-30 (throughput)
 
@@ -65,7 +51,7 @@ To deploy and run this project, you need to address two main components: the **I
 ### 1. Infrastructure Requirements (The Inference Stack)
 The MCP server expects a running vLLM instance. Your TPU deployment for the model needs:
 *   **Hardware:** Cloud TPU v5e (v5litepod) with topology `1x1` (1 chip).
-*   **Software:** `vllm/vllm-tpu:nightly` specialized container (v0.19.2+ recommended for Gemma 4 fixes).
+*   **Software:** `vllm/vllm-tpu@sha256:19a1a052…` with this rig's `patches/` applied, built on the VM at boot as `vllm-tpu-w4a16:patched` (`startup_script_template.sh`). `vllm/vllm-tpu:nightly` cannot load this checkpoint (upstream tpu-inference #3225).
 *   **Model:** `google/gemma-4-E2B-it-qat-w4a16-ct` (Hugging Face ID).
 *   **Runtime:** `v2-alpha-tpuv5-lite` for Flex-start / Queued Resources.
 *   **Networking:** Private Google Access must be enabled for internal connectivity, or direct internet access for Hugging Face downloads.
@@ -100,7 +86,7 @@ You can configure the following variables for the MCP server:
     -   `--max-model-len 16384`
     -   `--disable_chunked_mm_input`
     -   `--max_num_batched_tokens 4096` (required for multimodal compatibility)
-    -   `--limit-mm-per-prompt '{"image":4,"audio":1}'` (JSON format required in nightly)
+    -   `--limit-mm-per-prompt '{"image":4,"audio":1}'` (JSON format)
 -   **Tooling:** Enable `--enable-auto-tool-choice`, `--tool-call-parser gemma4`, and `--reasoning-parser gemma4`.
 
 ## Flex-start VMs

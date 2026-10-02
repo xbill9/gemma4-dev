@@ -30,11 +30,16 @@ counterpart is `tpu-vllm-v5e1-2b`. If the wNa16 schemes ever land, this is the r
 
 ### Baseline: the v5e-1 sibling
 
-**Measured on v5e-4, 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`):** flex-start `v5litepod-4` in `us-west4-a` was granted in under 5
-minutes and the boot ran through this rig's own `create_tpu_queued_resource`. `vllm/vllm-tpu:nightly` as pulled 2026-10-02 (digest `sha256:106a30b6…`) cannot load this checkpoint: the container exits at model load with `ValueError: Following weights were not initialized from checkpoint` (`k_norm` of the KV-shared layers). The same container at `--tensor-parallel-size 1` on the same VM fails the same way, so the cause is the image and checkpoint, independent of chip count. **The rig does not serve as committed.**
-Cause (diagnosed 2026-10-02, run record's Diagnosis section): Google's QAT export omits `k_proj`/`v_proj`/`k_norm`
-for the 20 KV-shared layers and that day's nightly allocates and requires them on every layer. The same checkpoint
-serves at TP=4 on the pinned digest with `patches/` (`kvshare.diff`); moving this rig onto that image is the fix.
+**Serves on the patched image, measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e4`):** flex-start
+`v5litepod-4` in `us-west4-a`, booted through `create_tpu_queued_resource`. The boot script pulls the pinned
+`vllm/vllm-tpu@sha256:19a1a052…`, applies `patches/` in `patches/ORDER` and serves `vllm-tpu-q4_0:patched` with every
+other serving argument unchanged (multimodal limits included). Weights 2.31 GiB per chip, KV cache 709,152 tokens;
+greedy chat and tool call verified; **202.2 / 716.4 / 1,514.4 output tok/s at 1 / 4 / 16 requests**, against
+124.7 / 435.6 / 1,136.8 for the v5e-1 sibling on the same image the same day (1.62x / 1.64x / 1.33x).
+Why the image is pinned: Google's QAT export omits `k_proj`/`v_proj`/`k_norm` for the 20 KV-shared layers, and
+`vllm/vllm-tpu:nightly` (2026-10-02, `sha256:106a30b6…`) requires them on every layer and exits at model load
+(upstream tpu-inference #3225; `benchmarks/runs/2026-10-02-rig-boot-v5e4`). `kvshare.diff` builds no K/V weights for
+those layers. Moving to a newer image means re-checking that `patches/` still applies.
 
 The numbers below were measured
 on v5e-1 by [`../tpu-vllm-v5e1-2b-q4_0`](../tpu-vllm-v5e1-2b-q4_0) (2026-09-30, generation and tool calling):
@@ -53,9 +58,9 @@ At a 768-token limit the gap was −1.9 (−3.3 to −0.5); 86 of its answers we
 E2B has one KV head (`num_key_value_heads=1`), and a single KV head does not shard
 (`../MODELS.md`, "Single KV head does not shard"). At TP=4 every chip holds the whole KV cache, so KV per
 token per chip stays 18 KiB, while query heads split 8 -> 2 per chip. The KV pool grows only by the weights
-each chip no longer holds. **Four chips buy E2B compute and per-chip weight room; context grows only by that weight room.** On the 2026-10-02
-nightly image this checkpoint fails to load at TP=4 and at TP=1 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`), so this rig has no KV pool or
-throughput measurement.
+each chip no longer holds. **Four chips buy E2B compute and per-chip weight room; context grows only by that weight room.** Measured on the patched image
+(`benchmarks/runs/2026-10-02-rig-boot-patched-v5e4`): 709,152 KV tokens against the v5e-1 sibling's 323,424 (2.19x), from
+2.31 GiB of weights per chip against 8.94 GiB on one chip.
 
 ## Current Deployment
 *   **Model:** `google/gemma-4-E2B-it-qat-q4_0-unquantized` on TPU v5e-4 (`v5litepod-4`, four chips on one host).
@@ -70,7 +75,7 @@ To deploy and run this project, you need to address two main components: the **I
 ### 1. Infrastructure Requirements (The Inference Stack)
 The MCP server expects a running vLLM instance. Your TPU deployment for the model needs:
 *   **Hardware:** Cloud TPU v5e (v5litepod) with topology `2x2` (4 chips, one `ct5lp-hightpu-4t` host: 112 vCPU, 192 GiB RAM).
-*   **Software:** `vllm/vllm-tpu:nightly` specialized container (v0.19.2+ recommended for Gemma 4 fixes).
+*   **Software:** `vllm/vllm-tpu@sha256:19a1a052…` with this rig's `patches/` applied, built on the VM at boot as `vllm-tpu-q4_0:patched` (`startup_script_template.sh`). `vllm/vllm-tpu:nightly` cannot load this checkpoint (upstream tpu-inference #3225).
 *   **Model:** `google/gemma-4-E2B-it-qat-q4_0-unquantized` (Hugging Face ID).
 *   **Runtime:** `v2-alpha-tpuv5-lite` for Flex-start / Queued Resources.
 *   **Networking:** Private Google Access must be enabled for internal connectivity, or direct internet access for Hugging Face downloads.
@@ -105,7 +110,7 @@ You can configure the following variables for the MCP server:
     -   `--max-model-len 16384`
     -   `--disable_chunked_mm_input`
     -   `--max_num_batched_tokens 4096` (required for multimodal compatibility)
-    -   `--limit-mm-per-prompt '{"image":4,"audio":1}'` (JSON format required in nightly)
+    -   `--limit-mm-per-prompt '{"image":4,"audio":1}'` (JSON format)
 -   **Tooling:** Enable `--enable-auto-tool-choice`, `--tool-call-parser gemma4`, and `--reasoning-parser gemma4`.
 -   Every setting except chip count and tensor parallel size matches the v5e-1 sibling on purpose, so the two
     rigs differ only in those two.

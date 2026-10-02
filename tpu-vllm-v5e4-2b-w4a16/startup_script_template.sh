@@ -29,12 +29,12 @@ for i in $(seq 1 30); do
 done
 set -e # Re-enable exit on error
 
-# Docker pull vLLM image
-echo "Pulling vLLM Docker image: vllm/vllm-tpu:nightly"
+# Docker pull the pinned vLLM image the patches are written against
+echo "Pulling vLLM Docker image: {vllm_base_image}"
 set +e # Allow docker pull to fail without exiting immediately
 for i in $(seq 1 5); do
-  echo "Attempt $i/5: sudo docker pull vllm/vllm-tpu:nightly"
-  sudo docker pull vllm/vllm-tpu:nightly
+  echo "Attempt $i/5: sudo docker pull {vllm_base_image}"
+  sudo docker pull {vllm_base_image}
   if [ $? -eq 0 ]; then
     echo "Docker image pulled successfully."
     break
@@ -47,6 +47,28 @@ for i in $(seq 1 5); do
   fi
 done
 set -e # Re-enable exit on error
+
+# Patch tpu_inference inside the image and commit it as {vllm_serve_image}: the QAT export omits
+# k_proj, v_proj and k_norm for the KV-shared layers, which the unpatched model code requires
+# (kvshare.diff builds none for those layers).
+# The patches (patches/ in the rig, applied in ORDER) are embedded below as a base64 tar.gz.
+echo "Building {vllm_serve_image} from {vllm_base_image} with the rig's patches..."
+command -v patch >/dev/null || sudo apt-get install -y -qq patch
+PATCH_DIR=/opt/vllm-patches
+sudo rm -rf $PATCH_DIR /opt/tpu_inference_src && sudo mkdir -p $PATCH_DIR /opt/tpu_inference_src
+echo "{patches_b64}" | base64 -d | sudo tar xz -C $PATCH_DIR
+SITE=$(sudo docker run --rm --entrypoint python3 {vllm_base_image} -c "import os,tpu_inference;print(os.path.dirname(os.path.dirname(tpu_inference.__file__)))" | tail -1)
+sudo docker rm -f vllm-patch > /dev/null 2>&1 || true
+sudo docker create --name vllm-patch {vllm_base_image} > /dev/null
+sudo docker cp "vllm-patch:$SITE/tpu_inference" /opt/tpu_inference_src/
+for p in $(cat $PATCH_DIR/ORDER); do
+  echo "Applying $p (sha256 $(sha256sum $PATCH_DIR/$p | cut -c1-16))"
+  (cd /opt/tpu_inference_src && sudo patch -p1 --forward < $PATCH_DIR/$p) || {{ echo "ERROR: patch $p did not apply"; exit 1; }}
+done
+sudo docker cp /opt/tpu_inference_src/tpu_inference/. "vllm-patch:$SITE/tpu_inference/"
+sudo docker commit vllm-patch {vllm_serve_image} > /dev/null
+sudo docker rm vllm-patch > /dev/null
+echo "Patched image {vllm_serve_image} ready."
 
 # Set vLLM environment variables
 echo "Setting vLLM environment variables..."
@@ -109,7 +131,7 @@ echo 'Executing command: sudo docker run --name vllm-gemma4 --privileged --net=h
   -v /dev/shm:/dev/shm --shm-size 10gb \
   -e HF_HOME="$HF_HOME" \
   -e HF_TOKEN=<masked> \
-  vllm/vllm-tpu:nightly vllm serve "$VLLM_MODEL" \
+  {vllm_serve_image} vllm serve "$VLLM_MODEL" \
   --max-model-len "$VLLM_MAX_MODEL_LEN" \
   --tensor-parallel-size "$VLLM_TP_SIZE" \
   --disable_chunked_mm_input \
@@ -123,7 +145,7 @@ sudo docker run --name vllm-gemma4 --privileged --net=host -d \
   -v /dev/shm:/dev/shm --shm-size 10gb \
   -e HF_HOME="$HF_HOME" \
   -e HF_TOKEN="$HF_TOKEN" \
-  vllm/vllm-tpu:nightly vllm serve "$VLLM_MODEL" \
+  {vllm_serve_image} vllm serve "$VLLM_MODEL" \
   --max-model-len "$VLLM_MAX_MODEL_LEN" \
   --tensor-parallel-size "$VLLM_TP_SIZE" \
   --disable_chunked_mm_input \

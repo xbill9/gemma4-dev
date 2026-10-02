@@ -9,6 +9,11 @@ A single-file MCP server (`server.py`, MCPServer) that acts as a devops agent fo
 out to `gcloud` and talk HTTP to the vLLM OpenAI-compatible endpoint on port 8000. This rig is used for
 **live demos** — prefer changes that keep the demo working over broad refactors.
 
+## Image
+
+Serves on the pinned `vllm/vllm-tpu@sha256:19a1a052…` with `patches/` applied at boot as `vllm-tpu-q4_0:patched`. Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e1`), booted through `create_tpu_queued_resource` with every other serving argument unchanged: weights 8.94 GiB, KV cache 323,424 tokens, greedy chat and tool call verified, **124.7 / 435.6 / 1,136.8 output tok/s at 1 / 4 / 16 requests**. `vllm/vllm-tpu:nightly` (2026-10-02, `sha256:106a30b6…`) exits at model load on this checkpoint: Google's QAT export omits `k_proj`/`v_proj`/`k_norm` for the 20 KV-shared layers, and that image requires them on every layer (upstream tpu-inference #3225, `../tpu-vllm-v5e4-2b-q4_0/benchmarks/runs/2026-10-02-rig-boot-v5e4`). `kvshare.diff` builds no K/V weights for those layers.
+Moving to a newer image means re-checking that `patches/` still applies.
+
 ## Commands
 
 ```
@@ -51,7 +56,7 @@ Source of truth either way: `grep -n "^@mcp.tool" server.py`.
 
 **`startup_script_template.sh` is consumed by `str.format()`.** Placeholders are `{project_id}`, `{zone}`,
 `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`, `{max_num_batched_tokens}`,
-`{limit_mm_per_prompt}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
+`{limit_mm_per_prompt}`, `{vllm_base_image}`, `{vllm_serve_image}`, `{patches_b64}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
 `${VAR}`, a JSON literal — raises at format time and breaks the deploy. Escape as `{{` / `}}`.
 
 **The startup script fetches the HF token itself; never add a `{hf_token}` placeholder back.** The rendered

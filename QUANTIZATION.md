@@ -543,6 +543,11 @@ bf16 ulps of the source against 1.50. **The remaining ~26% is the source's own b
 (tpu_inference `431287b09`) fails `-qat-q4_0-unquantized` on exactly the 20 missing `k_norm` weights and `-qat-w4a16-ct`
 at JIT on the unloaded `k_norm`, at TP=4 and TP=1 alike. Both serve at TP=4 on the pinned digest with `kvshare.diff`
 (`tpu-vllm-v5e4-2b-{q4_0,w4a16}/benchmarks/runs/2026-10-02-rig-boot-v5e4`).
+The rigs `tpu-vllm-v5e{1,4}-2b-{q4_0,w4a16}` now boot on that image (`2026-10-02-rig-boot-patched-*`); three serve.
+`-qat-w4a16-ct` on **one** v5e chip at 4,096 batched tokens with multimodal limits does not: at the default 0.90 the
+compiled program needs 1.15 GiB with 1.13 free, and at 0.80 the compile is OOM-killed at 35.1 GiB resident on the
+48 GiB host, whose RAM also holds the checkpoint in `/dev/shm`. The serving W8A8 and int4-table rigs use 512 batched
+tokens with `MIN_TOKEN_BUCKET=64` to keep compile host memory down.
 `tpu-pytorch-v5e1-12b` is currently pinned at `gemma-4-12B-it-qat-w4a16-ct` and does not load.
 
 > **Which export shows which failure — settled 2026-09-25.** The devto forensics tabulate them

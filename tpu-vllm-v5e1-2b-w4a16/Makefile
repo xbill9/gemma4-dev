@@ -89,14 +89,16 @@ deploy-tpu-ondemand:
 # This target provides the command for reference.
 run-container:
 	@echo "🛠 Run this command on the TPU VM to start vLLM:"
+	@echo "   (vllm-tpu-w4a16:patched is vllm/vllm-tpu@sha256:19a1a052… with patches/ applied; the boot script builds it)"
 	@echo "sudo docker run -t --rm --name vllm-gemma4 --privileged --net=host \\"
 	@echo "    -v /dev/shm:/dev/shm --shm-size 10gb \\"
 	@echo "    -e HF_HOME=/dev/shm \\"
 	@echo "    -e HF_TOKEN=\$$HF_TOKEN \\"
-	@echo "    vllm/vllm-tpu:nightly \\"
+	@echo "    vllm-tpu-w4a16:patched \\"
 	@echo "    vllm serve $(MODEL_PATH) \\"
 	@echo "    --max-model-len 16384 \\"
 	@echo "    --tensor-parallel-size $(TENSOR_PARALLEL_SIZE) \\"
+	@echo "    --gpu-memory-utilization 0.80 \\"
 	@echo "    --disable_chunked_mm_input \\"
 	@echo "    --max_num_batched_tokens 4096 \\"
 	@echo "    --enable-auto-tool-choice \\"

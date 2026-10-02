@@ -10,9 +10,10 @@ Queued Resource. Its tools shell out to `gcloud` and talk HTTP to the vLLM OpenA
 8000. This rig is used for **live demos** — prefer changes that keep the demo working over broad refactors.
 
 It was forked on 2026-10-02 from [`../tpu-vllm-v5e1-2b-w4a16`](../tpu-vllm-v5e1-2b-w4a16/), the v5e-1 sibling,
-and differs from it only in chip count and tensor parallelism. Serving settings (`MAX_MODEL_LEN`,
-`MAX_NUM_BATCHED_TOKENS`, `LIMIT_MM_PER_PROMPT`, the `vllm/vllm-tpu:nightly` image) are kept identical to the
-sibling on purpose, so a difference between the two rigs is a chip-count difference.
+and differs from it in chip count, tensor parallelism and the KV cap. Serving settings (`MAX_MODEL_LEN`,
+`MAX_NUM_BATCHED_TOKENS`, `LIMIT_MM_PER_PROMPT`, the patched image) are kept identical to the
+sibling on purpose. The sibling sets `GPU_MEMORY_UTILIZATION=0.80` because one chip cannot fit the compiled
+program beside a 0.90 KV pool; this rig serves at vLLM's default 0.90.
 
 ## Four chips and one KV head
 
@@ -22,21 +23,21 @@ v5e-1. Query heads split 8 -> 2 per chip and the weights split four ways, so the
 the weights each chip no longer holds. Four chips give E2B more compute and more per-chip room for weights;
 context per chip grows only by that freed weight room.
 
-**Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`): the rig provisions and the model fails to
-load.** Flex-start `v5litepod-4` in `us-west4-a` was granted within 5 minutes and the rig booted through its own
-`create_tpu_queued_resource`. On `vllm/vllm-tpu:nightly` digest `sha256:106a30b6…` (pulled 2026-10-02) the
-container exits during model load with `TypeError: Argument 'model.states[0][378]' of shape bfloat16[256] ... is
-not a valid JAX type`. The same container at TP=1 on the same VM fails the same way, so chip count is not the
-cause; the stock image cannot load this W4A16 checkpoint, as `README.md` expected. No KV pool or throughput was
-measured. The same checkpoint served in `../jev-tpu-v5e1` only on the patched image (`wna16.diff`).
-Cause (diagnosed 2026-10-02, run record's Diagnosis section): Google's QAT export omits `k_proj`/`v_proj`/`k_norm`
-for the 20 KV-shared layers and that day's nightly allocates and requires them on every layer. The same checkpoint
-serves at TP=4 on the pinned digest with `patches/` (`kvshare.diff`); moving this rig onto that image is the fix.
+**Serves on the patched image, measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e4`).** Flex-start
+`v5litepod-4` in `us-west4-a`, booted through `create_tpu_queued_resource`: the boot script pulls the pinned
+`vllm/vllm-tpu@sha256:19a1a052…`, applies `patches/` and serves `vllm-tpu-w4a16:patched`. Weights 1.83 GiB per chip,
+KV cache 737,248 tokens, greedy chat and tool call verified, **116.7 / 409.5 / 1,088.1 output tok/s at 1 / 4 / 16 requests**. The v5e-1
+sibling did not reach serving on the same image the same day (host OOM during compilation). Compilation takes about 27 minutes, past the
+boot script's 20-minute readiness check; the container still serves.
+`vllm/vllm-tpu:nightly` (2026-10-02, `sha256:106a30b6…`) exits at model load at TP=4 and TP=1: Google's QAT export
+omits `k_proj`/`v_proj`/`k_norm` for the 20 KV-shared layers and that image requires them on every layer (upstream
+#3225; `benchmarks/runs/2026-10-02-rig-boot-v5e4`, Diagnosis). `kvshare.diff` and `wna16.diff` carry this checkpoint.
 
 ## Baseline: the v5e-1 sibling
 
-This rig's only run, `benchmarks/runs/2026-10-02-rig-boot-v5e4`, records the load failure above. Every throughput
-measurement of this checkpoint on v5e is the sibling's, on **v5e-1**: served beside the E2B QAT repack through
+This rig's runs: `benchmarks/runs/2026-10-02-rig-boot-v5e4` (the nightly load failure) and
+`benchmarks/runs/2026-10-02-rig-boot-patched-v5e4` (serving, above). Earlier throughput of this checkpoint is the
+sibling's, on **v5e-1**: served beside the E2B QAT repack through
 `../jev-tpu-v5e1/` (`../tpu-vllm-v5e1-2b-w4a16/benchmarks/runs/2026-09-30-gspeedb-e2b-google-v5e1`), it gave
 136.6 / 532.3 / 1,911 output tok/s at 1 / 4 / 16 requests. Do not quote those numbers as this rig's.
 
@@ -82,7 +83,7 @@ Source of truth either way: `grep -n "^@mcp.tool" server.py`.
 
 **`startup_script_template.sh` is consumed by `str.format()`.** Placeholders are `{project_id}`, `{zone}`,
 `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`, `{max_num_batched_tokens}`,
-`{limit_mm_per_prompt}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
+`{limit_mm_per_prompt}`, `{vllm_base_image}`, `{vllm_serve_image}`, `{patches_b64}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
 `${VAR}`, a JSON literal — raises at format time and breaks the deploy. Escape as `{{` / `}}`.
 
 **The startup script fetches the HF token itself; never add a `{hf_token}` placeholder back.** The rendered

@@ -9,6 +9,7 @@ This project provides an automated DevOps/SRE assistant that leverages **Gemma 4
 
 ## Current Deployment
 *   **Model:** `google/gemma-4-E2B-it-qat-w4a16-ct` on TPU v5e-1 (v5litepod).
+*   **Image:** Boots on the pinned `vllm/vllm-tpu@sha256:19a1a052…` with `patches/` applied as `vllm-tpu-w4a16:patched` (`wna16.diff` for the W4A16 linears, `kvshare.diff` for the KV-shared layers the QAT export omits); `vllm/vllm-tpu:nightly` exits at model load on this checkpoint (upstream #3225). **On v5e-1 it does not yet reach serving** (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e1`): at `--gpu-memory-utilization` 0.90 the compiled program does not fit beside the KV pool in HBM (short by 20 MiB), hence `GPU_MEMORY_UTILIZATION=0.80`; at 0.80 the host OOM killer stopped the engine during compilation (35.1 GiB resident on the 48 GiB host). The serving v5e-1 rigs on this image use `--max_num_batched_tokens 512` with `MIN_TOKEN_BUCKET=64`.
 *   **Endpoint:** discovered at runtime from the `ACTIVE` Queued Resource — use the
     `get_vllm_endpoint` tool or `make endpoint`. Do not hardcode an IP.
 
@@ -30,7 +31,7 @@ To deploy and run this project, you need to address two main components: the **I
 ### 1. Infrastructure Requirements (The Inference Stack)
 The MCP server expects a running vLLM instance. Your TPU deployment for the model needs:
 *   **Hardware:** Cloud TPU v5e (v5litepod) with topology `1x1` (1 chip).
-*   **Software:** `vllm/vllm-tpu:nightly` specialized container (v0.19.2+ recommended for Gemma 4 fixes).
+*   **Software:** `vllm/vllm-tpu@sha256:19a1a052…` with this rig's `patches/` applied, built on the VM at boot as `vllm-tpu-w4a16:patched` (`startup_script_template.sh`). `vllm/vllm-tpu:nightly` cannot load this checkpoint (upstream tpu-inference #3225).
 *   **Model:** `google/gemma-4-E2B-it-qat-w4a16-ct` (Hugging Face ID).
 *   **Runtime:** `v2-alpha-tpuv5-lite` for Flex-start / Queued Resources.
 *   **Networking:** Private Google Access must be enabled for internal connectivity, or direct internet access for Hugging Face downloads.
@@ -57,9 +58,9 @@ You can configure the following variables for the MCP server:
     -   `--max-model-len 16384`
     -   `--disable_chunked_mm_input`
     -   `--max_num_batched_tokens 4096` (required for multimodal compatibility)
-    -   `--limit-mm-per-prompt '{"image":4,"audio":1}'` (JSON format required in nightly)
+    -   `--limit-mm-per-prompt '{"image":4,"audio":1}'` (JSON format)
 -   **Tooling:** Enable `--enable-auto-tool-choice`, `--tool-call-parser gemma4`, and `--reasoning-parser gemma4`.
--   **Image:** `vllm/vllm-tpu:nightly` (v0.19.2+ recommended) is preferred for stable Gemma 4 support.
+-   **Image:** `vllm/vllm-tpu@sha256:19a1a052…` plus `patches/` (`kvshare.diff` handles the KV-shared layers the QAT export omits), served as `vllm-tpu-w4a16:patched`. Do not switch to `:nightly`.
 
 ## Flex-start VMs
 Our stack leverages **Flex-start VMs** (via the `v2-alpha-tpuv5-lite` runtime) to maximize TPU availability and minimize costs.

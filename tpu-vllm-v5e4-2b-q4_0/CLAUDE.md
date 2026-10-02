@@ -18,11 +18,16 @@ belongs to the sibling. Paired against E2B bf16 on v5e-1
 (`../jev-tpu-v5e1/results/2026-09-30-gen2048a-v5e1-GEN-VS-BF16.md`): GSM8K at a 2,048-token limit 0.897
 against 0.910, BFCL 0.922 against 0.928. Those runs live in `../tpu-vllm-v5e1-2b-q4_0/benchmarks/runs/`.
 
-**Measured on v5e-4, 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`):** flex-start `v5litepod-4` in `us-west4-a` was granted in under 5
-minutes and the boot ran through `create_tpu_queued_resource`. `vllm/vllm-tpu:nightly` as pulled 2026-10-02 (digest `sha256:106a30b6…`) cannot load this checkpoint: the container exits at model load with `ValueError: Following weights were not initialized from checkpoint` (`k_norm` of the KV-shared layers). The same container at `--tensor-parallel-size 1` on the same VM fails the same way, so the cause is the image and checkpoint, independent of chip count. **The rig does not serve as committed.**
-Cause (diagnosed 2026-10-02, run record's Diagnosis section): Google's QAT export omits `k_proj`/`v_proj`/`k_norm`
-for the 20 KV-shared layers and that day's nightly allocates and requires them on every layer. The same checkpoint
-serves at TP=4 on the pinned digest with `patches/` (`kvshare.diff`); moving this rig onto that image is the fix.
+**Serves on the patched image, measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e4`):** flex-start
+`v5litepod-4` in `us-west4-a`, booted through `create_tpu_queued_resource`. The boot script pulls the pinned
+`vllm/vllm-tpu@sha256:19a1a052…`, applies `patches/` in `patches/ORDER` and serves `vllm-tpu-q4_0:patched` with every
+other serving argument unchanged (multimodal limits included). Weights 2.31 GiB per chip, KV cache 709,152 tokens;
+greedy chat and tool call verified; **202.2 / 716.4 / 1,514.4 output tok/s at 1 / 4 / 16 requests**, against
+124.7 / 435.6 / 1,136.8 for the v5e-1 sibling on the same image the same day (1.62x / 1.64x / 1.33x).
+Why the image is pinned: Google's QAT export omits `k_proj`/`v_proj`/`k_norm` for the 20 KV-shared layers, and
+`vllm/vllm-tpu:nightly` (2026-10-02, `sha256:106a30b6…`) requires them on every layer and exits at model load
+(upstream tpu-inference #3225; `benchmarks/runs/2026-10-02-rig-boot-v5e4`). `kvshare.diff` builds no K/V weights for
+those layers. Moving to a newer image means re-checking that `patches/` still applies.
 
 ## Commands
 
@@ -66,7 +71,7 @@ Source of truth either way: `grep -n "^@mcp.tool" server.py`.
 
 **`startup_script_template.sh` is consumed by `str.format()`.** Placeholders are `{project_id}`, `{zone}`,
 `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`, `{max_num_batched_tokens}`,
-`{limit_mm_per_prompt}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
+`{limit_mm_per_prompt}`, `{vllm_base_image}`, `{vllm_serve_image}`, `{patches_b64}`. Any other literal `{` or `}` added to that bash file — a shell brace expansion, a
 `${VAR}`, a JSON literal — raises at format time and breaks the deploy. Escape as `{{` / `}}`.
 
 **The startup script fetches the HF token itself; never add a `{hf_token}` placeholder back.** The rendered
@@ -215,7 +220,7 @@ copy-paste from the v5e-1 sibling.
 `num_key_value_heads=1`, which does not shard (`../MODELS.md`, "Single KV head does not shard"): at TP=4
 every chip holds the whole KV cache, so KV per token per chip stays 18 KiB. Query heads split 8 -> 2 per
 chip. The KV pool grows only by the weights each chip no longer holds. Serving settings (`MAX_MODEL_LEN`,
-`MAX_NUM_BATCHED_TOKENS`, `LIMIT_MM_PER_PROMPT`, the `vllm/vllm-tpu:nightly` image) match the v5e-1 sibling
+`MAX_NUM_BATCHED_TOKENS`, `LIMIT_MM_PER_PROMPT`, the patched image) match the v5e-1 sibling
 on purpose, so the two rigs differ only in chip count and tensor parallel size.
 
 **v5e is spelled `v5litepod` to gcloud.** The accelerator type is `v5litepod-4` (not `v5e-4`), the Flex-start

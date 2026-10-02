@@ -59,6 +59,7 @@ offline and mock cloud, subprocess, and network boundaries.
 
 ## Deployment invariants and hazards
 
+- The image is pinned: `vllm/vllm-tpu@sha256:19a1a052…` plus `patches/`, built at boot as `vllm-tpu-q4_0:patched`. `vllm/vllm-tpu:nightly` exits at model load on this checkpoint (upstream #3225); do not switch back to it. Measured 2026-10-02: 124.7 / 435.6 / 1,136.8 output tok/s at 1 / 4 / 16 requests (`benchmarks/runs/2026-10-02-rig-boot-patched-v5e1`).
 - A v5e-1 is a single chip, so the correct default tensor parallel size is `1`. Older documentation and some
   Makefile examples incorrectly show `4`.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-1`, the Flex-start runtime version is
@@ -73,7 +74,7 @@ offline and mock cloud, subprocess, and network boundaries.
   queued resource's node to a TPU VM of that name, then to whichever node is confirmed serving vLLM.
 - `startup_script_template.sh` is rendered with Python `str.format()`. Its supported placeholders are
   `{project_id}`, `{zone}`, `{model_name}`, `{hf_secret_id}`, `{tensor_parallel_size}`, `{max_model_len}`,
-  `{max_num_batched_tokens}`, and `{limit_mm_per_prompt}`. Escape every other literal brace as `{{` or `}}`,
+  `{max_num_batched_tokens}`, `{limit_mm_per_prompt}`, `{vllm_base_image}`, `{vllm_serve_image}`, `{patches_b64}`. Escape every other literal brace as `{{` or `}}`,
   including shell `${VAR}` and JSON braces, or deployment rendering will fail.
 - There is deliberately no `{hf_token}` placeholder. The rendered script is uploaded as instance metadata, so
   it fetches `hf-token` from Secret Manager at boot using the VM's own credentials instead. The VM service

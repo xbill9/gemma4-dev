@@ -16,8 +16,7 @@ The inference server is deployed on **Cloud TPU v5e (v5litepod)** using the `vll
     *   **TPU Version:** v5e (v5litepod)
     *   **Topology:** `2x2` (4 chips on one host, v5litepod-4)
 *   **Software:**
-    *   **Image:** `vllm/vllm-tpu:nightly` (as pulled 2026-10-02, `sha256:106a30b6…`, it fails to load this
-        checkpoint at model load, at TP=4 and TP=1; see `benchmarks/runs/2026-10-02-rig-boot-v5e4`)
+    *   **Image:** `vllm/vllm-tpu@sha256:19a1a052…` with `patches/` applied (applied in `patches/ORDER`), built on the VM at boot as `vllm-tpu-q4_0:patched`
     *   **Max Model Length:** `16384`
     *   **Tensor Parallel Size:** `4`
 
@@ -50,7 +49,7 @@ sudo docker run -t --rm --name vllm-gemma4 --privileged --net=host \
     -v /dev/shm:/dev/shm --shm-size 10gb \
     -e HF_HOME=/dev/shm \
     -e HF_TOKEN=$HF_TOKEN \
-    vllm/vllm-tpu:nightly \
+    vllm-tpu-q4_0:patched \
     vllm serve google/gemma-4-E2B-it-qat-q4_0-unquantized \
     --max-model-len 16384 \
     --tensor-parallel-size 4 \
@@ -61,7 +60,7 @@ sudo docker run -t --rm --name vllm-gemma4 --privileged --net=host \
     --reasoning-parser gemma4
 ```
 
-This mirrors what `startup_script_template.sh` runs on the VM. If you change the
+`vllm-tpu-q4_0:patched` exists once the boot script has built it from the pinned digest and `patches/`. This mirrors what `startup_script_template.sh` runs on the VM. If you change the
 flags here, change them there too — the template is what an actual deploy uses.
 
 ### 3. Verification

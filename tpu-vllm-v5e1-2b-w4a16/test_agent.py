@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import unittest
 from types import SimpleNamespace
@@ -35,14 +36,18 @@ from server import (  # noqa: E402
     RESOURCE_ID,
     TPU_QUOTA_ID,
     TPU_SPOT_QUOTA_ID,
+    VLLM_BASE_IMAGE,
+    VLLM_SERVE_IMAGE,
     _create_queued_resource,
     _discover_vllm_node,
+    _get_formatted_startup_script,
     _lookup_tpu_rate,
     _parse_topology,
     _provisioning_flags,
     _quota_id_for,
     _resolve_node_id,
     _status_model,
+    _vllm_serve_flags,
     estimate_deployment_cost,
     get_help,
     get_metrics,
@@ -72,8 +77,41 @@ class TestDevOpsAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn("--accelerator-type=v5litepod-1", config)
         self.assertIn("--version=v2-alpha-tpuv5-lite", config)
 
-        self.assertIn("vllm/vllm-tpu:nightly", config)
+        # A fresh VM only serves this checkpoint once the boot script has patched the image,
+        # so the command hands it the rendered startup script rather than an inline run.
+        self.assertIn("--metadata-from-file=startup-script=", config)
+        self.assertIn(VLLM_BASE_IMAGE, config)
+        self.assertIn(VLLM_SERVE_IMAGE, config)
+        self.assertNotIn("nightly", config)
         self.assertIn("google/gemma-4-E2B-it", config)
+
+    async def test_startup_script_builds_and_serves_the_patched_image(self):
+        """The boot script embeds patches/ in ORDER, patches the pinned image, serves the result."""
+        import base64
+        import io
+        import re
+        import tarfile
+
+        script = await _get_formatted_startup_script(MODEL_NAME)
+        self.assertFalse(script.startswith("#!/bin/bash\necho 'Error"), script[:200])
+        found = re.search(r'echo "([A-Za-z0-9+/=]{100,})" \| base64 -d', script)
+        assert found is not None, "no embedded patches tarball in the startup script"
+        names = tarfile.open(fileobj=io.BytesIO(base64.b64decode(found.group(1)))).getnames()
+        order = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "patches", "ORDER")).read().split()
+        self.assertEqual(names, ["ORDER"] + order)
+        self.assertIn("kvshare.diff", order)
+        self.assertIn(f"sudo docker pull {VLLM_BASE_IMAGE}", script)
+        self.assertIn(f"sudo docker commit vllm-patch {VLLM_SERVE_IMAGE}", script)
+        self.assertIn(f"{VLLM_SERVE_IMAGE} vllm serve", script)
+        self.assertIn("--gpu-memory-utilization 0.80", script)
+        self.assertNotIn("vllm/vllm-tpu:nightly", script)
+
+    def test_serve_flags_unchanged_by_the_image_move(self):
+        """Batched tokens and multimodal limits stay; one chip needs the KV cap at 0.80 to load the program."""
+        flags = _vllm_serve_flags()
+        self.assertIn("--max_num_batched_tokens 4096", flags)
+        self.assertIn('--limit-mm-per-prompt \'{"image":4,"audio":1}\'', flags)
+        self.assertIn("--gpu-memory-utilization 0.80", flags)
 
     @patch("server.get_vllm_client", new_callable=AsyncMock)
     @patch("server.discover_vllm_url", new_callable=AsyncMock)
