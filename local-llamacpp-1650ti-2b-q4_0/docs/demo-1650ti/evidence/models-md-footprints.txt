@@ -1,0 +1,17 @@
+# excerpt of MODELS.md (repo root), 'Weight footprints', copied 2026-09-10T14:31:39-04:00
+## Weight footprints
+
+bf16 weight sizes, as recorded in `tpu-jax-v5e1-2b/server.py:806`:
+
+```python
+_BF16_WEIGHTS_GB = {"E2B": 10.2, "E4B": 16.0, "12B": 24.0, "26B": 52.0, "31B": 62.0}
+```
+
+| Model | Params | bf16 | GiB | int8 | int4 | v5e-1 (14.49 GiB)? | v6e-1 (~28 GiB)? |
+| :--- | :--- | ---: | ---: | ---: | ---: | :--- | :--- |
+| E2B | 2B effective / ~5B total | 10.2 GB | 9.5 | ~4.8 | ~2.4 | bf16 fits (8.97 measured) | yes |
+| **E4B** | 4.5B effective / 8.0B total | 16.0 GB | **14.9** | ~7.5 | ~3.7 | needs int8 | bf16 fits |
+| 12B | 12B | 24.0 GB | 22.4 | ~11.2 | ~5.6 | needs int4 | bf16 fits |
+| **26B A4B** | 26.5B total / **~4B active** | 51.61 GB | 48.1 | ~24 | **15.27 measured** | no | **yes, repacked** |
+| 31B | 31.0B | 62.0 GB | 57.7 | ~29 | ~14.4 | no | multi-chip |
+
