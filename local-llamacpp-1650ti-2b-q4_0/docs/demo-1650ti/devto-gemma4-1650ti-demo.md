@@ -49,10 +49,10 @@ The earliest published reviews of this laptop are from January 2021. The GTX 16 
 
 | Gemma 4 E2B | Weights | Fits in 4 GiB? |
 | :--- | ---: | :--- |
-| bf16 | 9.5 GiB | ❌ |
-| int8 | ~4.8 GB | ❌ |
-| Google QAT GGUF, resident on the card | 1.31 GiB | 🟢 |
-| Re-packed QAT GGUF, resident on the card | **1.20 GiB** | 🟢 🥇 |
+| bf16 | 9.5 GiB | ❌ no |
+| int8 | ~4.8 GB | ❌ no |
+| Google QAT GGUF, resident on the card | 1.31 GiB | 🟢 yes |
+| Re-packed QAT GGUF, resident on the card | **1.20 GiB** | 🟢 yes 🥇 |
 
 Two properties of the model close the gap.
 

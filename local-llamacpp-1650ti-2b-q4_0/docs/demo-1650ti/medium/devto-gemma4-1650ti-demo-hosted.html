@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 at Over 70 Tokens/s on a 2021 Laptop's 4 GB GPU: The Live Demo, Step by Step</title>
+  <meta name="description" content="The live demo, step by step: Gemma 4 E2B answering at 76 tok/s from a GTX 1650 Ti with 4 GB of memory, and the exact re-pack of Google&#x27;s QAT weights on Hugging Face that makes it fit, run faster and stay close to bf16." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to the live demo of Gemma
+4 E2B on a local, laptop hosted GPU enabled system: a Lenovo Yoga 9 from
+2021 with a 4 GB GTX 1650 Ti. One person asks questions, and the answers
+stream back at over 70 tokens per second with no cloud involved. The
+model file that makes it work is a re-pack of Google's
+quantization-aware-trained (QAT) weights, published on Hugging Face.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/medium/img/devto-cover.f8e939f0.jpg" alt="Gemma 4 at Over 70 Tokens/s on a 2021 Laptop&#x27;s 4 GB GPU: The Live Demo, Step by Step" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0</a></p>
+<p><strong>Gemma 4 E2B in bf16 is 9.5 GiB of weights and this card has 4
+GiB. The re-packed QAT file serves it in 1488 MiB and decodes at 76
+tok/s, 1.12x faster than Google's own GGUF on the same card and 32x
+closer to bf16.</strong></p>
+<hr />
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
+<p>Every other rig in this repository serves Gemma 4 from rented
+hardware. This one serves it from the laptop under the desk, for one
+person having a conversation. The demo is about responsiveness: the
+first words of a short answer on screen in under half a second, and a
+long answer streaming faster than anyone reads it.</p>
+<p>Two things get it there. QAT, which trains the model to live on a
+4-bit grid, makes it small enough. Packing those trained 4-bit values
+into the file exactly, with nothing re-rounded, makes it faster and more
+accurate than the stock conversion. The demo steps come first; the
+re-pack is explained after them.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An Nvidia GPU with 2 GB or more of free memory. This one is a GTX
+1650 Ti Max-Q: compute capability 7.5, 4096 MiB, a 40 W power cap and no
+tensor cores.</li>
+<li>llama.cpp built with CUDA for your card's architecture
+(<code>make build</code> in the rig builds it for
+<code>sm_75</code>).</li>
+<li>The re-packed GGUF from Hugging Face:
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</code>.</li>
+<li>About 3 GB of disk.</li>
+</ul>
+<hr />
+<h4 id="the-hardware">The Hardware</h4>
+<pre class="text"><code>product_version: Yoga 9 15IMH5
+Model name:                              Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz
+Mem:            15Gi       7.8Gi       1.0Gi       890Mi       7.9Gi       7.4Gi
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 4096 MiB, 7.5
+            Current Power Limit                        : 40.00 W</code></pre>
+<p>The earliest published reviews of this laptop are from January 2021.
+The GTX 16 series shares compute capability 7.5 with the T4 datacenter
+card, but Nvidia left the tensor cores off this chip, so every matrix
+multiply runs on ordinary CUDA cores.</p>
+<hr />
+<h4 id="why-does-it-fit-at-all">Why Does It Fit at All?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/medium/img/devto-gemma4-1650ti-demo-table-1.png"
+alt="Table: Gemma 4 E2B, Weights, Fits in 4 GiB?" /></p>
+<p>Two properties of the model close the gap.</p>
+<p><strong>QAT.</strong> Google trained a release of Gemma 4 knowing it
+would be stored at 4 bits, so the 4-bit copy keeps close to bf16
+quality. Most of the shrink from 9.5 GiB comes from here.</p>
+<p><strong>Per-layer embeddings stay in host memory.</strong> The
+<code>E</code> in E2B is a large per-layer embedding table,
+<code>per_layer_token_embd</code>, which llama.cpp loads lazily: it
+stays memory-mapped in system RAM and each token reads one row. That
+table is half of the re-packed file and none of it occupies the
+card.</p>
+<hr />
+<h4 id="step-1--download-the-re-packed-gguf">Step 1 — Download the
+Re-Packed GGUF</h4>
+<pre class="shell"><code>hf download xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf gemma-4-E2B-it-q4_0-exact.gguf \
+  --local-dir ~/models/gemma-4-E2B-it-qat-q4_0-exact-v2
+sha256sum ~/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf
+419db9a6bf3bc15d770c85ccf9216827aa88c64fe8f3d72fbe5674f48efe2dc8  gemma-4-E2B-it-q4_0-exact.gguf</code></pre>
+<p>The repository also holds <code>gguf_exact.py</code>, the script that
+builds the file from Google's two Hugging Face downloads, so anyone can
+rebuild it and compare the hash.</p>
+<hr />
+<h4 id="step-2--configure-the-server">Step 2 — Configure the Server</h4>
+<p><code>tpu.env</code> is the rig's configuration. These are the values
+the demo serves with:</p>
+<pre class="shell"><code>MODEL_PATH=/home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf
+MODEL_SHA256=419db9a6bf3bc15d770c85ccf9216827aa88c64fe8f3d72fbe5674f48efe2dc8
+N_GPU_LAYERS=99
+CONTEXT_SIZE=8192
+KV_CACHE_TYPE=f16
+FLASH_ATTENTION=1
+PARALLEL_SLOTS=1
+REASONING=off</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/medium/img/devto-gemma4-1650ti-demo-table-2.png"
+alt="Table: Setting, Why" /></p>
+<p><code>make serve</code> runs <code>llama-server</code> with exactly
+these flags.</p>
+<hr />
+<h4 id="step-3--start-it">Step 3 — Start It</h4>
+<p>The demo uses two small shell wrappers: <code>gpu</code> starts and
+stops the server and checks which device it is running on, and
+<code>ask</code> streams a chat from the terminal. Both read every value
+from <code>tpu.env</code>.</p>
+<pre class="shell"><code>gpu start
+ask -q &quot;hi&quot;
+gpu: starting /home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf on 127.0.0.1:8080 (-ngl 99)
+gpu: pid 132745, log /home/xbill/gemma4-dev/local-llamacpp-1650ti-2b-q4_0/run/llama-server.log
+gpu: waiting up to 180s for http://127.0.0.1:8080/health
+ 
+gpu: healthy after 4s -- http://127.0.0.1:8080
+gpu: device=gpu · pid=132745 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server
+Hi! How can I help you today? 😊</code></pre>
+<p>Healthy in 4 seconds, because llama.cpp memory-maps the file. The
+<code>hi</code> is a warm-up so the first question in front of an
+audience does not wait on the disk. Keep a second terminal open on
+<code>nvtop</code> for Demo Step 3.</p>
+<hr />
+<h4 id="demo-step-1--it-answers-instantly">Demo Step 1 — It Answers
+Instantly</h4>
+<pre class="shell"><code>ask What is the capital of Australia? One sentence.
+The capital of Australia is Canberra.
+[wall 0.38 s]</code></pre>
+<p>0.38 seconds end to end, from a 4 GB laptop GPU.</p>
+<hr />
+<h4 id="demo-step-2--pipe-it-real-work">Demo Step 2 — Pipe It Real
+Work</h4>
+<p><code>ask</code> reads standard input as material and its arguments
+as the instruction, so it slots into a shell pipeline:</p>
+<pre class="shell"><code>git -C ~/gemma4-dev log --oneline -12 | ask summarize what this project has been working on, in 3 bullets
+Here is a 3-bullet summary of what this project has been working on:
+ 
+* **Article Refinement and Content Updates:** Significant effort has been dedicated to rewriting, retitling, and restructuring articles related to v5e QAT builds, ...
+* **Benchmark and Index Maintenance:** The project has been actively working on updating and regenerating various benchmarks, indices, and documentation files ...
+* **Resource and Environment Configuration:** The work also involves managing and referencing specific hardware/software configurations, ...
+[wall 4.26 s]</code></pre>
+<hr />
+<h4 id="demo-step-3--show-the-footprint">Demo Step 3 — Show the
+Footprint</h4>
+<pre class="shell"><code>nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+nvidia-smi --query-gpu=name,memory.used,memory.total,power.draw,temperature.gpu --format=csv
+gpu arm
+pid, process_name, used_gpu_memory [MiB]
+7978, /home/xbill/llama.cpp/build/bin/llama-server, 1488 MiB
+name, memory.used [MiB], memory.total [MiB], power.draw [W], temperature.gpu
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 1493 MiB, 4096 MiB, 40.43 W, 47
+device=gpu · pid=7978 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server</code></pre>
+<p>The server holds 1488 MiB, 36% of the card, drawing 40 W.
+<code>gpu arm</code> reads the device from the running process: the
+loaded CUDA libraries and the real <code>-ngl</code>. This rig has a
+CPU-only twin that serves the same file on the same port, so a healthy
+endpoint alone does not say which device is answering.</p>
+<hr />
+<h4 id="demo-step-4--hold-a-conversation">Demo Step 4 — Hold a
+Conversation</h4>
+<p><code>ask</code> with no arguments opens a session that keeps the
+conversation in context:</p>
+<ul>
+<li>"Explain what quantizing a model means, in three sentences, for an
+engineer."</li>
+<li>"Give me an everyday analogy for it."</li>
+<li>"Now as a haiku."</li>
+</ul>
+<p>The second answer, from the same session:</p>
+<pre class="text"><code>Imagine you have a super detailed blueprint for a house (the high-precision model), where every single measurement is recorded with extreme accuracy (32-bit precision). Quantizing is like printing that blueprint on a smaller, simpler sketch (like an 8-bit drawing), where you only record the most essential measurements, sacrificing a tiny bit of microscopic detail to make the drawing much easier and faster to read and reproduce.</code></pre>
+<p><code>!</code> clears the conversation and Ctrl-D leaves. Keep
+questions on general topics: a small model asked about its own training
+will invent an answer with confidence.</p>
+<hr />
+<h4 id="demo-step-5--turn-thinking-on">Demo Step 5 — Turn Thinking
+On</h4>
+<pre class="shell"><code>ask -T Which is larger, 9.11 or 9.9? Explain.
+**9.9 is larger than 9.11.**
+ 
+Here is the explanation based on comparing the place values:
+ 
+1. **Whole Numbers:** Both numbers have a whole number part of **9**.
+2. **Tenths Place:**
+   * In 9.**1**1, the digit in the tenths place is **1**.
+   * In 9.**9**, the digit in the tenths place is **9**.
+3. **Comparison:** Since 9 is greater than 1, the number 9.9 is larger than 9.11.
+[wall 9.36 s]</code></pre>
+<p>In a terminal the model's reasoning streams first, dimmed, then the
+answer. That reasoning is why thinking is off by default: this question
+took 9.36 seconds with it on, against well under a second for a short
+answer with it off.</p>
+<hr />
+<h4 id="demo-step-6--open-the-browser-chat">Demo Step 6 — Open the
+Browser Chat</h4>
+<p>llama-server ships its own chat page. Open
+<code>http://127.0.0.1:8080</code> in a browser on the same machine: no
+install, no account, and it shows each answer's token count, time and
+speed underneath.</p>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/img/webui-77tps.182dd485.png"
+alt="llama-server&#39;s built-in chat page answering &quot;is a hotdog a sandwich&quot; with the re-packed Gemma 4 E2B GGUF: 462 tokens in 6.0 s at 77.35 tokens per second" /></p>
+<p>462 tokens in 6.0 seconds, <strong>77.35 tokens per second</strong>,
+on the 4 GB card.</p>
+<hr />
+<h4 id="how-fast-is-it-measured">How Fast Is It, Measured?</h4>
+<p>The chat page's figure agrees with the server's own timings.
+llama-server reports them with every response. Five requests for a
+250-word explanation, thinking off:</p>
+<pre class="text"><code>{&quot;run&quot;:1,&quot;finish&quot;:&quot;stop&quot;,&quot;completion_tokens&quot;:302,&quot;predicted_per_second&quot;:76.1367071253587}
+{&quot;run&quot;:2,&quot;finish&quot;:&quot;length&quot;,&quot;completion_tokens&quot;:400,&quot;predicted_per_second&quot;:76.3564025991796}
+{&quot;run&quot;:3,&quot;finish&quot;:&quot;stop&quot;,&quot;completion_tokens&quot;:366,&quot;predicted_per_second&quot;:76.20224702680754}
+{&quot;run&quot;:4,&quot;finish&quot;:&quot;stop&quot;,&quot;completion_tokens&quot;:239,&quot;predicted_per_second&quot;:76.87420440850953}
+{&quot;run&quot;:5,&quot;finish&quot;:&quot;stop&quot;,&quot;completion_tokens&quot;:285,&quot;predicted_per_second&quot;:77.1396194517872}</code></pre>
+<p><strong>76.14 to 77.14 tokens per second</strong> while serving.
+<code>llama-bench</code>, which measures generation with no HTTP in the
+way, puts the same file at 81.75 tok/s and Google's GGUF at 73.26 on
+this card.</p>
+<hr />
+<h4 id="how-the-re-pack-works">How the Re-Pack Works</h4>
+<p><strong>What QAT stores.</strong> Google publishes the QAT weights
+twice: as a ready GGUF, and unpacked as bf16 safetensors
+(<code>google/gemma-4-E2B-it-qat-q4_0-unquantized</code>). In the
+unpacked copy every block of 32 values along a row holds at most 16
+distinct values: an integer level from -8 to 7 times one step size per
+block. That is Q4_0's own layout, 4-bit levels plus one fp16 scale per
+32 values. A QAT weight matrix therefore fits into Q4_0 with nothing
+lost except rounding the step to fp16.</p>
+<p><strong>What Google's GGUF does to it.</strong> Its transformer
+layers are Q4_0, but quantized with llama.cpp's default step, the
+block's largest value divided by 8. Wherever a block's largest value
+sits below level 8, that step differs from the trained one and values
+move off the grid. Its two embedding tables are stored as Q6_K, a
+different format altogether, and they are most of the file:</p>
+<pre class="text"><code>gemma-4-E2B_q4_0-it.gguf
+  by tensor type (the slot-5 token is q4_0; the file mostly is not):
+    Q6_K      2.257 GB  (67.7%)
+    Q4_0      1.048 GB  (31.4%)
+    F16       0.028 GB  ( 0.8%)
+    F32       0.001 GB  ( 0.0%)</code></pre>
+<p><strong>What the re-pack does.</strong> <code>gguf_exact.py</code>
+copies Google's GGUF header, tokenizer, chat template and settings byte
+for byte. It rewrites all 275 layer matrices, both embedding tables and
+<code>per_layer_model_proj</code> as Q4_0. For each block of 32 values
+it finds the step the block was trained on, the first
+<code>amax/m</code> for <code>m</code> from 1 to 8 that puts every value
+on an integer level, and refines it by least squares. A block with no
+such step stops the build.</p>
+<pre class="text"><code>gemma-4-E2B-it-q4_0-exact.gguf
+  lazy (never on GPU):        1.321 GB  (51% of file)
+  must be resident:           1.283 GB = 1.20 GiB
+ 
+  by tensor type (the slot-5 token is q4_0; the file mostly is not):
+    Q4_0      2.603 GB  (100.0%)
+    F32       0.001 GB  ( 0.0%)</code></pre>
+<p>Of 4.63 billion rebuilt values, 96.84% decode back to the exact
+source value; the rest are within the fp16 rounding of the scale. The
+file shrank from 3,349,516,256 bytes to 2,620,370,912, 21.8%
+smaller.</p>
+<hr />
+<h4 id="why-the-re-pack-is-faster">Why the Re-Pack Is Faster</h4>
+<p>Generating one token reads every resident weight once, so on this
+card decode speed follows the number of bytes read per token.
+<code>token_embd</code> doubles as the output layer, so the whole table
+is read for every generated token. As Q6_K it is 330.3 MB; as Q4_0 it is
+226.5 MB, 31% smaller.</p>
+<p><code>llama-bench</code>, full offload, four passes alternating the
+order of the files, with the card cooled to 50 °C before each pass:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/medium/img/devto-gemma4-1650ti-demo-table-3.png"
+alt="Table: tok/s, mean of 4 passes, Google GGUF, Re-packed" /></p>
+<p>Generation is 1.12x faster and held between 1.111x and 1.121x in
+every pass. The re-packed file also leaves the card 134 MiB lighter:
+1480 MiB against 1614 MiB for the server process.</p>
+<hr />
+<h4 id="why-the-re-pack-is-more-accurate">Why the Re-Pack Is More
+Accurate</h4>
+<p>The quality check compares each file's next-token predictions against
+the bf16 model over wikitext-2, 16 chunks of 512 tokens, scored on the
+card. KL divergence measures how far the two probability distributions
+are apart; zero means identical.</p>
+<pre class="text"><code>Mean PPL(Q)/PPL(base)         :   1.021563 ±   0.005079
+Mean    KLD:   0.001680 ±   0.000072
+99.0%   KLD:   0.016059
+Same top p: 98.260 ± 0.205 %</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/medium/img/devto-gemma4-1650ti-demo-table-4.png"
+alt="Table: against bf16, Google GGUF, Re-packed" /></p>
+<p>Google's file picks a different most-likely next token from bf16
+about one time in eight. The re-packed file does so under one time in
+fifty. The weights QAT trained are the weights the card serves.</p>
+<hr />
+<h4 id="mag_right-tip-settings-that-look-like-speedups-on-this-card">🔎
+Tip: Settings That Look Like Speedups on This Card</h4>
+<p>Measured on this card at first light, and all three stay off:</p>
+<ul>
+<li><strong>Quantizing the KV cache to <code>q8_0</code></strong> costs
+12% of decode and 20–40% of prefill. With no tensor cores the
+dequantization is not hidden, and E2B's KV cache is small at 8192
+tokens.</li>
+<li><strong><code>GGML_CUDA_FORCE_MMQ</code></strong>, which llama.cpp
+itself suggests for cards without tensor cores, measured marginally
+slower.</li>
+<li><strong>Lowering <code>-ngl</code> to save memory</strong> moves
+real matrix multiplies to the CPU and buys memory the card was never
+short of.</li>
+</ul>
+<hr />
+<h4 id="mag_right-tip-keep-demo-inputs-short">🔎 Tip: Keep Demo Inputs
+Short</h4>
+<p>The context is 8192 tokens and prefill runs at about 345 tokens per
+second, so a 4,000-token paste is over 11 seconds of silence before the
+first word. Pipe a commit summary into <code>ask</code>, never a large
+diff.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/medium/img/devto-gemma4-1650ti-demo-table-5.png"
+alt="Table: on the GTX 1650 Ti, Google QAT GGUF, Re-packed QAT GGUF" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For this laptop, the re-packed file. It loads in the same llama.cpp
+build with the same flags; the only change is the path in
+<code>tpu.env</code>. It is smaller, faster and closer to bf16, on a
+card with little room to spare.</p>
+<p>The re-pack depends on Google's unpacked QAT checkpoint staying
+published, and it works only where the source was trained onto a 4-bit
+grid. <code>gguf_exact.py</code> refuses any tensor with blocks off
+it.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to run Gemma 4 E2B as a responsive,
+single-user assistant on a 2021 laptop with a 4 GB GPU, and to show the
+demo step by step. The key to the solution was the QAT release on
+Hugging Face, re-packed so every trained 4-bit value lands in the file
+exactly. The measured results were:</p>
+<ul>
+<li>🟢 <strong>76.14 to 77.14 tok/s while serving</strong>, measured by
+llama-server over five requests, and 77.35 tok/s on its chat page; 81.75
+tok/s in <code>llama-bench</code>.</li>
+<li>🟢 <strong>0.38 s for a one-sentence answer</strong>, end to end,
+and a 4-second cold start.</li>
+<li>🟢 <strong>1488 MiB of a 4096 MiB card</strong>, drawing 40 W.</li>
+<li>🟢 <strong>1.12x faster generation than Google's GGUF</strong>, from
+a 31% smaller output table.</li>
+<li>🟢 <strong>32x closer to bf16</strong> by mean KL divergence; same
+top token 98.26% of the time against 87.18%.</li>
+<li>⚠️ <strong>Thinking costs seconds</strong>: 9.36 s for a short
+reasoning question, so it stays off by default.</li>
+<li>❌ <strong>KV cache quantization and <code>FORCE_MMQ</code> are
+slower</strong> on this card.</li>
+</ul>
+<p>Scope: one Lenovo Yoga 9 15IMH5 (Core i7-10750H, GTX 1650 Ti Max-Q,
+4096 MiB, 40 W cap), llama.cpp <code>f95b0d9</code> built for sm_75 with
+CUDA 13.4, one user, thinking off unless stated. The demo steps were
+re-run on 2026-10-02 for the output and the screenshot shown here.
+<code>llama-bench</code> and KL divergence figures come from the
+2026-09-29 runs of four alternating passes and 16 × 512 tokens of
+wikitext-2. Task accuracy beyond KL divergence was not measured.</p>
+<p>The strategy for running Gemma 4 on a 4 GB laptop GPU with an exactly
+re-packed QAT GGUF was validated with an incremental step by step
+approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0">local-llamacpp-1650ti-2b-q4_0
+| GitHub</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf">google/gemma-4-E2B-it-qat-q4_0-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized">google/gemma-4-E2B-it-qat-q4_0-unquantized
+| Hugging Face</a></li>
+<li><a
+href="https://dev.to/gde/gemma-4-on-an-old-4-gb-laptop-gpu-qat-takes-it-from-95-gib-to-16-b5l">Gemma
+4 on an Old 4 GB Laptop GPU: QAT Takes It From 9.5 GiB to 1.6 |
+dev.to</a></li>
+<li><a
+href="https://blog.google/innovation-and-ai/technology/developers-tools/quantization-aware-training-gemma-4/">Quantization-Aware
+Training for Gemma 4 | Google</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp |
+GitHub</a></li>
+</ul>
+</body>
+</html>
