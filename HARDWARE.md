@@ -139,6 +139,19 @@ same chip and flags). Not measured on v6e.
 3.21x bf16 at 1 token, 1.87x at 16, 1.68x at 64, relative error 0.32%; at 4 tokens the kernel's tile
 needs 129.07M of VMEM against 128M and fails to compile, the same failure class as the scoped limit above.
 
+### v5e-4 — four 16 GB chips on one host
+
+`v5litepod-4`, topology `2x2`, the same `v2-alpha-tpuv5-lite` runtime as v5e-1. The host is
+`ct5lp-hightpu-4t`: 112 vCPU and 192 GiB of RAM, against `ct5lp-hightpu-1t`'s 24 vCPU and 48 GiB, so
+the host-memory ceiling a v5e-1 compile runs into is four times further away. Listed in `us-west4-a` and
+six other zones checked on 2026-10-02; the v5e quota is 512 chips per zone in 44 zones, so it does not bind.
+Flex-start for `v5litepod-4` has not been tried anywhere.
+
+Four chips divide a model's KV cost only across KV heads. E2B has one, so every chip holds the whole
+cache (`MODELS.md`, "Single KV head does not shard"); 12B's 8 sliding-layer heads split to 2 per chip
+while its single global head is copied, 96 KiB per chip per token against 336 KiB on one chip. Nothing
+here has been measured on v5e-4 yet; the five `tpu-vllm-v5e4-*` rigs exist to measure it.
+
 ### v6e-1 — 32 GB nominal
 
 Measured on `ct6e-standard-1t` serving E2B under vLLM at 65,536 context. The allocation is recorded in

@@ -431,6 +431,11 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-4b-w8a8 | 0 | 1 |
 | tpu-vllm-v5e1-4b-w8a8emb4 | 0 | 4 |
 | tpu-vllm-v5e1-4b-w8a8rtn | 0 | 1 |
+| tpu-vllm-v5e4-12b-w8a8emb4 | 0 | 0 |
+| tpu-vllm-v5e4-2b-q4_0 | 0 | 0 |
+| tpu-vllm-v5e4-2b-q4w4a16emb4 | 0 | 0 |
+| tpu-vllm-v5e4-2b-w4a16 | 0 | 0 |
+| tpu-vllm-v5e4-2b-w8a8 | 0 | 0 |
 | tpu-vllm-v5p1-2b | 0 | 0 |
 | tpu-vllm-v6e1-2b | 1 | 8 |
 | tpu-vllm-v6e8-2b | 1 | 1 |

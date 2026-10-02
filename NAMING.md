@@ -218,6 +218,7 @@ Accelerator generation plus chip count, punctuation stripped.
 | Value | Means |
 | --- | --- |
 | `v5e1` | TPU v5e, 1 chip |
+| `v5e4` | TPU v5e, 4 chips — one host (`v5litepod-4`, topology `2x2`) |
 | `v5p1` | TPU v5p, 1 chip — only reachable via Compute Engine, see below |
 | `v6e1` | TPU v6e (Trillium), 1 chip |
 | `v6e4` | TPU v6e, 4 chips |
@@ -450,6 +451,11 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-w8a8` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-1 | `xbill9/gemma-4-E2B-it-qat-w8a8-int8` | `w8a8` — int8 W8A8 built from the QAT weights; `w8a8` rather than `int8`, which would also describe weight-only int8 |
 | `~/gemma4-dev/tpu-vllm-v5e1-2b-q4w4a16emb4` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-1 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` | `q4w4a16emb4` — the QAT W4A16 repack with its embedding tables and `lm_head` int4 too, text only. Created as `tpu-vllm-v5e1-2b-w4a16emb4` and renamed 2026-09-30 under slot 5's fifth rule, before it had provisioned |
 | `~/gemma4-dev/tpu-vllm-v5e1-12b-w8a8emb4` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-1 | `xbill9/gemma-4-12B-it-qat-w8a8-int8-emb4` | `w8a8emb4` — 12B int8 W8A8 linears from the QAT weights with int4 vocabulary tables, text only; the largest model measured to serve on one v5e chip |
+| `~/gemma4-dev/tpu-vllm-v5e4-2b-q4_0` | TPU Queued Resource | vLLM in Docker | v5e-4 | `google/gemma-4-E2B-it-qat-q4_0-unquantized` | `q4_0` — the four-chip sibling of `tpu-vllm-v5e1-2b-q4_0`, forked 2026-10-02 at TP=4 |
+| `~/gemma4-dev/tpu-vllm-v5e4-2b-w4a16` | TPU Queued Resource | vLLM in Docker | v5e-4 | `google/gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the four-chip sibling of `tpu-vllm-v5e1-2b-w4a16`, forked 2026-10-02 at TP=4 |
+| `~/gemma4-dev/tpu-vllm-v5e4-2b-w8a8` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-4 | `xbill9/gemma-4-E2B-it-qat-w8a8-int8` | `w8a8` — the four-chip sibling of `tpu-vllm-v5e1-2b-w8a8`, forked 2026-10-02 at TP=4 |
+| `~/gemma4-dev/tpu-vllm-v5e4-2b-q4w4a16emb4` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-4 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` | `q4w4a16emb4` — the four-chip sibling of `tpu-vllm-v5e1-2b-q4w4a16emb4`, forked 2026-10-02 at TP=4 |
+| `~/gemma4-dev/tpu-vllm-v5e4-12b-w8a8emb4` | TPU Queued Resource | vLLM in Docker, **patched image** | v5e-4 | `xbill9/gemma-4-12B-it-qat-w8a8-int8-emb4` | `w8a8emb4` — the four-chip sibling of `tpu-vllm-v5e1-12b-w8a8emb4`, forked 2026-10-02 at TP=4 |
 | `~/gemma4-dev/tpu-vllm-v5p1-2b` | **GCE instance** (not the TPU API) | vLLM in Docker | v5p, 1 chip (`ct5p-hightpu-1t-tpu`) | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v6e1-2b` | TPU Queued Resource | vLLM in Docker | v6e-1 | `gemma-4-E2B-it` | — |
 | `~/gemma4-dev/tpu-vllm-v6e8-2b` | TPU flex-start VM | vLLM in Docker | v6e-8 | `gemma-4-E2B-it` | — |
