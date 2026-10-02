@@ -1,0 +1,11 @@
+This article provides a step by step guide to the live demo of Gemma 4 E2B on a local, laptop hosted GPU enabled system: a Lenovo Yoga 9 from 2021 with a 4 GB GTX 1650 Ti. One person asks questions, and the answers stream back at over 70 tokens per second with no cloud involved. The model file that makes it work is a re-pack of Google's quantization-aware-trained (QAT) weights, published on Hugging Face.
+
+https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0
+
+Gemma 4 E2B in bf16 is 9.5 GiB of weights and this card has 4 GiB. The re-packed QAT file serves it in 1488 MiB and decodes at 76 tok/s, 1.12x faster than Google's own GGUF on the same card and 32x closer to bf16.
+
+Dev.to is here: https://dev.to/gde/gemma-4-at-over-70-tokenss-on-a-2021-laptops-4-gb-gpu-the-live-demo-step-by-step-52hg
+
+Medium is here: https://medium.com/@xbill999/gemma-4-at-over-70-tokens-s-on-a-2021-laptops-4-gb-gpu-the-live-demo-step-by-step-aef88e27a23c
+
+My LinkedIn post is here: https://www.linkedin.com/posts/xbill_gde-gdg-devfest2026-activity-7511814181336207360-hCqc
