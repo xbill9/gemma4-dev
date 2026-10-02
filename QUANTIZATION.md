@@ -251,8 +251,12 @@ E2B saves little HBM because the QAT export leaves its PLE table at bf16 (see th
   12B), and **31B takes about 27 minutes to boot cold**. A persistent compile cache
   (`VLLM_XLA_CACHE_PATH` on a host volume) brings the same boot to 9 minutes (541 s), about half of it weight loading (279 s).
 - **TP=4 on v5e serves** (2026-10-02, `tpu-vllm-v5e4-*/benchmarks/runs/2026-10-02-rig-boot-v5e4`): Google's E2B
-  `-qat-w4a16-ct` and the E2B int4-table repack load and answer correctly at TP=4 on the patched image. Accuracy at
-  TP=4 is unmeasured.
+  `-qat-w4a16-ct` and the E2B int4-table repack load and answer correctly at TP=4 on the patched image. **Accuracy at
+  TP=4 is level on the suite**, paired record for record against TP=1 on v5e-1 (2026-10-02,
+  `tpu-vllm-v5e4-{2b-w8a8,12b-w8a8emb4}/benchmarks/runs/2026-10-02-suite-tp4-v5e4`): E2B W8A8 −0.4 points
+  (−1.2 to +0.5), 12B W8A8 + int4 tables −0.1 (−0.6 to +0.5). GSM8K moves about a point in opposite
+  directions (E2B +1.4, 12B −0.9): splitting the matmuls changes which long greedy answers come out right,
+  in no consistent direction; run-to-run spread on one chip is unmeasured.
 
 **The accuracy cost is 1–3 points and shrinks with size.** A label read on the 3,880-record public suite,
 each W4A16 export paired per record with its bf16 checkpoint on the same patched image:
