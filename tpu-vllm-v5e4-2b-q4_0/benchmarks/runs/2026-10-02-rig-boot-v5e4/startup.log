@@ -1,0 +1,402 @@
++ echo 'Starting Queued vLLM Bootloader...'
+Starting Queued vLLM Bootloader...
++ echo -----------------------------------
+-----------------------------------
++ echo 'Project ID: aisprint-491218'
+Project ID: aisprint-491218
++ echo 'Zone: us-west4-a'
+Zone: us-west4-a
++ echo 'Model Name: google/gemma-4-E2B-it-qat-q4_0-unquantized'
+Model Name: google/gemma-4-E2B-it-qat-q4_0-unquantized
++ echo 'HF_SECRET_ID: hf-token'
+HF_SECRET_ID: hf-token
++ echo -----------------------------------
+-----------------------------------
++ echo 'Checking internet connectivity...'
+Checking internet connectivity...
++ set +e
+++ seq 1 30
++ for i in $(seq 1 30)
++ echo 'Attempt 1/30: Pinging x.x.x.x...'
+Attempt 1/30: Pinging x.x.x.x...
++ ping -c 1 x.x.x.x
+PING x.x.x.x (x.x.x.x) 56(84) bytes of data.
+64 bytes from x.x.x.x: icmp_seq=1 ttl=115 time=0.356 ms
+
+--- x.x.x.x ping statistics ---
+1 packets transmitted, 1 received, 0% packet loss, time 0ms
+rtt min/avg/max/mdev = 0.356/0.356/0.356/0.000 ms
++ '[' 0 -eq 0 ']'
++ echo 'Internet connected.'
+Internet connected.
++ break
++ set -e
++ echo 'Pulling vLLM Docker image: vllm/vllm-tpu:nightly'
+Pulling vLLM Docker image: vllm/vllm-tpu:nightly
++ set +e
+++ seq 1 5
++ for i in $(seq 1 5)
++ echo 'Attempt 1/5: sudo docker pull vllm/vllm-tpu:nightly'
+Attempt 1/5: sudo docker pull vllm/vllm-tpu:nightly
++ sudo docker pull vllm/vllm-tpu:nightly
+nightly: Pulling from vllm/vllm-tpu
+774043ccc8cc: Pulling fs layer
+dbf5e2aa24a0: Pulling fs layer
+faea3286cb6a: Pulling fs layer
+59fc966a4f9d: Pulling fs layer
+4a2fd97345c1: Pulling fs layer
+da8110a656bd: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+264468fe8e18: Pulling fs layer
+18845e41cf06: Pulling fs layer
+40cf2db5a719: Pulling fs layer
+8421d7a38284: Pulling fs layer
+f33a9f0cdbcd: Pulling fs layer
+14a0e0f79dfb: Pulling fs layer
+92a6099114f7: Pulling fs layer
+5b8862514114: Pulling fs layer
+29a374abdf10: Pulling fs layer
+da8110a656bd: Waiting
+59fc966a4f9d: Waiting
+5c8d7e701e8a: Pulling fs layer
+a8dde14767a1: Pulling fs layer
+60de439bb4c6: Pulling fs layer
+4f4fb700ef54: Waiting
+4a2fd97345c1: Waiting
+5cc71bb2299a: Pulling fs layer
+264468fe8e18: Waiting
+b9044dc05081: Pulling fs layer
+dc6f8bf3cd42: Pulling fs layer
+8421d7a38284: Waiting
+40cf2db5a719: Waiting
+1db794dae6d8: Pulling fs layer
+18845e41cf06: Waiting
+b6d7b50b0656: Pulling fs layer
+29a374abdf10: Waiting
+f33a9f0cdbcd: Waiting
+b27152c87cc3: Pulling fs layer
+5c8d7e701e8a: Waiting
+034e631225a3: Pulling fs layer
+5b8862514114: Waiting
+5cc71bb2299a: Waiting
+14a0e0f79dfb: Waiting
+92a6099114f7: Waiting
+a8dde14767a1: Waiting
+dc6f8bf3cd42: Waiting
+b27152c87cc3: Waiting
+60de439bb4c6: Waiting
+b9044dc05081: Waiting
+034e631225a3: Waiting
+b6d7b50b0656: Waiting
+dbf5e2aa24a0: Verifying Checksum
+dbf5e2aa24a0: Download complete
+faea3286cb6a: Verifying Checksum
+faea3286cb6a: Download complete
+774043ccc8cc: Verifying Checksum
+774043ccc8cc: Download complete
+59fc966a4f9d: Verifying Checksum
+59fc966a4f9d: Download complete
+4f4fb700ef54: Download complete
+4a2fd97345c1: Verifying Checksum
+4a2fd97345c1: Download complete
+774043ccc8cc: Pull complete
+18845e41cf06: Verifying Checksum
+18845e41cf06: Download complete
+dbf5e2aa24a0: Pull complete
+264468fe8e18: Verifying Checksum
+264468fe8e18: Download complete
+40cf2db5a719: Verifying Checksum
+40cf2db5a719: Download complete
+faea3286cb6a: Pull complete
+59fc966a4f9d: Pull complete
+4a2fd97345c1: Pull complete
+unexpected EOF
++ '[' 1 -eq 0 ']'
++ echo 'Docker pull failed, retrying in 20 seconds...'
+Docker pull failed, retrying in 20 seconds...
++ sleep 20
++ '[' 1 -eq 5 ']'
++ for i in $(seq 1 5)
++ echo 'Attempt 2/5: sudo docker pull vllm/vllm-tpu:nightly'
+Attempt 2/5: sudo docker pull vllm/vllm-tpu:nightly
++ sudo docker pull vllm/vllm-tpu:nightly
+nightly: Pulling from vllm/vllm-tpu
+774043ccc8cc: Already exists
+dbf5e2aa24a0: Already exists
+faea3286cb6a: Already exists
+59fc966a4f9d: Already exists
+4a2fd97345c1: Already exists
+da8110a656bd: Pulling fs layer
+4f4fb700ef54: Pulling fs layer
+264468fe8e18: Pulling fs layer
+18845e41cf06: Pulling fs layer
+40cf2db5a719: Pulling fs layer
+8421d7a38284: Pulling fs layer
+f33a9f0cdbcd: Pulling fs layer
+14a0e0f79dfb: Pulling fs layer
+92a6099114f7: Pulling fs layer
+5b8862514114: Pulling fs layer
+29a374abdf10: Pulling fs layer
+5c8d7e701e8a: Pulling fs layer
+a8dde14767a1: Pulling fs layer
+18845e41cf06: Waiting
+60de439bb4c6: Pulling fs layer
+40cf2db5a719: Waiting
+5cc71bb2299a: Pulling fs layer
+da8110a656bd: Waiting
+5c8d7e701e8a: Waiting
+a8dde14767a1: Waiting
+5b8862514114: Waiting
+4f4fb700ef54: Waiting
+f33a9f0cdbcd: Waiting
+92a6099114f7: Waiting
+264468fe8e18: Waiting
+14a0e0f79dfb: Waiting
+b9044dc05081: Pulling fs layer
+60de439bb4c6: Waiting
+5cc71bb2299a: Waiting
+dc6f8bf3cd42: Pulling fs layer
+29a374abdf10: Waiting
+dc6f8bf3cd42: Waiting
+1db794dae6d8: Pulling fs layer
+b6d7b50b0656: Pulling fs layer
+b27152c87cc3: Pulling fs layer
+034e631225a3: Pulling fs layer
+b6d7b50b0656: Waiting
+034e631225a3: Waiting
+4f4fb700ef54: Verifying Checksum
+4f4fb700ef54: Download complete
+18845e41cf06: Verifying Checksum
+18845e41cf06: Download complete
+40cf2db5a719: Verifying Checksum
+40cf2db5a719: Download complete
+264468fe8e18: Verifying Checksum
+264468fe8e18: Download complete
+da8110a656bd: Verifying Checksum
+da8110a656bd: Download complete
+14a0e0f79dfb: Verifying Checksum
+14a0e0f79dfb: Download complete
+92a6099114f7: Verifying Checksum
+92a6099114f7: Download complete
+8421d7a38284: Verifying Checksum
+8421d7a38284: Download complete
+5b8862514114: Verifying Checksum
+5b8862514114: Download complete
+5c8d7e701e8a: Download complete
+a8dde14767a1: Verifying Checksum
+a8dde14767a1: Download complete
+29a374abdf10: Verifying Checksum
+29a374abdf10: Download complete
+60de439bb4c6: Verifying Checksum
+60de439bb4c6: Download complete
+5cc71bb2299a: Verifying Checksum
+5cc71bb2299a: Download complete
+dc6f8bf3cd42: Download complete
+b9044dc05081: Verifying Checksum
+b9044dc05081: Download complete
+b6d7b50b0656: Verifying Checksum
+b6d7b50b0656: Download complete
+b27152c87cc3: Verifying Checksum
+034e631225a3: Verifying Checksum
+034e631225a3: Download complete
+1db794dae6d8: Verifying Checksum
+1db794dae6d8: Download complete
+da8110a656bd: Pull complete
+4f4fb700ef54: Pull complete
+264468fe8e18: Pull complete
+18845e41cf06: Pull complete
+40cf2db5a719: Pull complete
+f33a9f0cdbcd: Verifying Checksum
+f33a9f0cdbcd: Download complete
+8421d7a38284: Pull complete
+f33a9f0cdbcd: Pull complete
+14a0e0f79dfb: Pull complete
+92a6099114f7: Pull complete
+5b8862514114: Pull complete
+29a374abdf10: Pull complete
+5c8d7e701e8a: Pull complete
+a8dde14767a1: Pull complete
+60de439bb4c6: Pull complete
+5cc71bb2299a: Pull complete
+b9044dc05081: Pull complete
+dc6f8bf3cd42: Pull complete
+1db794dae6d8: Pull complete
+b6d7b50b0656: Pull complete
+b27152c87cc3: Pull complete
+034e631225a3: Pull complete
+Digest: sha256:106a30b605d48adfc5f555fe20dbca9e0d3cef4f1af89cc239e743f161e650ff
+Status: Downloaded newer image for vllm/vllm-tpu:nightly
+docker.io/vllm/vllm-tpu:nightly
++ '[' 0 -eq 0 ']'
++ echo 'Docker image pulled successfully.'
+Docker image pulled successfully.
++ break
++ set -e
++ echo 'Setting vLLM environment variables...'
+Setting vLLM environment variables...
++ VLLM_MODEL=google/gemma-4-E2B-it-qat-q4_0-unquantized
++ VLLM_MAX_MODEL_LEN=16384
++ VLLM_TP_SIZE=4
++ VLLM_MAX_BATCHED_TOKENS=4096
++ VLLM_LIMIT_MM_PER_PROMPT='{"image":4,"audio":1}'
++ HF_HOME=/dev/shm
++ echo 'VLLM_MODEL set to: google/gemma-4-E2B-it-qat-q4_0-unquantized'
+VLLM_MODEL set to: google/gemma-4-E2B-it-qat-q4_0-unquantized
++ echo 'VLLM_MAX_MODEL_LEN set to: 16384'
+VLLM_MAX_MODEL_LEN set to: 16384
++ echo 'VLLM_TP_SIZE set to: 4'
+VLLM_TP_SIZE set to: 4
++ echo 'VLLM_MAX_BATCHED_TOKENS set to: 4096'
+VLLM_MAX_BATCHED_TOKENS set to: 4096
++ echo 'VLLM_LIMIT_MM_PER_PROMPT set to: {"image":4,"audio":1}'
+VLLM_LIMIT_MM_PER_PROMPT set to: {"image":4,"audio":1}
++ echo 'HF_HOME set to: /dev/shm'
+HF_HOME set to: /dev/shm
++ set +x
+Fetching 'hf-token' from Secret Manager (retrying for up to 30 minutes)...
+Secret retrieved successfully on attempt 1 (value masked).
+Attempting to start vLLM container...
+Executing command: sudo docker run --name vllm-gemma4 --privileged --net=host -d \
+  -v /dev/shm:/dev/shm --shm-size 10gb \
+  -e HF_HOME="$HF_HOME" \
+  -e HF_TOKEN=<masked> \
+  vllm/vllm-tpu:nightly vllm serve "$VLLM_MODEL" \
+  --max-model-len "$VLLM_MAX_MODEL_LEN" \
+  --tensor-parallel-size "$VLLM_TP_SIZE" \
+  --disable_chunked_mm_input \
+  --max_num_batched_tokens "$VLLM_MAX_BATCHED_TOKENS" \
+  --limit-mm-per-prompt "$VLLM_LIMIT_MM_PER_PROMPT" \
+  --enable-auto-tool-choice \
+  --tool-call-parser gemma4 \
+  --reasoning-parser gemma4
+84eea8ce3d322211422f83bfc4f94561daa8ce8a643ca66d97a9f5b808a08d19
++ echo 'Docker container started. Waiting for '\''Application startup complete.'\'' in logs (up to 20 minutes)...'
+Docker container started. Waiting for 'Application startup complete.' in logs (up to 20 minutes)...
++ HEALTHY=0
+++ seq 1 120
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 1/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 1/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 2/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 2/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 3/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 3/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 4/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 4/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 5/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 5/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 6/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 6/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 7/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 7/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 8/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 8/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 9/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 9/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 10/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 10/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 11/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 11/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 12/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 12/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 13/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 13/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 14/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 14/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 15/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 15/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 16/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 16/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 17/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 17/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 18/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 18/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 19/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 19/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 20/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 20/120). Retrying in 10 seconds...
++ sleep 10
++ for i in $(seq 1 120)
++ sudo docker logs vllm-gemma4
++ grep -q 'Application startup complete.'
++ echo 'vLLM not yet fully started (attempt 21/120). Retrying in 10 seconds...'
+vLLM not yet fully started (attempt 21/120). Retrying in 10 seconds...
++ sleep 10

@@ -32,6 +32,9 @@ counterpart is `tpu-vllm-v5e1-2b`. If the wNa16 schemes ever land, this is the r
 
 **Measured on v5e-4, 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`):** flex-start `v5litepod-4` in `us-west4-a` was granted in under 5
 minutes and the boot ran through this rig's own `create_tpu_queued_resource`. `vllm/vllm-tpu:nightly` as pulled 2026-10-02 (digest `sha256:106a30b6…`) cannot load this checkpoint: the container exits at model load with `ValueError: Following weights were not initialized from checkpoint` (`k_norm` of the KV-shared layers). The same container at `--tensor-parallel-size 1` on the same VM fails the same way, so the cause is the image and checkpoint, independent of chip count. **The rig does not serve as committed.**
+Cause (diagnosed 2026-10-02, run record's Diagnosis section): Google's QAT export omits `k_proj`/`v_proj`/`k_norm`
+for the 20 KV-shared layers and that day's nightly allocates and requires them on every layer. The same checkpoint
+serves at TP=4 on the pinned digest with `patches/` (`kvshare.diff`); moving this rig onto that image is the fix.
 
 The numbers below were measured
 on v5e-1 by [`../tpu-vllm-v5e1-2b-q4_0`](../tpu-vllm-v5e1-2b-q4_0) (2026-09-30, generation and tool calling):

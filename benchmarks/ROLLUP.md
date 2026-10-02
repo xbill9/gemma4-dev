@@ -179,7 +179,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-google-vs-v2-cpu` | 5 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-paired-sweep-cpu` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-4b-q4_0 | `2026-09-30-paired-sweep-cpu` | 10 | 0 | 0 | yes | **no** |
-| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 16 | 1 | 0 | yes | **no** |
+| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 17 | 1 | 0 | yes | **no** |
 | local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-v2-i71360p` | 9 | 1 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
@@ -320,9 +320,9 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-30-longb-e4b-w8a8-emb4-v5e1` | 14 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w8a8rtn | `2026-09-30-fillB-e4b-w8a8rtn-v5e1` | 36 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e4-12b-w8a8emb4 | `2026-10-02-rig-boot-v5e4` | 10 | 7 | 0 | **no** | **no** |
-| tpu-vllm-v5e4-2b-q4_0 | `2026-10-02-rig-boot-v5e4` | 5 | 1 | 0 | **no** | **no** |
+| tpu-vllm-v5e4-2b-q4_0 | `2026-10-02-rig-boot-v5e4` | 11 | 6 | 0 | **no** | **no** |
 | tpu-vllm-v5e4-2b-q4w4a16emb4 | `2026-10-02-rig-boot-v5e4` | 10 | 7 | 0 | **no** | **no** |
-| tpu-vllm-v5e4-2b-w4a16 | `2026-10-02-rig-boot-v5e4` | 5 | 1 | 0 | **no** | **no** |
+| tpu-vllm-v5e4-2b-w4a16 | `2026-10-02-rig-boot-v5e4` | 11 | 6 | 0 | **no** | **no** |
 | tpu-vllm-v5e4-2b-w8a8 | `2026-10-02-rig-boot-v5e4` | 10 | 7 | 0 | **no** | **no** |
 | tpu-vllm-v6e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |

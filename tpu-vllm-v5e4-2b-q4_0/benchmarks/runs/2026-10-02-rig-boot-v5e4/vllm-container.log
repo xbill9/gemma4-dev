@@ -1,0 +1,212 @@
+Pin memory is not supported on TPU.
+Failed to import from vllm._C: ModuleNotFoundError("No module named 'vllm._C'")
+Failed to import the DeepSelect extension (vllm._deepselect_C): No module named 'vllm._deepselect_C'
+Load format `runai_streamer` is already registered, and will be overwritten by the new loader class `<class 'tpu_inference.models.vllm.vllm_model_loader.RunaiIncrementalModelLoader'>`.
+(APIServer pid=1) INFO 10-02 18:22:10 [api_utils.py:347] 
+(APIServer pid=1) INFO 10-02 18:22:10 [api_utils.py:347]        █     █     █▄   ▄█
+(APIServer pid=1) INFO 10-02 18:22:10 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.30.1rc1.dev427+g72e7874fa
+(APIServer pid=1) INFO 10-02 18:22:10 [api_utils.py:347]   █▄█▀ █     █     █     █  model   google/gemma-4-E2B-it-qat-q4_0-unquantized
+(APIServer pid=1) INFO 10-02 18:22:10 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=1) INFO 10-02 18:22:10 [api_utils.py:347] 
+(APIServer pid=1) INFO 10-02 18:22:10 [api_utils.py:286] non-default args: {'model_tag': 'google/gemma-4-E2B-it-qat-q4_0-unquantized', 'enable_auto_tool_choice': True, 'tool_call_parser': 'gemma4', 'model': 'google/gemma-4-E2B-it-qat-q4_0-unquantized', 'max_model_len': 16384, 'reasoning_parser': 'gemma4', 'tensor_parallel_size': 4, 'limit_mm_per_prompt': {'image': 4, 'audio': 1}, 'max_num_batched_tokens': 4096, 'disable_chunked_mm_input': True}
+(APIServer pid=1) INFO 10-02 18:22:27 [model.py:699] Resolved architecture: Gemma4ForConditionalGeneration
+(APIServer pid=1) INFO 10-02 18:22:27 [model.py:2109] Using max model len 16384
+(APIServer pid=1) INFO 10-02 18:22:31 [scheduler.py:308] Chunked prefill is enabled with max_num_batched_tokens=4096.
+(APIServer pid=1) INFO 10-02 18:22:31 [config.py:266] Gemma4 model has heterogeneous head dimensions {'sliding_attention': 256, 'full_attention': 512}. FA4 not available, forcing TRITON_ATTN backend.
+(APIServer pid=1) WARNING 10-02 18:22:32 [vllm.py:1746] Inductor compilation was disabled by user settings, optimizations settings that are only active during inductor compilation will be ignored.
+(APIServer pid=1) INFO 10-02 18:22:32 [kernel.py:408] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['native'])
+(APIServer pid=1) INFO 10-02 18:22:32 [tpu_platform.py:291] Initialized sharding configuration: ShardingConfigManager(total_devices=4, sharding_strategy=ShardingStrategy(tensor_parallelism=4, expert_parallelism=1, sequence_parallelism=1, data_parallelism=1, attention_data_parallelism=1, attention_data_expert_parallelism=1, decode_context_parallelism=1, prefill_context_parallelism=1), mm_encoder_tp_mode=weights, device_indexes=None)
+(APIServer pid=1) WARNING 10-02 18:22:32 [tpu_platform.py:424] Increase the page size from 16 to 32 to avoid SMEM OOM
+(APIServer pid=1) INFO 10-02 18:22:32 [tpu_platform.py:439] Force using UniProcExecutor for JAX on single host without pipeline parallelism.
+(APIServer pid=1) WARNING 10-02 18:22:32 [vllm.py:747] Model Runner V2 requires Triton; using the V1 model runner instead.
+(APIServer pid=1) INFO 10-02 18:22:32 [compilation.py:331] Enabled custom fusions: norm_quant, act_quant
+Pin memory is not supported on TPU.
+(EngineCore pid=651) INFO 10-02 18:23:23 [attention_interface.py:58] Using default RPA kernel
+(EngineCore pid=651) WARNING 10-02 18:23:24 [interface.py:369] Failed to import from vllm._C: ModuleNotFoundError("No module named 'vllm._C'")
+(EngineCore pid=651) INFO 10-02 18:23:25 [__init__.py:113] Registered model loader `<class 'tpu_inference.models.jax.utils.weight_utils.JaxDummyModelLoader'>` with load format `jax_dummy`
+(EngineCore pid=651) INFO 10-02 18:23:25 [__init__.py:113] Registered model loader `<class 'tpu_inference.models.common.pathways_dummy_loader.PathwaysDummyModelLoader'>` with load format `pathways_dummy`
+(EngineCore pid=651) WARNING 10-02 18:23:26 [indexer_topk.py:35] Failed to import the DeepSelect extension (vllm._deepselect_C): No module named 'vllm._deepselect_C'
+(EngineCore pid=651) INFO 10-02 18:23:26 [__init__.py:113] Registered model loader `<class 'tpu_inference.models.vllm.vllm_model_loader.IncrementalModelLoader'>` with load format `tpu_streaming_loader`
+(EngineCore pid=651) WARNING 10-02 18:23:26 [__init__.py:102] Load format `runai_streamer` is already registered, and will be overwritten by the new loader class `<class 'tpu_inference.models.vllm.vllm_model_loader.RunaiIncrementalModelLoader'>`.
+(EngineCore pid=651) INFO 10-02 18:23:26 [__init__.py:113] Registered model loader `<class 'tpu_inference.models.vllm.vllm_model_loader.RunaiIncrementalModelLoader'>` with load format `runai_streamer`
+(EngineCore pid=651) INFO 10-02 18:23:26 [core.py:129] Initializing a V1 LLM engine (v0.30.1rc1.dev427+g72e7874fa) with config: model='google/gemma-4-E2B-it-qat-q4_0-unquantized', speculative_config=None, tokenizer='google/gemma-4-E2B-it-qat-q4_0-unquantized', skip_tokenizer_init=False, tokenizer_mode=auto, revision=main, tokenizer_revision=main, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=16384, download_dir=None, load_format=auto, tensor_parallel_size=4, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=True, quantization=None, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=None, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='gemma4', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=google/gemma-4-E2B-it-qat-q4_0-unquantized, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'eager', 'custom_ops': ['all'], 'ir_enable_torch_wrap': False, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'compile_sizes': None, 'compile_ranges_endpoints': [4096], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'size_asserts': False, 'alignment_asserts': False, 'scalar_asserts': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.NONE: 0>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': None, 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': True, 'fuse_act_quant': True, 'fuse_attn_quant': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': None, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': True, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['native']), enable_flashinfer_autotune=True, enable_cutedsl_warmup=True, enable_jit_warmup=True, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=651) INFO 10-02 18:23:31 [parallel_state.py:1825] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/tmplesd3_ij backend=gloo
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+(EngineCore pid=651) INFO 10-02 18:23:31 [parallel_state.py:2269] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=651) INFO 10-02 18:23:31 [tpu_runner.py:879] Init mesh | mesh=Mesh('data': 1, 'model': 4, axis_types=(Auto, Auto))
+(EngineCore pid=651) INFO 10-02 18:23:31 [utils.py:225] Prepared token paddings: [16, 32, 64, 128, 256, 512, 1024, 2048, 4096]
+(EngineCore pid=651) INFO 10-02 18:23:31 [utils.py:171] Prepared request paddings: [8, 16, 32, 64, 128, 256]
+(EngineCore pid=651) INFO 10-02 18:23:31 [utils.py:190] Prepared attn request paddings: [256]
+(EngineCore pid=651) INFO 10-02 18:23:31 [compilation_manager.py:78] Enabling JAX compile cache.
+(EngineCore pid=651) INFO 10-02 18:23:31 [tpu_worker.py:472] Init worker | rank=0 | is_first_rank=True | is_last_rank=True | topology_order_id=0 | is_driver_worker=True | hbm=[(0.0, 15.75), (0.0, 15.75), (0.0, 15.75), (0.0, 15.75)]GiB |self.devices=[TpuDevice(id=0, process_index=0, coords=(0,0,0), core_on_chip=0), TpuDevice(id=1, process_index=0, coords=(1,0,0), core_on_chip=0), TpuDevice(id=2, process_index=0, coords=(0,1,0), core_on_chip=0), TpuDevice(id=3, process_index=0, coords=(1,1,0), core_on_chip=0)] | total devices=[TpuDevice(id=0, process_index=0, coords=(0,0,0), core_on_chip=0), TpuDevice(id=1, process_index=0, coords=(1,0,0), core_on_chip=0), TpuDevice(id=2, process_index=0, coords=(0,1,0), core_on_chip=0), TpuDevice(id=3, process_index=0, coords=(1,1,0), core_on_chip=0)] | local_devices=[TpuDevice(id=0, process_index=0, coords=(0,0,0), core_on_chip=0), TpuDevice(id=1, process_index=0, coords=(1,0,0), core_on_chip=0), TpuDevice(id=2, process_index=0, coords=(0,1,0), core_on_chip=0), TpuDevice(id=3, process_index=0, coords=(1,1,0), core_on_chip=0)]
+(EngineCore pid=651) INFO 10-02 18:23:31 [model_loader.py:674] Loading model with MODEL_IMPL_TYPE=auto
+(EngineCore pid=651) INFO 10-02 18:23:31 [model_loader.py:718] Resolved MODEL_IMPL_TYPE 'auto' to 'flax_nnx'
+(EngineCore pid=651) WARNING 10-02 18:23:32 [gemma4.py:306] num_kv_heads=1 is not divisible by TP size 4, sharding k/v projections on head_dim instead of kv-heads. This may cause all-to-all communication overhead.
+(APIServer pid=1) INFO 10-02 18:23:50 [base.py:255] Multi-modal warmup completed in 38.876s
+(EngineCore pid=651) INFO 10-02 18:23:53 [weight_utils.py:523] Time spent downloading weights for google/gemma-4-E2B-it-qat-q4_0-unquantized: 10.391438 seconds
+(EngineCore pid=651) INFO 10-02 18:23:53 [weight_utils.py:1063] Filesystem type for checkpoints: TMPFS. Checkpoint size: 9.51 GiB. Available RAM: 166.84 GiB.
+(EngineCore pid=651) INFO 10-02 18:23:53 [weight_utils.py:1086] Auto-prefetch is disabled because the filesystem (TMPFS) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [01:10<00:00, 70.74s/it]
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [01:10<00:00, 70.74s/it]
+
+(EngineCore pid=651) INFO 10-02 18:25:04 [default_loader.py:484] Loading weights took 70.77 seconds
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436] EngineCore failed to start.
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436] Traceback (most recent call last):
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/v1/engine/core.py", line 1398, in run_engine_core
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Process EngineCore:
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     return func(*args, **kwargs)
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/v1/engine/core.py", line 1154, in __init__
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     super().__init__(
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/v1/engine/core.py", line 140, in __init__
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     self.model_executor = executor_class(vllm_config)
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     return func(*args, **kwargs)
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/v1/executor/abstract.py", line 113, in __init__
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     self._init_executor()
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/v1/executor/uniproc_executor.py", line 74, in _init_executor
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     self.driver_worker.load_model()
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/tpu_inference/tpu_inference/worker/tpu_worker.py", line 668, in load_model
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     self.model_runner.load_model()
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/tpu_inference/tpu_inference/runner/tpu_runner.py", line 1210, in load_model
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     model = get_model(
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]             ^^^^^^^^^^
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 692, in get_model
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     return get_flax_model(vllm_config, rng, mesh,
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 348, in get_flax_model
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     jit_model = _get_nnx_model(model_class,
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 285, in _get_nnx_model
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     loader.load_weights(model, model_config)
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     return func(*args, **kwargs)
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/model_executor/model_loader/default_loader.py", line 499, in load_weights
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     self.track_weights_loading(model, loaded_weights)
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]   File "/workspace/vllm/vllm/model_executor/model_loader/default_loader.py", line 521, in track_weights_loading
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436]     raise ValueError(
+(EngineCore pid=651) ERROR 10-02 18:25:04 [core.py:1436] ValueError: Following weights were not initialized from checkpoint: {'model.language_model.layers.22.self_attn.k_norm.weight', 'model.language_model.layers.31.self_attn.k_norm.weight', 'model.language_model.layers.17.self_attn.k_norm.weight', 'model.language_model.layers.27.self_attn.k_norm.weight', 'model.language_model.layers.24.self_attn.k_norm.weight', 'model.language_model.layers.34.self_attn.k_norm.weight', 'model.language_model.layers.21.self_attn.k_norm.weight', 'model.language_model.layers.29.self_attn.k_norm.weight', 'model.language_model.layers.33.self_attn.k_norm.weight', 'model.language_model.layers.30.self_attn.k_norm.weight', 'model.language_model.layers.18.self_attn.k_norm.weight', 'model.language_model.layers.25.self_attn.k_norm.weight', 'model.language_model.layers.28.self_attn.k_norm.weight', 'model.language_model.layers.19.self_attn.k_norm.weight', 'model.language_model.layers.15.self_attn.k_norm.weight', 'model.language_model.layers.26.self_attn.k_norm.weight', 'model.language_model.layers.16.self_attn.k_norm.weight', 'model.language_model.layers.23.self_attn.k_norm.weight', 'model.language_model.layers.32.self_attn.k_norm.weight', 'model.language_model.layers.20.self_attn.k_norm.weight'}
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/usr/local/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/workspace/vllm/vllm/v1/engine/core.py", line 1440, in run_engine_core
+    raise e
+  File "/workspace/vllm/vllm/v1/engine/core.py", line 1398, in run_engine_core
+    engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/v1/engine/core.py", line 1154, in __init__
+    super().__init__(
+  File "/workspace/vllm/vllm/v1/engine/core.py", line 140, in __init__
+    self.model_executor = executor_class(vllm_config)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/v1/executor/abstract.py", line 113, in __init__
+    self._init_executor()
+  File "/workspace/vllm/vllm/v1/executor/uniproc_executor.py", line 74, in _init_executor
+    self.driver_worker.load_model()
+  File "/workspace/tpu_inference/tpu_inference/worker/tpu_worker.py", line 668, in load_model
+    self.model_runner.load_model()
+  File "/workspace/tpu_inference/tpu_inference/runner/tpu_runner.py", line 1210, in load_model
+    model = get_model(
+            ^^^^^^^^^^
+  File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 692, in get_model
+    return get_flax_model(vllm_config, rng, mesh,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 348, in get_flax_model
+    jit_model = _get_nnx_model(model_class,
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/tpu_inference/tpu_inference/models/common/model_loader.py", line 285, in _get_nnx_model
+    loader.load_weights(model, model_config)
+  File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/model_executor/model_loader/default_loader.py", line 499, in load_weights
+    self.track_weights_loading(model, loaded_weights)
+  File "/workspace/vllm/vllm/model_executor/model_loader/default_loader.py", line 521, in track_weights_loading
+    raise ValueError(
+ValueError: Following weights were not initialized from checkpoint: {'model.language_model.layers.22.self_attn.k_norm.weight', 'model.language_model.layers.31.self_attn.k_norm.weight', 'model.language_model.layers.17.self_attn.k_norm.weight', 'model.language_model.layers.27.self_attn.k_norm.weight', 'model.language_model.layers.24.self_attn.k_norm.weight', 'model.language_model.layers.34.self_attn.k_norm.weight', 'model.language_model.layers.21.self_attn.k_norm.weight', 'model.language_model.layers.29.self_attn.k_norm.weight', 'model.language_model.layers.33.self_attn.k_norm.weight', 'model.language_model.layers.30.self_attn.k_norm.weight', 'model.language_model.layers.18.self_attn.k_norm.weight', 'model.language_model.layers.25.self_attn.k_norm.weight', 'model.language_model.layers.28.self_attn.k_norm.weight', 'model.language_model.layers.19.self_attn.k_norm.weight', 'model.language_model.layers.15.self_attn.k_norm.weight', 'model.language_model.layers.26.self_attn.k_norm.weight', 'model.language_model.layers.16.self_attn.k_norm.weight', 'model.language_model.layers.23.self_attn.k_norm.weight', 'model.language_model.layers.32.self_attn.k_norm.weight', 'model.language_model.layers.20.self_attn.k_norm.weight'}
+Traceback (most recent call last):
+  File "/usr/local/bin/vllm", line 6, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/workspace/vllm/vllm/entrypoints/cli/main.py", line 118, in main
+    args.dispatch_function(args)
+  File "/workspace/vllm/vllm/entrypoints/cli/serve.py", line 154, in cmd
+    uvloop.run(run_server(args))
+  File "/usr/local/lib/python3.12/site-packages/uvloop/__init__.py", line 96, in run
+    return __asyncio.run(
+           ^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1515, in uvloop.loop.Loop.run_until_complete
+  File "/usr/local/lib/python3.12/site-packages/uvloop/__init__.py", line 48, in wrapper
+    return await main
+           ^^^^^^^^^^
+  File "/workspace/vllm/vllm/entrypoints/launchers/api_server/entry.py", line 172, in run_server
+    await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+  File "/workspace/vllm/vllm/entrypoints/launchers/api_server/entry.py", line 185, in run_server_worker
+    async with build_async_engine_client(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/entrypoints/launchers/api_server/entry.py", line 58, in build_async_engine_client
+    async with build_async_engine_client_from_engine_args(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/entrypoints/launchers/api_server/entry.py", line 92, in build_async_engine_client_from_engine_args
+    async_llm = AsyncLLM.from_vllm_config(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/v1/engine/async_llm.py", line 248, in from_vllm_config
+    return cls(
+           ^^^^
+  File "/workspace/vllm/vllm/v1/engine/async_llm.py", line 180, in __init__
+    self.engine_core = EngineCoreClient.make_async_mp_client(
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/v1/engine/core_client.py", line 167, in make_async_mp_client
+    return AsyncMPClient(
+           ^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/tracing/otel.py", line 175, in sync_wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vllm/vllm/v1/engine/core_client.py", line 1100, in __init__
+    super().__init__(
+  File "/workspace/vllm/vllm/v1/engine/core_client.py", line 674, in __init__
+    with launch_core_engines(
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/contextlib.py", line 144, in __exit__
+    next(self.gen)
+  File "/workspace/vllm/vllm/v1/engine/utils.py", line 1287, in launch_core_engines
+    wait_for_engine_startup(
+  File "/workspace/vllm/vllm/v1/engine/utils.py", line 1367, in wait_for_engine_startup
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}

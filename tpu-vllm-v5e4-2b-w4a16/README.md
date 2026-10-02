@@ -64,6 +64,9 @@ error, so the failure belongs to the image and checkpoint and is independent of 
 nightly is a JAX type error on a model state; the 2026-08-07 source reading above predicted the compressed-tensors
 `NotImplementedError`. The rig does not serve as committed. Record and logs:
 [`benchmarks/runs/2026-10-02-rig-boot-v5e4`](benchmarks/runs/2026-10-02-rig-boot-v5e4/).
+Cause (diagnosed 2026-10-02, run record's Diagnosis section): Google's QAT export omits `k_proj`/`v_proj`/`k_norm`
+for the 20 KV-shared layers and that day's nightly allocates and requires them on every layer. The same checkpoint
+serves at TP=4 on the pinned digest with `patches/` (`kvshare.diff`); moving this rig onto that image is the fix.
 
 ### Four chips and one KV head
 

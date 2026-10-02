@@ -29,6 +29,9 @@ container exits during model load with `TypeError: Argument 'model.states[0][378
 not a valid JAX type`. The same container at TP=1 on the same VM fails the same way, so chip count is not the
 cause; the stock image cannot load this W4A16 checkpoint, as `README.md` expected. No KV pool or throughput was
 measured. The same checkpoint served in `../jev-tpu-v5e1` only on the patched image (`wna16.diff`).
+Cause (diagnosed 2026-10-02, run record's Diagnosis section): Google's QAT export omits `k_proj`/`v_proj`/`k_norm`
+for the 20 KV-shared layers and that day's nightly allocates and requires them on every layer. The same checkpoint
+serves at TP=4 on the pinned digest with `patches/` (`kvshare.diff`); moving this rig onto that image is the fix.
 
 ## Baseline: the v5e-1 sibling
 
