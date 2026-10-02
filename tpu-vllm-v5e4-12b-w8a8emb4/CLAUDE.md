@@ -23,8 +23,8 @@ replicated. `patches/` replicates the 0.53 GiB int4 `embed_tokens` table on ever
 of the 11.31 GiB. Predicted ~122,400 KV tokens and 3.22 GiB per chip at 0.92; measured 122,624 tokens and
 3.25 GiB (`benchmarks/runs/2026-10-02-rig-boot-v5e4`), against 9,728 on v5e-1 (12.61x). Output throughput from the rig's own boot is 128.4 /
 450.9 / 1,212.9 tok/s at 1 / 4 / 16 requests, 2.25x / 2.09x / 1.70x the v5e-1 rig's. `MAX_MODEL_LEN` stays
-8192, where the pool holds 14.97 full-length requests; raising it is the next experiment, with no
-measurement yet. `server.py` embeds
+8192, where the pool holds 14.97 full-length requests; `--max-model-len`
+serves up to 122,368 tokens on this rig (vLLM refuses 131,072: the pool sets the cap, below the model's 262,144), at 3-10% lower throughput than 8,192 at every load measured (`benchmarks/runs/2026-10-02-longctx-v5e4`). `server.py` embeds
 the patches in the rendered startup script as a base64 tar.gz; the VM pulls the pinned
 `VLLM_BASE_IMAGE`, patches it, and serves `VLLM_SERVE_IMAGE` (`vllm-tpu-w8a8emb4:patched`). Change the
 image digest and the patches together, never one alone. Every path that starts a container

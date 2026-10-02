@@ -37,7 +37,8 @@ created (engine init 541 s, 501 s of it compilation).
 Both columns are each rig's own boot run with the same load client (256 output tokens, greedy, median of
 three passes). Predicted ~122,400 KV tokens and 3.22 GiB per chip; measured 122,624 and 3.25. At
 `MAX_MODEL_LEN` 8192 the pool holds 14.97 requests of full length, so the context limit sits far below
-what memory allows; raising it is the next experiment and has no measurement yet.
+what memory allows. Measured 2026-10-02: `--max-model-len`
+serves up to 122,368 tokens on this rig (vLLM refuses 131,072: the pool sets the cap, below the model's 262,144), at 3-10% lower throughput than 8,192 at every load measured (`benchmarks/runs/2026-10-02-longctx-v5e4`).
 
 ### Baseline: the v5e-1 sibling
 
@@ -63,7 +64,7 @@ is replicated, so each chip holds 96 KiB per token. Holding the sibling's per-ch
 (14.43 GiB for weights + KV) gives about 122,400 KV tokens: `patches/` keeps the int4 `embed_tokens`
 table (0.53 GiB) whole on every chip (`WNA16EmbedMethod`, "Tables are replicated") and splits the rest,
 3.22 GiB per chip. Measured: 122,624 tokens and 3.25 GiB per chip (`benchmarks/runs/2026-10-02-rig-boot-v5e4`). `MAX_MODEL_LEN` stays
-8192 for now; on this rig memory stops being the limit, so raising it is the next experiment.
+8192; the longest it can be raised to here is 122,368 (`benchmarks/runs/2026-10-02-longctx-v5e4`).
 
 ### Why it needs a patched image
 

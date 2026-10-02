@@ -152,6 +152,10 @@ five slices within five minutes; the v5e quota is 512 chips per zone in 44 zones
 - **12B** (`12b-w8a8emb4`): 2.25x / 2.09x / 1.70x the v5e-1 rig's output tok/s at 1 / 4 / 16 requests, and
   122,624 KV tokens against 9,728. Its 8 sliding-layer KV heads split to 2 per chip; the single global head is
   copied, 96 KiB per chip per token against 336 KiB on one chip.
+  Its context limit on v5e-4 is 122,368 tokens at `--gpu-memory-utilization 0.92` (vLLM refuses 131,072: the
+  KV pool sets the cap, below the model's 262,144); raising the limit from 8,192 costs 3-10% throughput. At 16
+  requests of ~3,600-token prompts v5e-4 delivers 5.9x one chip, whose 9,728-token pool makes them queue
+  (`tpu-vllm-v5e4-12b-w8a8emb4/benchmarks/runs/2026-10-02-longctx-v5e4`).
 - **E2B**: 1.09x / 1.11x / 1.06x (`2b-w8a8`) and 1.46x / 1.37x / 1.22x (`2b-q4w4a16emb4`) of the v5e-1 rigs
   booted the same day with identical serving arguments. The single KV head is copied to every chip
   (`MODELS.md`), so the KV pool grows only by the weight room each chip frees: 1.90x for W8A8
