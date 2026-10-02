@@ -25,16 +25,17 @@ This rig is the v5e-4 fork of `../tpu-vllm-v5e1-2b-q4w4a16emb4`. The two differ 
 tensor parallelism: `GPU_MEMORY_UTILIZATION`, `MAX_MODEL_LEN`, `MAX_NUM_BATCHED_TOKENS`, `VLLM_ENV` and the
 image digest are kept identical to the sibling's on purpose, so a result from one can be read against the other.
 
-**Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`): four chips add 7% to the KV pool and speed up one request,
-and run 16 requests slower than one chip.** E2B has `num_key_value_heads=1`, and a single KV head does not
+**Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`): four chips add 9% to the KV pool and 22-46% to output.** E2B has `num_key_value_heads=1`, and a single KV head does not
 shard (`../MODELS.md`). At `TENSOR_PARALLEL_SIZE=4` every chip holds the whole KV cache, so KV costs 18 KiB
 per token per chip, the same as on v5e-1; query heads split 8 -> 2 per chip. The pool grows only by the
 weights each chip no longer holds, and in this checkpoint most of the bytes stay put: `WNA16EmbedMethod` in
 `patches/lowmem.diff` replicates the int4 embedding tables (`embed_tokens` and `embed_tokens_per_layer`,
 1.44 GiB of the 2.64) on every chip. Weights per chip are 1.95 GiB against 2.84 on one chip, and the KV pool
-is 620,512 tokens against 578,944 (1.07x): predicted about +52,000 tokens, measured +41,568.
-Output throughput against the v5e-1 sweep is 187 / 613 / 1,424 tok/s at 1 / 4 / 16 requests, 1.25x / 1.05x /
-0.69x.
+is 620,512 tokens against 568,224 on the v5e-1 rig (1.09x): predicted about +52,000 tokens, measured +52,288.
+Output is 187 / 613 / 1,424 tok/s at 1 / 4 / 16 requests against 128 / 446 / 1,171 for the v5e-1 rig booted the
+same day with identical serving arguments (`../tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-10-02-rig-boot-v5e1`):
+1.46x / 1.37x / 1.22x. The `../jev-tpu-v5e1` sweep's 150 / 583 / 2,067 used `--max-num-seqs 16`,
+`--max-model-len 2048` and no parsers, worth about 2x at 16 requests on one chip, and pairs with neither rig.
 
 **The patched paths serve at TP=4.** The W4A16 linears, int4 embedding tables and int4 `lm_head` in
 `patches/` (byte-identical to the sibling's) loaded and served at TP=4 on 2026-10-02: `/v1/models`, a greedy

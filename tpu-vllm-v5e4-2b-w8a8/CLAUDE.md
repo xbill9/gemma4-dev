@@ -24,9 +24,11 @@ the two rigs differ only in chip count and TP.
 **Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`).** Flex-start `v5litepod-4` in `us-west4-a`, created through this rig's own
 `create_tpu_queued_resource`, got capacity within 5 minutes and served about 13 minutes after creation.
 Text, greedy chat and a tool call verified. Weights per chip 1.75 GiB (v5e-1: 6.88), KV pool 631,968 tokens
-(v5e-1: 333,312, 1.90x). Output tok/s at 1 / 4 / 16 requests: 190 / 644 / 1,465, which is 0.87x / 0.77x /
-0.51x the v5e-1 sweep (220 / 841 / 2,872). **For E2B this rig is a worse server than its v5e-1 sibling:**
-four chips buy context, and every concurrency measured runs slower.
+(v5e-1 rig: 333,344, 1.90x). Output tok/s at 1 / 4 / 16 requests: 190 / 644 / 1,465 against 175 / 581 / 1,386
+for the v5e-1 rig booted the same day with identical serving arguments
+(`../tpu-vllm-v5e1-2b-w8a8/benchmarks/runs/2026-10-02-rig-boot-v5e1`): **1.09x / 1.11x / 1.06x. Four chips buy
+E2B a 1.9x KV pool and up to 11% more output.** The v5e-1 sweep's 220 / 841 / 2,872 used `--max-num-seqs 16`,
+`--max-model-len 2048` and no parsers, worth about 2x at 16 requests on one chip; it pairs with neither rig.
 
 **Why the pool nearly doubled.** E2B has one KV head (`num_key_value_heads=1`), and a single KV head does not
 shard (`../MODELS.md`). At TP=4 every chip still holds a copy of the whole KV cache, so KV per token per chip

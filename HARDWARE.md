@@ -152,10 +152,13 @@ five slices within five minutes; the v5e quota is 512 chips per zone in 44 zones
 - **12B** (`12b-w8a8emb4`): 2.25x / 2.09x / 1.70x the v5e-1 rig's output tok/s at 1 / 4 / 16 requests, and
   122,624 KV tokens against 9,728. Its 8 sliding-layer KV heads split to 2 per chip; the single global head is
   copied, 96 KiB per chip per token against 336 KiB on one chip.
-- **E2B**: 0.87x / 0.77x / 0.51x (`2b-w8a8`) and 1.25x / 1.05x / 0.69x (`2b-q4w4a16emb4`) of the v5e-1 sweep.
-  Per-layer all-reduce across four chips costs more than a 2B model's matmuls save. The single KV head is
-  copied to every chip (`MODELS.md`), so the KV pool grows only by the weight room each chip frees: 1.90x for
-  W8A8 (6.88 → 1.75 GiB per chip), 1.07x for the int4-table build, whose embedding tables are replicated.
+- **E2B**: 1.09x / 1.11x / 1.06x (`2b-w8a8`) and 1.46x / 1.37x / 1.22x (`2b-q4w4a16emb4`) of the v5e-1 rigs
+  booted the same day with identical serving arguments. The single KV head is copied to every chip
+  (`MODELS.md`), so the KV pool grows only by the weight room each chip frees: 1.90x for W8A8
+  (6.88 → 1.75 GiB per chip), 1.09x for the int4-table build, whose embedding tables are replicated.
+  Against the `jev-tpu-v5e1` sweep's numbers (`--max-num-seqs 16`, `--max-model-len 2048`, no parsers),
+  E2B reads 0.5-0.9x: those settings are worth about 2x at 16 requests on one chip, so a sweep number never
+  pairs with a rig run.
 
 ### v6e-1 — 32 GB nominal
 

@@ -45,13 +45,15 @@ same VM at TP=4, every serving argument unchanged from the failed container (mul
 - Weights per chip `[(1.83, 15.75), (1.83, 15.75), (1.83, 15.75), (1.83, 15.75)]` GiB; KV cache 737,248 tokens.
 - Chat, greedy: `The capital of Australia is Canberra.`. Tool call: `tool_calls`, `get_weather({"city": "Paris"})`.
 
-| Requests | output tok/s | v5e-1 | v5e-4 / v5e-1 |
+| Requests | output tok/s | v5e-1 sweep (other settings) | v5e-4 / sweep |
 |---:|---:|---:|---:|
 | 1 | **116.7** | 136.6 | 0.85x |
 | 4 | **409.1** | 532.3 | 0.77x |
 | 16 | **1,083.5** | 1,911 | 0.57x |
 
-The v5e-1 column is the `../jev-tpu-v5e1` serving run `2026-09-30-gspeedb-e2b-google-v5e1`.
+The v5e-1 column is the `../jev-tpu-v5e1` serving run `2026-09-30-gspeedb-e2b-google-v5e1`. That harness serves with
+`--max-model-len 2048`, `--max-num-seqs 16` and no parsers, worth about 2x at 16 requests on one chip, so the ratio
+measures the settings along with the chips; a same-settings v5e-1 run is in `../../../../tpu-vllm-v5e1-2b-w4a16/benchmarks/runs/`.
 
 **Fix for the rig:** serve on the pinned digest with `patches/`, as `tpu-vllm-v5e4-2b-w8a8` does, instead of
 `vllm/vllm-tpu:nightly`. The v5e-1 sibling pulls the same tag and fails the same way on its next boot.

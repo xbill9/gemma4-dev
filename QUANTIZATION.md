@@ -250,7 +250,9 @@ E2B saves little HBM because the QAT export leaves its PLE table at bf16 (see th
 - **Startup compile is about 2.7x the XLA path's** (warm-up pass 181 s → 472 s on E4B, 207 s → 570 s on
   12B), and **31B takes about 27 minutes to boot cold**. A persistent compile cache
   (`VLLM_XLA_CACHE_PATH` on a host volume) brings the same boot to 9 minutes (541 s), about half of it weight loading (279 s).
-- **Untested:** tensor parallelism above 1, and every chip but v6e.
+- **TP=4 on v5e serves** (2026-10-02, `tpu-vllm-v5e4-*/benchmarks/runs/2026-10-02-rig-boot-v5e4`): Google's E2B
+  `-qat-w4a16-ct` and the E2B int4-table repack load and answer correctly at TP=4 on the patched image. Accuracy at
+  TP=4 is unmeasured.
 
 **The accuracy cost is 1–3 points and shrinks with size.** A label read on the 3,880-record public suite,
 each W4A16 export paired per record with its bf16 checkpoint on the same patched image:
@@ -533,6 +535,10 @@ bf16 ulps of the source against 1.50. **The remaining ~26% is the source's own b
 (`google/gemma-4-{E2B,12B}-it-qat-w4a16-ct`). A **second, independent** failure hits the QAT exports:
 `k_norm.weight` "missing" for layers 15-34. Upstream:
 [tpu-inference #3225](https://github.com/vllm-project/tpu-inference/issues/3225).
+**Still unfixed on 2026-10-02**: #3225 and its fix #3299 are both open, and `vllm/vllm-tpu:nightly` as pulled that day
+(tpu_inference `431287b09`) fails `-qat-q4_0-unquantized` on exactly the 20 missing `k_norm` weights and `-qat-w4a16-ct`
+at JIT on the unloaded `k_norm`, at TP=4 and TP=1 alike. Both serve at TP=4 on the pinned digest with `kvshare.diff`
+(`tpu-vllm-v5e4-2b-{q4_0,w4a16}/benchmarks/runs/2026-10-02-rig-boot-v5e4`).
 `tpu-pytorch-v5e1-12b` is currently pinned at `gemma-4-12B-it-qat-w4a16-ct` and does not load.
 
 > **Which export shows which failure — settled 2026-09-25.** The devto forensics tabulate them

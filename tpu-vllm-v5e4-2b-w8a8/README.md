@@ -47,13 +47,16 @@ verified ([`benchmarks/runs/2026-10-02-rig-boot-v5e4`](benchmarks/runs/2026-10-0
 | | v5e-1 | v5e-4, TP=4 | v5e-4 / v5e-1 |
 |---|---:|---:|---:|
 | Weights per chip | 6.88 GiB | 1.75 GiB | |
-| KV pool | 333,312 tokens | 631,968 tokens | 1.90x |
-| Output tok/s, 1 request | 220 | 190 | 0.87x |
-| Output tok/s, 4 requests | 841 | 644 | 0.77x |
-| Output tok/s, 16 requests | 2,872 | 1,465 | 0.51x |
+| KV pool | 333,344 tokens | 631,968 tokens | 1.90x |
+| Output tok/s, 1 request | 175 | 190 | 1.09x |
+| Output tok/s, 4 requests | 581 | 644 | 1.11x |
+| Output tok/s, 16 requests | 1,386 | 1,465 | 1.06x |
 
-**For E2B this rig is a worse server than its v5e-1 sibling.** It is slower at every concurrency measured,
-and the gap widens with load. Four chips do buy context: E2B has one KV head, which does not shard
+The v5e-1 column is the v5e-1 rig booted the same day with identical serving arguments
+([`../tpu-vllm-v5e1-2b-w8a8/benchmarks/runs/2026-10-02-rig-boot-v5e1`](../tpu-vllm-v5e1-2b-w8a8/benchmarks/runs/2026-10-02-rig-boot-v5e1/README.md)).
+**Four chips buy E2B a 1.9x KV pool and up to 11% more output.** The sweep figures above (220 / 841 / 2,872)
+were served with `--max-num-seqs 16`, `--max-model-len 2048` and no parsers, worth about 2x at 16 requests on
+one chip, so they pair with neither rig. On the pool: E2B has one KV head, which does not shard
 ([`../MODELS.md`](../MODELS.md)), so every chip holds a copy of the whole KV cache at 18 KiB per token, and
 the weight room each chip frees (6.88 -> 1.75 GiB) nearly doubles the pool. Query heads split 8 -> 2 per chip.
 

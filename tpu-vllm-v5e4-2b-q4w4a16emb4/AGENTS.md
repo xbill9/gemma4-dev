@@ -64,8 +64,9 @@ offline and mock cloud, subprocess, and network boundaries.
 - A v5e-4 is four chips on one host, so the correct default tensor parallel size is `4`. A `1` or a `1x1`
   topology is copy-paste from the v5e-1 sibling (`../tpu-vllm-v5e1-2b-q4w4a16emb4`). The patched W4A16 /
   int4-table / int4 `lm_head` paths serve at TP=4 (2026-10-02, `benchmarks/runs/2026-10-02-rig-boot-v5e4`). E2B's single KV head does
-  not shard and the int4 tables are replicated, so the KV pool is 620,512 tokens against 578,944 on v5e-1
-  (1.07x), and throughput is 1.25x / 1.05x / 0.69x of v5e-1 at 1 / 4 / 16 requests; see CLAUDE.md.
+  not shard and the int4 tables are replicated, so the KV pool is 620,512 tokens against 568,224 on the v5e-1
+  rig (1.09x), and throughput is 1.46x / 1.37x / 1.22x of the v5e-1 rig at 1 / 4 / 16 requests, both booted
+  2026-10-02 with identical serving arguments; see CLAUDE.md.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-4`, the Flex-start runtime version is
   `v2-alpha-tpuv5-lite`, and `--type=v5litepod --topology=2x2` is the tpu-vm form. Use "v5e-4" in prose only,
   never as a gcloud argument.

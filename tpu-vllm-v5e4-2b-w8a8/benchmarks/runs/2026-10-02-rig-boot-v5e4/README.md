@@ -7,7 +7,7 @@ Queued Resource created 2026-10-02T18:18:34.629194250Z. Capacity was granted wit
 | | |
 |---|---|
 | Weights per chip | `[(1.75, 15.75), (1.75, 15.75), (1.75, 15.75), (1.75, 15.75)]` GiB (v5e-1: 6.88 GiB on one chip) |
-| KV cache | 631,968 tokens (v5e-1: 333,312, so 1.90x) |
+| KV cache | 631,968 tokens (v5e-1 rig: 333,344, so 1.90x) |
 
 #### Verification
 
@@ -19,13 +19,18 @@ Queued Resource created 2026-10-02T18:18:34.629194250Z. Capacity was granted wit
 
 `../../../../jev-tpu-v5e1/tpu/w4a16_client.py load` on the VM against `localhost:8000`: N parallel chat requests of
 exactly 256 output tokens (`ignore_eos`, greedy), one untimed warm-up pass, then three timed passes; median.
-The v5e-1 column is the `../jev-tpu-v5e1` sweep, `2026-09-29-qatw8-e2b-qat-w8a8-v5e1`.
+The v5e-1 column is the v5e-1 rig booted the same day through the same code path with identical serving arguments
+(`../../../../tpu-vllm-v5e1-2b-w8a8/benchmarks/runs/2026-10-02-rig-boot-v5e1`). The sweep column is the `../jev-tpu-v5e1`
+harness, which serves with `--max-model-len 2048`, `--max-num-seqs 16` and no parsers; those settings are worth about
+2x at 16 requests on one chip, so it does not pair with either rig run.
 
-| Requests | v5e-1 | v5e-4, TP=4 | v5e-4 / v5e-1 |
-|---:|---:|---:|---:|
-| 1 | 220 | **190.3** | 0.87x |
-| 4 | 841 | **643.5** | 0.77x |
-| 16 | 2,872 | **1,464.5** | 0.51x |
+| Requests | v5e-1 rig | v5e-4 rig, TP=4 | v5e-4 / v5e-1 | v5e-1 sweep (other settings) |
+|---:|---:|---:|---:|---:|
+| 1 | 174.7 | **190.3** | 1.09x | 220 |
+| 4 | 581.1 | **643.5** | 1.11x | 841 |
+| 16 | 1,386.0 | **1,464.5** | 1.06x | 2,872 |
+
+KV cache: 631,968 tokens against 333,344 on the v5e-1 rig (1.90x).
 
 #### Files
 

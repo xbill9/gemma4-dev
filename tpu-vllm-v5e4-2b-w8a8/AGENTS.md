@@ -65,8 +65,8 @@ offline and mock cloud, subprocess, and network boundaries.
   `1x1` as topology is copy-paste from the v5e-1 sibling (`../tpu-vllm-v5e1-2b-w8a8`). The int8 W8A8 patches
   serve at TP=4 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`). E2B's single KV head does not shard, so every chip holds a copy of the
   whole KV cache, yet freeing weight room (6.88 -> 1.75 GiB per chip) took the pool from 333,312 to 631,968
-  tokens (1.90x). Throughput is 0.87x / 0.77x / 0.51x the v5e-1 sibling at 1 / 4 / 16 requests: for E2B this
-  rig is a worse server than its v5e-1 sibling.
+  tokens (1.90x). Throughput is 1.09x / 1.11x / 1.06x the v5e-1 rig at 1 / 4 / 16 requests, both booted
+  2026-10-02 with identical serving arguments.
 - Serving settings are kept identical to the v5e-1 sibling on purpose, so the two rigs differ only in chip
   count and TP. Flex-start `v5litepod-4` was accepted in `us-west4-a` on 2026-10-02; other zones are untried.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-4`, the Flex-start runtime version is

@@ -49,16 +49,21 @@ int4 `lm_head` serve at tensor parallelism 4: `/v1/models`, a greedy chat answer
 | | v5e-1 | v5e-4, TP=4 | v5e-4 / v5e-1 |
 |---|---:|---:|---:|
 | Weights per chip | 2.84 GiB | 1.95 GiB | |
-| KV cache | 578,944 tokens | 620,512 tokens | 1.07x |
-| Output tok/s, 1 request | 150 | 187.2 | 1.25x |
-| Output tok/s, 4 requests | 583 | 613.2 | 1.05x |
-| Output tok/s, 16 requests | 2,067 | 1,424.0 | 0.69x |
+| KV cache | 568,224 tokens | 620,512 tokens | 1.09x |
+| Output tok/s, 1 request | 128.2 | 187.2 | 1.46x |
+| Output tok/s, 4 requests | 446.0 | 613.2 | 1.37x |
+| Output tok/s, 16 requests | 1,171.0 | 1,424.0 | 1.22x |
 
-Four chips run one request faster and 16 requests slower than one chip. The KV pool grows by 7%: E2B has
+The v5e-1 column is the v5e-1 rig booted the same day with identical serving arguments
+([`../tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-10-02-rig-boot-v5e1`](../tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-10-02-rig-boot-v5e1/README.md)).
+The `../jev-tpu-v5e1` sweep's 150 / 583 / 2,067 tok/s used `--max-num-seqs 16`, `--max-model-len 2048` and no
+parsers, worth about 2x at 16 requests on one chip, so it pairs with neither rig.
+
+Four chips add 22-46% to output. The KV pool grows by 9%: E2B has
 one KV head, and a single KV head does not shard (`../MODELS.md`), so every chip holds the whole KV cache at
 18 KiB per token, as on v5e-1, while query heads split 8 -> 2 per chip. The pool grows only by the weights
 each chip no longer holds, and `patches/lowmem.diff` replicates the int4 embedding tables (1.44 GiB of the
-2.64) on every chip. Predicted about +52,000 KV tokens, measured +41,568.
+2.64) on every chip. Predicted about +52,000 KV tokens, measured +52,288.
 
 Ready came about 23 minutes after the Queued Resource was created: 17 minutes after `docker run`, 12.5 of
 them precompiling subgraphs. The boot script's readiness wait is 20 minutes from `docker run`, and this boot
