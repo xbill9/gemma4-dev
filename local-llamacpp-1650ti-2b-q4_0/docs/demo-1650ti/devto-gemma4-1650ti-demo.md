@@ -223,9 +223,19 @@ In a terminal the model's reasoning streams first, dimmed, then the answer. That
 
 ---
 
+#### Demo Step 6 — Open the Browser Chat
+
+llama-server ships its own chat page. Open `http://127.0.0.1:8080` in a browser on the same machine: no install, no account, and it shows each answer's token count, time and speed underneath.
+
+![llama-server's built-in chat page answering "is a hotdog a sandwich" with the re-packed Gemma 4 E2B GGUF: 462 tokens in 6.0 s at 77.35 tokens per second](https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-1650ti-2b-q4_0/docs/demo-1650ti/img/webui-77tps.182dd485.png)
+
+462 tokens in 6.0 seconds, **77.35 tokens per second**, on the 4 GB card.
+
+---
+
 #### How Fast Is It, Measured?
 
-llama-server reports its own timings with every response. Five requests for a 250-word explanation, thinking off:
+The chat page's figure agrees with the server's own timings. llama-server reports them with every response. Five requests for a 250-word explanation, thinking off:
 
 ```text
 {"run":1,"finish":"stop","completion_tokens":302,"predicted_per_second":76.1367071253587}
@@ -346,7 +356,7 @@ The re-pack depends on Google's unpacked QAT checkpoint staying published, and i
 
 The goal of this article was to run Gemma 4 E2B as a responsive, single-user assistant on a 2021 laptop with a 4 GB GPU, and to show the demo step by step. The key to the solution was the QAT release on Hugging Face, re-packed so every trained 4-bit value lands in the file exactly. The measured results were:
 
-- 🟢 **76.14 to 77.14 tok/s while serving**, measured by llama-server over five requests; 81.75 tok/s in `llama-bench`.
+- 🟢 **76.14 to 77.14 tok/s while serving**, measured by llama-server over five requests, and 77.35 tok/s on its chat page; 81.75 tok/s in `llama-bench`.
 - 🟢 **0.38 s for a one-sentence answer**, end to end, and a 4-second cold start.
 - 🟢 **1488 MiB of a 4096 MiB card**, drawing 40 W.
 - 🟢 **1.12x faster generation than Google's GGUF**, from a 31% smaller output table.
@@ -354,7 +364,7 @@ The goal of this article was to run Gemma 4 E2B as a responsive, single-user ass
 - ⚠️ **Thinking costs seconds**: 9.36 s for a short reasoning question, so it stays off by default.
 - ❌ **KV cache quantization and `FORCE_MMQ` are slower** on this card.
 
-Scope: one Lenovo Yoga 9 15IMH5 (Core i7-10750H, GTX 1650 Ti Max-Q, 4096 MiB, 40 W cap), llama.cpp `f95b0d9` built for sm_75 with CUDA 13.4, one user, thinking off unless stated. The demo steps were re-run on 2026-10-02 for the output shown here. `llama-bench` and KL divergence figures come from the 2026-09-29 runs of four alternating passes and 16 × 512 tokens of wikitext-2. Task accuracy beyond KL divergence was not measured.
+Scope: one Lenovo Yoga 9 15IMH5 (Core i7-10750H, GTX 1650 Ti Max-Q, 4096 MiB, 40 W cap), llama.cpp `f95b0d9` built for sm_75 with CUDA 13.4, one user, thinking off unless stated. The demo steps were re-run on 2026-10-02 for the output and the screenshot shown here. `llama-bench` and KL divergence figures come from the 2026-09-29 runs of four alternating passes and 16 × 512 tokens of wikitext-2. Task accuracy beyond KL divergence was not measured.
 
 The strategy for running Gemma 4 on a 4 GB laptop GPU with an exactly re-packed QAT GGUF was validated with an incremental step by step approach.
 
