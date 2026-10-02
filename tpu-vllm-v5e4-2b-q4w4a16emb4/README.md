@@ -31,7 +31,7 @@ value. `emb4` records that the embedding tables and `lm_head` are int4 as well.
 
 ### Baseline: the v5e-1 sibling
 
-This rig has provisioned nothing and measured nothing as of 2026-10-02. Every number below was measured
+Every number in this section was measured
 on **one `v5litepod-1`** by [`../tpu-vllm-v5e1-2b-q4w4a16emb4`](../tpu-vllm-v5e1-2b-q4w4a16emb4) (runner
 `../jev-tpu-v5e1` at `--max-model-len 2048`, 2026-09-29): weights 2.66 GiB on the chip, 578,944 KV tokens
 (1.61x the W4A16 repack's), suite 0.681 against bf16's 0.683 (−0.2, −1.2 to +0.7), **150 / 583 / 2,067
@@ -42,13 +42,29 @@ decoded at 85 tok/s. The W8A8 + int4-table build of the same model runs at 243 /
 
 ### What four chips change
 
-Four chips buy compute and per-chip weight room for E2B; the KV pool stays close to its one-chip size. E2B has one KV head, and a single
-KV head does not shard (`../MODELS.md`), so at tensor parallelism 4 every chip holds the whole KV cache:
-18 KiB per token per chip, as on v5e-1. Query heads split 8 -> 2 per chip. The KV pool grows only by the
-weights each chip no longer holds, and the int4 embedding tables (1.44 GiB of the 2.64) are replicated on
-every chip by `patches/lowmem.diff`. If the rest splits evenly, each chip frees about 0.9 GiB, roughly
-52,000 more KV tokens (arithmetic, not measured). TP=4 is untested for every patched path: the W4A16
-linears, int4 tables and int4 `lm_head` were only ever run at TP=1.
+Measured 2026-10-02 on `v5litepod-4` (flex-start, `us-west4-a`), booted by this rig's own
+`create_tpu_queued_resource` ([`benchmarks/runs/2026-10-02-rig-boot-v5e4`](benchmarks/runs/2026-10-02-rig-boot-v5e4/README.md)). The patched W4A16 linears, int4 tables and
+int4 `lm_head` serve at tensor parallelism 4: `/v1/models`, a greedy chat answer and a tool call verified.
+
+| | v5e-1 | v5e-4, TP=4 | v5e-4 / v5e-1 |
+|---|---:|---:|---:|
+| Weights per chip | 2.84 GiB | 1.95 GiB | |
+| KV cache | 578,944 tokens | 620,512 tokens | 1.07x |
+| Output tok/s, 1 request | 150 | 187.2 | 1.25x |
+| Output tok/s, 4 requests | 583 | 613.2 | 1.05x |
+| Output tok/s, 16 requests | 2,067 | 1,424.0 | 0.69x |
+
+Four chips run one request faster and 16 requests slower than one chip. The KV pool grows by 7%: E2B has
+one KV head, and a single KV head does not shard (`../MODELS.md`), so every chip holds the whole KV cache at
+18 KiB per token, as on v5e-1, while query heads split 8 -> 2 per chip. The pool grows only by the weights
+each chip no longer holds, and `patches/lowmem.diff` replicates the int4 embedding tables (1.44 GiB of the
+2.64) on every chip. Predicted about +52,000 KV tokens, measured +41,568.
+
+Ready came about 23 minutes after the Queued Resource was created: 17 minutes after `docker run`, 12.5 of
+them precompiling subgraphs. The boot script's readiness wait is 20 minutes from `docker run`, and this boot
+cleared it at check 103 of 120. A slower boot logs `ERROR: vLLM did not report 'Application startup
+complete.' within the timeout.` while the container keeps compiling; check `docker logs vllm-gemma4` before
+treating that as a failure.
 
 ### Why it needs a patched image
 

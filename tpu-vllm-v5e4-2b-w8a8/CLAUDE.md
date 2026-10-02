@@ -17,16 +17,21 @@ image digest and the patches together, never one alone. Every path that starts a
 (`manage_vllm_docker`, `make run-container`) must use the patched tag.
 
 This rig is the four-chip fork of `../tpu-vllm-v5e1-2b-w8a8`. The patches are byte-identical to the
-sibling's and were only ever run at TP=1: the int8 W8A8 linears at `--tensor-parallel-size 4` are untested
-(`../QUANTIZATION.md`). The serving settings (`GPU_MEMORY_UTILIZATION`, `MAX_MODEL_LEN`,
+sibling's; the int8 W8A8 linears serve at `--tensor-parallel-size 4` (`../QUANTIZATION.md`). The serving settings (`GPU_MEMORY_UTILIZATION`, `MAX_MODEL_LEN`,
 `MAX_NUM_BATCHED_TOKENS`, `VLLM_ENV`, the image digest) are kept identical to the sibling on purpose, so
-the two rigs differ only in chip count and TP. As of 2026-10-02 this rig has provisioned nothing and
-measured nothing.
+the two rigs differ only in chip count and TP.
 
-**Four chips buy E2B compute and per-chip weight room; the KV pool stays close to its one-chip size.** E2B has one KV head
-(`num_key_value_heads=1`), and a single KV head does not shard (`../MODELS.md`). At TP=4 every chip holds
-the whole KV cache, so KV per token per chip stays 18 KiB; the pool grows only by the weights each chip no
-longer holds. Query heads split 8 -> 2 per chip.
+**Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`).** Flex-start `v5litepod-4` in `us-west4-a`, created through this rig's own
+`create_tpu_queued_resource`, got capacity within 5 minutes and served about 13 minutes after creation.
+Text, greedy chat and a tool call verified. Weights per chip 1.75 GiB (v5e-1: 6.88), KV pool 631,968 tokens
+(v5e-1: 333,312, 1.90x). Output tok/s at 1 / 4 / 16 requests: 190 / 644 / 1,465, which is 0.87x / 0.77x /
+0.51x the v5e-1 sweep (220 / 841 / 2,872). **For E2B this rig is a worse server than its v5e-1 sibling:**
+four chips buy context, and every concurrency measured runs slower.
+
+**Why the pool nearly doubled.** E2B has one KV head (`num_key_value_heads=1`), and a single KV head does not
+shard (`../MODELS.md`). At TP=4 every chip still holds a copy of the whole KV cache, so KV per token per chip
+stays 18 KiB; the pool grows by the weight room each chip frees, and with weights per chip down from 6.88 to
+1.75 GiB that is nearly a second pool. Query heads split 8 -> 2 per chip.
 
 ## Commands
 
@@ -159,11 +164,12 @@ v6e rigs and the v5e-1 sibling: `compare_chips.py`, `compare_benchmarks.py`, and
 "v6e-4"/"v6e-1" titles and read CSVs out of sibling `../tpu-*-v6e*-devops-agent/` directories.
 `plot_sweep_v5e1.py` is titled for the v5e-1 sibling. Don't read those labels as describing this rig.
 
-**Flex-start for `v5litepod-4` has not been tried.** `v5litepod-4` is listed in `us-west4-a` (and
+**Flex-start `v5litepod-4` is accepted in `us-west4-a`** (2026-10-02, capacity in under 5 minutes,
+`benchmarks/runs/2026-10-02-rig-boot-v5e4`); the other zones are untried. `v5litepod-4` is listed in `us-west4-a` (and
 `us-west1-c`, `us-east5-b`, `us-central1-a`, `us-south1-a`, `europe-west4-b`, `us-east1-c`), and the quota
 `TPUV5sLitepodPerProjectPerZoneForTPUAPI` is 512 chips per zone in 44 zones (spot 1536), so quota does not
 bind at four chips (checked 2026-10-02). The zone finding below belongs to the v5e-1 sibling's
-`v5litepod-1`; the default zone stays `us-west4-a` on its strength.
+`v5litepod-1`.
 
 Sibling finding — flex-start `v5litepod-1` is only accepted in `us-west4-a`. Verified 2026-08-04 by attempting creation:
 `europe-west4-a` and `europe-west4-b` both reject it at the API with `FLEX_START provisioning model is not
@@ -259,7 +265,7 @@ This rig was forked out of `/home/xbill/gemma4-queens`, which is still a separat
 `-devops-agent` naming. Nothing here is shared with it any more — don't look for this project's history
 there.
 
-No benchmark artifacts were carried over from the fork, and this rig has measured nothing. The v5e-1
+No benchmark artifacts were carried over from the fork. This rig's own measurement is `benchmarks/runs/2026-10-02-rig-boot-v5e4`. The v5e-1
 sibling's measurements (bf16, W4A16 and two W8A8 builds of E2B on one v5e chip, 2026-09-29) were made with
 the `../jev-tpu-v5e1` runner and live in `../jev-tpu-v5e1/results/`; README.md quotes them as the baseline. New runs from this rig go
 under `benchmarks/runs/<date>-<what>-<hw>/` per the root `CLAUDE.md`.

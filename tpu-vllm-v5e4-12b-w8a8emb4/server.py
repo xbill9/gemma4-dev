@@ -88,7 +88,8 @@ TENSOR_PARALLEL_SIZE = int(os.getenv("TENSOR_PARALLEL_SIZE", "4"))
 
 # How a Queued Resource asks for capacity. flex-start is the default inherited from the v5e-1
 # sibling, which found it accepted for v5litepod-1 in us-west4-a only (see CLAUDE.md); that is
-# the reason the other two exist. Flex-start for v5litepod-4 has not been tried.
+# the reason the other two exist. Flex-start for v5litepod-4 was accepted in us-west4-a on
+# 2026-10-02 (benchmarks/runs/2026-10-02-rig-boot-v5e4); other zones are untried for it.
 PROVISIONING_MODELS = ("flex-start", "spot", "on-demand")
 PROVISIONING_MODEL = os.getenv("PROVISIONING_MODEL", "flex-start")
 
@@ -120,9 +121,10 @@ VLLM_SERVE_IMAGE = "vllm-tpu-w8a8emb4:patched"
 PATCH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "patches")
 # Kept identical to the v5e-1 sibling so the two rigs differ only in chip count and TP. Measured
 # there (2026-09-30): 11.31 GiB of weights; at 0.92 vLLM sized 9,728 KV tokens and the compiled
-# program fit in the HBM left outside the cap. At TP=4 (unmeasured) each chip holds ~3.22 GiB of
-# weights (the int4 embed_tokens table is replicated, the rest split) and 96 KiB of KV per token, so
-# the same 0.92 leaves room for ~122,400 KV tokens. Four
+# program fit in the HBM left outside the cap. At TP=4 (measured 2026-10-02,
+# benchmarks/runs/2026-10-02-rig-boot-v5e4) each chip holds 3.25 GiB of weights (the int4
+# embed_tokens table is replicated, the rest split) and 96 KiB of KV per token, and the same 0.92
+# sized 122,624 KV tokens (predicted ~122,400). Four
 # backbone buckets (64..512 tokens) instead of eight keep compile time and host memory down.
 GPU_MEMORY_UTILIZATION = os.getenv("GPU_MEMORY_UTILIZATION", "0.92")
 VLLM_ENV = {
@@ -788,8 +790,9 @@ async def create_tpu_queued_resource(
 
     provisioning_model is one of:
       * 'flex-start' (default) — queues for scarce capacity, self-terminates after 4h.
-        Untested for v5litepod-4; the v5e-1 sibling found v5litepod-1 accepted only in
-        us-west4-a, with other zones rejecting it at the API.
+        Accepted for v5litepod-4 in us-west4-a (2026-10-02); other zones are untried for
+        it. The v5e-1 sibling found v5litepod-1 accepted only in us-west4-a, with other
+        zones rejecting it at the API.
       * 'spot' — cheapest, draws on the separate preemptible quota, and can be reclaimed
         with ~30s notice. No max-run-duration, so destroy it when you are done.
       * 'on-demand' — standard capacity at full price, no preemption, no run bound.

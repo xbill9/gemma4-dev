@@ -13,12 +13,13 @@ out to `gcloud` and talk HTTP to the vLLM OpenAI-compatible endpoint on port 800
 ## Baseline: the v5e-1 sibling
 
 This rig was forked on 2026-10-02 from [`../tpu-vllm-v5e1-2b-q4_0`](../tpu-vllm-v5e1-2b-q4_0), which serves the
-same checkpoint on one v5e chip. **As of 2026-10-02 this rig has provisioned nothing and measured nothing**;
-every number below was measured on v5e-1 and belongs to the sibling. Paired against E2B bf16 on v5e-1
+same checkpoint on one v5e chip. Every number in this paragraph was measured on v5e-1 and
+belongs to the sibling. Paired against E2B bf16 on v5e-1
 (`../jev-tpu-v5e1/results/2026-09-30-gen2048a-v5e1-GEN-VS-BF16.md`): GSM8K at a 2,048-token limit 0.897
 against 0.910, BFCL 0.922 against 0.928. Those runs live in `../tpu-vllm-v5e1-2b-q4_0/benchmarks/runs/`.
 
-Serving at TP=4 on the unpatched `vllm/vllm-tpu:nightly` image is unmeasured for this checkpoint.
+**Measured on v5e-4, 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`):** flex-start `v5litepod-4` in `us-west4-a` was granted in under 5
+minutes and the boot ran through `create_tpu_queued_resource`. `vllm/vllm-tpu:nightly` as pulled 2026-10-02 (digest `sha256:106a30b6…`) cannot load this checkpoint: the container exits at model load with `ValueError: Following weights were not initialized from checkpoint` (`k_norm` of the KV-shared layers). The same container at `--tensor-parallel-size 1` on the same VM fails the same way, so the cause is the image and checkpoint, independent of chip count. **The rig does not serve as committed.**
 
 ## Commands
 
@@ -151,12 +152,13 @@ v5e-1 sibling unchanged: `compare_chips.py`, `compare_benchmarks.py`, and `plot_
 "v6e-4"/"v6e-1" titles and read CSVs out of sibling `../tpu-*-v6e*-devops-agent/` directories, and
 `plot_sweep_v5e1.py` is labelled for v5e-1. Don't read those labels as describing this rig.
 
-**Flex-start for `v5litepod-4` has not been tried in any zone.** The zone default, `us-west4-a`, comes from
+**Flex-start `v5litepod-4` is accepted in `us-west4-a`** (2026-10-02, capacity in under 5 minutes, `benchmarks/runs/2026-10-02-rig-boot-v5e4`);
+every other zone is untried. The zone default, `us-west4-a`, comes from
 the v5e-1 sibling's finding (verified 2026-08-04 by attempting creation): flex-start `v5litepod-1` is accepted
 in `us-west4-a`, while `europe-west4-a` and `europe-west4-b` reject it at the API with `FLEX_START
 provisioning model is not supported for accelerator type "v5litepod-1" in location "..."`. That finding is
-about `v5litepod-1` only. `v5litepod-4` is listed in `us-west4-a`, `us-west1-c`, `us-east5-b`,
-`us-central1-a`, `us-south1-a`, `europe-west4-b` and `us-east1-c` (2026-10-02); whether each accepts it under
+about `v5litepod-1`. `v5litepod-4` is listed in `us-west4-a`, `us-west1-c`, `us-east5-b`,
+`us-central1-a`, `us-south1-a`, `europe-west4-b` and `us-east1-c` (2026-10-02); whether the others accept it under
 flex-start is unknown until a creation attempt says so. Quota does not bind: `TPUV5sLitepodPerProjectPerZoneForTPUAPI`
 is 512 chips per zone in 44 zones, and spot is 1536.
 
@@ -256,9 +258,8 @@ This rig was forked out of `/home/xbill/gemma4-queens`, which is still a separat
 there.
 
 Committed benchmark artifacts are intentionally tracked. Don't regenerate or delete them unless asked.
-This rig has no `benchmarks/runs/` as of 2026-10-02 because it has measured nothing; the v5e-1 sibling's
-runs stay in `../tpu-vllm-v5e1-2b-q4_0/benchmarks/runs/`. File this rig's first run under
-`benchmarks/runs/<date>-<what>-v5e4/`.
+This rig's runs live in `benchmarks/runs/<date>-<what>-v5e4/`; the first is `benchmarks/runs/2026-10-02-rig-boot-v5e4` (the failed boot
+above, with a TP=1 control log). The v5e-1 sibling's runs stay in `../tpu-vllm-v5e1-2b-q4_0/benchmarks/runs/`.
 
 Scripts that *write*
 (`run_sweep.py`, `run_grid_benchmark.py`, `run_fast_sweep.py`, `benchmarking_suite.py --output`,

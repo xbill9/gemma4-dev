@@ -48,13 +48,30 @@ Nothing here needs to change except the expectation. `supported_quantization` in
 passes platform validation; only the per-layer scheme is missing. If a `wNa16` scheme lands in
 either backend, this rig serves it with no config change.
 
+### Measured on v5e-4 (2026-10-02)
+
+The rig provisioned through its own `create_tpu_queued_resource`: flex-start `v5litepod-4` in `us-west4-a`, runtime
+`v2-alpha-tpuv5-lite`, `--tensor-parallel-size 4`, capacity granted within 5 minutes of the request. On
+`vllm/vllm-tpu:nightly` as pulled that day (digest `sha256:106a30b6…`) the container exits during model load, inside
+`get_flax_model` → `create_jit_model`:
+
+```
+TypeError: Argument 'model.states[0][378]' of shape bfloat16[256] of type <class 'jax.ShapeDtypeStruct'> is not a valid JAX type.
+```
+
+The same container at `--tensor-parallel-size 1` on the same VM, every other argument identical, fails with the same
+error, so the failure belongs to the image and checkpoint and is independent of chip count. The raise site on this
+nightly is a JAX type error on a model state; the 2026-08-07 source reading above predicted the compressed-tensors
+`NotImplementedError`. The rig does not serve as committed. Record and logs:
+[`benchmarks/runs/2026-10-02-rig-boot-v5e4`](benchmarks/runs/2026-10-02-rig-boot-v5e4/).
+
 ### Four chips and one KV head
 
-E2B has `num_key_value_heads=1`, and a single KV head does not shard ([MODELS.md](../MODELS.md#single-kv-head-does-not-shard)). At TP=4 every chip holds the whole KV cache, so KV per token per chip stays 18 KiB, as on v5e-1. Query heads split 8 → 2 per chip and the weights split four ways, so each chip's KV pool grows only by the weights it no longer holds. Four chips give E2B compute and per-chip weight room; context per chip grows only by that freed room. TP=4 is untested for this checkpoint ([QUANTIZATION.md](../QUANTIZATION.md) lists "tensor parallelism above 1, and every chip but v6e" as untested for W4A16).
+E2B has `num_key_value_heads=1`, and a single KV head does not shard ([MODELS.md](../MODELS.md#single-kv-head-does-not-shard)). At TP=4 every chip holds the whole KV cache, so KV per token per chip stays 18 KiB, as on v5e-1. Query heads split 8 → 2 per chip and the weights split four ways, so each chip's KV pool grows only by the weights it no longer holds. Four chips give E2B compute and per-chip weight room; context per chip grows only by that freed room. No KV pool has been measured for this checkpoint at TP=4: on the 2026-10-02 nightly it fails at model load at both TP=4 and TP=1 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`).
 
 ### Baseline: the v5e-1 sibling
 
-This rig has provisioned nothing and measured nothing as of 2026-10-02. The numbers below were measured on **v5e-1** by the sibling, [`tpu-vllm-v5e1-2b-w4a16`](../tpu-vllm-v5e1-2b-w4a16/), served beside the E2B QAT repack on the same VM through [`jev-tpu-v5e1`](../jev-tpu-v5e1/) (`benchmarks/runs/2026-09-30-gspeedb-e2b-google-v5e1` in the sibling): output tok/s at 1 / 4 / 16 requests 136.6 / 532.3 / 1,911 against the repack's 136.5 / 532.1 / 1,910, with the repack 2.4 suite points ahead.
+This rig provisioned on 2026-10-02 and failed at model load (above), so it has no throughput of its own. The numbers below were measured on **v5e-1** by the sibling, [`tpu-vllm-v5e1-2b-w4a16`](../tpu-vllm-v5e1-2b-w4a16/), served beside the E2B QAT repack on the same VM through [`jev-tpu-v5e1`](../jev-tpu-v5e1/) (`benchmarks/runs/2026-09-30-gspeedb-e2b-google-v5e1` in the sibling): output tok/s at 1 / 4 / 16 requests 136.6 / 532.3 / 1,911 against the repack's 136.5 / 532.1 / 1,910, with the repack 2.4 suite points ahead.
 
 ## Current Deployment
 *   **Model:** `google/gemma-4-E2B-it-qat-w4a16-ct` on TPU v5e-4 (v5litepod, one host, four chips).

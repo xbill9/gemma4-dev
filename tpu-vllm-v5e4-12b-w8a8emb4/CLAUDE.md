@@ -13,16 +13,18 @@ The checkpoint is Gemma 4 12B-it with int8 W8A8 linears built from Google's QAT 
 patched image**: `patches/` (applied in `patches/ORDER`) adds int8 W8A8 linears, int4 embedding tables
 (`WNA16EmbedMethod`, padded to 128 columns), an int4 `lm_head` and a text-only `text_config` fallback to
 `tpu_inference`'s JAX compressed-tensors path. The patches are byte-identical to the v5e-1 sibling's, and
-**every one of them has only ever run at TP=1**; TP=4 is untested for the int8 W8A8 linears, the int4
-embedding tables and the int4 `lm_head` (`../QUANTIZATION.md`). **Memory set every limit on v5e-1**
+**they work at TP=4**: the int8 W8A8 linears, the int4 embedding tables and the int4 `lm_head` served chat
+and a tool call on 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`). **Memory set every limit on v5e-1**
 (`../tpu-vllm-v5e1-12b-w8a8emb4`): at `GPU_MEMORY_UTILIZATION=0.92` the KV cache held 9,728 tokens, and raising
 utilization or adding `--num-gpu-blocks-override` failed at boot (`../jev-tpu-v5e1/README.md`). On four chips
 the 12B KV cost of 336 KiB per token (40 sliding layers x 8 KV heads x 256 + 8 full layers x 1 global KV head x
 512, K and V, bf16) splits to 96 KiB per chip: the sliding heads shard 8 -> 2 and the single global head is
-replicated. Arithmetic, not measured: holding the sibling's per-chip budget at 0.92 (14.43 GiB for weights + KV)
-gives about 122,400 KV tokens: `patches/` replicates the 0.53 GiB int4 `embed_tokens` table on every chip and
-splits the rest of the 11.31 GiB, 3.22 GiB per chip. v5e-1 measured 9,728. `MAX_MODEL_LEN` stays 8192 for now; with memory no longer the limit, raising it is the first experiment
-to run. `server.py` embeds
+replicated. `patches/` replicates the 0.53 GiB int4 `embed_tokens` table on every chip and splits the rest
+of the 11.31 GiB. Predicted ~122,400 KV tokens and 3.22 GiB per chip at 0.92; measured 122,624 tokens and
+3.25 GiB (`benchmarks/runs/2026-10-02-rig-boot-v5e4`), against 9,728 on v5e-1 (12.61x). Output throughput from the rig's own boot is 128.4 /
+450.9 / 1,212.9 tok/s at 1 / 4 / 16 requests, 2.25x / 2.09x / 1.70x the v5e-1 rig's. `MAX_MODEL_LEN` stays
+8192, where the pool holds 14.97 full-length requests; raising it is the next experiment, with no
+measurement yet. `server.py` embeds
 the patches in the rendered startup script as a base64 tar.gz; the VM pulls the pinned
 `VLLM_BASE_IMAGE`, patches it, and serves `VLLM_SERVE_IMAGE` (`vllm-tpu-w8a8emb4:patched`). Change the
 image digest and the patches together, never one alone. Every path that starts a container
@@ -161,14 +163,15 @@ only useful for prefill-only benchmarks.
 "v6e-4"/"v6e-1" titles and read CSVs out of sibling `../tpu-*-v6e*-devops-agent/` directories.
 `benchmark_tables.md` is likewise a v6e-era report. Don't read those labels as describing this rig.
 
-**Flex-start for `v5litepod-4` has not been tried.** The sibling's finding is about `v5litepod-1`: verified
+**Flex-start for `v5litepod-4` is accepted in `us-west4-a`** (2026-10-02, capacity within 5 minutes,
+`benchmarks/runs/2026-10-02-rig-boot-v5e4`); every other zone is untried for it. The sibling's finding is about `v5litepod-1`: verified
 2026-08-04, `europe-west4-a` and `europe-west4-b` reject flex-start for it at the API (`FLEX_START provisioning
 model is not supported for accelerator type "v5litepod-1" in location "..."`) and `us-west4-a` accepts. A zone's
 answer for one accelerator type says nothing about another. `v5litepod-4` is listed in `us-west4-a`, `us-west1-c`,
 `us-east5-b`, `us-central1-a`, `us-south1-a`, `europe-west4-b` and `us-east1-c` (2026-10-02), and the default
 `ZONE` stays `us-west4-a`. Quota does not bind: `TPUV5sLitepodPerProjectPerZoneForTPUAPI` is 512 chips per zone
 in 44 zones, spot 1,536. The skill's reference guide lists `europe-west4-b` as flex-start-capable for v5e with a
-`v5litepod-4` example; that is the first fallback to try if `us-west4-a` refuses.
+`v5litepod-4` example; that is the first fallback to try if `us-west4-a` stops granting capacity.
 
 **The Queued Resource path takes three provisioning models.** `_provisioning_flags()` in `server.py` is the
 one place that maps `flex-start` / `spot` / `on-demand` to gcloud flags; every creation tool
@@ -260,11 +263,11 @@ This rig was forked out of `/home/xbill/gemma4-queens`, which is still a separat
 `-devops-agent` naming. Nothing here is shared with it any more — don't look for this project's history
 there.
 
-No benchmark artifacts were carried over from the fork: as of 2026-10-02 this rig has provisioned nothing and
-measured nothing. Every number for this checkpoint was measured on v5e-1 and belongs to the sibling
+No benchmark artifacts were carried over from the fork. This rig's own measurement is `benchmarks/runs/2026-10-02-rig-boot-v5e4`
+(provisioned and booted 2026-10-02, TP=4). The v5e-1 numbers for this checkpoint belong to the sibling
 `../tpu-vllm-v5e1-12b-w8a8emb4` (its own boot run, `benchmarks/runs/2026-09-30-rig-boot-v5e1`: 57 / 216 / 713
 output tok/s at 1 / 4 / 16) or to `../jev-tpu-v5e1/results/` (`2026-09-29-12b-v5e1`, `2026-09-30-12bctx*-v5e1`);
-README.md quotes them as the baseline. New runs from this rig go under `benchmarks/runs/<date>-<what>-<hw>/` per the root `CLAUDE.md`.
+README.md quotes them as the baseline beside the v5e-4 numbers. New runs from this rig go under `benchmarks/runs/<date>-<what>-<hw>/` per the root `CLAUDE.md`.
 
 `AGENTS.md` in this directory is maintained by a different tool and overlaps with this file — if you change a
 convention here, check whether it needs the same change there. It has already drifted on two points: it claims

@@ -61,7 +61,10 @@ offline and mock cloud, subprocess, and network boundaries.
 
 - A v5e-4 is four chips on one host, so the correct default tensor parallel size is `4`. A `1` or `1x1` here
   is copy-paste from the v5e-1 sibling, `../tpu-vllm-v5e1-2b-q4_0`. E2B's single KV head does not shard, so
-  every chip holds the whole KV cache. This rig has provisioned nothing and measured nothing as of 2026-10-02.
+  every chip holds the whole KV cache.
+- Flex-start `v5litepod-4` was accepted in `us-west4-a` on 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`), but the container then
+  exited at model load: `vllm/vllm-tpu:nightly` as pulled that day (`sha256:106a30b6…`) reports `k_norm` weights
+  of the KV-shared layers not initialized from checkpoint, at TP=4 and at TP=1. The rig does not serve as committed.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-4`, the Flex-start runtime version is
   `v2-alpha-tpuv5-lite`, and `--type=v5litepod --topology=2x2` is the tpu-vm form. Use "v5e-4" in prose only,
   never as a gcloud argument.

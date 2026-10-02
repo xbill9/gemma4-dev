@@ -1,0 +1,43 @@
+{
+  "createTime": "2026-10-02T18:18:21.569626026Z",
+  "guaranteed": {},
+  "name": "projects/aisprint-491218/locations/us-west4-a/queuedResources/tpu-vllm-v5e4-2b-w4a16",
+  "provisioningModel": "FLEX_START",
+  "queueingPolicy": {
+    "validUntilTime": "2026-10-02T22:18:21.591069190Z"
+  },
+  "runDuration": {
+    "maxRunDuration": "14400s"
+  },
+  "state": {
+    "state": "ACTIVE"
+  },
+  "tpu": {
+    "nodeSpec": [
+      {
+        "node": {
+          "acceleratorType": "v5litepod-4",
+          "labels": {
+            "purpose": "flex-start"
+          },
+          "metadata": {
+            "startup-script": "#!/bin/bash\nexec > /var/log/vllm-startup.log 2>&1\nset -ex # Enable command tracing and exit on error\n\necho \"Starting Queued vLLM Bootloader...\"\necho \"-----------------------------------\"\necho \"Project ID: aisprint-491218\"\necho \"Zone: us-west4-a\"\necho \"Model Name: google/gemma-4-E2B-it-qat-w4a16-ct\"\necho \"HF_SECRET_ID: hf-token\"\necho \"-----------------------------------\"\n\n# Ensure internet connectivity\necho \"Checking internet connectivity...\"\nset +e # Allow ping to fail without exiting immediately\nfor i in $(seq 1 30); do\n  echo \"Attempt $i/30: Pinging 8.8.8.8...\"\n  ping -c 1 8.8.8.8\n  if [ $? -eq 0 ]; then\n    echo \"Internet connected.\"\n    break\n  fi\n  echo \"Ping failed, retrying in 5 seconds...\"\n  sleep 5\n  if [ $i -eq 30 ]; then\n    echo \"ERROR: Internet connectivity failed after multiple retries. Exiting.\"\n    exit 1\n  fi\ndone\nset -e # Re-enable exit on error\n\n# Docker pull vLLM image\necho \"Pulling vLLM Docker image: vllm/vllm-tpu:nightly\"\nset +e # Allow docker pull to fail without exiting immediately\nfor i in $(seq 1 5); do\n  echo \"Attempt $i/5: sudo docker pull vllm/vllm-tpu:nightly\"\n  sudo docker pull vllm/vllm-tpu:nightly\n  if [ $? -eq 0 ]; then\n    echo \"Docker image pulled successfully.\"\n    break\n  fi\n  echo \"Docker pull failed, retrying in 20 seconds...\"\n  sleep 20\n  if [ $i -eq 5 ]; then\n    echo \"ERROR: Failed to pull vLLM Docker image after multiple retries. Exiting.\"\n    exit 1\n  fi\ndone\nset -e # Re-enable exit on error\n\n# Set vLLM environment variables\necho \"Setting vLLM environment variables...\"\nVLLM_MODEL=\"google/gemma-4-E2B-it-qat-w4a16-ct\"\nVLLM_MAX_MODEL_LEN=\"16384\"\nVLLM_TP_SIZE=\"4\"\nVLLM_MAX_BATCHED_TOKENS=\"4096\"\nVLLM_LIMIT_MM_PER_PROMPT='{\"image\":4,\"audio\":1}'\nHF_HOME=\"/dev/shm\"\n\necho \"VLLM_MODEL set to: $VLLM_MODEL\"\necho \"VLLM_MAX_MODEL_LEN set to: $VLLM_MAX_MODEL_LEN\"\necho \"VLLM_TP_SIZE set to: $VLLM_TP_SIZE\"\necho \"VLLM_MAX_BATCHED_TOKENS set to: $VLLM_MAX_BATCHED_TOKENS\"\necho \"VLLM_LIMIT_MM_PER_PROMPT set to: $VLLM_LIMIT_MM_PER_PROMPT\"\necho \"HF_HOME set to: $HF_HOME\"\n\n# Fetch the Hugging Face token from Secret Manager at boot.\n# The token is NEVER written into instance metadata or this script — it is read at\n# runtime with the VM's own service-account credentials from the metadata server.\n# Tracing stays off from here on: every line below touches the token.\nset +x\necho \"Fetching 'hf-token' from Secret Manager (retrying for up to 30 minutes)...\"\nMETADATA_TOKEN_URL=\"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token\"\nSECRET_URL=\"https://secretmanager.googleapis.com/v1/projects/aisprint-491218/secrets/hf-token/versions/latest:access\"\n\nHF_TOKEN=\"\"\nset +e\nfor i in $(seq 1 90); do\n  ACCESS_TOKEN=$(curl -s -H \"Metadata-Flavor: Google\" \"$METADATA_TOKEN_URL\" |\n    python3 -c 'import json,sys; print(json.load(sys.stdin)[\"access_token\"])' 2>/dev/null)\n  if [ -n \"$ACCESS_TOKEN\" ]; then\n    HF_TOKEN=$(curl -s -H \"Authorization: Bearer $ACCESS_TOKEN\" \"$SECRET_URL\" |\n      python3 -c 'import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode())' 2>/dev/null)\n  fi\n  if [ -n \"$HF_TOKEN\" ]; then\n    echo \"Secret retrieved successfully on attempt $i (value masked).\"\n    break\n  fi\n  echo \"Attempt $i/90: could not read the secret yet. Retrying in 20 seconds...\"\n  echo \"  (if this never succeeds, grant the VM service account roles/secretmanager.secretAccessor on 'hf-token')\"\n  sleep 20\ndone\nset -e\n\nif [ -z \"$HF_TOKEN\" ]; then\n  echo \"ERROR: Could not read 'hf-token' from Secret Manager after 30 minutes.\"\n  echo \"Grant the VM's service account roles/secretmanager.secretAccessor on the secret, then reset the VM.\"\n  exit 1\nfi\n\necho \"Attempting to start vLLM container...\"\n# Stop and remove any existing container with the same name to ensure a clean start\nsudo docker stop vllm-gemma4 > /dev/null 2>&1 || true\nsudo docker rm vllm-gemma4 > /dev/null 2>&1 || true\n\n# Log the full docker run command before executing it. HF_TOKEN is deliberately shown\n# as a literal placeholder here — do not interpolate it into a logged string.\necho 'Executing command: sudo docker run --name vllm-gemma4 --privileged --net=host -d \\\n  -v /dev/shm:/dev/shm --shm-size 10gb \\\n  -e HF_HOME=\"$HF_HOME\" \\\n  -e HF_TOKEN=<masked> \\\n  vllm/vllm-tpu:nightly vllm serve \"$VLLM_MODEL\" \\\n  --max-model-len \"$VLLM_MAX_MODEL_LEN\" \\\n  --tensor-parallel-size \"$VLLM_TP_SIZE\" \\\n  --disable_chunked_mm_input \\\n  --max_num_batched_tokens \"$VLLM_MAX_BATCHED_TOKENS\" \\\n  --limit-mm-per-prompt \"$VLLM_LIMIT_MM_PER_PROMPT\" \\\n  --enable-auto-tool-choice \\\n  --tool-call-parser gemma4 \\\n  --reasoning-parser gemma4'\n\nsudo docker run --name vllm-gemma4 --privileged --net=host -d \\\n  -v /dev/shm:/dev/shm --shm-size 10gb \\\n  -e HF_HOME=\"$HF_HOME\" \\\n  -e HF_TOKEN=\"$HF_TOKEN\" \\\n  vllm/vllm-tpu:nightly vllm serve \"$VLLM_MODEL\" \\\n  --max-model-len \"$VLLM_MAX_MODEL_LEN\" \\\n  --tensor-parallel-size \"$VLLM_TP_SIZE\" \\\n  --disable_chunked_mm_input \\\n  --max_num_batched_tokens \"$VLLM_MAX_BATCHED_TOKENS\" \\\n  --limit-mm-per-prompt \"$VLLM_LIMIT_MM_PER_PROMPT\" \\\n  --enable-auto-tool-choice \\\n  --tool-call-parser gemma4 \\\n  --reasoning-parser gemma4\n\nif [ $? -ne 0 ]; then\n  echo \"ERROR: Docker run command failed. Check parameters and image.\"\n  sudo docker logs vllm-gemma4 || echo \"Could not fetch logs for failed container.\"\n  exit 1\nfi\n\n# The token is no longer needed in this shell; drop it and resume tracing.\nunset HF_TOKEN ACCESS_TOKEN\nset -x\n\necho \"Docker container started. Waiting for 'Application startup complete.' in logs (up to 20 minutes)...\"\nHEALTHY=0\nfor i in $(seq 1 120); do\n  if sudo docker logs vllm-gemma4 2>&1 | grep -q \"Application startup complete.\"; then\n    echo \"vLLM 'Application startup complete.' message found in logs.\"\n    HEALTHY=1\n    break\n  fi\n  echo \"vLLM not yet fully started (attempt $i/120). Retrying in 10 seconds...\"\n  sleep 10\ndone\n\nif [ \"$HEALTHY\" -eq 0 ]; then\n  echo \"ERROR: vLLM did not report 'Application startup complete.' within the timeout.\"\n  echo \"Attempting to retrieve Docker logs for 'vllm-gemma4':\"\n  sudo docker logs vllm-gemma4 || echo \"Could not retrieve Docker logs.\"\n  exit 1\nfi\n\necho \"vLLM application startup complete. The server should now be ready.\"\n"
+          },
+          "networkConfig": {
+            "enableExternalIps": true,
+            "network": "default"
+          },
+          "queuedResource": "projects/289270257791/locations/us-west4-a/queuedResources/tpu-vllm-v5e4-2b-w4a16",
+          "runtimeVersion": "v2-alpha-tpuv5-lite",
+          "schedulingConfig": {
+            "terminationTimestamp": "2026-10-02T22:18:44.641965306Z"
+          },
+          "serviceAccount": {},
+          "shieldedInstanceConfig": {}
+        },
+        "nodeId": "tpu-vllm-v5e4-2b-w4a16-node",
+        "parent": "projects/289270257791/locations/us-west4-a"
+      }
+    ]
+  }
+}

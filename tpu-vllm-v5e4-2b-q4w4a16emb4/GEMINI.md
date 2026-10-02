@@ -53,7 +53,7 @@ You can configure the following variables for the MCP server:
 ## Technical Standards
 -   **vLLM API:** OpenAI-compatible endpoint at `/v1/chat/completions`.
 -   **Optimization Flags:**
-    -   `--tensor-parallel-size 4` (v5e-4 is four chips; untested at TP=4 for the patched paths, see CLAUDE.md)
+    -   `--tensor-parallel-size 4` (v5e-4 is four chips; the patched paths serve at TP=4, measured 2026-10-02 in `benchmarks/runs/2026-10-02-rig-boot-v5e4`)
     -   `--max-model-len 16384`
     -   `--disable_chunked_mm_input`
     -   `--max_num_batched_tokens 4096` (required for multimodal compatibility)

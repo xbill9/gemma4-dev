@@ -121,7 +121,8 @@ VLLM_SERVE_IMAGE = "vllm-tpu-w8a8:patched"
 PATCH_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "patches")
 # Measured with this checkpoint on the v5e-1 sibling: the compiled model needs HBM outside the
 # KV cap, and four backbone buckets (64..512 tokens) instead of eight keep compile host memory
-# down. Kept identical here so the two rigs differ only in chip count and TP; untested at TP=4.
+# down. Kept identical here so the two rigs differ only in chip count and TP; serves at TP=4
+# (benchmarks/runs/2026-10-02-rig-boot-v5e4).
 GPU_MEMORY_UTILIZATION = os.getenv("GPU_MEMORY_UTILIZATION", "0.80")
 VLLM_ENV = {
     "MIN_TOKEN_BUCKET": os.getenv("MIN_TOKEN_BUCKET", "64"),
@@ -218,7 +219,7 @@ async def _get_node_ip(node_id: str) -> Optional[str]:
 async def get_secret(secret_id: str = HF_SECRET_ID) -> Optional[str]:
     """Retrieves a secret from Secret Manager."""
     rc, stdout, stderr = await run_command(
-        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}"]
+        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}", f"--project={PROJECT_ID}"]
     )
     if rc == 0:
         return stdout.strip()
@@ -786,7 +787,7 @@ async def create_tpu_queued_resource(
 
     provisioning_model is one of:
       * 'flex-start' (default) — queues for scarce capacity, self-terminates after 4h.
-        Untried for v5litepod-4. The v5e-1 sibling found v5litepod-1 accepted only in us-west4-a.
+        Accepted for v5litepod-4 in us-west4-a (2026-10-02); other zones untried.
       * 'spot' — cheapest, draws on the separate preemptible quota, and can be reclaimed
         with ~30s notice. No max-run-duration, so destroy it when you are done.
       * 'on-demand' — standard capacity at full price, no preemption, no run bound.

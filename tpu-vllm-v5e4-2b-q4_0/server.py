@@ -86,7 +86,8 @@ TENSOR_PARALLEL_SIZE = int(os.getenv("TENSOR_PARALLEL_SIZE", "4"))
 # How a Queued Resource asks for capacity. flex-start is the historical default and the only
 # model the v5e-1 sibling has provisioned in production — it found flex-start accepted for
 # v5litepod-1 in us-west4-a only (see CLAUDE.md), which is the reason the other two exist.
-# Flex-start v5litepod-4 is untried in every zone.
+# Flex-start v5litepod-4 was accepted in us-west4-a on 2026-10-02
+# (benchmarks/runs/2026-10-02-rig-boot-v5e4); other zones are untried.
 PROVISIONING_MODELS = ("flex-start", "spot", "on-demand")
 PROVISIONING_MODEL = os.getenv("PROVISIONING_MODEL", "flex-start")
 
@@ -201,7 +202,7 @@ async def _get_node_ip(node_id: str) -> Optional[str]:
 async def get_secret(secret_id: str = HF_SECRET_ID) -> Optional[str]:
     """Retrieves a secret from Secret Manager."""
     rc, stdout, stderr = await run_command(
-        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}"]
+        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}", f"--project={PROJECT_ID}"]
     )
     if rc == 0:
         return stdout.strip()
@@ -743,7 +744,7 @@ async def create_tpu_queued_resource(
     provisioning_model is one of:
       * 'flex-start' (default) — queues for scarce capacity, self-terminates after 4h.
         The v5e-1 sibling found it accepted for v5litepod-1 only in us-west4-a; v5litepod-4
-        is untried.
+        was accepted there on 2026-10-02; other zones are untried.
       * 'spot' — cheapest, draws on the separate preemptible quota, and can be reclaimed
         with ~30s notice. No max-run-duration, so destroy it when you are done.
       * 'on-demand' — standard capacity at full price, no preemption, no run bound.

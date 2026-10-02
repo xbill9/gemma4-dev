@@ -16,7 +16,8 @@ The inference server is deployed on **Cloud TPU v5e (v5litepod)** using the `vll
     *   **TPU Version:** v5e (v5litepod)
     *   **Topology:** `2x2` (4 chips on one host, v5litepod-4)
 *   **Software:**
-    *   **Image:** `vllm/vllm-tpu:nightly`
+    *   **Image:** `vllm/vllm-tpu:nightly` (as pulled 2026-10-02, `sha256:106a30b6…`, it fails to load this
+        checkpoint at model load, at TP=4 and TP=1; see `benchmarks/runs/2026-10-02-rig-boot-v5e4`)
     *   **Max Model Length:** `16384`
     *   **Tensor Parallel Size:** `4`
 

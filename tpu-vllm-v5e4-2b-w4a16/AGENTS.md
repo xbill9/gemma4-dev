@@ -66,11 +66,13 @@ offline and mock cloud, subprocess, and network boundaries.
   never as a gcloud argument.
 - E2B has one KV head, which does not shard: at TP=4 every chip holds the whole KV cache (18 KiB per token per
   chip, as on v5e-1). Four chips add compute and per-chip weight room; context per chip grows only by the
-  weights each chip no longer holds. TP=4 is untested for this checkpoint.
-- Flex-start `v5litepod-4` has not been tried in any zone. The "only `us-west4-a`" finding belongs to the
-  sibling's `v5litepod-1`. Serving settings are kept identical to the sibling so the rigs differ only in chip
-  count and TP.
-- This rig has provisioned nothing and measured nothing as of 2026-10-02. Benchmark numbers for this checkpoint
+  weights each chip no longer holds. On 2026-10-02 this checkpoint failed at model load at TP=4 and at TP=1 on
+  `vllm/vllm-tpu:nightly` digest `sha256:106a30b6…` (`TypeError: ... bfloat16[256] ... is not a valid JAX type`),
+  so the rig does not serve as committed (`benchmarks/runs/2026-10-02-rig-boot-v5e4`).
+- Flex-start `v5litepod-4` was accepted in `us-west4-a` on 2026-10-02 (capacity within 5 minutes); other zones
+  are untried. The "only `us-west4-a`" finding for the v5e-1 sibling belongs to `v5litepod-1`. Serving
+  settings are kept identical to the sibling so the rigs differ only in chip count and TP.
+- This rig provisioned on 2026-10-02 but has no throughput of its own. Benchmark numbers for this checkpoint
   on v5e live in the sibling and were measured on v5e-1; never report them as this rig's.
 - `_discover_vllm_node()` / `discover_vllm_url()` dynamically find the TPU node serving vLLM in the configured
   zone and construct `http://{ip}:8000`. They list **TPU VM nodes**, not queued resources, so a node created

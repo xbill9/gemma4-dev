@@ -142,15 +142,20 @@ needs 129.07M of VMEM against 128M and fails to compile, the same failure class 
 ### v5e-4 — four 16 GB chips on one host
 
 `v5litepod-4`, topology `2x2`, the same `v2-alpha-tpuv5-lite` runtime as v5e-1. The host is
-`ct5lp-hightpu-4t`: 112 vCPU and 192 GiB of RAM, against `ct5lp-hightpu-1t`'s 24 vCPU and 48 GiB, so
-the host-memory ceiling a v5e-1 compile runs into is four times further away. Listed in `us-west4-a` and
-six other zones checked on 2026-10-02; the v5e quota is 512 chips per zone in 44 zones, so it does not bind.
-Flex-start for `v5litepod-4` has not been tried anywhere.
+`ct5lp-hightpu-4t`: 112 vCPU and 192 GiB of RAM, against `ct5lp-hightpu-1t`'s 24 vCPU and 48 GiB. Each chip
+reports 15.75 GiB to vLLM, as on v5e-1. Flex-start was accepted in `us-west4-a` on 2026-10-02 and granted
+five slices within five minutes; the v5e quota is 512 chips per zone in 44 zones.
 
-Four chips divide a model's KV cost only across KV heads. E2B has one, so every chip holds the whole
-cache (`MODELS.md`, "Single KV head does not shard"); 12B's 8 sliding-layer heads split to 2 per chip
-while its single global head is copied, 96 KiB per chip per token against 336 KiB on one chip. Nothing
-here has been measured on v5e-4 yet; the five `tpu-vllm-v5e4-*` rigs exist to measure it.
+**Four chips pay off only when a model is memory-bound on one.** Measured 2026-10-02 at TP=4 on the
+`tpu-vllm-v5e4-*` rigs (`benchmarks/runs/2026-10-02-rig-boot-v5e4` in each):
+
+- **12B** (`12b-w8a8emb4`): 2.25x / 2.09x / 1.70x the v5e-1 rig's output tok/s at 1 / 4 / 16 requests, and
+  122,624 KV tokens against 9,728. Its 8 sliding-layer KV heads split to 2 per chip; the single global head is
+  copied, 96 KiB per chip per token against 336 KiB on one chip.
+- **E2B**: 0.87x / 0.77x / 0.51x (`2b-w8a8`) and 1.25x / 1.05x / 0.69x (`2b-q4w4a16emb4`) of the v5e-1 sweep.
+  Per-layer all-reduce across four chips costs more than a 2B model's matmuls save. The single KV head is
+  copied to every chip (`MODELS.md`), so the KV pool grows only by the weight room each chip frees: 1.90x for
+  W8A8 (6.88 → 1.75 GiB per chip), 1.07x for the int4-table build, whose embedding tables are replicated.
 
 ### v6e-1 — 32 GB nominal
 

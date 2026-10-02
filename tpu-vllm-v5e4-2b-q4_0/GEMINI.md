@@ -8,8 +8,10 @@ This project functions as an expert TPU SRE and DevOps Engineer, specialized in 
 This project provides an automated DevOps/SRE assistant that leverages **Gemma 4 models self-hosted via vLLM on Cloud TPUs**. It bridges Google Cloud Logging with a private inference endpoint to analyze infrastructure issues and suggest remediations.
 
 ## Current Deployment
-*   **Model:** `google/gemma-4-E2B-it-qat-q4_0-unquantized` on TPU v5e-4 (`v5litepod-4`, four chips on one host). This rig has provisioned nothing and measured nothing
-    as of 2026-10-02; the measured baseline is the v5e-1 sibling, `../tpu-vllm-v5e1-2b-q4_0`.
+*   **Model:** `google/gemma-4-E2B-it-qat-q4_0-unquantized` on TPU v5e-4 (`v5litepod-4`, four chips on one host). It provisioned on 2026-10-02 (flex-start,
+    `us-west4-a`) but does not serve as committed: `vllm/vllm-tpu:nightly` as pulled that day fails at model load
+    (`k_norm` weights not initialized), at TP=4 and at TP=1 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`). The measured quality baseline is the v5e-1
+    sibling, `../tpu-vllm-v5e1-2b-q4_0`.
 *   **Endpoint:** discovered at runtime from the `ACTIVE` Queued Resource — use the
     `get_vllm_endpoint` tool or `make endpoint`. Do not hardcode an IP.
 

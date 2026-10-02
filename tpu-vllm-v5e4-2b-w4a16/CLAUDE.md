@@ -22,13 +22,17 @@ v5e-1. Query heads split 8 -> 2 per chip and the weights split four ways, so the
 the weights each chip no longer holds. Four chips give E2B more compute and more per-chip room for weights;
 context per chip grows only by that freed weight room.
 
-TP=4 is untested for this checkpoint: `../QUANTIZATION.md` lists "tensor parallelism above 1, and every chip
-but v6e" as untested for W4A16, and this rig runs the unpatched nightly image, where the checkpoint is expected
-to fail at load (see `README.md`).
+**Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`): the rig provisions and the model fails to
+load.** Flex-start `v5litepod-4` in `us-west4-a` was granted within 5 minutes and the rig booted through its own
+`create_tpu_queued_resource`. On `vllm/vllm-tpu:nightly` digest `sha256:106a30b6…` (pulled 2026-10-02) the
+container exits during model load with `TypeError: Argument 'model.states[0][378]' of shape bfloat16[256] ... is
+not a valid JAX type`. The same container at TP=1 on the same VM fails the same way, so chip count is not the
+cause; the stock image cannot load this W4A16 checkpoint, as `README.md` expected. No KV pool or throughput was
+measured. The same checkpoint served in `../jev-tpu-v5e1` only on the patched image (`wna16.diff`).
 
 ## Baseline: the v5e-1 sibling
 
-This rig has provisioned nothing and measured nothing as of 2026-10-02; it has no `benchmarks/runs/`. Every
+This rig's only run, `benchmarks/runs/2026-10-02-rig-boot-v5e4`, records the load failure above. Every throughput
 measurement of this checkpoint on v5e is the sibling's, on **v5e-1**: served beside the E2B QAT repack through
 `../jev-tpu-v5e1/` (`../tpu-vllm-v5e1-2b-w4a16/benchmarks/runs/2026-09-30-gspeedb-e2b-google-v5e1`), it gave
 136.6 / 532.3 / 1,911 output tok/s at 1 / 4 / 16 requests. Do not quote those numbers as this rig's.
@@ -166,8 +170,9 @@ out of sibling `../tpu-*-v6e*-devops-agent/` directories; `plot_sweep_v5e1.py`, 
 `generate_report.py` title their output "v5e-1" and default to v5e-1 run dirs that live in the sibling. Don't
 read those labels as describing this rig.
 
-**Flex-start for `v5litepod-4` is untried in every zone.** The v5e-1 sibling verified on 2026-08-04 that
-flex-start `v5litepod-1` is accepted only in `us-west4-a`: `europe-west4-a` and `europe-west4-b` reject it at
+**Flex-start `v5litepod-4` is accepted in `us-west4-a`** (2026-10-02, capacity within 5 minutes,
+`benchmarks/runs/2026-10-02-rig-boot-v5e4`); every other zone is still untried. The v5e-1 sibling verified on
+2026-08-04 that flex-start `v5litepod-1` is accepted only in `us-west4-a`: `europe-west4-a` and `europe-west4-b` reject it at
 the API with `FLEX_START provisioning model is not supported for accelerator type "v5litepod-1" in location
 "..."`. That finding belongs to `v5litepod-1`. `v5litepod-4` is listed in `us-west4-a`, `us-west1-c`,
 `us-east5-b`, `us-central1-a`, `us-south1-a`, `europe-west4-b` and `us-east1-c` (2026-10-02), and the default

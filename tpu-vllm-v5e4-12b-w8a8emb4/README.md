@@ -18,9 +18,30 @@ int4 (group 32, fp16 scales), taken byte for byte from the `-emb4` build by
 Slot 5 is `w8a8emb4`: `w8a8` names the linears as `tpu-vllm-v5e1-2b-w8a8` does, and `emb4` records
 that the vocabulary tables and `lm_head` are int4, as in `tpu-vllm-v5e1-2b-w4a16emb4`.
 
+### Measured on v5e-4
+
+On 2026-10-02 this rig provisioned (flex-start `v5litepod-4` in `us-west4-a`, capacity within 5 minutes)
+and booted through its own `create_tpu_queued_resource` at `TENSOR_PARALLEL_SIZE=4`
+([`benchmarks/runs/2026-10-02-rig-boot-v5e4`](benchmarks/runs/2026-10-02-rig-boot-v5e4)). The patched int8 W8A8 linears, int4 embedding tables and int4 `lm_head`
+all work at TP=4: chat and a tool call verified, ready about 17.5 minutes after the queued resource was
+created (engine init 541 s, 501 s of it compilation).
+
+| | v5e-1 sibling | v5e-4, TP=4 | v5e-4 / v5e-1 |
+|---|---:|---:|---:|
+| Weights per chip | 11.31 GiB | 3.25 GiB | |
+| KV cache | 9,728 tokens | 122,624 tokens | 12.61x |
+| Output tok/s, 1 request | 57.0 | 128.4 | 2.25x |
+| Output tok/s, 4 requests | 215.7 | 450.9 | 2.09x |
+| Output tok/s, 16 requests | 713.4 | 1,212.9 | 1.70x |
+
+Both columns are each rig's own boot run with the same load client (256 output tokens, greedy, median of
+three passes). Predicted ~122,400 KV tokens and 3.22 GiB per chip; measured 122,624 and 3.25. At
+`MAX_MODEL_LEN` 8192 the pool holds 14.97 requests of full length, so the context limit sits far below
+what memory allows; raising it is the next experiment and has no measurement yet.
+
 ### Baseline: the v5e-1 sibling
 
-As of 2026-10-02 this rig has provisioned nothing and measured nothing. Every number below was
+Every number in this section was
 measured on one `v5litepod-1` and belongs to [`../tpu-vllm-v5e1-12b-w8a8emb4`](../tpu-vllm-v5e1-12b-w8a8emb4)
 and the `../jev-tpu-v5e1` runner (`2026-09-29-12b-v5e1`, `2026-09-30-12bctx5-v5e1`):
 
@@ -34,16 +55,15 @@ and the `../jev-tpu-v5e1` runner (`2026-09-29-12b-v5e1`, `2026-09-30-12bctx5-v5e
 
 On v5e-1 memory set every limit: raising utilization or adding a block override failed at boot.
 
-### What four chips change (arithmetic, not measured)
+### What four chips change (the arithmetic behind the prediction)
 
 12B KV costs 336 KiB per token: 40 sliding layers x 8 KV heads x 256 plus 8 full layers x 1 global KV
 head x 512, K and V, bf16. At TP=4 the sliding heads split 8 -> 2 per chip and the single global head
 is replicated, so each chip holds 96 KiB per token. Holding the sibling's per-chip budget at 0.92
 (14.43 GiB for weights + KV) gives about 122,400 KV tokens: `patches/` keeps the int4 `embed_tokens`
 table (0.53 GiB) whole on every chip (`WNA16EmbedMethod`, "Tables are replicated") and splits the rest,
-3.22 GiB per chip. v5e-1 measured 9,728. `MAX_MODEL_LEN` stays 8192 for now; on this rig memory
-stops being the limit, so raising it is the first experiment. TP=4 is untested for every patched
-path below: the int8 W8A8 linears, the int4 embedding tables and the int4 `lm_head` have only run at TP=1.
+3.22 GiB per chip. Measured: 122,624 tokens and 3.25 GiB per chip (`benchmarks/runs/2026-10-02-rig-boot-v5e4`). `MAX_MODEL_LEN` stays
+8192 for now; on this rig memory stops being the limit, so raising it is the next experiment.
 
 ### Why it needs a patched image
 

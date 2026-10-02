@@ -319,6 +319,11 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-30-gen2048b2-e4b-w8a8-emb4-v5e1` | 8 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w8a8emb4 | `2026-09-30-longb-e4b-w8a8-emb4-v5e1` | 14 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-4b-w8a8rtn | `2026-09-30-fillB-e4b-w8a8rtn-v5e1` | 36 | 0 | 0 | **no** | **no** |
+| tpu-vllm-v5e4-12b-w8a8emb4 | `2026-10-02-rig-boot-v5e4` | 10 | 7 | 0 | **no** | **no** |
+| tpu-vllm-v5e4-2b-q4_0 | `2026-10-02-rig-boot-v5e4` | 5 | 1 | 0 | **no** | **no** |
+| tpu-vllm-v5e4-2b-q4w4a16emb4 | `2026-10-02-rig-boot-v5e4` | 10 | 7 | 0 | **no** | **no** |
+| tpu-vllm-v5e4-2b-w4a16 | `2026-10-02-rig-boot-v5e4` | 5 | 1 | 0 | **no** | **no** |
+| tpu-vllm-v5e4-2b-w8a8 | `2026-10-02-rig-boot-v5e4` | 10 | 7 | 0 | **no** | **no** |
 | tpu-vllm-v6e1-2b | `2026-04-28-vllm-concurrency-v6e1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v6e1-2b | `2026-08-05-vllm-sweep-v5e1` | 7 | 1 | 0 | yes | yes |
 | tpu-vllm-v6e1-2b | `2026-08-06-vllm-sweep-v5e1` | 16 | 13 | 0 | yes | yes |
@@ -431,11 +436,11 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-4b-w8a8 | 0 | 1 |
 | tpu-vllm-v5e1-4b-w8a8emb4 | 0 | 4 |
 | tpu-vllm-v5e1-4b-w8a8rtn | 0 | 1 |
-| tpu-vllm-v5e4-12b-w8a8emb4 | 0 | 0 |
-| tpu-vllm-v5e4-2b-q4_0 | 0 | 0 |
-| tpu-vllm-v5e4-2b-q4w4a16emb4 | 0 | 0 |
-| tpu-vllm-v5e4-2b-w4a16 | 0 | 0 |
-| tpu-vllm-v5e4-2b-w8a8 | 0 | 0 |
+| tpu-vllm-v5e4-12b-w8a8emb4 | 0 | 1 |
+| tpu-vllm-v5e4-2b-q4_0 | 0 | 1 |
+| tpu-vllm-v5e4-2b-q4w4a16emb4 | 0 | 1 |
+| tpu-vllm-v5e4-2b-w4a16 | 0 | 1 |
+| tpu-vllm-v5e4-2b-w8a8 | 0 | 1 |
 | tpu-vllm-v5p1-2b | 0 | 0 |
 | tpu-vllm-v6e1-2b | 1 | 8 |
 | tpu-vllm-v6e8-2b | 1 | 1 |

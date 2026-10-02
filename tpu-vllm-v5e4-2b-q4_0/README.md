@@ -30,7 +30,10 @@ counterpart is `tpu-vllm-v5e1-2b`. If the wNa16 schemes ever land, this is the r
 
 ### Baseline: the v5e-1 sibling
 
-**This rig has provisioned nothing and measured nothing as of 2026-10-02.** The numbers below were measured
+**Measured on v5e-4, 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`):** flex-start `v5litepod-4` in `us-west4-a` was granted in under 5
+minutes and the boot ran through this rig's own `create_tpu_queued_resource`. `vllm/vllm-tpu:nightly` as pulled 2026-10-02 (digest `sha256:106a30b6…`) cannot load this checkpoint: the container exits at model load with `ValueError: Following weights were not initialized from checkpoint` (`k_norm` of the KV-shared layers). The same container at `--tensor-parallel-size 1` on the same VM fails the same way, so the cause is the image and checkpoint, independent of chip count. **The rig does not serve as committed.**
+
+The numbers below were measured
 on v5e-1 by [`../tpu-vllm-v5e1-2b-q4_0`](../tpu-vllm-v5e1-2b-q4_0) (2026-09-30, generation and tool calling):
 Google's QAT weights with no quantization applied, paired against E2B bf16 on the same v5e-1 chip
 (`../jev-tpu-v5e1/results/2026-09-30-gen2048a-v5e1-GEN-VS-BF16.md`):
@@ -47,8 +50,9 @@ At a 768-token limit the gap was −1.9 (−3.3 to −0.5); 86 of its answers we
 E2B has one KV head (`num_key_value_heads=1`), and a single KV head does not shard
 (`../MODELS.md`, "Single KV head does not shard"). At TP=4 every chip holds the whole KV cache, so KV per
 token per chip stays 18 KiB, while query heads split 8 -> 2 per chip. The KV pool grows only by the weights
-each chip no longer holds. **Four chips buy E2B compute and per-chip weight room; context grows only by that weight room.** TP=4 on the
-unpatched nightly image is unmeasured for this checkpoint.
+each chip no longer holds. **Four chips buy E2B compute and per-chip weight room; context grows only by that weight room.** On the 2026-10-02
+nightly image this checkpoint fails to load at TP=4 and at TP=1 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`), so this rig has no KV pool or
+throughput measurement.
 
 ## Current Deployment
 *   **Model:** `google/gemma-4-E2B-it-qat-q4_0-unquantized` on TPU v5e-4 (`v5litepod-4`, four chips on one host).

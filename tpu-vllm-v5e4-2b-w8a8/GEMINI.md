@@ -8,7 +8,7 @@ This project functions as an expert TPU SRE and DevOps Engineer, specialized in 
 This project provides an automated DevOps/SRE assistant that leverages **Gemma 4 models self-hosted via vLLM on Cloud TPUs**. It bridges Google Cloud Logging with a private inference endpoint to analyze infrastructure issues and suggest remediations.
 
 ## Current Deployment
-*   **Model:** `xbill9/gemma-4-E2B-it-qat-w8a8-int8` on TPU v5e-4 (`v5litepod-4`, four chips). Nothing is provisioned as of 2026-10-02.
+*   **Model:** `xbill9/gemma-4-E2B-it-qat-w8a8-int8` on TPU v5e-4 (`v5litepod-4`, four chips). Booted and measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`).
 *   **Endpoint:** discovered at runtime from the `ACTIVE` Queued Resource — use the
     `get_vllm_endpoint` tool or `make endpoint`. Do not hardcode an IP.
 
@@ -53,7 +53,7 @@ You can configure the following variables for the MCP server:
 ## Technical Standards
 -   **vLLM API:** OpenAI-compatible endpoint at `/v1/chat/completions`.
 -   **Optimization Flags:**
-    -   `--tensor-parallel-size 4` (v5e-4 is four chips on one host; untested with the patches)
+    -   `--tensor-parallel-size 4` (v5e-4 is four chips on one host; the patches serve at TP=4)
     -   `--max-model-len 16384`
     -   `--disable_chunked_mm_input`
     -   `--max_num_batched_tokens 4096` (required for multimodal compatibility)

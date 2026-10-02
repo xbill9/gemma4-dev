@@ -25,18 +25,28 @@ This rig is the v5e-4 fork of `../tpu-vllm-v5e1-2b-q4w4a16emb4`. The two differ 
 tensor parallelism: `GPU_MEMORY_UTILIZATION`, `MAX_MODEL_LEN`, `MAX_NUM_BATCHED_TOKENS`, `VLLM_ENV` and the
 image digest are kept identical to the sibling's on purpose, so a result from one can be read against the other.
 
-**Four chips buy compute and per-chip weight room for E2B; the KV pool stays close to its one-chip size.** E2B has `num_key_value_heads=1`,
-and a single KV head does not shard (`../MODELS.md`). At `TENSOR_PARALLEL_SIZE=4` every chip holds the whole
-KV cache, so KV costs 18 KiB per token per chip, the same as on v5e-1; query heads split 8 -> 2 per chip. The
-KV pool grows only by the weights each chip no longer holds, and in this checkpoint most of the bytes stay
-put: `WNA16EmbedMethod` in `patches/lowmem.diff` replicates the int4 embedding tables (`embed_tokens` and
-`embed_tokens_per_layer`, 1.44 GiB of the 2.64) on every chip. If the remaining ~1.2 GiB splits evenly, each
-chip frees about 0.9 GiB, roughly 52,000 more KV tokens. That is arithmetic, not a measurement.
+**Measured 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`): four chips add 7% to the KV pool and speed up one request,
+and run 16 requests slower than one chip.** E2B has `num_key_value_heads=1`, and a single KV head does not
+shard (`../MODELS.md`). At `TENSOR_PARALLEL_SIZE=4` every chip holds the whole KV cache, so KV costs 18 KiB
+per token per chip, the same as on v5e-1; query heads split 8 -> 2 per chip. The pool grows only by the
+weights each chip no longer holds, and in this checkpoint most of the bytes stay put: `WNA16EmbedMethod` in
+`patches/lowmem.diff` replicates the int4 embedding tables (`embed_tokens` and `embed_tokens_per_layer`,
+1.44 GiB of the 2.64) on every chip. Weights per chip are 1.95 GiB against 2.84 on one chip, and the KV pool
+is 620,512 tokens against 578,944 (1.07x): predicted about +52,000 tokens, measured +41,568.
+Output throughput against the v5e-1 sweep is 187 / 613 / 1,424 tok/s at 1 / 4 / 16 requests, 1.25x / 1.05x /
+0.69x.
 
-**TP=4 is untested for every patched path here.** The W4A16 linears, int4 embedding tables and int4
-`lm_head` in `patches/` were only ever run at TP=1, and `../QUANTIZATION.md` lists tensor parallelism above 1
-as untested for W4A16. The patches are byte-identical to the sibling's. As of 2026-10-02 this rig has
-provisioned nothing and measured nothing.
+**The patched paths serve at TP=4.** The W4A16 linears, int4 embedding tables and int4 `lm_head` in
+`patches/` (byte-identical to the sibling's) loaded and served at TP=4 on 2026-10-02: `/v1/models`, a greedy
+chat answer and a `get_weather` tool call all verified (`benchmarks/runs/2026-10-02-rig-boot-v5e4`).
+
+**Boot to ready takes about 23 minutes, close to the boot script's limit.** The Queued Resource was created
+at 18:18:47 UTC and the server reported ready at 18:41:37. The boot script's wait for
+`Application startup complete.` (120 checks, 10 s apart, 20 minutes from `docker run`) found it at check
+103, about 3 minutes before it would have logged a timeout. Precompiling the model's subgraphs took
+12.5 minutes of that (18:29:07 to 18:41:35 in `vllm-container.log`). A slower boot crosses the limit, the
+script logs `ERROR: vLLM did not report 'Application startup complete.' within the timeout.`, and the
+container keeps compiling; check `docker logs vllm-gemma4` before treating that error as a failed boot.
 
 ## Commands
 
@@ -171,10 +181,11 @@ then forked to v5e-4, and the scripts came along unchanged: `compare_chips.py`, 
 directories, and `plot_sweep_v5e1.py`, `plot_grid_benchmark.py` and `generate_report.py` title their output
 "v5e-1". Don't read those labels as describing this rig.
 
-**Flex-start for `v5litepod-4` has not been tried.** The sibling's finding is about `v5litepod-1`: verified
+**Flex-start `v5litepod-4` is accepted in `us-west4-a`** (2026-10-02, capacity granted within 5 minutes,
+`benchmarks/runs/2026-10-02-rig-boot-v5e4`); every other zone is untried for it. The sibling's finding is about `v5litepod-1`: verified
 2026-08-04 by attempting creation, `europe-west4-a` and `europe-west4-b` both reject flex-start for it at the
 API with `FLEX_START provisioning model is not supported for accelerator type "v5litepod-1" in location
-"..."`, and `us-west4-a` accepts. Whether `v5litepod-4` follows the same rule is unknown. `v5litepod-4` is
+"..."`, and `us-west4-a` accepts. `v5litepod-4` is
 listed in `us-west4-a`, `us-west1-c`, `us-east5-b`, `us-central1-a`, `us-south1-a`, `europe-west4-b` and
 `us-east1-c` (2026-10-02), and quota does not bind: `TPUV5sLitepodPerProjectPerZoneForTPUAPI` is 512 chips
 per zone in 44 zones, spot 1536. The default zone stays `us-west4-a`. A refusal there is the first thing to
@@ -271,8 +282,9 @@ there.
 
 ## Baseline: the v5e-1 sibling
 
-No benchmark artifacts were carried over from the fork; this rig has provisioned nothing and measured
-nothing as of 2026-10-02. Every number for this checkpoint was measured on one v5e chip and lives in
+No benchmark artifacts were carried over from the fork. This rig's own record is `benchmarks/runs/2026-10-02-rig-boot-v5e4`
+(boot, verification, throughput at 1 / 4 / 16 requests; see "Four chips, one E2B"). Every other number for
+this checkpoint was measured on one v5e chip and lives in
 `../tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/` (made with the `../jev-tpu-v5e1` runner, 2026-09-29):
 on v5e-1, 2.66 GiB of weights, 578,944 KV tokens at `--max-model-len 2048`, suite 0.681 against bf16's
 0.683, and 150 / 583 / 2,067 output tok/s at 1 / 4 / 16 requests. New runs from this rig go under

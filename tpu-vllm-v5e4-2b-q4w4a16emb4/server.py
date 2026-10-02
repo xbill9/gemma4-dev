@@ -88,8 +88,8 @@ TENSOR_PARALLEL_SIZE = int(os.getenv("TENSOR_PARALLEL_SIZE", "4"))
 
 # How a Queued Resource asks for capacity. flex-start is the historical default and the only
 # model this rig line has provisioned in production. The v5e-1 sibling found it accepted for
-# v5litepod-1 in us-west4-a only; v5litepod-4 is untried (see CLAUDE.md). That refusal is the
-# reason the other two exist.
+# v5litepod-1 in us-west4-a only; this rig's v5litepod-4 was accepted in us-west4-a on 2026-10-02
+# and is untried elsewhere (see CLAUDE.md). That refusal is the reason the other two exist.
 PROVISIONING_MODELS = ("flex-start", "spot", "on-demand")
 PROVISIONING_MODEL = os.getenv("PROVISIONING_MODEL", "flex-start")
 
@@ -218,7 +218,7 @@ async def _get_node_ip(node_id: str) -> Optional[str]:
 async def get_secret(secret_id: str = HF_SECRET_ID) -> Optional[str]:
     """Retrieves a secret from Secret Manager."""
     rc, stdout, stderr = await run_command(
-        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}"]
+        ["gcloud", "secrets", "versions", "access", "latest", f"--secret={secret_id}", f"--project={PROJECT_ID}"]
     )
     if rc == 0:
         return stdout.strip()
@@ -864,7 +864,8 @@ async def get_zones_with_available_quota(
     Retrieves a list of GCP zones that have a non-zero quota for a specific metric.
 
     Non-zero quota does NOT mean the zone will accept the request — flex-start is refused
-    for v5litepod-1 outside us-west4-a in zones that all report quota (v5litepod-4 untried). Quota is a ceiling,
+    for v5litepod-1 outside us-west4-a in zones that all report quota (v5litepod-4: accepted in us-west4-a,
+    untried elsewhere). Quota is a ceiling,
     not an offer of capacity.
 
     Args:

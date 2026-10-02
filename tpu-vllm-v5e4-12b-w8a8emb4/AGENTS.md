@@ -62,15 +62,16 @@ offline and mock cloud, subprocess, and network boundaries.
 ## Deployment invariants and hazards
 
 - A v5e-4 is four chips on one host, so the correct default tensor parallel size is `4`. A `1` or a `1x1`
-  topology is copy-paste from the v5e-1 sibling (`../tpu-vllm-v5e1-12b-w8a8emb4`). TP=4 is untested for every
-  patched path (int8 W8A8 linears, int4 embedding tables, int4 `lm_head`); they have only run at TP=1. Every
+  topology is copy-paste from the v5e-1 sibling (`../tpu-vllm-v5e1-12b-w8a8emb4`). Every patched path (int8 W8A8
+  linears, int4 embedding tables, int4 `lm_head`) works at TP=4 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`). Every
   other serving setting matches the sibling's on purpose, so the two rigs differ only in chip count and TP.
-- This rig has provisioned nothing and measured nothing as of 2026-10-02. Numbers quoted in README.md were
-  measured on v5e-1 by the sibling.
+- This rig provisioned and booted on 2026-10-02 (`benchmarks/runs/2026-10-02-rig-boot-v5e4`): 122,624 KV tokens, 3.25 GiB of
+  weights per chip, 128.4 / 450.9 / 1,212.9 output tok/s at 1 / 4 / 16 requests. README.md quotes the v5e-1
+  sibling's numbers beside them.
 - gcloud calls v5e `v5litepod`. The accelerator type is `v5litepod-4`, the runtime version is
   `v2-alpha-tpuv5-lite`, and `--type=v5litepod --topology=2x2` is the tpu-vm form. Flex-start for `v5litepod-4`
-  has not been tried; the sibling's finding that flex-start is accepted only in `us-west4-a` is about
-  `v5litepod-1`. Use "v5e-4" in prose only,
+  was accepted in `us-west4-a` on 2026-10-02; other zones are untried for it. The sibling's finding that
+  flex-start is accepted only in `us-west4-a` is about `v5litepod-1`. Use "v5e-4" in prose only,
   never as a gcloud argument.
 - `_discover_vllm_node()` / `discover_vllm_url()` dynamically find the TPU node serving vLLM in the configured
   zone and construct `http://{ip}:8000`. They list **TPU VM nodes**, not queued resources, so a node created
