@@ -241,7 +241,9 @@ thought you had spent.** Read the engine's own allocation log before sizing cont
 `num_key_value_heads=1` cannot be split across chips. Runtimes pad `num_kv_heads` up to a multiple of
 the tensor-parallel size, so at TP=4 you pay **4x the KV memory to store the same head replicated**.
 A larger topology does not divide E2B's KV cost; it multiplies it. Check the target model's
-`num_key_value_heads` before assuming more chips solves a memory problem.
+`num_key_value_heads` before assuming more chips solves a memory problem. The same holds for attention
+compute: at TP=4 every chip runs the whole attention kernel, so on a multi-chip host E2B serves fastest
+data-parallel, one engine per chip (measured on v5e-4, `HARDWARE.md` §v5e-4).
 
 ### RMSNorm has NO `1 + weight` convention — unlike Gemma 1, 2 and 3
 

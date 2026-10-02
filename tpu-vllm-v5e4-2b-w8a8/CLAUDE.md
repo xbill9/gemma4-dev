@@ -29,6 +29,10 @@ for the v5e-1 rig booted the same day with identical serving arguments
 (`../tpu-vllm-v5e1-2b-w8a8/benchmarks/runs/2026-10-02-rig-boot-v5e1`): **1.09x / 1.11x / 1.06x. Four chips buy
 E2B a 1.9x KV pool and up to 11% more output.** The v5e-1 sweep's 220 / 841 / 2,872 used `--max-num-seqs 16`,
 `--max-model-len 2048` and no parsers, worth about 2x at 16 requests on one chip; it pairs with neither rig.
+**Four one-chip engines do better than TP=4**: `--data-parallel-size 4 --tensor-parallel-size 1` gives 1.39x TP=4's
+output at 16 requests and 3.36x at 256 (`benchmarks/runs/2026-10-02-tp-vs-replicas-v5e4`); the rig still boots TP=4.
+The sweep's 2x came from its 2,048 `--max-model-len`: the attention kernel is sized by the limit, so 8,192 gives
+1.4-1.5x over 16,384 on one chip, at the cost of context.
 
 **Why the pool nearly doubled.** E2B has one KV head (`num_key_value_heads=1`), and a single KV head does not
 shard (`../MODELS.md`). At TP=4 every chip still holds a copy of the whole KV cache, so KV per token per chip

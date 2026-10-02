@@ -163,6 +163,16 @@ five slices within five minutes; the v5e quota is 512 chips per zone in 44 zones
   Against the `jev-tpu-v5e1` sweep's numbers (`--max-num-seqs 16`, `--max-model-len 2048`, no parsers),
   E2B reads 0.5-0.9x: those settings are worth about 2x at 16 requests on one chip, so a sweep number never
   pairs with a rig run.
+- **E2B belongs on four one-chip engines, not TP=4** (2026-10-02, `tpu-vllm-v5e4-2b-w8a8/benchmarks/runs/2026-10-02-tp-vs-replicas-v5e4`). On one
+  VM with identical arguments, `--data-parallel-size 4 --tensor-parallel-size 1` delivers 1.39x TP=4's output at
+  16 requests, 2.52x at 64 and 3.36x at 256, and 1.77x on 2,048-token prompts; one request runs at one chip's
+  speed (0.93x) and each engine has the one-chip pool. A profile shows why: the attention decode kernel stays
+  803 / 839 / 831 ms at TP=1 / 2 / 4 because the single KV head is read whole on every chip, the matmuls split
+  (443 → 130 ms), and collectives add 243 ms at TP=4.
+- **Attention cost follows `--max-model-len`, not the context in use.** The kernel's KV block is sized by the
+  limit, so E2B's 512-token sliding-window layers run 16,384-token blocks at a 16,384 limit (666 of 803 ms).
+  One chip at 16 requests: 1,387 tok/s at 16,384, 2,056 at 8,192, 2,478 at 4,096, 2,744 at 2,048 (1.98x). This
+  is what the `jev-tpu-v5e1` sweep's 2,048 limit was worth; `--max-num-seqs 16` alone is 0.92x.
 
 ### v6e-1 — 32 GB nominal
 
