@@ -1,0 +1,34 @@
+Two papers on Google's quantization-aware-trained Gemma 4 weights on one TPU chip, repacked into formats vLLM serves on the JAX path. The repacks are on Hugging Face.
+
+Gemma 4 QAT on One TPU v5e: What Runs and What Doesn't
+
+🟢 The repacks serve every Gemma 4 size from E2B to 26B on one v5e chip, level with bf16 through 12B
+🟢 12B fits at 11.31 GiB and serves 675 output tokens per second, with 0.964 on GSM8K and 0.955 on BFCL
+🟢 Up to 2.4 points above Google's own 4-bit exports, at the same speed
+❌ bf16 above E2B, 31B in any build, and 26B past a 2,176-token context
+
+Dev.to is here:
+https://dev.to/gde/gemma-4-qat-on-one-tpu-v5e-what-runs-and-what-doesnt-2gii
+
+Medium is here:
+https://medium.com/@xbill999/gemma-4-qat-on-one-tpu-v5e-what-runs-and-what-doesnt-0947ce178981
+
+Google's QAT Gemma 4 26B-A4B on One TPU v6e: 15.6x the KV Cache and 1.9x the Throughput of FP8
+
+🟢 The QAT 26B serves on one v6e chip at 17.43 GiB, against 27.99 GiB for RedHat's FP8 build
+🟢 53,888 tokens of KV cache against 3,456, and 1,283 output tokens per second against 668
+⚠️ Against bf16 the suite reads 1.1 points lower on the TPU
+
+Dev.to is here:
+https://dev.to/gde/googles-qat-gemma-4-26b-a4b-on-one-tpu-v6e-156x-the-kv-cache-and-19x-the-throughput-of-fp8-36kl
+
+Medium is here:
+https://xbill999.medium.com/googles-qat-gemma-4-26b-a4b-on-one-tpu-v6e-15-6x-the-kv-cache-and-1-9x-the-throughput-of-fp8-da9d479164d1
+
+Hugging Face repacks are here:
+https://huggingface.co/xbill9/gemma-4-12B-it-qat-w8a8-int8-emb4
+https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct
+All of them: https://huggingface.co/xbill9
+
+Repo is here:
+https://github.com/xbill9/gemma4-dev
