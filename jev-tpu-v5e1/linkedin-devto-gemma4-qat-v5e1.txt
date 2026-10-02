@@ -1,0 +1,15 @@
+Gemma 4 QAT on One TPU v5e: What Runs and What Doesn't
+
+Google's quantization-aware-trained Gemma 4 weights, repacked into int4 and int8 formats vLLM serves on TPU, on one v5e chip. What runs: every size from E2B to 26B, level with bf16 through 12B, up to 2.4 points above Google's own 4-bit exports at the same speed, and 12B at 675 output tokens per second. What doesn't: bf16 above E2B, 31B in any build, and 26B past a 2,176-token context.
+
+What is in it:
+
+- 🟢 The repacks serve every Gemma 4 size from E2B to 26B on one v5e chip, level with bf16 on the suite through 12B
+- 🟢 12B w8a8emb4 fits at 11.31 GiB and serves 675 output tokens per second, with 0.964 on GSM8K and 0.955 on BFCL
+- 🟢 The repacks read the suite up to 2.4 points above Google's 4-bit exports, at the same speed
+- 🟢 int8 from the QAT weights beats int8 rounded from bf16: +1.5 suite points at E2B, +7.2 BFCL points at 12B
+
+dev.to (Google Developer Experts): https://dev.to/gde/gemma-4-qat-on-one-tpu-v5e-what-runs-and-what-doesnt-2gii
+Medium: https://medium.com/@xbill999/gemma-4-qat-on-one-tpu-v5e-what-runs-and-what-doesnt-0947ce178981
+Source: https://github.com/xbill9/gemma4-dev/tree/main/jev-tpu-v5e1
+Checkpoint: https://huggingface.co/xbill9/gemma-4-12B-it-qat-w8a8-int8-emb4
