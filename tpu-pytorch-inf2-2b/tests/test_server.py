@@ -39,6 +39,7 @@ class ToolCatalogTests(unittest.TestCase):
             "stop_inf2_instance", "terminate_inf2_instance", "verify_neuron_health",
             "get_vllm_logs", "get_endpoint", "query_model", "save_hf_token",
             "check_inf2_quotas", "get_deployment_config", "get_help",
+            "run_benchmark",
         }
         self.assertEqual(set(self.tools), expected)
 
@@ -59,6 +60,32 @@ class ToolCatalogTests(unittest.TestCase):
         tail = self.tools["get_vllm_logs"].input_schema["properties"]["tail"]
         self.assertEqual(tail["minimum"], 1)
         self.assertEqual(tail["maximum"], 5000)
+
+
+class BenchmarkTests(unittest.TestCase):
+    def test_p95_is_nearest_rank(self):
+        self.assertEqual(server._p95([float(i) for i in range(1, 9)]), 8.0)
+        self.assertEqual(server._p95([float(i) for i in range(1, 101)]), 95.0)
+        self.assertEqual(server._p95([3.0]), 3.0)
+
+    def test_row_counts_only_reported_tokens(self):
+        results = [
+            {"latency": 1.0, "tokens": 100},
+            {"latency": 3.0, "tokens": 50},
+            {"error": "no usage"},
+        ]
+        row = server._benchmark_row(2, results, wall=5.0)
+        self.assertEqual(row["requests"], 3)
+        self.assertEqual(row["succeeded"], 2)
+        self.assertEqual(row["completion_tokens"], 150)
+        self.assertEqual(row["tok_per_s"], 30.0)
+        self.assertEqual(row["avg_latency_s"], 2.0)
+        self.assertEqual(row["p95_latency_s"], 3.0)
+
+    def test_row_with_no_successes(self):
+        row = server._benchmark_row(1, [{"error": "x"}], wall=1.0)
+        self.assertEqual(row["succeeded"], 0)
+        self.assertIsNone(row["avg_latency_s"])
 
 
 class Inf2HelpersTests(unittest.TestCase):

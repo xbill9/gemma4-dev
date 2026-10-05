@@ -56,7 +56,7 @@ DESTRUCTIVE = ToolAnnotations(destructiveHint=True)
 
 AWS_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 AWS_PROFILE = os.getenv("AWS_PROFILE")
-MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "google/gemma-4-E2B-it")
 INSTANCE_TYPE = os.getenv("INSTANCE_TYPE", "inf2.xlarge")
 SERVICE_NAME = os.getenv("SERVICE_NAME", "vllm-inf2")
 HF_SECRET_ID = os.getenv("HF_SECRET_ID", "vllm/hf-token")
@@ -495,6 +495,105 @@ async def query_model(
         return response.choices[0].message.content or ""
     except Exception as exc:
         return _error(exc)
+
+
+BENCHMARK_PROMPT = "Explain the importance of Site Reliability Engineering for large scale AI deployments."
+BENCHMARK_FIELDS = (
+    "concurrency", "requests", "succeeded", "completion_tokens", "wall_s",
+    "req_per_s", "tok_per_s", "avg_latency_s", "p95_latency_s",
+)
+
+
+def _p95(values: list[float]) -> float:
+    """Nearest-rank 95th percentile: with 8 samples this is the slowest one."""
+    ordered = sorted(values)
+    return ordered[max(0, -(-95 * len(ordered) // 100) - 1)]
+
+
+def _benchmark_row(concurrency: int, results: list[dict], wall: float) -> dict:
+    ok = [r for r in results if "tokens" in r]
+    tokens = sum(r["tokens"] for r in ok)
+    latencies = [r["latency"] for r in ok]
+    return {
+        "concurrency": concurrency,
+        "requests": len(results),
+        "succeeded": len(ok),
+        "completion_tokens": tokens,
+        "wall_s": round(wall, 3),
+        "req_per_s": round(len(ok) / wall, 3),
+        "tok_per_s": round(tokens / wall, 2),
+        "avg_latency_s": round(sum(latencies) / len(latencies), 3) if ok else None,
+        "p95_latency_s": round(_p95(latencies), 3) if ok else None,
+    }
+
+
+@mcp.tool(title="Run concurrency benchmark", annotations=READ_ONLY)
+async def run_benchmark(
+    endpoint: str,
+    concurrency: Annotated[tuple[Annotated[int, Field(ge=1, le=64)], ...], Field(min_length=1)] = (1, 2, 4),
+    requests_per_level: Annotated[int, Field(ge=1, le=256)] = 8,
+    max_tokens: Annotated[int, Field(ge=1, le=4096)] = 128,
+    model: str = MODEL_NAME,
+) -> str:
+    """Sweep concurrency against an OpenAI-compatible /v1/completions endpoint.
+
+    One warm-up request, then `requests_per_level` greedy requests at each concurrency
+    level. Throughput counts only the `usage.completion_tokens` the server reports; a
+    response without usage counts as a failure rather than as `max_tokens`.
+    """
+    url = endpoint.rstrip("/") + "/v1/completions"
+    payload = {
+        "model": model, "prompt": BENCHMARK_PROMPT, "max_tokens": max_tokens,
+        "temperature": 0.0, "stream": False,
+    }
+
+    async def one(client: httpx.AsyncClient, sem: asyncio.Semaphore) -> dict:
+        async with sem:
+            start = time.perf_counter()
+            try:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                tokens = response.json()["usage"]["completion_tokens"]
+                return {"latency": time.perf_counter() - start, "tokens": tokens}
+            except (httpx.HTTPError, KeyError, TypeError, ValueError) as exc:
+                return {"error": str(exc) or type(exc).__name__}
+
+    try:
+        rows, errors = [], []
+        async with httpx.AsyncClient(timeout=300) as client:
+            warm = await one(client, asyncio.Semaphore(1))
+            if "error" in warm:
+                return f"Error: warm-up request to `{url}` failed: {warm['error']}"
+            for level in concurrency:
+                sem = asyncio.Semaphore(level)
+                start = time.perf_counter()
+                results = await asyncio.gather(*(one(client, sem) for _ in range(requests_per_level)))
+                rows.append(_benchmark_row(level, results, time.perf_counter() - start))
+                errors += [r["error"] for r in results if "error" in r]
+    except Exception as exc:
+        return _error(exc)
+
+    lines = [
+        f"### Benchmark: `{url}`",
+        f"\nmodel `{model}`, max_tokens {max_tokens}, temperature 0, "
+        f"{requests_per_level} requests per level\n",
+        "| Concurrency | OK | Tokens | Req/s | Tok/s | Avg latency | P95 latency |",
+        "|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for r in rows:
+        avg = "—" if r["avg_latency_s"] is None else f"{r['avg_latency_s']:.2f}s"
+        p95 = "—" if r["p95_latency_s"] is None else f"{r['p95_latency_s']:.2f}s"
+        lines.append(
+            f"| {r['concurrency']} | {r['succeeded']}/{r['requests']} | {r['completion_tokens']} "
+            f"| {r['req_per_s']:.2f} | {r['tok_per_s']:.1f} | {avg} | {p95} |"
+        )
+    if errors:
+        lines.append(f"\n{len(errors)} failed request(s); first: `{errors[0]}`")
+    csv_rows = [",".join(BENCHMARK_FIELDS)] + [
+        ",".join("" if r[f] is None else str(r[f]) for f in BENCHMARK_FIELDS) for r in rows
+    ]
+    lines.append("\n```csv\n" + "\n".join(csv_rows) + "\n```")
+    return "\n".join(lines)
 
 
 @mcp.tool(title="Check Inferentia quotas", annotations=READ_ONLY)

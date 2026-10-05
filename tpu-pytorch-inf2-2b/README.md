@@ -55,7 +55,7 @@ one-time neff load.
 |---|---|---|
 | `AWS_REGION` | `us-east-1` | AWS region |
 | `AWS_PROFILE` | unset | Optional shared-config profile |
-| `MODEL_NAME` | `meta-llama/Llama-3.1-8B-Instruct` | Hugging Face model |
+| `MODEL_NAME` | `google/gemma-4-E2B-it` | Hugging Face model |
 | `INSTANCE_TYPE` | `inf2.xlarge` | Inf2 size |
 | `SERVICE_NAME` | `vllm-inf2` | EC2 Name tag |
 | `HF_SECRET_ID` | `vllm/hf-token` | Secrets Manager secret |
@@ -130,7 +130,7 @@ Three properties are worth knowing before touching it:
 
 - `get_deployment_config`, `create_inf2_instance`, `list_inf2_instances`
 - `start_inf2_instance`, `stop_inf2_instance`, `terminate_inf2_instance`
-- `verify_neuron_health`, `get_vllm_logs`, `get_endpoint`, `query_model`
+- `verify_neuron_health`, `get_vllm_logs`, `get_endpoint`, `query_model`, `run_benchmark`
 - `save_hf_token`, `check_inf2_quotas`, `get_help`
 
 Remote operations use SSM Run Command, so the generated deployment does not

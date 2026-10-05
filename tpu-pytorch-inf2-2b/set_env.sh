@@ -3,7 +3,7 @@
 set -euo pipefail
 cat >.env <<'EOF'
 AWS_REGION=us-east-1
-MODEL_NAME=meta-llama/Llama-3.1-8B-Instruct
+MODEL_NAME=google/gemma-4-E2B-it
 INSTANCE_TYPE=inf2.xlarge
 SERVICE_NAME=vllm-inf2
 HF_SECRET_ID=vllm/hf-token
