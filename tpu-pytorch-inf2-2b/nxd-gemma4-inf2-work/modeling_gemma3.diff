@@ -1,0 +1,98 @@
+--- /opt/conda/lib/python3.12/site-packages/neuronx_distributed_inference/models/gemma3/modeling_gemma3.py.prefix.bak	2026-07-05 01:23:59.851504542 +0000
++++ /opt/conda/lib/python3.12/site-packages/neuronx_distributed_inference/models/gemma3/modeling_gemma3.py	2026-07-05 05:02:42.121627909 +0000
+@@ -189,8 +189,12 @@
+         # KV-sharing boundary — do not conflate them.
+         _is_swa = layer_idx is None or (layer_idx + 1) % 5 != 0
+         self.gemma4_layer_type = "sliding" if _is_swa else "full"
+-        self.gemma4_shared_kv = layer_idx is not None and layer_idx >= 20
+-        self.gemma4_store_kv = layer_idx in (18, 19)
++        _nkvs = getattr(config, "num_kv_shared_layers", 0) or 0
++        _first_shared = config.num_hidden_layers - _nkvs
++        self.gemma4_shared_kv = (layer_idx is not None) and (_nkvs > 0) and (layer_idx >= _first_shared)
++        _anchor_sliding = max([j for j in range(_first_shared) if (j + 1) % 5 != 0], default=-1)
++        _anchor_full = max([j for j in range(_first_shared) if (j + 1) % 5 == 0], default=-1)
++        self.gemma4_store_kv = (_nkvs > 0) and (layer_idx in (_anchor_sliding, _anchor_full))
+         self.gemma4_v_norm = not self.gemma4_shared_kv
+         self.gemma4_rms_eps = config.rms_norm_eps
+ 
+@@ -259,6 +263,7 @@
+         self.query_pre_attn_scalar = config.query_pre_attn_scalar
+ 
+         self.self_attn = NeuronGemma3Attention(config, layer_idx=layer_idx)
++        self.self_attn.__dict__['parent'] = parent
+         self.mlp = NeuronLlamaMLP(config)  # can reuse LlamaMLP module
+         self.input_layernorm = get_rmsnorm_cls()(
+             config.hidden_size,
+@@ -285,6 +290,7 @@
+         position_ids: Optional[torch.LongTensor] = None,
+         past_key_value: Optional[Tuple[torch.Tensor]] = None,
+         adapter_ids=None,
++        gemma4_shared_kv_in=None,
+         **kwargs,
+     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+         mask = local_mask
+@@ -311,6 +317,7 @@
+             position_ids=position_ids,
+             past_key_value=past_key_value,
+             adapter_ids=adapter_ids,
++            gemma4_shared_kv_in=gemma4_shared_kv_in,
+             **kwargs,
+         )
+         hidden_states = self.post_attention_layernorm(hidden_states)
+@@ -323,7 +330,7 @@
+         hidden_states = residual + hidden_states
+         
+         per_layer_inputs = getattr(self.parent, "current_per_layer_inputs", None)
+-        import sys as _p; _p.stderr.write('[PLE_DBG] L%s per_layer_inputs_is_None=%s gate_is_None=%s\n' % (getattr(self,'layer_idx','?'), per_layer_inputs is None, self.per_layer_input_gate is None)); _p.stderr.flush()
++        pass  # debug silenced
+         if per_layer_inputs is not None and self.per_layer_input_gate is not None:
+             per_layer_input = per_layer_inputs[:, :, self.layer_idx, :]
+             ple_signal = self.per_layer_input_gate(hidden_states)
+@@ -338,7 +345,8 @@
+ 
+         # # End module marker
+         # hidden_states = ModuleMarkerEndWrapper()(hidden_states)
+-        outputs = (hidden_states, present_key_value, cos_cache, sin_cache, None)
++        _rk = getattr(self.self_attn, "_g4_raw_kv", None)
++        outputs = (hidden_states, present_key_value, cos_cache, sin_cache, None, _rk)
+ 
+         return outputs
+ 
+@@ -588,15 +596,15 @@
+             new_state_dict[new_key] = v
+         state_dict = new_state_dict
+         neuron_config = config.neuron_config
+-        print("DEBUG STATE DICT ALL KEYS CONTAINS EMBED:", [k for k in state_dict.keys() if "embed" in k])
+-        print("DEBUG STATE DICT ALL KEYS CONTAINS NORM:", [k for k in state_dict.keys() if "norm" in k])
+-        print("DEBUG STATE DICT PLE KEYS BEFORE:", [k for k in state_dict.keys() if "per_layer" in k or "embed_tokens_per_layer" in k])
++        pass  # debug silenced
++        pass  # debug silenced
++        pass  # debug silenced
+         if "embed_tokens_per_layer.weight" in state_dict:
+             if neuron_config.vocab_parallel:
+                 state_dict["embed_tokens_per_layer.rank_util.rank"] = torch.arange(
+                     0, neuron_config.local_ranks_size
+                 )
+-        print("DEBUG STATE DICT PLE KEYS AFTER:", [k for k in state_dict.keys() if "per_layer" in k or "embed_tokens_per_layer" in k])
++        pass  # debug silenced
+ 
+         if neuron_config.vocab_parallel:
+             # TODO: this hack can be removed after replication_id is ready to use
+@@ -668,8 +676,8 @@
+         import sys as _n
+         for _k in sorted(state_dict.keys()):
+             if 'norm' in _k and str(_k).endswith('weight'):
+-                try: _n.stderr.write('[NORM_DBG] '+_k+' mean=%.4f'%state_dict[_k].float().mean().item()+'\n')
+-                except Exception: _n.stderr.write('[NORM_DBG] '+_k+' ERR\n')
++                pass  # debug silenced
++                pass  # debug silenced
+         _n.stderr.flush()
+ 
+         return state_dict
+@@ -680,4 +688,4 @@
+ 
+     @classmethod
+     def get_config_cls(cls):
+-        return Gemma3InferenceConfig
++        return Gemma3InferenceConfig
+\ No newline at end of file

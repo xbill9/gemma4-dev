@@ -1,0 +1,95 @@
+--- /opt/conda/lib/python3.12/site-packages/neuronx_distributed_inference/modules/attention/attention_base.py.prefix.bak	2026-07-05 01:23:59.846504432 +0000
++++ /opt/conda/lib/python3.12/site-packages/neuronx_distributed_inference/modules/attention/attention_base.py	2026-07-05 04:36:32.537572437 +0000
+@@ -449,7 +449,7 @@
+             return self.learned_sinks.sink
+ 
+     def scaled_qk(self, Q, K, attention_mask):
+-        import sys as _e; _e.stderr.write("[EXEC SCALED_QK]\n"); _e.stderr.flush()
++        pass  # debug silenced
+         QK = torch.matmul(Q, K.transpose(2, 3)) / self.softmax_scale
+         softcap = getattr(self.config, "attn_logit_softcapping", None)
+         if softcap is not None:
+@@ -491,10 +491,9 @@
+         if not use_polar_compatible_rope and self.rotary_emb is not None:
+             if cos_cache is None or sin_cache is None:
+                 cos_cache, sin_cache = self.rotary_emb(V, position_ids)
+-            import sys as _e; _e.stderr.write("[EXEC APPLY_ROTARY]\n"); _e.stderr.flush()
+             from .utils import _rotate_half
+             is_swa_layer = True
+-            Q = Q * 0.0  # FORCE_ZERO_DBG
++            Q = Q  # FORCE_ZERO_DBG removed (was zeroing all queries)
+             if hasattr(self, "layer_idx") and self.layer_idx is not None:
+                 if (self.layer_idx + 1) % 5 == 0:
+                     is_swa_layer = False
+@@ -565,7 +564,7 @@
+     ):
+         """take care of the shape, layout, group query, custom position encoding, etc.
+            also return residual for MLP """
+-        import sys as _e; _e.stderr.write("[EXEC PREP_QKV]\n"); _e.stderr.flush()
++        pass  # debug silenced
+         is_qkv_cte_fuse_rope_nki_kernel_enabled = self.neuron_config.is_prefill_stage and self.qkv_cte_nki_kernel_fuse_rope
+         assert not (is_qkv_cte_fuse_rope_nki_kernel_enabled and self.use_qk_norm and self.qk_norm_placement == QKNormPlacement.PRE_ROPE), "qkv cte nki kernel fuse rope is not compatible with pre rope qk norm"
+         if is_qkv_cte_fuse_rope_nki_kernel_enabled:
+@@ -641,11 +640,19 @@
+         # Gemma4 KV sharing: source layers (18 sliding / 19 full) stash post-RoPE K/V;
+         # virtual layers (>= 20) discard their own K/V and reuse the stash. The stash is
+         # plain tensor plumbing within one forward pass, so it bakes into the traced graph.
+-        _gemma4_stash = globals().setdefault("_GEMMA4_KV_STASH", {})
++        self._g4_raw_kv = (K, V)
++        _g4h = getattr(self, "parent", None)
+         if getattr(self, "gemma4_store_kv", False):
+-            _gemma4_stash[self.gemma4_layer_type] = (K, V)
++            if _g4h is not None:
++                setattr(_g4h, "_g4kv_k_" + self.gemma4_layer_type, K)
++                setattr(_g4h, "_g4kv_v_" + self.gemma4_layer_type, V)
+         elif getattr(self, "gemma4_shared_kv", False):
+-            K, V = _gemma4_stash[self.gemma4_layer_type]
++            _sh = getattr(self, "_g4_shared_in", None)
++            if _sh is not None and _sh[0] is not None:
++                K, V = _sh[0], _sh[1]
++            elif _g4h is not None:
++                K = getattr(_g4h, "_g4kv_k_" + self.gemma4_layer_type)
++                V = getattr(_g4h, "_g4kv_v_" + self.gemma4_layer_type)
+         if Q.shape[-1] < 512:
+             import torch.nn.functional as F
+             Q = F.pad(Q, (0, 512 - Q.shape[-1]))
+@@ -729,7 +736,7 @@
+ 
+     def perform_prefill(self, Q, K, V, q_len, bsz, attention_mask) -> Tensor:
+         """attention computation at prefilling (context encoding) phase"""
+-        import sys as _e; _e.stderr.write("[EXEC PERFORM_PREFILL]\n"); _e.stderr.flush()
++        pass  # debug silenced
+         flash_attn_strategy = self.get_flash_attention_strategy(q_len, attention_mask is not None)
+         logger.debug(f"Flash attention strategy: {flash_attn_strategy}")
+ 
+@@ -984,7 +991,7 @@
+             # i. prior (cached) KV
+             if not self.k_cache_transposed:
+                 K_prior = K_prior.transpose(2, 3)
+-            import sys as _e; _e.stderr.write("[EXEC TOKEN_GEN_NATIVE]\n"); _e.stderr.flush()
++            pass  # debug silenced
+             prior_scores = torch.matmul(Q, K_prior) / self.softmax_scale
+             softcap = getattr(self.config, "attn_logit_softcapping", None)
+             if softcap is not None:
+@@ -1741,8 +1748,14 @@
+         update_kv_per_layer: bool = False,
+         residual: Optional[torch.Tensor] = None,
+         windowed_context_encoding_window_idx: int = -1,
++        gemma4_shared_kv_in=None,
+         **kwargs,
+     ) -> Tuple[Tensor, Optional[Tuple[Tensor, Tensor]]]:
++        if getattr(self, "gemma4_shared_kv", False) and past_key_value is not None:
++            self._g4_shared_in = past_key_value
++            past_key_value = None
++        else:
++            self._g4_shared_in = None
+         if self.attention_chunk_size and self.cp_degree == 1:
+             return self.chunked_attention_forward(
+                 hidden_states,
+@@ -2639,4 +2652,4 @@
+                 attn_output, gather_dim=0, process_group=get_data_parallel_attention_dp_group()
+             )
+ 
+-        return NeuronAttentionBaseOutput(attn_output, kv, cos_cache, sin_cache, residual)
++        return NeuronAttentionBaseOutput(attn_output, kv, cos_cache, sin_cache, residual)
+\ No newline at end of file

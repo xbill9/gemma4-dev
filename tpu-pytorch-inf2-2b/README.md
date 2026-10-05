@@ -97,6 +97,17 @@ python3 torch_generate.py --parity --batch 4
 python3 torch_openai_server.py --port 8000 --neff-dir /opt/gemma4/neff
 ```
 
+**Container build source — `nxd-gemma4-inf2-work/optb/`.** The trace scripts,
+servers and Dockerfiles that produced every `xbill9/gemma4-optb` tag: the
+single-core build (`optb_kv.py`, `optb_server.py`, ~44 tok/s), KV aliasing
+(`optb_kv_alias.py`, 47.5 tok/s at 2048 context) and TP=2 across both
+NeuronCores (`tp_alias_trace.py`, `optb_server_tp.py`, 72.7 tok/s at 2048
+context; `optb_server_tp_slim.py` for inf2.xlarge, ~61 tok/s). The top level of
+`nxd-gemma4-inf2-work/` holds the NxD attempt that preceded it. Copied from
+`~/gemma4-tips-aws/gpu-2B-inf-devops-agent` on 2026-10-05. As of that date the
+AMI, S3 backup and ECR copies that `optb/RESTART.md` and `optb/DOCKER.md` name
+are deleted; Docker Hub holds the only built images.
+
 > **No MCP tool deploys the native engine yet.** `create_inf2_instance` still
 > renders cloud-init for the container, so the engine is started by hand for now.
 > It has **not been run on a device** — it is the container's proven graph design,

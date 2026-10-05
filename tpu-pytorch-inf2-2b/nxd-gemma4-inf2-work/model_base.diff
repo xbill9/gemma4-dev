@@ -1,0 +1,54 @@
+--- /opt/conda/lib/python3.12/site-packages/neuronx_distributed_inference/models/model_base.py.g4loop.bak	2026-07-05 02:55:55.200083833 +0000
++++ /opt/conda/lib/python3.12/site-packages/neuronx_distributed_inference/models/model_base.py	2026-07-05 05:02:42.120627886 +0000
+@@ -1340,14 +1340,25 @@
+             local_attn_mask = None
+         if self.config.neuron_config.is_eagle3:
+             eagle3_target_hidden_states = []
++        _g4_kvstash = {}
+         for idx, decoder_layer in enumerate(self.layers):
+             if self.config.neuron_config.layer_boundary_markers:
+                 hidden_states = ModuleMarkerStartWrapper()(hidden_states)
+             _gemma4_src_idx = idx
+-            if idx >= 20:
+-                _gemma4_src_idx = 18 if (idx + 1) % 5 != 0 else 19
++            _g4a = getattr(decoder_layer, "self_attn", None)
++            if _g4a is not None and getattr(_g4a, "gemma4_shared_kv", False):
++                _g4t = getattr(_g4a, "gemma4_layer_type", None)
++                for _j, _dl in enumerate(self.layers):
++                    _da = getattr(_dl, "self_attn", None)
++                    if _da is not None and getattr(_da, "gemma4_store_kv", False) and getattr(_da, "gemma4_layer_type", None) == _g4t:
++                        _gemma4_src_idx = _j
++            _g4_shared_in_val = None
++            if _g4a is not None and getattr(_g4a, "gemma4_shared_kv", False):
++                _g4_shared_in_val = _g4_kvstash.get(getattr(_g4a, "gemma4_layer_type", None))
+             if past_key_values is not None and _gemma4_src_idx < len(past_key_values):
+                 past_key_value = past_key_values[_gemma4_src_idx]
++            elif _g4a is not None and getattr(_g4a, "gemma4_shared_kv", False) and _g4_kvstash.get(getattr(_g4a, "gemma4_layer_type", None)) is not None:
++                past_key_value = _g4_kvstash.get(getattr(_g4a, "gemma4_layer_type", None))
+             else:
+                 past_key_value = None
+ 
+@@ -1378,6 +1389,7 @@
+                 local_mask=local_attn_mask,
+                 windowed_context_encoding_window_idx=windowed_context_encoding_window_idx,
+                 padding_mask=padding_mask,
++                gemma4_shared_kv_in=_g4_shared_in_val,
+                 **kwargs,
+             )
+ 
+@@ -1399,6 +1411,8 @@
+                 )
+ 
+             kv = layer_outputs[1]
++            if _g4a is not None and getattr(_g4a, "gemma4_store_kv", False):
++                _g4_kvstash[getattr(_g4a, "gemma4_layer_type", None)] = (layer_outputs[5] if len(layer_outputs) > 5 and layer_outputs[5] is not None else kv)
+             if update_kv_per_layer:
+                 next_decoder_cache += kv
+             else:
+@@ -3954,4 +3968,4 @@
+ 
+         if not self.token_generation_model.is_neuron():
+             for i, kv_tensor in enumerate(self.token_generation_model.model.past_key_values):
+-                self.token_generation_model.model.past_key_values[i] = torch.zeros_like(kv_tensor)
++                self.token_generation_model.model.past_key_values[i] = torch.zeros_like(kv_tensor)
+\ No newline at end of file

@@ -1,0 +1,40 @@
+Proper two-graph KV-cache decode on Inferentia2 (Option B) — 2026-07-06
+box i-01718af33c99f0eeb (inf2.8xlarge, us-east-1)
+env: /opt/aws_neuronx_venv_pytorch_2_8 + transformers==5.13.0
+
+Architecture:
+  PREFILL graph : Option B forward, also returns the 15 non-shared layers' K/V.
+                  (shared layers 15-34 never write cache — HF modeling_gemma4 L1273;
+                   cache.layers[i].keys/.values is the transformers-5.13 API)
+  DECODE graph  : single-token forward vs a fixed MAX=128 KV buffer threaded as
+                  explicit tensor I/O. Custom StaticKV.update = one-hot masked write
+                  buf*(1-oh)+k*oh (pure arithmetic, trace-safe). Position/masks/onehot
+                  precomputed on host -> zero int-index ops in the graph. attention_mask
+                  passed as a dict {full_attention,sliding_attention} to bypass
+                  create_causal_mask. KV-sharing handled by TextModel.forward internally.
+
+Compile: bf16 (--auto-cast all --auto-cast-type bf16) so each ~7.7GB neff fits a 16GB
+  core (fp32 neffs were 15.4GB -> decode alone overflowed one core).
+  prefill PASS 415s ; decode PASS 381s.
+
+Correctness (CPU-validated first, then device):
+  DEV GEN "What is the capital of France?": 'The capital of France is **Paris**.'
+  SEQ_MATCH True (bf16 device ids == fp32 CPU ids)
+  ids [818, 5279, 529, 7001, 563, 5213, 50429, 84750, 106]
+
+SPEED (measured per phase):
+  prefill run        : 0.06s  (after neff load)
+  DECODE             : ~23 ms/token = ~44 tok/s   <-- the real number
+  one-time neff load : ~49s prefill + ~37s decode (fixed startup, load once serve many)
+  NOTE: an earlier "4s/token" figure was a MEASUREMENT ARTIFACT (total time incl. the
+  ~86s load divided by tokens). I/O aliasing is NOT needed — decode is already fast.
+
+Full demo ("What is Gemma?", 115 tokens to MAX):
+  '**Gemma** is a family of **lightweight, state-of-the-art open models** developed by
+   **Google DeepMind**. ... ### Key Characteristics of Gemma 1. **Open Weights:** ...'
+  decode: 2.6s / 115 steps = 23 ms/tok = 44.3 tok/s
+
+Neffs on box: /workspace/kv_pre_neff.pt, /workspace/kv_dec_neff.pt
+Run: python optb_kv_run.py "<prompt>"  (prefill core0 / decode core1)
+Productionization left (optional): seq bucketing for prompts >32, batch>1,
+persistent server (load once), MAX>128 for longer outputs.
