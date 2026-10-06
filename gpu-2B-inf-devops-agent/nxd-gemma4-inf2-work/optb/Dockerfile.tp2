@@ -1,0 +1,21 @@
+# TP=2 + KV-aliasing image for Gemma4-E2B on Inferentia2 — ~72 tok/s decode @ 2048 (both cores).
+# Builds on the working single-core image (has /opt/aws/neuron runtime, torch 2.8, torch-neuronx,
+# transformers 5.13, model weights) and adds neuronx-distributed + the serialized TP+alias neffs.
+FROM xbill9/gemma4-optb:latest
+
+# tensor-parallel runtime (neuronx-distributed); pipeline submodule is shimmed at import in the server
+RUN pip install --no-cache-dir --extra-index-url https://pip.repos.neuron.amazonaws.com \
+      "neuronx-distributed==0.17.26814" || \
+    pip install --no-cache-dir --extra-index-url https://pip.repos.neuron.amazonaws.com neuronx-distributed
+
+# serialized TP+alias neffs (each dir has tp_0.pt + tp_1.pt, one per core)
+COPY tpa_pre /workspace/tpa_pre
+COPY tpa_dec /workspace/tpa_dec
+COPY optb_server_tp.py /app/optb_server_tp.py
+
+ENV KV_MAX=2048 KV_BUCKET=512 \
+    TPA_PRE=/workspace/tpa_pre TPA_DEC=/workspace/tpa_dec \
+    NEURON_RT_VISIBLE_CORES=0,1 PORT=8080
+EXPOSE 8080
+# run with: docker run -d --device /dev/neuron0 --ipc=host -p 8080:8080 xbill9/gemma4-optb:tp2-2048
+CMD ["python","/app/optb_server_tp.py"]
