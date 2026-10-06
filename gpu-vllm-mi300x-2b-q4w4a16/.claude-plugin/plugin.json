@@ -1,0 +1,32 @@
+{
+  "name": "gpu-vllm-mi300x-2b-q4w4a16",
+  "description": "Manage one AMD Instinct MI300X serving the QAT Q4_0 W4A16 repack of Gemma 4 E2B (text only) through vLLM on a DigitalOcean GPU droplet: droplet lifecycle, ROCm diagnostics, image vetting that also checks the image lists a gfx942 4-bit kernel, serving deployment with the Gemma 4 parser flags, and SRE diagnostics via the gpu-vllm-mi300x-2b-q4w4a16 MCP server.",
+  "version": "0.1.0",
+  "author": {
+    "name": "xbill9",
+    "url": "https://github.com/xbill9"
+  },
+  "homepage": "https://github.com/xbill9/gemma4-dev",
+  "repository": "https://github.com/xbill9/gemma4-dev",
+  "license": "Apache-2.0",
+  "keywords": [
+    "amd",
+    "mi300x",
+    "rocm",
+    "vllm",
+    "gemma",
+    "mcp",
+    "devops",
+    "w4a16",
+    "int4",
+    "qat"
+  ],
+  "mcpServers": {
+    "gpu-vllm-mi300x-2b-q4w4a16": {
+      "command": "python3",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/skills/gpu-vllm-mi300x-2b-q4w4a16-management/mcp/server.py"
+      ]
+    }
+  }
+}
