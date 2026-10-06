@@ -6,7 +6,7 @@ This rig packages the `tpu-pytorch-trn1-2b-management` skill and the `tpu-pytorc
 
 `create_trn1_instance` launches the prebuilt Gemma-4 Option-B image (`docker.io/xbill9/gemma4-optb:slim`, E2B, override with `image=` or `OPTB_IMAGE`) on one Neuron device. The image was compiled for **inf2** and runs on trn1 unchanged: both chips carry two NeuronCore-v2 cores and 32 GiB of device memory (`aws ec2 describe-instance-types`). Measured in `benchmarks/runs/2026-10-05-smoke-trn1/`.
 
-**There is no vLLM path, and none can be added by changing a flag.** vLLM-Neuron 0.24 and 0.21 list Trn2/Trn3 only; the 0.5.3 line that still covers Trn1 and Inf2 pins vLLM 0.16; no release has a Gemma-4 model class. The inf2 sibling's `serving="vllm"` path came up healthy and served gibberish for Gemma-4, which is why it was not carried over.
+**There is no vLLM path, and none can be added by changing a flag.** vLLM-Neuron 0.24 and 0.21 list Trn2/Trn3 only; the 0.5.3 line that still covers Trn1 and Inf2 pins vLLM 0.16; no release has a Gemma-4 model class. The inf2 sibling's `serving="vllm"` path came up healthy and served gibberish for Gemma-4, which is why it was not carried over. The attempt lives in its own sibling, `tpu-vllm-trn1-2b`, which differs from this rig in slot 2 only. The quant siblings `tpu-pytorch-trn1-2b-{fp8,q4w4a16,q4w4a16emb4,w8a8}` differ in slot 5 only.
 
 ## Authoritative files
 

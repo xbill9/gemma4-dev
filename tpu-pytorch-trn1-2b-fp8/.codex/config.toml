@@ -1,0 +1,14 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env.
+[mcp_servers.tpu-pytorch-trn1-2b-fp8]
+command = "python3"
+args = [".claude/skills/tpu-pytorch-trn1-2b-fp8-management/mcp/server.py"]
+
+[mcp_servers.tpu-pytorch-trn1-2b-fp8.env]
+AWS_REGION = "us-east-2"
+MODEL_NAME = "gemma-4-E2B-it"
+INSTANCE_TYPE = "trn1.2xlarge"
+MCP_SERVER_NAME = "tpu-pytorch-trn1-2b-fp8"
+
+[mcp_servers.tpu-pytorch-trn1-2b-fp8.tools.create_trn1_instance]
+approval_mode = "approve"

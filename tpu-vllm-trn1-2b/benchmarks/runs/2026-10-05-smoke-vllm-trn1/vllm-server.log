@@ -1,0 +1,61 @@
+status=running restarts=7
+INFO 10-05 23:17:59 [importing.py:68] Triton not installed or not compatible; certain GPU-related functions will not be available.
+WARNING 10-05 23:17:59 [interface.py:225] Failed to import from vllm._C: ImportError('libcuda.so.1: cannot open shared object file: No such file or directory')
+(APIServer pid=7) INFO 10-05 23:18:02 [utils.py:287] 
+(APIServer pid=7) INFO 10-05 23:18:02 [utils.py:287]        █     █     █▄   ▄█
+(APIServer pid=7) INFO 10-05 23:18:02 [utils.py:287]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.16.0
+(APIServer pid=7) INFO 10-05 23:18:02 [utils.py:287]   █▄█▀ █     █     █     █  model   google/gemma-4-E2B-it
+(APIServer pid=7) INFO 10-05 23:18:02 [utils.py:287]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=7) INFO 10-05 23:18:02 [utils.py:287] 
+(APIServer pid=7) INFO 10-05 23:18:02 [utils.py:223] non-default args: {'model_tag': 'google/gemma-4-E2B-it', 'api_server_count': 1, 'host': '0.0.0.0', 'model': 'google/gemma-4-E2B-it', 'max_model_len': 4096, 'tensor_parallel_size': 2, 'max_num_seqs': 4}
+(APIServer pid=7) Traceback (most recent call last):
+(APIServer pid=7)   File "/opt/conda/bin/vllm", line 6, in <module>
+(APIServer pid=7)     sys.exit(main())
+(APIServer pid=7)              ^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/entrypoints/cli/main.py", line 73, in main
+(APIServer pid=7)     args.dispatch_function(args)
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/entrypoints/cli/serve.py", line 111, in cmd
+(APIServer pid=7)     uvloop.run(run_server(args))
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/uvloop/__init__.py", line 96, in run
+(APIServer pid=7)     return __asyncio.run(
+(APIServer pid=7)            ^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/asyncio/runners.py", line 195, in run
+(APIServer pid=7)     return runner.run(main)
+(APIServer pid=7)            ^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/asyncio/runners.py", line 118, in run
+(APIServer pid=7)     return self._loop.run_until_complete(task)
+(APIServer pid=7)            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/uvloop/__init__.py", line 48, in wrapper
+(APIServer pid=7)     return await main
+(APIServer pid=7)            ^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/entrypoints/openai/api_server.py", line 457, in run_server
+(APIServer pid=7)     await run_server_worker(listen_address, sock, args, **uvicorn_kwargs)
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/entrypoints/openai/api_server.py", line 476, in run_server_worker
+(APIServer pid=7)     async with build_async_engine_client(
+(APIServer pid=7)                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=7)     return await anext(self.gen)
+(APIServer pid=7)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/entrypoints/openai/api_server.py", line 96, in build_async_engine_client
+(APIServer pid=7)     async with build_async_engine_client_from_engine_args(
+(APIServer pid=7)                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/contextlib.py", line 210, in __aenter__
+(APIServer pid=7)     return await anext(self.gen)
+(APIServer pid=7)            ^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/entrypoints/openai/api_server.py", line 122, in build_async_engine_client_from_engine_args
+(APIServer pid=7)     vllm_config = engine_args.create_engine_config(usage_context=usage_context)
+(APIServer pid=7)                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/engine/arg_utils.py", line 1410, in create_engine_config
+(APIServer pid=7)     model_config = self.create_model_config()
+(APIServer pid=7)                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/vllm/engine/arg_utils.py", line 1264, in create_model_config
+(APIServer pid=7)     return ModelConfig(
+(APIServer pid=7)            ^^^^^^^^^^^^
+(APIServer pid=7)   File "/opt/conda/lib/python3.12/site-packages/pydantic/_internal/_dataclasses.py", line 121, in __init__
+(APIServer pid=7)     s.__pydantic_validator__.validate_python(ArgsKwargs(args, kwargs), self_instance=s)
+(APIServer pid=7) pydantic_core._pydantic_core.ValidationError: 1 validation error for ModelConfig
+(APIServer pid=7)   Value error, The checkpoint you are trying to load has model type `gemma4` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.
+(APIServer pid=7) 
+(APIServer pid=7) You can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/transformers.git` [type=value_error, input_value=ArgsKwargs((), {'model': ...rocessor_plugin': None}), input_type=ArgsKwargs]
+(APIServer pid=7)     For further information visit https://errors.pydantic.dev/2.13/v/value_error

@@ -1,0 +1,14 @@
+# Codex's view of this rig's MCP server. Keep it in step with .mcp.json — same server name,
+# same entry point, same env.
+[mcp_servers.tpu-vllm-trn1-2b]
+command = "python3"
+args = [".claude/skills/tpu-vllm-trn1-2b-management/mcp/server.py"]
+
+[mcp_servers.tpu-vllm-trn1-2b.env]
+AWS_REGION = "us-east-2"
+MODEL_NAME = "google/gemma-4-E2B-it"
+INSTANCE_TYPE = "trn1.2xlarge"
+MCP_SERVER_NAME = "tpu-vllm-trn1-2b"
+
+[mcp_servers.tpu-vllm-trn1-2b.tools.create_trn1_instance]
+approval_mode = "approve"
