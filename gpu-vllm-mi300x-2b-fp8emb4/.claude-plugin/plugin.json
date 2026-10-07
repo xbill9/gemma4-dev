@@ -1,0 +1,31 @@
+{
+  "name": "gpu-vllm-mi300x-2b-fp8emb4",
+  "description": "Manage one AMD Instinct MI300X serving xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text-emb4 (Gemma 4 E2B, fp8emb4, text only) through vLLM on a DigitalOcean GPU droplet: droplet lifecycle, ROCm diagnostics, image vetting, serving deployment with the Gemma 4 parser flags, and SRE diagnostics via the gpu-vllm-mi300x-2b-fp8emb4 MCP server. One arm of the E2B data-type sweep.",
+  "version": "0.1.0",
+  "author": {
+    "name": "xbill9",
+    "url": "https://github.com/xbill9"
+  },
+  "homepage": "https://github.com/xbill9/gemma4-dev",
+  "repository": "https://github.com/xbill9/gemma4-dev",
+  "license": "Apache-2.0",
+  "keywords": [
+    "amd",
+    "mi300x",
+    "rocm",
+    "vllm",
+    "gemma",
+    "mcp",
+    "devops",
+    "fp8",
+    "qat"
+  ],
+  "mcpServers": {
+    "gpu-vllm-mi300x-2b-fp8emb4": {
+      "command": "python3",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/skills/gpu-vllm-mi300x-2b-fp8emb4-management/mcp/server.py"
+      ]
+    }
+  }
+}

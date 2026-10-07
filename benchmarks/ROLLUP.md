@@ -205,10 +205,13 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-inf2-2b | `2026-07-31-inf2-jax-parity-e2b` | 1 | 0 | 0 | yes | **no** |
 | tpu-pytorch-inf2-2b | `2026-07-31-inf2-serving-perf` | 1 | 0 | 0 | yes | **no** |
 | tpu-pytorch-inf2-2b | `2026-08-02-inf2-latest-stack-e2b` | 10 | 0 | 0 | yes | **no** |
+| tpu-pytorch-inf2-2b | `2026-10-05-inf2-optb-concurrency` | 2 | 0 | 0 | yes | **no** |
+| tpu-pytorch-trn1-2b | `2026-10-05-smoke-trn1` | 3 | 0 | 0 | yes | **no** |
 | tpu-pytorch-v5e1-12b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e4-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
+| tpu-vllm-trn1-2b | `2026-10-05-smoke-vllm-trn1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-12b-fp8 | `2026-09-30-fillA-12b-fp8-v5e1` | 40 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-fp8 | `2026-09-30-gen2048b2-12b-fp8-v5e1` | 8 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-q4w4a16 | `2026-09-28-12b3-12b-repack-v5e1` | 35 | 0 | 0 | **no** | **no** |
@@ -395,6 +398,15 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-31b-w4a16 | 0 | 2 |
 | gpu-vllm-l4-4b-w4a16 | 0 | 1 |
 | gpu-vllm-mi300x-2b | 7 | 8 |
+| gpu-vllm-mi300x-2b-fp8 | 0 | 0 |
+| gpu-vllm-mi300x-2b-fp8emb4 | 0 | 0 |
+| gpu-vllm-mi300x-2b-q4w4a16 | 0 | 0 |
+| gpu-vllm-mi300x-2b-q4w4a16emb4 | 0 | 0 |
+| gpu-vllm-mi300x-2b-q4w4a16ple4 | 0 | 0 |
+| gpu-vllm-mi300x-2b-w8a8 | 0 | 0 |
+| gpu-vllm-mi300x-2b-w8a8emb4 | 0 | 0 |
+| gpu-vllm-mi300x-31b | 0 | 0 |
+| gpu-vllm-mi300x-31b-q4w4a16 | 0 | 0 |
 | gpu-vllm-t4-2b | 0 | 1 |
 | gpu-vllm-t4-2b-w4a16 | 1 | 2 |
 | gpu-vllm-t4-4b-q4w4a16emb4 | 1 | 1 |
@@ -414,11 +426,21 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-jax-v6e1-26b-q4_0 | 0 | 1 |
 | tpu-jax-v6e1-2b | 1 | 4 |
 | tpu-jax-v6e1-31b-w4a16 | 0 | 1 |
-| tpu-pytorch-inf2-2b | 1 | 10 |
+| tpu-pytorch-inf2-2b | 1 | 11 |
+| tpu-pytorch-inf2-2b-fp8 | 0 | 0 |
+| tpu-pytorch-inf2-2b-q4w4a16 | 0 | 0 |
+| tpu-pytorch-inf2-2b-q4w4a16emb4 | 0 | 0 |
+| tpu-pytorch-inf2-2b-w8a8 | 0 | 0 |
+| tpu-pytorch-trn1-2b | 0 | 1 |
+| tpu-pytorch-trn1-2b-fp8 | 0 | 0 |
+| tpu-pytorch-trn1-2b-q4w4a16 | 0 | 0 |
+| tpu-pytorch-trn1-2b-q4w4a16emb4 | 0 | 0 |
+| tpu-pytorch-trn1-2b-w8a8 | 0 | 0 |
 | tpu-pytorch-v5e1-12b | 1 | 1 |
 | tpu-pytorch-v5e1-2b | 1 | 1 |
 | tpu-pytorch-v6e1-2b | 1 | 1 |
 | tpu-pytorch-v6e4-2b | 1 | 1 |
+| tpu-vllm-trn1-2b | 0 | 1 |
 | tpu-vllm-v5e1-12b-fp8 | 0 | 2 |
 | tpu-vllm-v5e1-12b-q4w4a16 | 0 | 2 |
 | tpu-vllm-v5e1-12b-q4w4a16emb4 | 0 | 7 |
