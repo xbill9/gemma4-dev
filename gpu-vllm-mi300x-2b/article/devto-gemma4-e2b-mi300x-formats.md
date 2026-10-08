@@ -24,19 +24,22 @@ What is left to choose on is speed and precision. The card multiplies some numbe
 
 #### The Ten Builds
 
-Every quantized build starts from Google's `gemma-4-E2B-it-qat-q4_0-unquantized` release, whose weights already sit on a 4-bit grid with one scale per group of 32 values:
+Every quantized build starts from Google's `gemma-4-E2B-it-qat-q4_0-unquantized` release, whose weights already sit on a 4-bit grid with one scale per group of 32 values. All nine are text only and on Hugging Face:
 
-| Build | Linear layers | Vocabulary tables |
-|---|---|---|
-| bf16 | bf16 (`google/gemma-4-E2B-it`) | bf16 |
-| `fp8` | FP8 E4M3 weights, FP8 activations per token | bf16 |
-| `fp8fnuz` | FP8 E4M3FNUZ, the MI300X's own FP8 | bf16 |
-| `w8a8` | int8 weights per channel, int8 activations per token | bf16 |
-| `q4w4a16` | int4 holding the QAT grid exactly, bf16 activations | bf16 |
-| `*emb4` | as above | int4: `embed_tokens`, an untied `lm_head`, per-layer embeddings |
-| `q4w4a16ple4` | as `q4w4a16` | int4 per-layer embeddings only |
+| Build | Linear layers | Vocabulary tables | Made with |
+|---|---|---|---|
+| bf16 | bf16, [`google/gemma-4-E2B-it`](https://huggingface.co/google/gemma-4-E2B-it) | bf16 | — |
+| [`fp8`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text) | FP8 E4M3, FP8 activations per token | bf16 | `fp8_text.py` |
+| [`fp8fnuz`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text) | FP8 E4M3FNUZ, the MI300X's own FP8 | bf16 | `fp8_text.py --fnuz` |
+| [`fp8emb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text-emb4) | FP8 E4M3 | int4 | `fp8_text.py build-on` |
+| [`fp8fnuzemb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text-emb4) | FP8 E4M3FNUZ | int4 | `fp8_text.py build-on --fnuz` |
+| [`w8a8`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-w8a8-int8) | int8 per channel, int8 activations per token | bf16 | `w8a8_from_qat.py` |
+| [`w8a8emb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-w8a8-ct-text-emb4) | int8 per channel | int4 | `w8a8.py` |
+| [`q4w4a16`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text) | int4 holding the QAT grid exactly, bf16 activations | bf16 | `repack_q4_0.py`, `text_only.py` |
+| [`q4w4a16ple4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-ple4) | as `q4w4a16` | int4 per-layer embeddings only | `embed_int4.py` |
+| [`q4w4a16emb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4) | as `q4w4a16` | int4 | `embed_int4.py` |
 
-All of them are on Hugging Face under `xbill9/gemma-4-E2B-it-qat-*`, text only.
+The int4 vocabulary tables are `embed_tokens`, an untied `lm_head` and the per-layer embeddings, packed at the same group-of-32 grid QAT trained them on.
 
 ---
 
@@ -49,7 +52,35 @@ All of them are on Hugging Face under `xbill9/gemma-4-E2B-it-qat-*`, text only.
 
 ---
 
-#### Step 1 — Time the Card's Matrix Multiplies
+#### Step 1 — Build the Formats
+
+Each build reads Google's QAT checkpoint and writes one format. The FP8 builds take the text-only model's config and tensor list from the 4-bit repack, so every build quantizes the same 276 linear layers:
+
+```bash
+hf download google/gemma-4-E2B-it-qat-q4_0-unquantized --local-dir src
+hf download xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text config.json model.safetensors.index.json --local-dir ct-text
+python3 repack/fp8_text.py build src ct-text/config.json ct-text/model.safetensors.index.json fp8fnuz-text --fnuz
+python3 repack/fp8_text.py verify src fp8fnuz-text --fnuz
+```
+
+`verify` rereads both checkpoints and compares every quantized value with its QAT original:
+
+```json
+{
+ "modules": 276,
+ "values": 1876819968,
+ "max_rel_err": 0.03333339840173721,
+ "copied": 264,
+ "copied_identical": 264,
+ "relative_rms_error": 0.026415727046737517
+}
+```
+
+`build-on` makes the `emb4` variants by swapping the linear layers of an existing int4-table build for FP8 and leaving its tables untouched. The int8 builds come from `w8a8_from_qat.py`, and the 4-bit repack from `repack_q4_0.py`, which recovers each group's trained step and stores the levels as int4 without re-rounding them.
+
+---
+
+#### Step 2 — Time the Card's Matrix Multiplies
 
 Before serving anything, `gemm_decode_shapes.py` times every matrix multiply E2B runs per token, at 1, 8 and 64 rows, from a HIP graph so launch overhead stays out of the number:
 
@@ -72,7 +103,7 @@ The MI300X has no int4 multiply, so a 4-bit build unpacks its weights to bf16 in
 
 ---
 
-#### Step 2 — Serve Every Build on One Pinned Image
+#### Step 3 — Serve Every Build on One Pinned Image
 
 `dtype_sweep.py` serves each build in turn from its own rig directory, on one image digest, with identical serving settings: `--max-model-len 32768`, `--gpu-memory-utilization 0.90`, prefix caching on, and no `--quantization` flag, so vLLM reads the format from each checkpoint:
 
@@ -96,7 +127,7 @@ A quantized build that loaded near bf16's 9.42 GiB would have been unpacked to b
 
 ---
 
-#### Step 3 — Check Each Build Answers
+#### Step 4 — Check Each Build Answers
 
 `verify_capabilities` sends a text question, a thinking prompt and a tool call to each build, with known answers:
 
@@ -112,7 +143,7 @@ All nine quantized builds pass all three. bf16 passes the same three and refuses
 
 ---
 
-#### Step 4 — Sweep Request Count and Prompt Length
+#### Step 5 — Sweep Request Count and Prompt Length
 
 Each build runs 1, 8 and 64 requests at once against prompts of 128, 1,024 and 8,192 tokens, 512 output tokens each, three repeats per cell, with a fresh random seed for every run so no prompt is served from the prefix cache.
 
