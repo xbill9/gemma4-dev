@@ -28,16 +28,28 @@ Every quantized build starts from Google's `gemma-4-E2B-it-qat-q4_0-unquantized`
 
 | Build | Linear layers | Vocabulary tables | Made with |
 |---|---|---|---|
-| bf16 | bf16, [`google/gemma-4-E2B-it`](https://huggingface.co/google/gemma-4-E2B-it) | bf16 | — |
-| [`fp8`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text) | FP8 E4M3, FP8 activations per token | bf16 | `fp8_text.py` |
-| [`fp8fnuz`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text) | FP8 E4M3FNUZ, the MI300X's own FP8 | bf16 | `fp8_text.py --fnuz` |
-| [`fp8emb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text-emb4) | FP8 E4M3 | int4 | `fp8_text.py build-on` |
-| [`fp8fnuzemb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text-emb4) | FP8 E4M3FNUZ | int4 | `fp8_text.py build-on --fnuz` |
-| [`w8a8`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-w8a8-int8) | int8 per channel, int8 activations per token | bf16 | `w8a8_from_qat.py` |
-| [`w8a8emb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-w8a8-ct-text-emb4) | int8 per channel | int4 | `w8a8.py` |
-| [`q4w4a16`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text) | int4 holding the QAT grid exactly, bf16 activations | bf16 | `repack_q4_0.py`, `text_only.py` |
-| [`q4w4a16ple4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-ple4) | as `q4w4a16` | int4 per-layer embeddings only | `embed_int4.py` |
-| [`q4w4a16emb4`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4) | as `q4w4a16` | int4 | `embed_int4.py` |
+| bf16 | bf16, `google/gemma-4-E2B-it` | bf16 | — |
+| `fp8` | FP8 E4M3, FP8 activations per token | bf16 | `fp8_text.py` |
+| `fp8fnuz` | FP8 E4M3FNUZ, the MI300X's own FP8 | bf16 | `fp8_text.py --fnuz` |
+| `fp8emb4` | FP8 E4M3 | int4 | `fp8_text.py build-on` |
+| `fp8fnuzemb4` | FP8 E4M3FNUZ | int4 | `fp8_text.py build-on --fnuz` |
+| `w8a8` | int8 per channel, int8 activations per token | bf16 | `w8a8_from_qat.py` |
+| `w8a8emb4` | int8 per channel | int4 | `w8a8.py` |
+| `q4w4a16` | int4 holding the QAT grid exactly, bf16 activations | bf16 | `repack_q4_0.py`, `text_only.py` |
+| `q4w4a16ple4` | as `q4w4a16` | int4 per-layer embeddings only | `embed_int4.py` |
+| `q4w4a16emb4` | as `q4w4a16` | int4 | `embed_int4.py` |
+
+On Hugging Face:
+
+- `fp8`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text
+- `fp8fnuz`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text
+- `fp8emb4`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text-emb4
+- `fp8fnuzemb4`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text-emb4
+- `w8a8`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-w8a8-int8
+- `w8a8emb4`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-w8a8-ct-text-emb4
+- `q4w4a16`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text
+- `q4w4a16ple4`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-ple4
+- `q4w4a16emb4`: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4
 
 The int4 vocabulary tables are `embed_tokens`, an untied `lm_head` and the per-layer embeddings, packed at the same group-of-32 grid QAT trained them on.
 
