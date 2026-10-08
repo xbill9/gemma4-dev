@@ -1,0 +1,7 @@
+✅ Started `vllm` on `debian-gpu-mi300x1-192gb-devcloud-atl1` serving `google/gemma-4-E4B-it`.
+
+- image: `vllm/vllm-openai-rocm@sha256:ec62abecc13923172cf1225c0270b8cea7d84b652eacd3c8dffe2dd35dd73e37`
+- context: 32768, gpu-memory-utilization 0.90
+- multimodal: `{"image": 0, "audio": 0}` — audio is 0 because no ROCm image ships `vllm[audio]`
+
+📡 Loading takes minutes: weights, then torch.compile, then graph capture. Poll `serving_status`; read `server_logs` if it does not come up.
