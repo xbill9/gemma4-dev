@@ -9,6 +9,10 @@ already sit on the Q4_0 grid, rather than the original bf16 model.
 
 - Quantized: the same language-model linears repack_q4_0.py quantizes (attention, MLP, the
   per-layer-embedding projections), each row scaled by max|w| / 127 and rounded to nearest.
+- Mixture-of-experts banks (26B-A4B): each fused `experts.gate_up_proj` / `experts.down_proj`
+  is split into per-expert `experts.{i}.{gate,up,down}_proj` modules, the layout the W4A16
+  repack uses and vLLM's FusedMoE loader reads, and each is quantized as above. The routers
+  (`router.proj`) stay bf16 and go on the ignore list.
 - Dropped: the vision and audio towers (text only, `Gemma4ForCausalLM`).
 - Copied byte for byte: everything else (embeddings, norms, scalars).
 
@@ -24,8 +28,8 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from repack_q4_0 import (LINEAR, TOWERS, bf16_to_f32, f32_to_bf16,  # noqa: E402
-                         open_checkpoint, write_safetensors, _kind)
+from repack_q4_0 import (EXPERTS, KEEP_LINEAR, LINEAR, TOWERS, bf16_to_f32,  # noqa: E402
+                         f32_to_bf16, open_checkpoint, write_safetensors, _kind)
 
 SHARD_BYTES = 2 << 30
 
@@ -49,7 +53,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     ck = open_checkpoint(a.src)
 
-    shard, size, n, weight_map, errs = [], 0, 0, {}, {}
+    shard, size, n, weight_map, errs, ignore = [], 0, 0, {}, {}, ["lm_head"]
 
     def flush():
         nonlocal shard, size, n
@@ -64,11 +68,27 @@ def main():
             continue
         tag = ck[name].header[name]["dtype"]
         raw = np.asarray(ck[name].raw(name))
+        e = EXPERTS.match(name)
         if LINEAR.match(name) and tag == "BF16":
             q, scale, err = quantize_int8(raw)
             errs.setdefault(_kind(name), []).append(err)
             entries = [(name, "I8", q), (name[:-len(".weight")] + ".weight_scale", "BF16", scale)]
+        elif e and tag == "BF16":
+            base = name[: -len(e.group(2))]
+            if e.group(2) == "gate_up_proj":
+                f = raw.shape[1] // 2
+                parts = [("gate_proj", slice(0, f)), ("up_proj", slice(f, 2 * f))]
+            else:
+                parts = [("down_proj", slice(None))]
+            entries = []
+            for i in range(raw.shape[0]):
+                for proj, rows in parts:
+                    q, scale, err = quantize_int8(np.ascontiguousarray(raw[i, rows]))
+                    errs.setdefault(f"experts.{proj}", []).append(err)
+                    entries += [(f"{base}{i}.{proj}.weight", "I8", q), (f"{base}{i}.{proj}.weight_scale", "BF16", scale)]
         else:
+            if KEEP_LINEAR.search(name) and tag == "BF16":
+                ignore.append(name[: -len(".weight")])
             entries = [(name, tag, raw)]
         nbytes = sum(e[2].nbytes for e in entries)
         if size + nbytes > SHARD_BYTES:
@@ -99,7 +119,7 @@ def main():
                                   "observer_kwargs": {}},
             "output_activations": None,
         }},
-        "ignore": ["lm_head"],
+        "ignore": ignore,
         "kv_cache_scheme": None,
         "sparsity_config": {},
     }

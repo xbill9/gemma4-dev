@@ -264,6 +264,12 @@ def _ssh_argv(ip: str, command: Optional[str] = None) -> list[str]:
         "StrictHostKeyChecking=accept-new",
         "-o",
         "ConnectTimeout=10",
+        # A dropped connection otherwise leaves ssh waiting forever on a remote
+        # command that is already gone (a 4B sweep cell hung 10 h this way).
+        "-o",
+        "ServerAliveInterval=30",
+        "-o",
+        "ServerAliveCountMax=6",
         "-p",
         SSH_PORT,
     ]
@@ -290,6 +296,8 @@ async def run_command(cmd: list[str], timeout: int = 120) -> tuple[int, str, str
             stderr.decode(errors="replace"),
         )
     except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
         return 124, "", f"timed out after {timeout}s"
     except FileNotFoundError:
         return 127, "", f"not found: {cmd[0]}"
