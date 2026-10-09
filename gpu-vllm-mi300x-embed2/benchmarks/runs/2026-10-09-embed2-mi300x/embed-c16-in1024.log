@@ -1,0 +1,37 @@
+Namespace(subparser='bench', bench_type='serve', dispatch_function=<function BenchmarkServingSubcommand.cmd at 0x7f61eae279c0>, trust_remote_code=False, seed=70000005, num_prompts=256, dataset_name='random', no_stream=False, dataset_path=None, no_oversample=False, skip_chat_template=False, enable_multimodal_chat=False, disable_shuffle=False, custom_output_len=256, custom_ensure_client_side_data=False, spec_bench_output_len=256, spec_bench_category=None, sharegpt_output_len=None, timed_trace_chunk_hash_size=16, timed_trace_sec_multiplier=1, timed_trace_label_timestamp='timestamp', timed_trace_label_input_length='input_length', timed_trace_label_output_length='output_length', timed_trace_label_hash_ids='hash_ids', blazedit_min_distance=0.0, blazedit_max_distance=1.0, asr_max_audio_len_sec=inf, asr_min_audio_len_sec=0.0, random_input_len=1024, random_output_len=1, random_range_ratio='0.0', random_prefix_len=0, random_batch_size=1, no_reranker=False, random_mm_base_items_per_request=1, random_mm_num_mm_items_range_ratio=0.0, random_mm_limit_mm_per_prompt={'image': 255, 'video': 1}, random_mm_bucket_config={(256, 256, 1): 0.5, (720, 1280, 1): 0.5, (720, 1280, 16): 0.0}, hf_subset=None, hf_split=None, hf_name=None, hf_output_len=None, bfcl_categories=None, prefix_repetition_prefix_len=256, prefix_repetition_suffix_len=256, prefix_repetition_num_prefixes=10, prefix_repetition_output_len=128, speed_bench_dataset_subset='qualitative', speed_bench_output_len=4096, speed_bench_category=None, label=None, backend='openai-embeddings', base_url='http://127.0.0.1:8001', host='127.0.0.1', port=8000, endpoint='/v1/embeddings', header=None, max_concurrency=16, model='google/embeddinggemma-2', input_len=None, output_len=None, tokenizer=None, tokenizer_mode='auto', use_beam_search=False, logprobs=None, request_rate=inf, burstiness=1.0, probe_request_rate=0.0, disable_tqdm=False, num_warmups=0, profile=False, save_result=True, save_detailed=False, append_result=False, metadata=None, result_dir='/dev/shm', result_filename='bench-embed-c16-in1024.json', ignore_eos=False, self_timed=None, percentile_metrics=None, metric_percentiles='99', goodput=None, request_id_prefix='bench-58fffe24-', top_p=None, top_k=None, min_p=None, temperature=None, frequency_penalty=None, presence_penalty=None, repetition_penalty=None, served_model_name=None, lora_modules=None, lora_assignment='random', ramp_up_strategy=None, ramp_up_start_rps=None, ramp_up_end_rps=None, ready_check_timeout_sec=0, chat_template_kwargs=None, extra_body=None, skip_tokenizer_init=False, insecure=False, plot_timeline=False, timeline_itl_thresholds='25,50', plot_dataset_stats=False, log_config_file=None, logging_config=LoggingConfig(log_level='INFO', formatter='text', configure_logging=True, pylogging_config_file=None))
+(MainProcess pid=1) INFO 10-09 15:51:24 [config.py:1140] Found sentence-transformers tokenize configuration.
+(MainProcess pid=1) INFO 10-09 15:51:24 [utils.py:88] Sampling input_len from [1022, 1022] and output_len from [1, 1]
+Starting initial single prompt test run...
+Skipping endpoint ready check.
+Starting main benchmark run...
+Traffic request rate: inf
+Burstiness factor: 1.0 (Poisson process)
+Maximum request concurrency: 16
+
+  0%|          | 0/256 [00:00<?, ?it/s]
+  1%|          | 2/256 [00:00<00:16, 15.46it/s]
+ 10%|█         | 26/256 [00:00<00:01, 121.94it/s]
+ 20%|█▉        | 50/256 [00:00<00:01, 152.91it/s]
+ 29%|██▉       | 74/256 [00:00<00:01, 167.19it/s]
+ 38%|███▊      | 98/256 [00:00<00:00, 175.02it/s]
+ 48%|████▊     | 122/256 [00:00<00:00, 179.67it/s]
+ 57%|█████▋    | 146/256 [00:00<00:00, 182.81it/s]
+ 66%|██████▋   | 170/256 [00:01<00:00, 184.47it/s]
+ 76%|███████▌  | 194/256 [00:01<00:00, 185.52it/s]
+ 85%|████████▌ | 218/256 [00:01<00:00, 186.46it/s]
+ 95%|█████████▍| 242/256 [00:01<00:00, 187.02it/s]
+100%|██████████| 256/256 [00:01<00:00, 178.69it/s]
+============ Serving Benchmark Result ============
+Successful requests:                     256       
+Failed requests:                         0         
+Maximum request concurrency:             16        
+Benchmark duration (s):                  1.43      
+Total input tokens:                      262144    
+Request throughput (req/s):              178.68    
+Input throughput (inputs/s):             178.68    
+Total token throughput (tok/s):          182973.08 
+----------------End-to-end Latency----------------
+Mean E2EL (ms):                          87.33     
+Median E2EL (ms):                        84.37     
+P99 E2EL (ms):                           131.57    
+==================================================

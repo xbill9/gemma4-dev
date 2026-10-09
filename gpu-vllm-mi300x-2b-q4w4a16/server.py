@@ -128,6 +128,9 @@ CHAT_TEMPLATE = os.environ.get("CHAT_TEMPLATE", "/app/vllm/examples/tool_chat_te
 # The render groups on the Debian 13 GPU image. Passed as --group-add so the
 # container can open /dev/kfd without running privileged.
 RENDER_GIDS = os.environ.get("RENDER_GIDS", "44,991")
+# Comma-separated KEY=VALUE pairs passed into the model server's container, e.g.
+# "VLLM_ROCM_USE_AITER=1". Empty by default: the server runs on the image's defaults.
+VLLM_DOCKER_ENV = os.environ.get("VLLM_DOCKER_ENV", "")
 
 mcp = MCPServer(MCP_SERVER_NAME)
 READ_ONLY = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
@@ -399,8 +402,12 @@ def _serve_argv() -> list[str]:
         f"{HF_CACHE}:/root/.cache/huggingface",
         "-p",
         f"{VLLM_PORT}:{VLLM_PORT}",
-        VLLM_IMAGE,
     ]
+    for pair in VLLM_DOCKER_ENV.split(","):
+        pair = pair.strip()
+        if pair:
+            argv += ["-e", pair]
+    argv.append(VLLM_IMAGE)
     if not _is_official_image(VLLM_IMAGE):
         argv += ["vllm", "serve"]
     argv += [

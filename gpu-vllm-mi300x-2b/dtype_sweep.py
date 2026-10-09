@@ -219,8 +219,13 @@ def tool_main(rig: str, fn: str, kwargs: str) -> int:
 # --------------------------------------------------------------------------- driver
 
 
+ENGINE_ENV = ""  # --engine-env: KEY=VALUE pairs for the model server's container
+
+
 def _env(arm: Arm, image: str) -> dict:
     env = dict(os.environ, VLLM_IMAGE=image, **arm.env)
+    if ENGINE_ENV:
+        env["VLLM_DOCKER_ENV"] = ENGINE_ENV
     if arm.model is not None:
         env["SUITE_OUTPUT_DIR"] = str(ROOT / arm.rig)
     return env
@@ -369,7 +374,10 @@ def main() -> int:
     p.add_argument("--size", default="2b", choices=sorted(SIZES))
     p.add_argument("--seed-base", type=int, default=50_000_000)
     p.add_argument("--only", nargs="+", help="run these encodings only")
+    p.add_argument("--engine-env", default="", help="KEY=VALUE[,KEY=VALUE] for the server container, e.g. VLLM_ROCM_USE_AITER=1")
     args = p.parse_args()
+    global ENGINE_ENV
+    ENGINE_ENV = args.engine_env
     if "@sha256:" not in args.image:
         sys.exit("--image must be a pinned digest: arms on different nightlies are not comparable")
 
@@ -379,6 +387,7 @@ def main() -> int:
         sys.exit(f"no rig directory for: {', '.join(missing)}")
     summary_path = ROOT / arms[0].rig / "benchmarks" / "runs" / args.run_id / "dtype-summary.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
+    (summary_path.parent / "engine-env.txt").write_text((ENGINE_ENV or "(none: image defaults)") + "\n")
     results = json.loads(summary_path.read_text())["arms"] if summary_path.exists() else []
     done = {r["encoding"] for r in results if r.get("status") in ("ok", "failed")}
     for i, arm in enumerate(arms):

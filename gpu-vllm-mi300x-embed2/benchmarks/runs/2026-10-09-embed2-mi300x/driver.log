@@ -1,0 +1,63 @@
+2026-10-09T15:41:42Z queue.sh stopped (it matched its own launcher); embed_run started directly
+vllm-gen ready after 162.0s
+vllm-embed ready after Nones
+vllm-embed did not start; log filed
+2026-10-09T15:46:12Z restart on the 2026-10-09 nightly (sweep digest's transformers cannot parse embedding_gemma2)
+vllm-gen ready after 161.8s
+vllm-embed ready after 81.3s
+{
+ "reference": {
+  "model": "google/embeddinggemma-2",
+  "revision": "914f7f8",
+  "device": "cpu",
+  "torch": "2.14.1+cpu",
+  "transformers": "5.19.0",
+  "sentence_transformers": "6.1.0"
+ },
+ "768": {
+  "dims": 768,
+  "cos_min": 0.99988,
+  "cos_mean": 0.999941,
+  "cos_long_text": 0.999986,
+  "top_doc_agrees": 8,
+  "queries": 8
+ },
+ "512": {
+  "error": "{\"error\":{\"message\":\"Model 'google/embeddinggemma-2' does not support Matryoshka embeddings; dimensions must be unset (received dimensions=512).\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}"
+ },
+ "256": {
+  "error": "{\"error\":{\"message\":\"Model 'google/embeddinggemma-2' does not support Matryoshka embeddings; dimensions must be unset (received dimensions=256).\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}"
+ },
+ "128": {
+  "error": "{\"error\":{\"message\":\"Model 'google/embeddinggemma-2' does not support Matryoshka embeddings; dimensions must be unset (received dimensions=128).\",\"type\":\"BadRequestError\",\"param\":null,\"code\":400}}"
+ }
+}
+embed c1 in128: {'completed': 64, 'duration': 2.3362753439996595, 'request_throughput': 27.394031343254774, 'total_input_tokens': 8192, 'total_token_throughput': 3506.436011936611, 'mean_e2el_ms': 36.23692037507453, 'median_e2el_ms': 36.21019900037936, 'p99_e2el_ms': 38.929857390012316}
+embed c16 in128: {'completed': 256, 'duration': 1.116033855999376, 'request_throughput': 229.3837222086416, 'total_input_tokens': 32768, 'total_token_throughput': 29361.116442706123, 'mean_e2el_ms': 67.88537562499286, 'median_e2el_ms': 66.46252000018649, 'p99_e2el_ms': 116.01415184995858}
+embed c128 in128: {'completed': 2048, 'duration': 2.4713368259999697, 'request_throughput': 828.7012836347485, 'total_input_tokens': 262144, 'total_token_throughput': 106073.76430524781, 'mean_e2el_ms': 148.5605163710977, 'median_e2el_ms': 130.80675349965531, 'p99_e2el_ms': 366.20190577992616}
+embed c1 in1024: {'completed': 64, 'duration': 2.3995708399997966, 'request_throughput': 26.671435963943214, 'total_input_tokens': 65536, 'total_token_throughput': 27311.55042707785, 'mean_e2el_ms': 37.22985012498725, 'median_e2el_ms': 36.95351750047848, 'p99_e2el_ms': 45.36885773031825}
+embed c16 in1024: {'completed': 256, 'duration': 1.4326915929996176, 'request_throughput': 178.68465289449657, 'total_input_tokens': 262144, 'total_token_throughput': 182973.08456396448, 'mean_e2el_ms': 87.32764182812502, 'median_e2el_ms': 84.37027450008827, 'p99_e2el_ms': 131.56638559985367}
+embed c128 in1024: {'completed': 2048, 'duration': 9.463019838000037, 'request_throughput': 216.42139983432972, 'total_input_tokens': 2097152, 'total_token_throughput': 221615.51343035363, 'mean_e2el_ms': 573.4119852670933, 'median_e2el_ms': 577.5921005001692, 'p99_e2el_ms': 700.4151406702658}
+embed c1 in4096: {'completed': 64, 'duration': 2.9746180120000645, 'request_throughput': 21.515367600752164, 'total_input_tokens': 262144, 'total_token_throughput': 88126.94569268086, 'mean_e2el_ms': 46.21292073443328, 'median_e2el_ms': 46.74513100007971, 'p99_e2el_ms': 49.892857220256694}
+embed c16 in4096: {'completed': 256, 'duration': 6.117489972999465, 'request_throughput': 41.847228377961805, 'total_input_tokens': 1048576, 'total_token_throughput': 171406.24743613155, 'mean_e2el_ms': 372.18170280859295, 'median_e2el_ms': 379.08005000008416, 'p99_e2el_ms': 405.28770039995777}
+embed c128 in4096: {'completed': 2048, 'duration': 49.2285183669992, 'request_throughput': 41.60190206684945, 'total_input_tokens': 8388608, 'total_token_throughput': 170401.39086581534, 'mean_e2el_ms': 2981.510178072757, 'median_e2el_ms': 3068.3092955000575, 'p99_e2el_ms': 3076.6124359100468}
+gen c8: {'completed': 32, 'duration': 19.1578868459992, 'request_throughput': 1.6703303583131173, 'total_input_tokens': 32768, 'total_token_throughput': 2565.627430368948, 'output_throughput': 855.209143456316, 'median_ttft_ms': 313.7467149999793, 'median_tpot_ms': 8.16664586399243}
+gen c64: {'completed': 256, 'duration': 47.75725093000074, 'request_throughput': 5.3604425509170746, 'total_input_tokens': 262144, 'total_token_throughput': 8233.639758208627, 'output_throughput': 2744.546586069542, 'median_ttft_ms': 1383.4382820004976, 'median_tpot_ms': 20.71326072407102}
+gen c8 under embed load: {'completed': 32, 'duration': 17.819629473000532, 'request_throughput': 1.7957724681360463, 'total_input_tokens': 32768, 'total_token_throughput': 2758.3065110569673, 'output_throughput': 919.4355036856557, 'median_ttft_ms': 313.81791300009354, 'median_tpot_ms': 8.118920202543446}
+gen c64 under embed load: {'completed': 256, 'duration': 54.40381645799971, 'request_throughput': 4.705552232675341, 'total_input_tokens': 262144, 'total_token_throughput': 7227.728229389324, 'output_throughput': 2409.2427431297747, 'median_ttft_ms': 1388.135395000063, 'median_tpot_ms': 21.522207159490964}
+embed c1 in1024 under gen load: {'completed': 64, 'duration': 87.40727146900008, 'request_throughput': 0.7322045285751573, 'total_input_tokens': 65536, 'total_token_throughput': 749.777437260961, 'mean_e2el_ms': 1365.3681824218183, 'median_e2el_ms': 1267.2691795005449, 'p99_e2el_ms': 3332.069755559996}
+embed c16 in1024 under gen load: {'completed': 256, 'duration': 3.9276365360001364, 'request_throughput': 65.17914721831865, 'total_input_tokens': 262144, 'total_token_throughput': 66743.4467515583, 'mean_e2el_ms': 243.73044787499865, 'median_e2el_ms': 245.00763649984947, 'p99_e2el_ms': 268.91086370001176}
+embed c128 in1024 under gen load: {'completed': 2048, 'duration': 17.94065056999989, 'request_throughput': 114.15416581518163, 'total_input_tokens': 2097152, 'total_token_throughput': 116893.86579474599, 'mean_e2el_ms': 1103.2492717958978, 'median_e2el_ms': 1228.1360295000923, 'p99_e2el_ms': 1295.1063093001812}
+wrote /home/xbill/gemma4-dev/gpu-vllm-mi300x-embed2/benchmarks/runs/2026-10-09-embed2-mi300x/results.json
+2026-10-09T16:03:17Z rerun gen_under_embed: wait for requests in flight before measuring
+gen c8 under embed load: {'completed': 32, 'duration': 17.847243918999993, 'request_throughput': 1.7929939292157668, 'total_input_tokens': 32768, 'total_token_throughput': 2754.038675275418, 'output_throughput': 918.0128917584726, 'median_ttft_ms': 313.617923000038, 'median_tpot_ms': 8.116415354206927}
+gen c64 under embed load: {'completed': 256, 'duration': 47.787830236000445, 'request_throughput': 5.357012417926127, 'total_input_tokens': 262144, 'total_token_throughput': 8228.37107393453, 'output_throughput': 2742.790357978177, 'median_ttft_ms': 1412.9305815004045, 'median_tpot_ms': 20.62750574559722}
+wrote /home/xbill/gemma4-dev/gpu-vllm-mi300x-embed2/benchmarks/runs/2026-10-09-embed2-mi300x/results.json
+2026-10-09T16:10:33Z rerun gen_under_embed: wait on request lines in the server log, 6x longer load, overlap checked from result timestamps
+gen c8 under embed load: {'completed': 32, 'duration': 16.922475648000727, 'request_throughput': 1.8909762770898464, 'total_input_tokens': 32768, 'total_token_throughput': 2904.539561610004, 'output_throughput': 968.1798538700014, 'median_ttft_ms': 46.57398499966803, 'median_tpot_ms': 8.16298904500971}
+gen c64 under embed load: {'completed': 256, 'duration': 39.73912834600014, 'request_throughput': 6.442013467710273, 'total_input_tokens': 262144, 'total_token_throughput': 9894.932686402979, 'output_throughput': 3298.31089546766, 'median_ttft_ms': 147.71380299998782, 'median_tpot_ms': 19.093233445204916}
+wrote /home/xbill/gemma4-dev/gpu-vllm-mi300x-embed2/benchmarks/runs/2026-10-09-embed2-mi300x/results.json
+2026-10-09T16:24:36Z rerun gen_under_embed with a 20-minute wait for the background load
+gen c8 under embed load: {'completed': 32, 'duration': 68.25871342499977, 'request_throughput': 0.4688046169396447, 'total_input_tokens': 32768, 'total_token_throughput': 720.0838916192943, 'output_throughput': 240.0279638730981, 'median_ttft_ms': 131.22681100048794, 'median_tpot_ms': 33.16180427788686}
+gen c64 under embed load: {'completed': 256, 'duration': 91.25396358600028, 'request_throughput': 2.805357596974278, 'total_input_tokens': 262144, 'total_token_throughput': 4309.02926895249, 'output_throughput': 1436.3430896508303, 'median_ttft_ms': 252.0513605004453, 'median_tpot_ms': 44.052922824853525}
+wrote /home/xbill/gemma4-dev/gpu-vllm-mi300x-embed2/benchmarks/runs/2026-10-09-embed2-mi300x/results.json

@@ -1,0 +1,187 @@
+(APIServer pid=1) INFO 10-09 15:42:04 [api_utils.py:347] 
+(APIServer pid=1) INFO 10-09 15:42:04 [api_utils.py:347]        █     █     █▄   ▄█
+(APIServer pid=1) INFO 10-09 15:42:04 [api_utils.py:347]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.31.1rc1.dev23+g43b4aaea3
+(APIServer pid=1) INFO 10-09 15:42:04 [api_utils.py:347]   █▄█▀ █     █     █     █  model   xbill9/gemma-4-12B-it-qat-q4_0-fp8-text
+(APIServer pid=1) INFO 10-09 15:42:04 [api_utils.py:347]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=1) INFO 10-09 15:42:04 [api_utils.py:347] 
+(APIServer pid=1) INFO 10-09 15:42:04 [api_utils.py:286] non-default args: {'model_tag': 'xbill9/gemma-4-12B-it-qat-q4_0-fp8-text', 'host': '0.0.0.0', 'model': 'xbill9/gemma-4-12B-it-qat-q4_0-fp8-text', 'max_model_len': 32768, 'gpu_memory_utilization': 0.7}
+(APIServer pid=1) INFO 10-09 15:42:11 [model.py:730] Resolved architecture: Gemma4ForCausalLM
+(APIServer pid=1) INFO 10-09 15:42:11 [model.py:2141] Using max model len 32768
+[aiter] import [module_aiter_core] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_aiter_core.so
+(APIServer pid=1) WARNING 10-09 15:42:12 [indexer_topk.py:35] Failed to import the DeepSelect extension (vllm._deepselect_C): No module named 'vllm._deepselect_C'
+(APIServer pid=1) INFO 10-09 15:42:12 [scheduler.py:308] Chunked prefill is enabled with max_num_batched_tokens=16384.
+(APIServer pid=1) INFO 10-09 15:42:12 [config.py:278] Gemma4 model has heterogeneous head dimensions {'sliding_attention': 256, 'full_attention': 512}. FA4 not available, forcing TRITON_ATTN backend.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+(APIServer pid=1) INFO 10-09 15:42:13 [kernel.py:463] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['native'])
+(EngineCore pid=206) INFO 10-09 15:42:24 [parallel_state.py:1864] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_1b30865287174d02b1d704971acfef8a backend=nccl
+(EngineCore pid=206) INFO 10-09 15:42:24 [parallel_state.py:2308] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=206) INFO 10-09 15:42:24 [gpu_worker.py:501] Using V2 Model Runner
+W1009 15:42:25.167491     206 queue_controller.cpp:170] [queue-intercept] device-memory ring-buffer requested but profiling requires system-memory InterceptQueue; falling back to system-memory ring for agent 1010074784 (priority and CU-mask from the descriptor are not preserved)
+(EngineCore pid=206) INFO 10-09 15:42:25 [model_runner.py:381] Loading model from scratch...
+(EngineCore pid=206) INFO 10-09 15:42:25 [__init__.py:765] Selected RowWiseTorchFP8ScaledMMLinearKernel for CompressedTensorsW8A8Fp8
+(EngineCore pid=206) INFO 10-09 15:42:25 [rocm.py:745] Using TRITON_ATTN backend (selected via --attention-backend).
+(EngineCore pid=206) WARNING 10-09 15:42:25 [activation.py:441] [ROCm] PyTorch's native GELU with tanh approximation is unstable with torch.compile. For native implementation, fallback to 'none' approximation. The custom kernel implementation is unaffected.
+(EngineCore pid=206) WARNING 10-09 15:42:26 [compilation.py:1373] Op 'sparse_attn_indexer' doesn't exist (or wasn't imported/registered), enabling with '+sparse_attn_indexer' has no effect
+(EngineCore pid=206) INFO 10-09 15:42:26 [base_loader.py:81] Initializing model took 0.573173 seconds
+(EngineCore pid=206) INFO 10-09 15:42:26 [weight_utils.py:1063] Filesystem type for checkpoints: EXT4. Checkpoint size: 12.04 GiB. Available RAM: 230.12 GiB.
+(EngineCore pid=206) INFO 10-09 15:42:26 [weight_utils.py:1086] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+
+Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.64s/it]
+
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:01<00:00,  1.64s/it]
+
+(EngineCore pid=206) INFO 10-09 15:42:28 [default_loader.py:484] Loading weights took 1.78 seconds
+(EngineCore pid=206) INFO 10-09 15:42:28 [model_runner.py:413] Model loading took 12.65 GiB memory and 3.183872 seconds
+(EngineCore pid=206) INFO 10-09 15:42:28 [torch_utils.py:287] Reducing Torch threads from 20 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
+(EngineCore pid=206) INFO 10-09 15:42:28 [utils.py:347] Using LBNHC KV cache layout.
+(EngineCore pid=206) INFO 10-09 15:42:29 [monitor.py:40] [backbone] Starting torch.compile
+(EngineCore pid=206) INFO 10-09 15:42:41 [backends.py:1104] [backbone] Using cache directory: /root/.cache/vllm/torch_compile_cache/6331f4c025/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=206) INFO 10-09 15:42:41 [backends.py:1166] [backbone] Dynamo bytecode transform time: 12.21 s
+(EngineCore pid=206) INFO 10-09 15:43:08 [backends.py:398] [backbone] Compiling a graph for compile range (1, 16384) takes 26.31 s
+(EngineCore pid=206) INFO 10-09 15:43:15 [backends.py:927] collected artifacts: 49 entries, 5 artifacts, 18643763 bytes total
+(EngineCore pid=206) INFO 10-09 15:43:15 [decorators.py:743] [backbone] saved AOT compiled function to /root/.cache/vllm/torch_compile_cache/torch_aot_compile/679bb6e1a13924dc68f11c0f6f782562312a93cfb55bad87ba4f998ab7e7b01a/rank_0_0/model
+(EngineCore pid=206) INFO 10-09 15:43:15 [monitor.py:62] [backbone] torch.compile took 45.75 s in total
+(EngineCore pid=206) INFO 10-09 15:43:16 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.93 s
+W1009 15:43:18.023303     206 queue_controller.cpp:170] [queue-intercept] device-memory ring-buffer requested but profiling requires system-memory InterceptQueue; falling back to system-memory ring for agent 1010074784 (priority and CU-mask from the descriptor are not preserved)
+
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]
+Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/51 [00:01<01:04,  1.29s/it]
+Capturing CUDA graphs (PIECEWISE):   6%|▌         | 3/51 [00:01<00:18,  2.60it/s]
+Capturing CUDA graphs (PIECEWISE):  10%|▉         | 5/51 [00:01<00:10,  4.56it/s]
+Capturing CUDA graphs (PIECEWISE):  14%|█▎        | 7/51 [00:01<00:06,  6.52it/s]
+Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:01<00:05,  8.36it/s]
+Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 11/51 [00:01<00:04,  9.99it/s]
+Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 13/51 [00:02<00:03, 11.32it/s]
+Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 15/51 [00:02<00:02, 12.37it/s]
+Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 17/51 [00:02<00:02, 13.22it/s]
+Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:03<00:08,  3.86it/s]
+Capturing CUDA graphs (PIECEWISE):  41%|████      | 21/51 [00:03<00:05,  5.00it/s]
+Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 23/51 [00:03<00:04,  6.31it/s]
+Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:04<00:03,  7.69it/s]
+Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:04<00:02,  9.09it/s]
+Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:04<00:02, 10.43it/s]
+Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:04<00:01, 11.62it/s]
+Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:04<00:01, 12.61it/s]
+Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:04<00:01, 13.36it/s]
+Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:04<00:01, 13.84it/s]
+Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:04<00:00, 14.37it/s]
+Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:05<00:00, 14.76it/s]
+Capturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:05<00:00, 14.92it/s]
+Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:05<00:00, 15.07it/s]
+Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:06<00:00,  4.28it/s]
+Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:07<00:00,  2.84it/s]
+Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:09<00:00,  2.30it/s]
+Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:09<00:00,  5.61it/s]
+
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]
+Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00, 20.81it/s]
+(EngineCore pid=206) INFO 10-09 15:43:27 [model_runner.py:1109] Graph capturing finished in 10 secs, took 5.12 GiB
+(EngineCore pid=206) INFO 10-09 15:43:28 [gpu_worker.py:726] Available KV cache memory: 112.56 GiB
+(EngineCore pid=206) INFO 10-09 15:43:28 [gpu_worker.py:741] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.7000 is equivalent to --gpu-memory-utilization=0.6728 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.7272. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=206) INFO 10-09 15:43:28 [kv_cache_utils.py:2481] GPU KV cache size: 351,120 tokens, Maximum concurrency for 32,768 tokens per request: 10.72x
+(EngineCore pid=206) INFO 10-09 15:43:28 [kernel_warmup.py:173] JIT kernel warmup starting.
+
+JIT kernel warmup (76 compile keys):   0%|          | 0/4 [00:00<?, ?kernel/s]
+JIT kernel warmup (76 compile keys):  25%|██▌       | 1/4 [00:17<00:52, 17.49s/kernel, _DecoratedTritonJitKernel (12 keys)]
+JIT kernel warmup (76 compile keys):  50%|█████     | 2/4 [00:19<00:16,  8.17s/kernel, _DecoratedTritonJitKernel (16 keys)]
+JIT kernel warmup (76 compile keys):  75%|███████▌  | 3/4 [00:28<00:08,  8.53s/kernel, _DecoratedTritonJitKernel (32 keys)]
+JIT kernel warmup (76 compile keys): 100%|██████████| 4/4 [00:34<00:00,  7.64s/kernel, _DecoratedTritonJitKernel (16 keys)]
+JIT kernel warmup (76 compile keys): 100%|██████████| 4/4 [00:34<00:00,  8.59s/kernel, _DecoratedTritonJitKernel (16 keys)]
+(EngineCore pid=206) INFO 10-09 15:44:02 [kernel_warmup.py:186] JIT kernel warmup finished in 34.52s.
+(EngineCore pid=206) INFO 10-09 15:44:02 [ll_bf16.py:30] cuteDSL (CUTLASS Python) not available, ll_bf16_gemm disabled
+W1009 15:44:04.776548     206 queue_controller.cpp:170] [queue-intercept] device-memory ring-buffer requested but profiling requires system-memory InterceptQueue; falling back to system-memory ring for agent 1010074784 (priority and CU-mask from the descriptor are not preserved)
+W1009 15:44:05.965356     206 queue_controller.cpp:170] [queue-intercept] device-memory ring-buffer requested but profiling requires system-memory InterceptQueue; falling back to system-memory ring for agent 1010074784 (priority and CU-mask from the descriptor are not preserved)
+
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]
+Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/51 [00:00<00:21,  2.28it/s]
+Capturing CUDA graphs (PIECEWISE):   6%|▌         | 3/51 [00:00<00:08,  5.87it/s]
+Capturing CUDA graphs (PIECEWISE):  10%|▉         | 5/51 [00:00<00:05,  8.29it/s]
+Capturing CUDA graphs (PIECEWISE):  14%|█▎        | 7/51 [00:00<00:04, 10.02it/s]
+Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:01<00:03, 11.12it/s]
+Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 11/51 [00:01<00:03, 11.92it/s]
+Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 13/51 [00:01<00:03, 12.53it/s]
+Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 15/51 [00:01<00:02, 12.97it/s]
+Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 17/51 [00:01<00:02, 13.50it/s]
+Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:03<00:09,  3.50it/s]
+Capturing CUDA graphs (PIECEWISE):  41%|████      | 21/51 [00:03<00:06,  4.56it/s]
+Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 23/51 [00:03<00:04,  5.78it/s]
+Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:03<00:03,  7.11it/s]
+Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:03<00:02,  8.50it/s]
+Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:03<00:02,  9.82it/s]
+Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:03<00:01, 10.98it/s]
+Capturing CUDA graphs (PIECEWISE):  65%|██████▍   | 33/51 [00:04<00:01, 12.02it/s]
+Capturing CUDA graphs (PIECEWISE):  69%|██████▊   | 35/51 [00:04<00:01, 12.89it/s]
+Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 37/51 [00:04<00:01, 13.52it/s]
+Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 39/51 [00:04<00:00, 13.89it/s]
+Capturing CUDA graphs (PIECEWISE):  80%|████████  | 41/51 [00:04<00:00, 14.16it/s]
+Capturing CUDA graphs (PIECEWISE):  84%|████████▍ | 43/51 [00:04<00:00, 14.49it/s]
+Capturing CUDA graphs (PIECEWISE):  88%|████████▊ | 45/51 [00:04<00:00, 14.71it/s]
+Capturing CUDA graphs (PIECEWISE):  92%|█████████▏| 47/51 [00:05<00:00,  4.88it/s]
+Capturing CUDA graphs (PIECEWISE):  96%|█████████▌| 49/51 [00:06<00:00,  6.09it/s]
+Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:06<00:00,  7.37it/s]
+Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:06<00:00,  8.29it/s]
+
+Capturing CUDA graphs (FULL):   0%|          | 0/51 [00:00<?, ?it/s]
+Capturing CUDA graphs (FULL):   4%|▍         | 2/51 [00:00<00:02, 19.09it/s]
+Capturing CUDA graphs (FULL):  10%|▉         | 5/51 [00:00<00:02, 19.84it/s]
+Capturing CUDA graphs (FULL):  16%|█▌        | 8/51 [00:00<00:02, 20.23it/s]
+Capturing CUDA graphs (FULL):  22%|██▏       | 11/51 [00:00<00:01, 20.46it/s]
+Capturing CUDA graphs (FULL):  27%|██▋       | 14/51 [00:00<00:01, 20.54it/s]
+Capturing CUDA graphs (FULL):  33%|███▎      | 17/51 [00:00<00:01, 20.60it/s]
+Capturing CUDA graphs (FULL):  39%|███▉      | 20/51 [00:00<00:01, 20.63it/s]
+Capturing CUDA graphs (FULL):  45%|████▌     | 23/51 [00:01<00:01, 20.77it/s]
+Capturing CUDA graphs (FULL):  51%|█████     | 26/51 [00:01<00:01, 20.82it/s]
+Capturing CUDA graphs (FULL):  57%|█████▋    | 29/51 [00:01<00:01, 20.73it/s]
+Capturing CUDA graphs (FULL):  63%|██████▎   | 32/51 [00:01<00:00, 20.86it/s]
+Capturing CUDA graphs (FULL):  69%|██████▊   | 35/51 [00:01<00:00, 20.87it/s]
+Capturing CUDA graphs (FULL):  75%|███████▍  | 38/51 [00:01<00:00, 20.88it/s]
+Capturing CUDA graphs (FULL):  80%|████████  | 41/51 [00:01<00:00, 20.84it/s]
+Capturing CUDA graphs (FULL):  86%|████████▋ | 44/51 [00:02<00:00, 20.87it/s]
+Capturing CUDA graphs (FULL):  92%|█████████▏| 47/51 [00:02<00:00, 20.72it/s]
+Capturing CUDA graphs (FULL):  98%|█████████▊| 50/51 [00:02<00:00, 20.29it/s]
+Capturing CUDA graphs (FULL): 100%|██████████| 51/51 [00:02<00:00, 20.56it/s]
+(EngineCore pid=206) INFO 10-09 15:44:17 [model_runner.py:1109] Graph capturing finished in 9 secs, took 5.19 GiB
+(EngineCore pid=206) INFO 10-09 15:44:17 [gpu_worker.py:933] CUDA graph pool memory: 5.19 GiB (actual), 5.22 GiB (estimated), difference: 0.03 GiB (0.6%).
+(EngineCore pid=206) INFO 10-09 15:44:17 [gpu_worker.py:996] Free memory on device (191.36/191.69 GiB) on startup. Desired GPU memory utilization is (0.7, 134.18 GiB). Actual usage is 14.29 GiB for consumed memory (weights + non-torch), 7.33 GiB for peak activation, and 5.19 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=115135231898` (107.23 GiB) to fit into requested memory, or `--kv-cache-memory=176531873280` (164.41 GiB) to fully utilize gpu memory. Current kv cache memory in use is 112.56 GiB.
+(EngineCore pid=206) INFO 10-09 15:44:17 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=206) INFO 10-09 15:44:18 [core.py:373] init engine (profile, create kv cache, warmup model) took 109.37 s (compilation: 45.75 s)
+(EngineCore pid=206) INFO 10-09 15:44:19 [kv_cache_utils.py:789] kv cache group sizes [16, 16, 16, 16, 16, 64]
+(EngineCore pid=206) INFO 10-09 15:44:19 [kv_cache_utils.py:790] kv lcm block sizes 64
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+(EngineCore pid=206) INFO 10-09 15:44:20 [kernel.py:463] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['native'])
+(APIServer pid=1) INFO 10-09 15:44:20 [entry.py:135] Supported tasks: ['generate']
+(APIServer pid=1) INFO 10-09 15:44:20 [factories.py:76] Scale-out endpoints are disabled. Set --enable-scale-out to enable them.
+(APIServer pid=1) INFO 10-09 15:44:20 [hf.py:648] Detected the chat template content format to be 'openai'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=1) WARNING 10-09 15:44:20 [model.py:1882] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0, 'top_k': 64, 'top_p': 0.95}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=1) INFO 10-09 15:44:20 [entry.py:139] Starting vLLM server on http://0.0.0.0:8000
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:60] Available routes are:
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /openapi.json, Methods: HEAD, GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /docs, Methods: HEAD, GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /docs/oauth2-redirect, Methods: HEAD, GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /redoc, Methods: HEAD, GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /load, Methods: GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /version, Methods: GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /kv_event_sources, Methods: GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /health, Methods: GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /tokenize, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /detokenize, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/models, Methods: GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /ping, Methods: GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /ping, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /invocations, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/responses, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/completions, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/messages, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /generative_scoring, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=1) INFO 10-09 15:44:20 [launcher.py:69] Route: /is_scaling_elastic_ep, Methods: POST
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
