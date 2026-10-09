@@ -1,0 +1,15 @@
+[aiter] import [module_aiter_core] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_aiter_core.so
+(APIServer pid=1) INFO 10-09 15:14:00 [config.py:278] Gemma4 model has heterogeneous head dimensions {'sliding_attention': 256, 'full_attention': 512}. FA4 not available, forcing TRITON_ATTN backend.
+(APIServer pid=1) INFO 10-09 15:14:01 [kernel.py:463] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['native'])
+(EngineCore pid=206) INFO 10-09 15:14:12 [core.py:129] Initializing a V1 LLM engine (v0.31.1rc1.dev23+g43b4aaea3) with config: model='xbill9/gemma-4-12B-it-qat-q4_0-fp8-text', speculative_config=None, tokenizer='xbill9/gemma-4-12B-it-qat-q4_0-fp8-text', skip_tokenizer_init=False, tokenizer_mode=auto, revision=main, tokenizer_revision=main, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len
+(EngineCore pid=206) INFO 10-09 15:14:12 [parallel_state.py:1864] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_e292325d28c146f6a5374f9d771cb595 backend=nccl
+(EngineCore pid=206) INFO 10-09 15:14:13 [__init__.py:765] Selected RowWiseTorchFP8ScaledMMLinearKernel for CompressedTensorsW8A8Fp8
+(EngineCore pid=206) INFO 10-09 15:14:13 [rocm.py:745] Using TRITON_ATTN backend (selected via --attention-backend).
+(EngineCore pid=206) INFO 10-09 15:14:16 [model_runner.py:413] Model loading took 12.65 GiB memory and 3.124808 seconds
+(EngineCore pid=206) INFO 10-09 15:14:29 [backends.py:1104] [backbone] Using cache directory: /root/.cache/vllm/torch_compile_cache/6331f4c025/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=206) INFO 10-09 15:14:29 [backends.py:1166] [backbone] Dynamo bytecode transform time: 11.99 s
+(EngineCore pid=206) INFO 10-09 15:14:56 [backends.py:398] [backbone] Compiling a graph for compile range (1, 16384) takes 26.53 s
+(EngineCore pid=206) INFO 10-09 15:15:03 [backends.py:927] collected artifacts: 49 entries, 5 artifacts, 18347864 bytes total
+(EngineCore pid=206) INFO 10-09 15:15:16 [gpu_worker.py:741] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.9000 is equivalent to --gpu-memory-utilization=0.8728 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9272. To disable, set VLLM_MEMORY_PROFILER_ESTIMAT
+(EngineCore pid=206) INFO 10-09 15:15:16 [kv_cache_utils.py:2481] GPU KV cache size: 470,708 tokens, Maximum concurrency for 32,768 tokens per request: 14.36x
+(EngineCore pid=206) INFO 10-09 15:16:09 [kernel.py:463] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['native'])

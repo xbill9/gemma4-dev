@@ -1,0 +1,20 @@
+[aiter] import [module_aiter_core] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_aiter_core.so
+(APIServer pid=1) INFO 10-09 14:52:43 [config.py:278] Gemma4 model has heterogeneous head dimensions {'sliding_attention': 256, 'full_attention': 512}. FA4 not available, forcing TRITON_ATTN backend.
+(APIServer pid=1) INFO 10-09 14:52:44 [kernel.py:463] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['aiter', 'native'], fused_add_rms_norm=['aiter', 'native'], gelu_and_mul_sparse=['native'])
+(EngineCore pid=206) INFO 10-09 14:52:55 [core.py:129] Initializing a V1 LLM engine (v0.31.1rc1.dev23+g43b4aaea3) with config: model='xbill9/gemma-4-12B-it-qat-q4_0-fp8-text', speculative_config=None, tokenizer='xbill9/gemma-4-12B-it-qat-q4_0-fp8-text', skip_tokenizer_init=False, tokenizer_mode=auto, revision=main, tokenizer_revision=main, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len
+(EngineCore pid=206) INFO 10-09 14:52:55 [parallel_state.py:1864] world_size=1 rank=0 local_rank=0 distributed_init_method=tcp://172.17.0.2:33373 backend=nccl
+[aiter] import [module_aiter_core] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_aiter_core.so
+[aiter] merge tuned file under model_configs/ and configs/ /usr/local/lib/python3.12/dist-packages/aiter/configs/a8w8_bpreshuffle_tuned_gemm.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/a8w8_bpreshuffle_tuned_gemm_glm47.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/dsv3_a8w8_bpreshuffle_tuned_gemm.csv:/usr/local/lib/python3.12/dist-packages/aite
+[aiter] merge tuned file under model_configs/ and configs/ /usr/local/lib/python3.12/dist-packages/aiter/configs/a8w8_tuned_gemm.csv:/usr/local/lib/python3.12/dist-packages/aiter/configs/model_configs/dsr1_a8w8_tuned_gemm.csv
+(EngineCore pid=206) INFO 10-09 14:52:57 [__init__.py:765] Selected RowWiseTorchFP8ScaledMMLinearKernel for CompressedTensorsW8A8Fp8
+(EngineCore pid=206) INFO 10-09 14:52:57 [rocm.py:745] Using TRITON_ATTN backend (selected via --attention-backend).
+(EngineCore pid=206) INFO 10-09 14:53:00 [model_runner.py:413] Model loading took 12.65 GiB memory and 4.632660 seconds
+(EngineCore pid=206) INFO 10-09 14:53:10 [backends.py:1104] [backbone] Using cache directory: /root/.cache/vllm/torch_compile_cache/ac7290d365/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=206) INFO 10-09 14:53:10 [backends.py:1166] [backbone] Dynamo bytecode transform time: 9.51 s
+(EngineCore pid=206) INFO 10-09 14:53:35 [backends.py:398] [backbone] Compiling a graph for compile range (1, 16384) takes 23.74 s
+(EngineCore pid=206) INFO 10-09 14:53:41 [backends.py:927] collected artifacts: 49 entries, 5 artifacts, 11052867 bytes total
+[aiter] import [module_rmsnorm_quant] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_rmsnorm_quant.so
+[aiter] import [module_quant] under /usr/local/lib/python3.12/dist-packages/aiter/jit/module_quant.so
+(EngineCore pid=206) INFO 10-09 14:53:56 [gpu_worker.py:741] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.9000 is equivalent to --gpu-memory-utilization=0.8726 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9274. To disable, set VLLM_MEMORY_PROFILER_ESTIMAT
+(EngineCore pid=206) INFO 10-09 14:53:56 [kv_cache_utils.py:2481] GPU KV cache size: 471,183 tokens, Maximum concurrency for 32,768 tokens per request: 14.38x
+(EngineCore pid=206) INFO 10-09 14:54:56 [kernel.py:463] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['aiter', 'native'], fused_add_rms_norm=['aiter', 'native'], gelu_and_mul_sparse=['native'])
