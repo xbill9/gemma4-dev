@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 From E2B to 31B on an AMD MI300X: fp8 Overtakes bf16 From 12B Up</title>
+  <meta name="description" content="Every Gemma 4 size from E2B to 31B served on one AMD Instinct MI300X in bf16, fp8, int8 W8A8 and int4 W4A16, on the same vLLM image. fp8 goes from 0.75x bf16 for one request at E2B to 1.23x at 31B and is faster than bf16 in every cell at 12B and 31B. The mixture-of-experts 26B sits at bf16&#x27;s pace, and the 4-bit builds run at 0.14x to 0.69x at every size." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to serving every Gemma 4
+size, E2B, E4B, 12B, 26B-A4B and 31B, on one AMD Instinct MI300X through
+vLLM in four weight formats, with each build timed across the same grid
+of request counts and prompt lengths on the same image. Every log,
+report and script is committed.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-sizes/medium/img/devto-mi300x-sizes-cover.2c57f68d.jpg" alt="Gemma 4 From E2B to 31B on an AMD MI300X: fp8 Overtakes bf16 From 12B Up" /></figure>
+<p>The answer to "which format should I serve?" changes with the size of
+the model. At E2B, bf16 is fastest for a single user and fp8 only
+catches it with 8 or more requests in flight. From 12B up, fp8 is faster
+than bf16 in every cell: 1.12x to 1.41x at 12B and 1.20x to 1.45x at
+31B. The 4-bit builds stay at 0.14x to 0.69x of bf16 at every size.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b">https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b</a></p>
+<hr />
+<h4 id="why-sweep-every-size">Why Sweep Every Size?</h4>
+<p>The E2B article in this series found fp8 at 0.75x bf16 for one
+request on this card, and concluded that a small model gains nothing
+from smaller weights when the card has 192 GB. A small model also reads
+few bytes per output token. The larger sizes read many more, so they
+test whether a format that halves the bytes pays off once reading
+weights becomes the bigger cost.</p>
+<p>Memory still decides nothing here. 31B at bf16 loads in 58.99 GiB and
+leaves a cache of 121,290 tokens.</p>
+<hr />
+<h4 id="the-sizes-and-the-builds">The Sizes and the Builds</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-sizes/medium/img/devto-gemma4-sizes-mi300x-formats-table-1.png"
+alt="Table: Size, bf16 checkpoint, bf16 weights, Formats served" /></p>
+<p>Every quantized build starts from Google's quantization-aware-trained
+(QAT) <code>-qat-q4_0-unquantized</code> release for its size, text
+only, and is on Hugging Face under
+<code>xbill9/gemma-4-&lt;size&gt;-it-qat-*</code>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-sizes/medium/img/devto-gemma4-sizes-mi300x-formats-table-2.png"
+alt="Table: Format, Linear layers, Built with" /></p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An AMD Developer Cloud account with an MI300X droplet
+(<code>gpu-mi300x1-192gb</code>), and its SSH key</li>
+<li>A Hugging Face token</li>
+<li>A clone:
+<code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+<li>The droplet prepared with <code>make scaffold</code> from <a
+href="https://github.com/xbill9/amd-gputools">amd-gputools</a>, which
+installs Docker, adds the GPU groups and pulls the vLLM image</li>
+</ul>
+<hr />
+<h4 id="step-1--build-the-larger-repacks">Step 1 — Build the Larger
+Repacks</h4>
+<p>The E2B article has the build commands. Two things change at 26B-A4B,
+a mixture-of-experts model with 128 experts per layer. Google's QAT
+release stores each layer's experts as two fused banks,
+<code>experts.gate_up_proj</code> and <code>experts.down_proj</code>,
+and the fp8 and int8 builders split them into one module per expert,
+<code>experts.{i}.{gate,up,down}_proj</code>, the layout vLLM's
+compressed-tensors MoE methods load. The router,
+<code>router.proj</code>, stays bf16.</p>
+<pre class="bash"><code>python3 repack/fp8_text.py build src-26b ct-text-26b/config.json \
+  ct-text-26b/model.safetensors.index.json gemma-4-26B-A4B-it-qat-q4_0-fp8-text
+python3 repack/fp8_text.py verify src-26b gemma-4-26B-A4B-it-qat-q4_0-fp8-text</code></pre>
+<hr />
+<h4 id="step-2--serve-each-size-on-one-pinned-image">Step 2 — Serve Each
+Size on One Pinned Image</h4>
+<p><code>dtype_sweep.py --size</code> serves each size's builds one
+after another through the same server code, on the image digest the E2B
+sweep used, with the same settings: <code>--max-model-len 32768</code>,
+<code>--gpu-memory-utilization 0.90</code>, prefix caching on and no
+<code>--quantization</code> flag. 26B-A4B and 31B ran three formats
+each:</p>
+<pre class="bash"><code>python3 -u dtype_sweep.py --droplet $DROPLET --image $IMG --run-id $RID --size 31b --only bf16 fp8 q4w4a16</code></pre>
+<p>Each build is checked at boot for the kernel vLLM chose and the
+memory it loaded:</p>
+<pre class="text"><code>=== [1/7] bf16 (gpu-vllm-mi300x-31b)
+    ok: loading 58.99 GiB, KV 121290, kernels []
+=== [2/7] q4w4a16 (gpu-vllm-mi300x-31b-q4w4a16)
+    ok: loading 18.7 GiB, KV 170112, kernels [&#39;TritonW4A16LinearKernel&#39;]
+=== [4/7] fp8 (gpu-vllm-mi300x-31b-fp8)
+    ok: loading 30.63 GiB, KV 155730, kernels [&#39;RowWiseTorchFP8ScaledMMLinearKernel&#39;]</code></pre>
+<hr />
+<h4 id="step-3--sweep-request-count-and-prompt-length">Step 3 — Sweep
+Request Count and Prompt Length</h4>
+<p>Every build runs 1, 8 and 64 requests at once against prompts of 128,
+1,024 and 8,192 tokens, 512 output tokens each, three repeats per cell,
+with a fresh random seed for every run so no prompt is served from the
+prefix cache.</p>
+<hr />
+<h4 id="does-fp8-pay-off-as-the-model-grows">Does fp8 Pay Off as the
+Model Grows?</h4>
+<p>fp8 against bf16 on the same card, for one request with a 128-token
+prompt and across all nine cells:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-sizes/medium/img/devto-gemma4-sizes-mi300x-formats-table-3.png"
+alt="Table: Size, One request, Range, 9 cells, Cells where fp8 is faster" /></p>
+<p>Among the dense models the single-request figure rises with size,
+from 0.75x at E2B to 1.23x at 31B, and crosses bf16 between E4B and 12B.
+Above that crossing fp8 wins everywhere, with the largest margin at 8
+requests: 1.41x at 12B and 1.45x at 31B.</p>
+<p>Per GiB of weights loaded, bf16 at 31B produces 1.0 output token per
+second for one request and fp8 2.3, so halving the bytes more than
+doubles what each byte yields. At E2B the two are level, 36.5 against
+36.6.</p>
+<hr />
+<h4 id="why-the-mixture-of-experts-model-sits-lower">Why the
+Mixture-of-Experts Model Sits Lower</h4>
+<p>26B-A4B routes each token through a few of its 128 experts, so it
+reads far fewer weights per token than its 48.54 GiB suggests. Its bf16
+speed for one request, 224 output tokens per second, sits next to E4B's
+239 and far above 12B's 134, and fp8 lands where it does for E4B: 0.99x
+for one request, ahead from 8 requests up.</p>
+<p>All three 26B-A4B builds ran on vLLM's default expert-kernel
+settings, because the image ships no tuned configuration for this expert
+shape on the MI300X:</p>
+<pre class="text"><code>[fused_moe.py:1163] Using default MoE config. Performance might be sub-optimal! Config file not found at .../fused_moe/configs/E=128,N=704,device_name=AMD_Instinct_MI300X,dtype=fp8_w8a8.json</code></pre>
+<p>So the 26B-A4B comparison is between three untuned paths, and a tuned
+configuration could move any of them.</p>
+<hr />
+<h4 id="how-fast-is-each-size">How Fast Is Each Size?</h4>
+<p>Output tokens per second at 1 request (128-token prompt), and at 8
+and 64 requests (1,024-token prompts):</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-sizes/medium/img/devto-gemma4-sizes-mi300x-formats-table-4.png"
+alt="Table: Size, bf16, fp8, q4w4a16" /></p>
+<hr />
+<h4 id="the-4-bit-builds-stay-slow-at-every-size">The 4-Bit Builds Stay
+Slow at Every Size</h4>
+<p>The 4-bit builds keep the QAT grid exactly and load in about a third
+of bf16's memory, 18.70 GiB at 31B against 58.99, which grows the KV
+cache by 1.40x there. They run at 0.14x to 0.63x of bf16 at the four
+dense sizes, and 0.27x to 0.69x at 26B-A4B. The dense sizes use
+<code>TritonW4A16LinearKernel</code>, which unpacks the weights to bf16
+before each multiply, and 26B-A4B's experts use vLLM's Triton 4-bit
+expert path:</p>
+<pre class="text"><code>Using CompressedTensorsWNA16MoEMethod
+Using &#39;TRITON&#39; WNA16 MoE backend.</code></pre>
+<p>The gap closes with more requests and with longer prompts at every
+size. Averaged over prompt lengths, 31B's 4-bit build runs at 0.20x bf16
+for one request and 0.53x for 64.</p>
+<p>int8 W8A8 sits between the two at every size it ran: 0.29x to 0.87x
+at E2B, 0.31x to 0.82x at E4B and 0.39x to 0.93x at 12B, below fp8 in
+every cell but one, E2B's noisiest.</p>
+<hr />
+<h4
+id="mag_right-tip-int4-embedding-tables-cost-more-at-larger-sizes">🔎
+Tip: int4 Embedding Tables Cost More at Larger Sizes</h4>
+<p>The <code>emb4</code> builds pack the vocabulary tables as int4.
+Against the same format with bf16 tables, median over nine cells:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-sizes/medium/img/devto-gemma4-sizes-mi300x-formats-table-5.png"
+alt="Table: Pair, E2B, E4B, 12B" /></p>
+<p>They save 4.31 GiB at E4B and 0.82 GiB at 12B for a few percent of
+speed. On this card that memory is not needed.</p>
+<hr />
+<h4 id="mag_right-tip-two-int8-builds-do-not-load-on-this-image">🔎 Tip:
+Two int8 Builds Do Not Load on This Image</h4>
+<p>The E4B and 12B <code>w8a8emb4</code> builds, made by
+<code>w8a8_emb4.py</code> for TPU serving, stop at model load on the
+stock ROCm image:</p>
+<pre class="text"><code>AttributeError: &#39;VocabParallelEmbedding&#39; object has no attribute &#39;weight&#39;</code></pre>
+<p>The E2B <code>w8a8emb4</code> build, made by a different script for
+the NVIDIA T4, loads and serves. The <code>w8a8_emb4.py</code> builds,
+as published, do not serve on this image.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-sizes/medium/img/devto-gemma4-sizes-mi300x-formats-table-6.png"
+alt="Table: Size, Fastest for one user, Fastest for many, Smallest that serves" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For 12B and 31B, serve fp8: it is faster than bf16 in every cell and
+halves the weights. For E2B and E4B, bf16 for a single user and fp8 when
+many requests share the card. For 26B-A4B, fp8, which matches bf16 for
+one request and leads from 8 up. The 4-bit builds belong on cards where
+memory runs out first; on an MI300X they cost a factor of two to seven
+in speed at every size.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<p>Powering a droplet off does not stop billing. Destroy it in the AMD
+Developer Cloud console when the sweep finishes; the MI300X droplet
+bills $1.99 an hour until then.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find how the best weight format for
+Gemma 4 on an AMD MI300X changes with model size. The key to the
+solution was serving every size and format through one server and one
+pinned vLLM image, checking the kernel and loaded memory at boot, and
+timing every build on the same grid. The results were:</p>
+<ul>
+<li>🟢 fp8 overtakes bf16 between E4B and 12B, and is faster in every
+cell at 12B (1.12x to 1.41x) and 31B (1.20x to 1.45x)</li>
+<li>🟢 At 31B fp8 halves the weights to 30.63 GiB and serves 71 output
+tokens per second for one request against bf16's 58</li>
+<li>🟢 26B-A4B behaves like a small model: fp8 at 0.99x for one request,
+up to 1.23x with more</li>
+<li>⚠️ int4 tables cost a median of 0.4% to 6.5% of speed and save
+memory this card does not need</li>
+<li>⚠️ 26B-A4B ran on vLLM's untuned default expert-kernel settings in
+every format</li>
+<li>❌ The 4-bit builds run at 0.14x to 0.69x of bf16 at every size</li>
+<li>❌ The E4B and 12B <code>w8a8emb4</code> builds do not load on the
+stock ROCm image</li>
+</ul>
+<p>Scope: one MI300X droplet in AMD Developer Cloud's atl1 region, vLLM
+<code>0.31.1rc1.dev23+g43b4aaea3</code> at
+<code>vllm/vllm-openai-rocm@sha256:ec62abec…</code>, served between
+2026-10-07 and 2026-10-09 with three repeats per cell. 26B-A4B and 31B
+ran bf16, fp8 and int4 only. Each bf16 build is Google's original
+release and each quantized build is made from Google's QAT release, so
+bf16 differs in its weights as well as its format. Repeat spread stayed
+at 5.7% or less in every cell above E2B; at E2B one cell with 64
+requests and 8,192-token prompts varied by up to 15.7%. No accuracy
+benchmark was run on this card. The repacked checkpoints are unofficial
+and derived from Google's release under Apache 2.0. Parts of the
+analysis and writing were done with AI assistance (Claude); every figure
+comes from the committed output files.</p>
+<p>The strategy for choosing a weight format for every Gemma 4 size on
+an AMD MI300X was validated with an incremental step by step
+approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Code, logs, reports and this article's evidence: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b">https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b</a></li>
+<li>The E2B article, with every E2B build and the build commands: <a
+href="https://dev.to/gde/gemma-4-e2b-on-an-amd-mi300x-which-weight-format-should-you-serve-1a01">https://dev.to/gde/gemma-4-e2b-on-an-amd-mi300x-which-weight-format-should-you-serve-1a01</a></li>
+<li>31B fp8 build: <a
+href="https://huggingface.co/xbill9/gemma-4-31B-it-qat-q4_0-fp8-text">https://huggingface.co/xbill9/gemma-4-31B-it-qat-q4_0-fp8-text</a></li>
+<li>12B fp8 build: <a
+href="https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-fp8-text">https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-fp8-text</a></li>
+<li>26B-A4B fp8 build: <a
+href="https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-fp8-text">https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-fp8-text</a></li>
+<li>Google's QAT source checkpoints: <a
+href="https://huggingface.co/google/gemma-4-31B-it-qat-q4_0-unquantized">https://huggingface.co/google/gemma-4-31B-it-qat-q4_0-unquantized</a></li>
+<li>AMD Instinct MI300X: <a
+href="https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html">https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html</a></li>
+<li>AMD Developer Cloud: <a
+href="https://devcloud.amd.com">https://devcloud.amd.com</a></li>
+</ul>
+</body>
+</html>
