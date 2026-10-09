@@ -1,0 +1,598 @@
+{
+  "arms": [
+    {
+      "encoding": "bf16",
+      "rig": "gpu-vllm-mi300x-4b",
+      "run_dir": "gpu-vllm-mi300x-4b/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "google/gemma-4-E4B-it",
+      "served_from": "huggingface",
+      "boot_seconds": 204.3,
+      "model_loading_gib": 14.79,
+      "kv_tokens": 2794448,
+      "kernels": [],
+      "status": "ok",
+      "report": "gpu-vllm-mi300x-4b/benchmarks/reports/2026-10-07-dtype-sweep-mi300x.json",
+      "cells": [
+        {
+          "concurrency": 1,
+          "input_len": 128,
+          "output_tok_s": 239.16,
+          "tpot_ms_median": 4.16,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 1,
+          "input_len": 1024,
+          "output_tok_s": 224.63,
+          "tpot_ms_median": 4.38,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 1,
+          "input_len": 8192,
+          "output_tok_s": 164.05,
+          "tpot_ms_median": 5.62,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 8,
+          "input_len": 128,
+          "output_tok_s": 1397.93,
+          "tpot_ms_median": 5.63,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 8,
+          "input_len": 1024,
+          "output_tok_s": 1283.85,
+          "tpot_ms_median": 5.87,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 8,
+          "input_len": 8192,
+          "output_tok_s": 746.8,
+          "tpot_ms_median": 8.22,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 64,
+          "input_len": 128,
+          "output_tok_s": 7989.52,
+          "tpot_ms_median": 7.66,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 64,
+          "input_len": 1024,
+          "output_tok_s": 5778.44,
+          "tpot_ms_median": 9.6,
+          "output_ratio_vs_bf16": 1.0
+        },
+        {
+          "concurrency": 64,
+          "input_len": 8192,
+          "output_tok_s": 1652.69,
+          "tpot_ms_median": 35.13,
+          "output_ratio_vs_bf16": 1.0
+        }
+      ],
+      "ratio_min": 1.0,
+      "ratio_max": 1.0,
+      "ratio_cells": 9
+    },
+    {
+      "encoding": "q4w4a16",
+      "rig": "gpu-vllm-mi300x-4b-q4w4a16",
+      "run_dir": "gpu-vllm-mi300x-4b-q4w4a16/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text",
+      "served_from": "huggingface",
+      "boot_seconds": 182.5,
+      "model_loading_gib": 8.83,
+      "kv_tokens": 2835823,
+      "kernels": [
+        "TritonW4A16LinearKernel"
+      ],
+      "status": "ok",
+      "report": "gpu-vllm-mi300x-4b-q4w4a16/benchmarks/reports/2026-10-07-dtype-sweep-mi300x.json",
+      "cells": [
+        {
+          "concurrency": 1,
+          "input_len": 128,
+          "output_tok_s": 32.99,
+          "tpot_ms_median": 30.27,
+          "output_ratio_vs_bf16": 0.138
+        },
+        {
+          "concurrency": 1,
+          "input_len": 1024,
+          "output_tok_s": 32.69,
+          "tpot_ms_median": 30.53,
+          "output_ratio_vs_bf16": 0.146
+        },
+        {
+          "concurrency": 1,
+          "input_len": 8192,
+          "output_tok_s": 30.8,
+          "tpot_ms_median": 31.78,
+          "output_ratio_vs_bf16": 0.188
+        },
+        {
+          "concurrency": 8,
+          "input_len": 128,
+          "output_tok_s": 259.67,
+          "tpot_ms_median": 30.68,
+          "output_ratio_vs_bf16": 0.186
+        },
+        {
+          "concurrency": 8,
+          "input_len": 1024,
+          "output_tok_s": 254.45,
+          "tpot_ms_median": 30.81,
+          "output_ratio_vs_bf16": 0.198
+        },
+        {
+          "concurrency": 8,
+          "input_len": 8192,
+          "output_tok_s": 212.09,
+          "tpot_ms_median": 33.69,
+          "output_ratio_vs_bf16": 0.284
+        },
+        {
+          "concurrency": 64,
+          "input_len": 128,
+          "output_tok_s": 2597.24,
+          "tpot_ms_median": 24.0,
+          "output_ratio_vs_bf16": 0.325
+        },
+        {
+          "concurrency": 64,
+          "input_len": 1024,
+          "output_tok_s": 2183.05,
+          "tpot_ms_median": 26.05,
+          "output_ratio_vs_bf16": 0.378
+        },
+        {
+          "concurrency": 64,
+          "input_len": 8192,
+          "output_tok_s": 892.55,
+          "tpot_ms_median": 66.16,
+          "output_ratio_vs_bf16": 0.54
+        }
+      ],
+      "ratio_min": 0.138,
+      "ratio_max": 0.54,
+      "ratio_cells": 9
+    },
+    {
+      "encoding": "w8a8",
+      "rig": "gpu-vllm-mi300x-4b-w8a8",
+      "run_dir": "gpu-vllm-mi300x-4b-w8a8/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "xbill9/gemma-4-E4B-it-qat-w8a8-int8",
+      "served_from": "huggingface",
+      "boot_seconds": 250.8,
+      "model_loading_gib": 10.46,
+      "kv_tokens": 2806038,
+      "kernels": [
+        "TritonInt8ScaledMMLinearKernel"
+      ],
+      "status": "ok",
+      "report": "gpu-vllm-mi300x-4b-w8a8/benchmarks/reports/2026-10-07-dtype-sweep-mi300x.json",
+      "cells": [
+        {
+          "concurrency": 1,
+          "input_len": 128,
+          "output_tok_s": 73.64,
+          "tpot_ms_median": 13.56,
+          "output_ratio_vs_bf16": 0.308
+        },
+        {
+          "concurrency": 1,
+          "input_len": 1024,
+          "output_tok_s": 72.3,
+          "tpot_ms_median": 13.78,
+          "output_ratio_vs_bf16": 0.322
+        },
+        {
+          "concurrency": 1,
+          "input_len": 8192,
+          "output_tok_s": 64.29,
+          "tpot_ms_median": 15.11,
+          "output_ratio_vs_bf16": 0.392
+        },
+        {
+          "concurrency": 8,
+          "input_len": 128,
+          "output_tok_s": 573.81,
+          "tpot_ms_median": 13.86,
+          "output_ratio_vs_bf16": 0.41
+        },
+        {
+          "concurrency": 8,
+          "input_len": 1024,
+          "output_tok_s": 554.95,
+          "tpot_ms_median": 14.08,
+          "output_ratio_vs_bf16": 0.432
+        },
+        {
+          "concurrency": 8,
+          "input_len": 8192,
+          "output_tok_s": 422.44,
+          "tpot_ms_median": 16.48,
+          "output_ratio_vs_bf16": 0.566
+        },
+        {
+          "concurrency": 64,
+          "input_len": 128,
+          "output_tok_s": 3904.72,
+          "tpot_ms_median": 15.99,
+          "output_ratio_vs_bf16": 0.489
+        },
+        {
+          "concurrency": 64,
+          "input_len": 1024,
+          "output_tok_s": 3312.77,
+          "tpot_ms_median": 17.47,
+          "output_ratio_vs_bf16": 0.573
+        },
+        {
+          "concurrency": 64,
+          "input_len": 8192,
+          "output_tok_s": 1356.28,
+          "tpot_ms_median": 43.71,
+          "output_ratio_vs_bf16": 0.821
+        }
+      ],
+      "ratio_min": 0.308,
+      "ratio_max": 0.821,
+      "ratio_cells": 9
+    },
+    {
+      "encoding": "fp8",
+      "rig": "gpu-vllm-mi300x-4b-fp8",
+      "run_dir": "gpu-vllm-mi300x-4b-fp8/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "xbill9/gemma-4-E4B-it-qat-q4_0-fp8-text",
+      "served_from": "huggingface",
+      "boot_seconds": 182.9,
+      "model_loading_gib": 10.46,
+      "kv_tokens": 2803516,
+      "kernels": [
+        "RowWiseTorchFP8ScaledMMLinearKernel"
+      ],
+      "status": "ok",
+      "report": "gpu-vllm-mi300x-4b-fp8/benchmarks/reports/2026-10-07-dtype-sweep-mi300x.json",
+      "cells": [
+        {
+          "concurrency": 1,
+          "input_len": 128,
+          "output_tok_s": 211.87,
+          "tpot_ms_median": 4.69,
+          "output_ratio_vs_bf16": 0.886
+        },
+        {
+          "concurrency": 1,
+          "input_len": 1024,
+          "output_tok_s": 201.28,
+          "tpot_ms_median": 4.91,
+          "output_ratio_vs_bf16": 0.896
+        },
+        {
+          "concurrency": 1,
+          "input_len": 8192,
+          "output_tok_s": 150.57,
+          "tpot_ms_median": 6.26,
+          "output_ratio_vs_bf16": 0.918
+        },
+        {
+          "concurrency": 8,
+          "input_len": 128,
+          "output_tok_s": 1571.8,
+          "tpot_ms_median": 5.0,
+          "output_ratio_vs_bf16": 1.124
+        },
+        {
+          "concurrency": 8,
+          "input_len": 1024,
+          "output_tok_s": 1456.36,
+          "tpot_ms_median": 5.22,
+          "output_ratio_vs_bf16": 1.134
+        },
+        {
+          "concurrency": 8,
+          "input_len": 8192,
+          "output_tok_s": 850.86,
+          "tpot_ms_median": 7.42,
+          "output_ratio_vs_bf16": 1.139
+        },
+        {
+          "concurrency": 64,
+          "input_len": 128,
+          "output_tok_s": 8853.97,
+          "tpot_ms_median": 6.87,
+          "output_ratio_vs_bf16": 1.108
+        },
+        {
+          "concurrency": 64,
+          "input_len": 1024,
+          "output_tok_s": 6661.6,
+          "tpot_ms_median": 8.38,
+          "output_ratio_vs_bf16": 1.153
+        },
+        {
+          "concurrency": 64,
+          "input_len": 8192,
+          "output_tok_s": 1972.84,
+          "tpot_ms_median": 29.64,
+          "output_ratio_vs_bf16": 1.194
+        }
+      ],
+      "ratio_min": 0.886,
+      "ratio_max": 1.194,
+      "ratio_cells": 9
+    },
+    {
+      "encoding": "q4w4a16ple4",
+      "rig": "gpu-vllm-mi300x-4b-q4w4a16ple4",
+      "run_dir": "gpu-vllm-mi300x-4b-q4w4a16ple4/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-ple4",
+      "served_from": "droplet disk (not on the Hub yet)",
+      "boot_seconds": 182.6,
+      "model_loading_gib": 5.06,
+      "kv_tokens": 2985126,
+      "kernels": [
+        "TritonW4A16LinearKernel"
+      ],
+      "status": "ok",
+      "report": "gpu-vllm-mi300x-4b-q4w4a16ple4/benchmarks/reports/2026-10-07-dtype-sweep-mi300x.json",
+      "cells": [
+        {
+          "concurrency": 1,
+          "input_len": 128,
+          "output_tok_s": 32.99,
+          "tpot_ms_median": 30.28,
+          "output_ratio_vs_bf16": 0.138
+        },
+        {
+          "concurrency": 1,
+          "input_len": 1024,
+          "output_tok_s": 32.62,
+          "tpot_ms_median": 30.58,
+          "output_ratio_vs_bf16": 0.145
+        },
+        {
+          "concurrency": 1,
+          "input_len": 8192,
+          "output_tok_s": 30.73,
+          "tpot_ms_median": 31.84,
+          "output_ratio_vs_bf16": 0.187
+        },
+        {
+          "concurrency": 8,
+          "input_len": 128,
+          "output_tok_s": 258.54,
+          "tpot_ms_median": 30.76,
+          "output_ratio_vs_bf16": 0.185
+        },
+        {
+          "concurrency": 8,
+          "input_len": 1024,
+          "output_tok_s": 253.19,
+          "tpot_ms_median": 30.99,
+          "output_ratio_vs_bf16": 0.197
+        },
+        {
+          "concurrency": 8,
+          "input_len": 8192,
+          "output_tok_s": 211.05,
+          "tpot_ms_median": 34.41,
+          "output_ratio_vs_bf16": 0.283
+        },
+        {
+          "concurrency": 64,
+          "input_len": 128,
+          "output_tok_s": 2580.31,
+          "tpot_ms_median": 24.12,
+          "output_ratio_vs_bf16": 0.323
+        },
+        {
+          "concurrency": 64,
+          "input_len": 1024,
+          "output_tok_s": 2177.29,
+          "tpot_ms_median": 26.87,
+          "output_ratio_vs_bf16": 0.377
+        },
+        {
+          "concurrency": 64,
+          "input_len": 8192,
+          "output_tok_s": 892.66,
+          "tpot_ms_median": 65.5,
+          "output_ratio_vs_bf16": 0.54
+        }
+      ],
+      "ratio_min": 0.138,
+      "ratio_max": 0.54,
+      "ratio_cells": 9
+    },
+    {
+      "encoding": "q4w4a16emb4",
+      "rig": "gpu-vllm-mi300x-4b-q4w4a16emb4",
+      "run_dir": "gpu-vllm-mi300x-4b-q4w4a16emb4/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4",
+      "served_from": "huggingface",
+      "boot_seconds": 159.9,
+      "model_loading_gib": 4.51,
+      "kv_tokens": 3001791,
+      "kernels": [
+        "TritonW4A16LinearKernel"
+      ],
+      "status": "ok",
+      "report": "gpu-vllm-mi300x-4b-q4w4a16emb4/benchmarks/reports/2026-10-07-dtype-sweep-mi300x.json",
+      "cells": [
+        {
+          "concurrency": 1,
+          "input_len": 128,
+          "output_tok_s": 32.53,
+          "tpot_ms_median": 30.69,
+          "output_ratio_vs_bf16": 0.136
+        },
+        {
+          "concurrency": 1,
+          "input_len": 1024,
+          "output_tok_s": 32.19,
+          "tpot_ms_median": 30.99,
+          "output_ratio_vs_bf16": 0.143
+        },
+        {
+          "concurrency": 1,
+          "input_len": 8192,
+          "output_tok_s": 30.34,
+          "tpot_ms_median": 32.28,
+          "output_ratio_vs_bf16": 0.185
+        },
+        {
+          "concurrency": 8,
+          "input_len": 128,
+          "output_tok_s": 255.92,
+          "tpot_ms_median": 31.14,
+          "output_ratio_vs_bf16": 0.183
+        },
+        {
+          "concurrency": 8,
+          "input_len": 1024,
+          "output_tok_s": 250.4,
+          "tpot_ms_median": 31.31,
+          "output_ratio_vs_bf16": 0.195
+        },
+        {
+          "concurrency": 8,
+          "input_len": 8192,
+          "output_tok_s": 209.22,
+          "tpot_ms_median": 34.77,
+          "output_ratio_vs_bf16": 0.28
+        },
+        {
+          "concurrency": 64,
+          "input_len": 128,
+          "output_tok_s": 2558.05,
+          "tpot_ms_median": 24.3,
+          "output_ratio_vs_bf16": 0.32
+        },
+        {
+          "concurrency": 64,
+          "input_len": 1024,
+          "output_tok_s": 2157.36,
+          "tpot_ms_median": 26.25,
+          "output_ratio_vs_bf16": 0.373
+        },
+        {
+          "concurrency": 64,
+          "input_len": 8192,
+          "output_tok_s": 888.85,
+          "tpot_ms_median": 65.87,
+          "output_ratio_vs_bf16": 0.538
+        }
+      ],
+      "ratio_min": 0.136,
+      "ratio_max": 0.538,
+      "ratio_cells": 9
+    },
+    {
+      "encoding": "w8a8emb4",
+      "rig": "gpu-vllm-mi300x-4b-w8a8emb4",
+      "run_dir": "gpu-vllm-mi300x-4b-w8a8emb4/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "xbill9/gemma-4-E4B-it-qat-w8a8-int8-emb4",
+      "served_from": "huggingface",
+      "boot_seconds": 635.4,
+      "kernels": [
+        "TritonInt8ScaledMMLinearKernel",
+        "TritonW4A16LinearKernel"
+      ],
+      "status": "failed",
+      "cells": []
+    },
+    {
+      "encoding": "fp8emb4",
+      "rig": "gpu-vllm-mi300x-4b-fp8emb4",
+      "run_dir": "gpu-vllm-mi300x-4b-fp8emb4/benchmarks/runs/2026-10-07-dtype-sweep-mi300x",
+      "model": "xbill9/gemma-4-E4B-it-qat-q4_0-fp8-text-emb4",
+      "served_from": "droplet disk (not on the Hub yet)",
+      "boot_seconds": 183.7,
+      "model_loading_gib": 6.15,
+      "kv_tokens": 2970362,
+      "kernels": [
+        "RowWiseTorchFP8ScaledMMLinearKernel",
+        "TritonW4A16LinearKernel"
+      ],
+      "status": "ok",
+      "report": "gpu-vllm-mi300x-4b-fp8emb4/benchmarks/reports/2026-10-07-dtype-sweep-mi300x.json",
+      "cells": [
+        {
+          "concurrency": 1,
+          "input_len": 128,
+          "output_tok_s": 193.35,
+          "tpot_ms_median": 5.14,
+          "output_ratio_vs_bf16": 0.808
+        },
+        {
+          "concurrency": 1,
+          "input_len": 1024,
+          "output_tok_s": 184.37,
+          "tpot_ms_median": 5.35,
+          "output_ratio_vs_bf16": 0.821
+        },
+        {
+          "concurrency": 1,
+          "input_len": 8192,
+          "output_tok_s": 140.75,
+          "tpot_ms_median": 6.71,
+          "output_ratio_vs_bf16": 0.858
+        },
+        {
+          "concurrency": 8,
+          "input_len": 128,
+          "output_tok_s": 1443.06,
+          "tpot_ms_median": 5.46,
+          "output_ratio_vs_bf16": 1.032
+        },
+        {
+          "concurrency": 8,
+          "input_len": 1024,
+          "output_tok_s": 1354.61,
+          "tpot_ms_median": 5.64,
+          "output_ratio_vs_bf16": 1.055
+        },
+        {
+          "concurrency": 8,
+          "input_len": 8192,
+          "output_tok_s": 811.54,
+          "tpot_ms_median": 7.91,
+          "output_ratio_vs_bf16": 1.087
+        },
+        {
+          "concurrency": 64,
+          "input_len": 128,
+          "output_tok_s": 8318.4,
+          "tpot_ms_median": 7.41,
+          "output_ratio_vs_bf16": 1.041
+        },
+        {
+          "concurrency": 64,
+          "input_len": 1024,
+          "output_tok_s": 6435.51,
+          "tpot_ms_median": 8.71,
+          "output_ratio_vs_bf16": 1.114
+        },
+        {
+          "concurrency": 64,
+          "input_len": 8192,
+          "output_tok_s": 1945.72,
+          "tpot_ms_median": 29.65,
+          "output_ratio_vs_bf16": 1.177
+        }
+      ],
+      "ratio_min": 0.808,
+      "ratio_max": 1.177,
+      "ratio_cells": 9
+    }
+  ]
+}
