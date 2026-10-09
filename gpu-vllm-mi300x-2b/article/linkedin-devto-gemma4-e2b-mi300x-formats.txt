@@ -1,0 +1,15 @@
+Gemma 4 E2B on an AMD MI300X: Which Weight Format Should You Serve?
+
+Ten builds of Gemma 4 E2B (bf16, fp8 in both E4M3 flavours, int8 W8A8 and int4 W4A16, each with and without int4 embedding tables) served one after another on one AMD Instinct MI300X with the same vLLM image. fp8 is the only format that keeps pace with bf16, the 4-bit builds run at 0.14x to 0.63x, and int4 embedding tables cost almost nothing.
+
+What is in it:
+
+- 🟢 fp8 is the only format at bf16's pace: 0.75x for one request, up to 1.09x with 8 or 64
+- 🟢 E4M3 and E4M3FNUZ checkpoints serve identically, through vLLM's conversion at load
+- 🟢 int4 vocabulary tables halve the weights for 1% to 5% of speed
+- 🟢 Every quantized build answers text, thinking and tool-call checks
+
+dev.to (Google Developer Experts): https://dev.to/gde/gemma-4-e2b-on-an-amd-mi300x-which-weight-format-should-you-serve-1a01
+Medium: https://medium.com/@xbill999/gemma-4-e2b-on-an-amd-mi300x-which-weight-format-should-you-serve-1fc055a0375b
+Substack: https://xbill9.substack.com/p/gemma-4-e2b-on-an-amd-mi300x-which
+Source: https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b
