@@ -66,6 +66,72 @@ UNSERVED = ("**Status:** built and checked offline against its source; not yet s
             "It is queued for a serving sweep on one AMD Instinct MI300X.")
 
 
+RID = "2026-10-07-dtype-sweep-mi300x"
+SWEEP_KEY = {"E2B": "2b", "E4B": "4b", "12B": "12b", "26B-A4B": "26b", "31B": "31b"}
+ARTICLE = {"E2B": "https://dev.to/gde/gemma-4-e2b-on-an-amd-mi300x-which-weight-format-should-you-serve-1a01"}
+SIZES_ARTICLE = "https://dev.to/gde/gemma-4-from-e2b-to-31b-on-an-amd-mi300x-fp8-overtakes-bf16-from-12b-up-h4e"
+IMAGE = "vllm/vllm-openai-rocm@sha256:ec62abecc13923172cf1225c0270b8cea7d84b652eacd3c8dffe2dd35dd73e37"
+
+
+def encoding(repo):
+    tail = re.sub(r"^gemma-4-(E2B|E4B|12B|26B-A4B|31B)-it-qat-", "", repo)
+    return {"q4_0-fp8fnuz-text": "fp8fnuz", "q4_0-fp8fnuz-text-emb4": "fp8fnuzemb4", "q4_0-fp8-text": "fp8",
+            "q4_0-fp8-text-emb4": "fp8emb4", "q4_0-w4a16-ct-text-ple4": "q4w4a16ple4", "w8a8-int8": "w8a8",
+            "w8a8-int8-emb4": "w8a8emb4"}.get(tail)
+
+
+def sweep(size):
+    k = SWEEP_KEY[size]
+    path = os.path.join(DEV, f"gpu-vllm-mi300x-{k}/benchmarks/runs/{RID}/dtype-summary.json")
+    arms = {a["encoding"]: a for a in json.load(open(path))["arms"]}
+    b = arms["bf16"]
+    if b.get("model_loading_gib") is None:  # E2B's bf16 boot facts were refilled from its full log
+        log = open(os.path.join(DEV, f"gpu-vllm-mi300x-{k}/benchmarks/runs/{RID}/boot.log")).read()
+        b["model_loading_gib"] = float(re.search(r"took ([\d.]+) GiB", log).group(1))
+        b["kv_tokens"] = int(re.search(r"KV cache size: ([\d,]+)", log).group(1).replace(",", ""))
+    return arms
+
+
+def status(repo, size):
+    """The card's serving status, from the MI300X sweep's own summary."""
+    enc = encoding(repo)
+    arms = sweep(size)
+    a = arms.get(enc)
+    if a is None:
+        ran = ", ".join(x for x in arms)
+        s = (f"**Status:** built and checked offline against its source; not served. The AMD MI300X sweep at "
+             f"this size ran {ran} only.")
+        if enc == "w8a8emb4":
+            s += (" The E4B and 12B builds made by the same script stop at load on the stock ROCm vLLM image "
+                  "(`AttributeError: 'VocabParallelEmbedding' object has no attribute 'weight'`); this one was not tried.")
+        return s + "\n", "- Not served or evaluated."
+    if a["status"] != "ok":
+        return "**Status:** failed to load on the stock ROCm vLLM image.\n", "- Does not load on stock ROCm vLLM."
+    b = arms["bf16"]
+    cell = lambda e, c, i: next(x for x in arms[e]["cells"] if x["concurrency"] == c and x["input_len"] == i)["output_tok_s"]
+    row = lambda e: f"{cell(e,1,128):,.0f} / {cell(e,8,1024):,.0f} / {cell(e,64,1024):,.0f}"
+    art = ARTICLE.get(size, SIZES_ARTICLE)
+    out = f"""## Measured on one AMD Instinct MI300X
+
+Served with stock vLLM `0.31.1rc1.dev23` ({IMAGE.split('@')[0]} at `{IMAGE.split('@')[1][:19]}…`) on one MI300X, 2026-10-07 to 2026-10-09, against `google/gemma-4-{size}-it` in bf16 on the same card and image. Output tokens per second at 1 request (128-token prompt) and 8 and 64 requests (1,024-token prompts), and the range against bf16 over nine cells of 1/8/64 requests by 128/1,024/8,192-token prompts, three repeats each:
+
+| | Weights loaded | KV cache tokens | 1 / 8 / 64 requests | vs bf16 |
+|---|---:|---:|---|---|
+| bf16 | {b['model_loading_gib']:.2f} GiB | {b['kv_tokens']:,} | {row('bf16')} | 1.00x |
+| **This build** | **{a['model_loading_gib']:.2f} GiB** | **{a['kv_tokens']:,}** | **{row(enc)}** | **{a['ratio_min']:.2f}x – {a['ratio_max']:.2f}x** |
+
+vLLM picked {', '.join('`' + k + '`' for k in a['kernels'])}. Accuracy was not measured on this card. Write-up: {art}
+"""
+    if enc in ("fp8fnuz", "fp8fnuzemb4"):
+        twin = enc.replace("fnuz", "")
+        r = [x["output_tok_s"] / y["output_tok_s"] for x, y in zip(arms[enc]["cells"], arms[twin]["cells"])
+             if (x["concurrency"], x["input_len"]) != (64, 8192)]
+        out += (f"\nAgainst its E4M3 twin on the same card it loads the same kernel and memory and runs at "
+                f"{min(r):.3f}x to {max(r):.3f}x in eight of nine cells; the ninth, 64 requests with 8,192-token "
+                f"prompts, varied by up to 15.7% between repeats.\n")
+    return out, "- Speed measured on one AMD MI300X; accuracy not evaluated."
+
+
 def link(repo):
     return f"[`xbill9/{repo}`](https://huggingface.co/xbill9/{repo})"
 
@@ -91,6 +157,7 @@ def fp8_card(repo, size):
            f"tables of {link(src_ct)} (revision `{rev}`), copied unchanged; `lm_head` is untied."
            if emb4 else "Embeddings, norms and other tensors are bf16, copied byte for byte.")
     scale = "max\\|row\\| / 240" if fnuz else "max\\|row\\| / 448"
+    st, lim = status(repo, size)
     s = front(size, ["gemma4", "compressed-tensors", "fp8", "w8a8", "qat", "vllm", "text-only"]
               + (["rocm", "mi300x"] if fnuz else []))
     s += f"\n# {title}\n\n"
@@ -123,7 +190,7 @@ QAT trained the weights onto a 4-bit grid with one scale per group of 32 values.
 output channel cannot represent those per-group scales, so this build rounds the QAT weights again, and it
 also quantizes activations. For the exact QAT grid use {link(f'gemma-4-{size}-it-qat-q4_0-w4a16-ct-text')}.
 
-{UNSERVED}
+{st}
 """
     if fnuz:
         s += """
@@ -143,7 +210,7 @@ which imports helpers from `repack_q4_0.py` (also here). No calibration data is 
 ## Limitations
 
 - Text only.
-- Not yet served or evaluated.
+{lim}
 - Unofficial. Report problems here, not to Google.
 """ + TAIL
     return s, ["fp8_text.py", "fp8:repack_q4_0.py"]
@@ -181,7 +248,8 @@ def w8a8_card(repo, size):
     s += f"\nCheckpoint: {gib(sizes[repo])}"
     if emb4:
         s += f", against {gib(sizes[base])} for the build with bf16 embeddings"
-    s += f".\n\n{UNSERVED}\n"
+    st, lim = status(repo, size)
+    s += f".\n\n{st}\n"
     s += f"""
 ## Built with
 
@@ -191,7 +259,7 @@ No calibration data is used.
 ## Limitations
 
 - Text only.
-- Not yet served or evaluated.
+{lim}
 - Unofficial. Report problems here, not to Google.
 """ + TAIL
     return s, ["w8a8_from_qat.py", "repack_q4_0.py"] + (["w8a8_emb4.py"] if emb4 else [])
@@ -203,6 +271,7 @@ def ple4_card(repo, size):
                   r"groups; ([\d.]+)% of values bit-identical, worst error ([\d.e-]+) of the group max; scales ([\d.]+)\.\.([\d.]+)", log)
     a, b, off, ident, worst, lo, hi = m.groups()
     src = f"gemma-4-{size}-it-qat-q4_0-w4a16-ct-text"
+    st, lim = status(repo, size)
     s = front(size, ["gemma4", "compressed-tensors", "w4a16", "int4", "qat", "vllm", "text-only"])
     s += f"\n# Gemma 4 {size}-it QAT, W4A16 with int4 per-layer embeddings, text only (unofficial)\n\n"
     s += ("**This is an unofficial build, made and published independently of Google.** "
@@ -220,7 +289,7 @@ def ple4_card(repo, size):
 
 Checkpoint: {gib(sizes[repo])}. Linear layers are unchanged from the W4A16 repack.
 
-{UNSERVED}
+{st}
 
 ## Built with
 
@@ -230,7 +299,7 @@ Needs **vLLM 0.29 or later** (`CompressedTensorsEmbeddingWNA16Int`).
 ## Limitations
 
 - Text only.
-- Not yet served or evaluated.
+{lim}
 - Unofficial. Report problems here, not to Google.
 """ + TAIL
     return s, ["embed_int4.py", "repack_q4_0.py"]
