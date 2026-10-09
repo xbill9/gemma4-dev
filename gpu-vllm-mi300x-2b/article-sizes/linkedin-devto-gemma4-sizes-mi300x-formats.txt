@@ -1,0 +1,15 @@
+Gemma 4 From E2B to 31B on an AMD MI300X: fp8 Overtakes bf16 From 12B Up
+
+Every Gemma 4 size from E2B to 31B served on one AMD Instinct MI300X in bf16, fp8, int8 W8A8 and int4 W4A16, on the same vLLM image. fp8 goes from 0.75x bf16 for one request at E2B to 1.23x at 31B and is faster than bf16 in every cell at 12B and 31B. The mixture-of-experts 26B sits at bf16's pace, and the 4-bit builds run at 0.14x to 0.69x at every size.
+
+What is in it:
+
+- 🟢 fp8 overtakes bf16 between E4B and 12B, and is faster in every cell at 12B (1.12x to 1.41x) and 31B (1.20x to 1.45x)
+- 🟢 At 31B fp8 halves the weights to 30.63 GiB and serves 71 output tokens per second for one request against bf16's 58
+- 🟢 26B-A4B behaves like a small model: fp8 at 0.99x for one request, up to 1.23x with more
+- ⚠️ int4 tables cost a median of 0.4% to 6.5% of speed and save memory this card does not need
+
+dev.to (Google Developer Experts): https://dev.to/gde/gemma-4-from-e2b-to-31b-on-an-amd-mi300x-fp8-overtakes-bf16-from-12b-up-h4e
+Medium: https://medium.com/@xbill999/gemma-4-from-e2b-to-31b-on-an-amd-mi300x-fp8-overtakes-bf16-from-12b-up-3392cc1c2048
+Substack: https://xbill9.substack.com/p/gemma-4-from-e2b-to-31b-on-an-amd
+Source: https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b
