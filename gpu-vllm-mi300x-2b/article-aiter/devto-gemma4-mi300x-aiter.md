@@ -123,7 +123,7 @@ The log carries 924 of these: the model's six distinct weight shapes, each at 77
 
 #### 🔎 Tip: The Stock Run Reproduces Across Droplets
 
-The stock run here lands within 2.1% of the same build's numbers from the earlier sweep, two days before on a different droplet, in every cell (0.979x to 1.007x). Results on this platform hold from one droplet to the next on a pinned image digest, which is what makes a 1% to 3% difference readable at all.
+The stock run here lands within 2.1% of the same build's numbers from the earlier sweep, run the day before on a different droplet, in every cell (0.979x to 1.007x). Results on this platform hold from one droplet to the next on a pinned image digest, which is what makes a 1% to 3% difference readable at all.
 
 ---
 
@@ -165,7 +165,7 @@ The goal of this article was to find whether AMD's AITER kernels speed up Gemma 
 - ⚠️ Attention stays on Triton either way: Gemma 4's 512-wide full-attention heads force it
 - ⚠️ The fp8 multiplies move to AITER, which has no tuned settings for any of the model's six weight shapes
 - 🟢 RMSNorm moves to AITER
-- 🟢 The stock numbers reproduce within 2.1% across droplets two days apart
+- 🟢 The stock numbers reproduce within 2.1% on a different droplet a day apart
 
 Scope: one MI300X droplet in AMD Developer Cloud's atl1 region, vLLM `0.31.1rc1.dev23+g43b4aaea3` at `vllm/vllm-openai-rocm@sha256:ec62abec…`, Gemma 4 12B in fp8 only, both runs on 2026-10-09 with three repeats per cell. bf16, the other sizes and a tuned AITER configuration were not run. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
