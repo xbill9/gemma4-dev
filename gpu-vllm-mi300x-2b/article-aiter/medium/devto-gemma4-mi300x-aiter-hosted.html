@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>VLLM_ROCM_USE_AITER=1 Slows Gemma 4 on an AMD MI300X: What the Flag Changes and Why</title>
+  <meta name="description" content="AMD&#x27;s AITER kernel library is the usual first switch for vLLM speed on an Instinct MI300X. On Gemma 4 12B fp8 it made every one of nine cells 0.6% to 2.6% slower. The boot logs show why: Gemma 4&#x27;s 512-wide attention heads keep attention on Triton, and AITER&#x27;s fp8 matrix multiply has no tuned settings for any of the model&#x27;s six weight shapes." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to turning on AMD's AITER
+kernels for vLLM on one AMD Instinct MI300X, serving Gemma 4 12B in fp8,
+and reading from the server's own boot log what the switch replaced.
+Every log, report and script is committed.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-aiter/medium/img/devto-mi300x-aiter-cover.923b77d8.jpg" alt="VLLM_ROCM_USE_AITER=1 Slows Gemma 4 on an AMD MI300X: What the Flag Changes and Why" /></figure>
+<p><code>VLLM_ROCM_USE_AITER=1</code> made Gemma 4 12B slower in every
+cell measured, by 0.6% to 2.6%, against the same build served the same
+day on the same droplet and image. The boot log explains it. Attention,
+where AITER usually helps most, never leaves Triton, because Gemma 4's
+full-attention layers use 512-wide heads. The fp8 matrix multiplies do
+move to AITER, which has no tuned settings for any of the model's six
+weight shapes and runs them on defaults.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b">https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b</a></p>
+<hr />
+<h4 id="what-is-aiter">What Is AITER?</h4>
+<p>AITER is AMD's library of tuned GPU kernels for Instinct cards, and
+vLLM on ROCm uses it when the server starts with
+<code>VLLM_ROCM_USE_AITER=1</code>. It covers attention, matrix
+multiplies and normalization, and it picks its matrix-multiply settings
+from tables tuned per matrix shape.</p>
+<p>The earlier articles in this series served every Gemma 4 size on one
+MI300X and found fp8 the fastest format from 12B up. This one asks
+whether AITER adds to that.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An AMD Developer Cloud account with an MI300X droplet
+(<code>gpu-mi300x1-192gb</code>), and its SSH key</li>
+<li>A clone:
+<code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+<li>The droplet prepared with <code>make scaffold</code> from <a
+href="https://github.com/xbill9/amd-gputools">amd-gputools</a>, which
+installs Docker, adds the GPU groups and pulls the vLLM image</li>
+</ul>
+<hr />
+<h4 id="step-1--pass-the-flag-into-the-server-container">Step 1 — Pass
+the Flag Into the Server Container</h4>
+<p>AITER is switched on by an environment variable inside the vLLM
+container, so the server needs a way to pass one through. The rig's
+server takes <code>VLLM_DOCKER_ENV</code>, a comma-separated list it
+turns into <code>docker run -e</code> arguments, and the sweep driver
+takes the same list as <code>--engine-env</code>:</p>
+<pre class="bash"><code>python3 -u dtype_sweep.py --droplet $DROPLET --image $IMG --run-id 2026-10-09-aiter-mi300x \
+  --size 12b --only fp8 --engine-env VLLM_ROCM_USE_AITER=1</code></pre>
+<hr />
+<h4 id="step-2--run-aiter-and-stock-back-to-back">Step 2 — Run AITER and
+Stock Back to Back</h4>
+<p>Both runs serve <code>xbill9/gemma-4-12B-it-qat-q4_0-fp8-text</code>
+on the same droplet, one after the other, on the image digest the
+earlier sweep used, with the same settings:
+<code>--max-model-len 32768</code>,
+<code>--gpu-memory-utilization 0.90</code>, prefix caching on. Each
+times 1, 8 and 64 requests against 128, 1,024 and 8,192-token prompts
+with 512 output tokens, three repeats per cell, with a fresh seed for
+every run so no prompt comes from the prefix cache.</p>
+<pre class="text"><code>2026-10-09T14:51:53Z start aiter fp8
+2026-10-09T15:13:26Z done aiter fp8 exit 0; start stock fp8
+2026-10-09T15:34:11Z done stock fp8 exit 0</code></pre>
+<hr />
+<h4 id="step-3--read-what-the-flag-changed">Step 3 — Read What the Flag
+Changed</h4>
+<p>Whether a flag changed the work shows in the boot log. The two, side
+by side:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-aiter/medium/img/devto-gemma4-mi300x-aiter-table-1.png"
+alt="Table: Part of the model, Stock, VLLM_ROCM_USE_AITER=1" /></p>
+<pre class="text"><code>Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=[&#39;aiter&#39;, &#39;native&#39;], ...)
+Selected RowWiseTorchFP8ScaledMMLinearKernel for CompressedTensorsW8A8Fp8</code></pre>
+<hr />
+<h4 id="how-fast-is-it">How Fast Is It?</h4>
+<p>Output tokens per second, same droplet, same day, same image
+digest:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-aiter/medium/img/devto-gemma4-mi300x-aiter-table-2.png"
+alt="Table: Requests, Prompt tokens, AITER, Stock, AITER / stock" /></p>
+<p>All nine cells are slower with AITER, from 0.974x to 0.994x, median
+0.981x. Repeats varied by 0.78% or less, so the gap is bigger than the
+run-to-run noise in every cell. With 64 requests and 1,024-token prompts
+the time per output token rises from 20.24 ms to 21.21 ms.</p>
+<hr />
+<h4 id="why-attention-stays-on-triton">Why Attention Stays on
+Triton</h4>
+<p>vLLM picks the attention backend from the model's head sizes, and for
+Gemma 4 it has one choice:</p>
+<pre class="text"><code>Gemma4 model has heterogeneous head dimensions {&#39;sliding_attention&#39;: 256, &#39;full_attention&#39;: 512}. FA4 not available, forcing TRITON_ATTN backend.</code></pre>
+<p>Gemma 4 alternates sliding-window layers with 256-wide heads and
+full-attention layers with 512-wide heads. One backend has to serve
+both, and Triton is the one that does, so attention runs the same code
+with the flag on or off.</p>
+<hr />
+<h4 id="why-the-fp8-multiplies-run-slower">Why the fp8 Multiplies Run
+Slower</h4>
+<p>With the flag on, vLLM's fp8 linear layer hands its matrix multiply
+to AITER, which looks up tuned settings for each weight shape and token
+count. It found none for Gemma 4 12B:</p>
+<pre class="text"><code>[aiter] shape is M:1, N:8192, K:3840, q_dtype_w:torch.float8_e4m3fnuz, not found tuned config in /tmp/aiter_configs/a8w8_bpreshuffle_tuned_gemm.csv, will use default config!</code></pre>
+<p>The log carries 924 of these: the model's six distinct weight shapes,
+each at 77 token counts from 1 to 262,144, in each of AITER's two fp8
+tuning tables. Every fp8 multiply in the model ran on AITER's default
+settings, and the end-to-end numbers fit those defaults being slightly
+slower on these shapes than PyTorch's own fp8 path.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-aiter/medium/img/devto-gemma4-mi300x-aiter-table-3.png"
+alt="Table: Weight shape (N x K), Untuned lookups" /></p>
+<hr />
+<h4 id="mag_right-tip-the-stock-run-reproduces-across-droplets">🔎 Tip:
+The Stock Run Reproduces Across Droplets</h4>
+<p>The stock run here lands within 2.1% of the same build's numbers from
+the earlier sweep, two days before on a different droplet, in every cell
+(0.979x to 1.007x). Results on this platform hold from one droplet to
+the next on a pinned image digest, which is what makes a 1% to 3%
+difference readable at all.</p>
+<hr />
+<h4 id="mag_right-tip-check-what-a-flag-changed-before-timing-it">🔎
+Tip: Check What a Flag Changed Before Timing It</h4>
+<p><code>VLLM_ROCM_USE_AITER=1</code> was accepted without a warning,
+and the server reported the same linear kernel name with it as without
+it. The difference shows only in the lines around it: the operator
+priority list, the attention backend decision, and AITER's own tuning
+lookups. Diff the two boot logs before reading any throughput
+number.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-aiter/medium/img/devto-gemma4-mi300x-aiter-table-4.png"
+alt="Table: Stock, VLLM_ROCM_USE_AITER=1" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For Gemma 4 on this image, leave <code>VLLM_ROCM_USE_AITER</code>
+off. AITER can only help here once two things change: tuned fp8 settings
+for Gemma 4's six weight shapes, generated with the tuning scripts AITER
+ships, and an attention path that serves 512-wide heads. Until then the
+flag swaps a tuned multiply for an untuned one and leaves the rest
+alone.</p>
+<hr />
+<h4 id="teardown">Teardown</h4>
+<p>Powering a droplet off does not stop billing. Destroy it in the AMD
+Developer Cloud console; the MI300X droplet bills $1.99 an hour until
+then.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find whether AMD's AITER kernels
+speed up Gemma 4 on an AMD MI300X. The key to the solution was running
+the same fp8 build with and without <code>VLLM_ROCM_USE_AITER=1</code>
+back to back on one droplet and one image digest, and diffing the two
+boot logs to see what the flag replaced. The results were:</p>
+<ul>
+<li>❌ AITER made Gemma 4 12B fp8 slower in every one of nine cells, by
+0.6% to 2.6%</li>
+<li>⚠️ Attention stays on Triton either way: Gemma 4's 512-wide
+full-attention heads force it</li>
+<li>⚠️ The fp8 multiplies move to AITER, which has no tuned settings for
+any of the model's six weight shapes</li>
+<li>🟢 RMSNorm moves to AITER</li>
+<li>🟢 The stock numbers reproduce within 2.1% across droplets two days
+apart</li>
+</ul>
+<p>Scope: one MI300X droplet in AMD Developer Cloud's atl1 region, vLLM
+<code>0.31.1rc1.dev23+g43b4aaea3</code> at
+<code>vllm/vllm-openai-rocm@sha256:ec62abec…</code>, Gemma 4 12B in fp8
+only, both runs on 2026-10-09 with three repeats per cell. bf16, the
+other sizes and a tuned AITER configuration were not run. The repacked
+checkpoint is unofficial and derived from Google's release under Apache
+2.0. Parts of the analysis and writing were done with AI assistance
+(Claude); every figure comes from the committed output files.</p>
+<p>The strategy for testing AITER with Gemma 4 on an AMD MI300X was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Code, logs, reports and this article's evidence: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b">https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b</a></li>
+<li>Gemma 4 from E2B to 31B on an AMD MI300X: <a
+href="https://dev.to/gde/gemma-4-from-e2b-to-31b-on-an-amd-mi300x-fp8-overtakes-bf16-from-12b-up-h4e">https://dev.to/gde/gemma-4-from-e2b-to-31b-on-an-amd-mi300x-fp8-overtakes-bf16-from-12b-up-h4e</a></li>
+<li>12B fp8 build: <a
+href="https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-fp8-text">https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-fp8-text</a></li>
+<li>AITER: <a
+href="https://github.com/ROCm/aiter">https://github.com/ROCm/aiter</a></li>
+<li>AMD Instinct MI300X: <a
+href="https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html">https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html</a></li>
+</ul>
+</body>
+</html>
