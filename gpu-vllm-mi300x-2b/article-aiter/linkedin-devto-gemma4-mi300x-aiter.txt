@@ -1,0 +1,15 @@
+VLLM_ROCM_USE_AITER=1 Slows Gemma 4 on an AMD MI300X: What the Flag Changes and Why
+
+AMD's AITER kernel library is the usual first switch for vLLM speed on an Instinct MI300X. On Gemma 4 12B fp8 it made every one of nine cells 0.6% to 2.6% slower. The boot logs show why: Gemma 4's 512-wide attention heads keep attention on Triton, and AITER's fp8 matrix multiply has no tuned settings for any of the model's six weight shapes.
+
+What is in it:
+
+- ❌ AITER made Gemma 4 12B fp8 slower in every one of nine cells, by 0.6% to 2.6%
+- ⚠️ Attention stays on Triton either way: Gemma 4's 512-wide full-attention heads force it
+- ⚠️ The fp8 multiplies move to AITER, which has no tuned settings for any of the model's six weight shapes
+- 🟢 RMSNorm moves to AITER
+
+dev.to (Google Developer Experts): https://dev.to/gde/vllmrocmuseaiter1-slows-gemma-4-on-an-amd-mi300x-what-the-flag-changes-and-why-69f
+Medium: https://medium.com/@xbill999/vllm-rocm-use-aiter-1-slows-gemma-4-on-an-amd-mi300x-what-the-flag-changes-and-why-a4db767dc4de
+Substack: https://xbill9.substack.com/p/vllm_rocm_use_aiter1-slows-gemma
+Source: https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b
