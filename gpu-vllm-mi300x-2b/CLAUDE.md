@@ -85,7 +85,12 @@ eager pass floored every small shape at ~17–20 us of host dispatch and made fp
 the opposite conclusion. `--mode eager` exists as a diagnostic only. See
 `benchmarks/runs/2026-09-18-gemm-decode-shapes-mi300x/REPORT.md`.
 
-`VLLM_ROCM_USE_AITER=1` is a second untested lever — the server currently selects `TRITON_ATTN`.
+`VLLM_ROCM_USE_AITER=1` alone made 12B fp8 0.6–2.6% slower (2026-10-09, `article-aiter/`): attention stays on
+`TRITON_ATTN` because vLLM's `Gemma4Config` falls back to it **whenever no backend is named**, and the boot
+log then says "selected via --attention-backend" even though nothing passed the flag. `ATTENTION_BACKEND`
+(env, or `dtype_sweep.py --attention-backend`) passes one explicitly; `ROCM_AITER_UNIFIED_ATTN` exists at the
+image's vLLM commit and accepts head size ≥ 32, and is unmeasured — check the backend line and the suite
+before reading its throughput.
 
 ## Code style
 

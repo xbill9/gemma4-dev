@@ -122,6 +122,16 @@ class TestServeArgv(unittest.TestCase):
             argv = server._serve_argv()
         self.assertEqual(argv[argv.index("--quantization") + 1], "fp8")
 
+    def test_attention_backend_absent_by_default(self):
+        with patch.object(server, "ATTENTION_BACKEND", ""):
+            argv = server._serve_argv()
+        self.assertNotIn("--attention-backend", argv)
+
+    def test_attention_backend_passed_through(self):
+        with patch.object(server, "ATTENTION_BACKEND", "ROCM_AITER_UNIFIED_ATTN"):
+            argv = server._serve_argv()
+        self.assertEqual(argv[argv.index("--attention-backend") + 1], "ROCM_AITER_UNIFIED_ATTN")
+
     def test_devices_are_mapped_in(self):
         argv = server._serve_argv()
         devices = [argv[i + 1] for i, part in enumerate(argv) if part == "--device"]

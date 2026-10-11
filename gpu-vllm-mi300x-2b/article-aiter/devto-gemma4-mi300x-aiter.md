@@ -1,14 +1,14 @@
 ---
 title: "VLLM_ROCM_USE_AITER=1 Slows Gemma 4 on an AMD MI300X: What the Flag Changes and Why"
 published: false
-description: "AMD's AITER kernel library is the usual first switch for vLLM speed on an Instinct MI300X. On Gemma 4 12B fp8 it made every one of nine cells 0.6% to 2.6% slower. The boot logs show why: Gemma 4's 512-wide attention heads keep attention on Triton, and AITER's fp8 matrix multiply has no tuned settings for any of the model's six weight shapes."
+description: "AMD's AITER kernel library is the usual first switch for vLLM speed on an Instinct MI300X. On Gemma 4 12B fp8 it made every one of nine cells 0.6% to 2.6% slower. The boot logs show why: vLLM's Gemma 4 fallback keeps attention on Triton, and AITER's fp8 matrix multiply has no tuned settings for any of the model's six weight shapes."
 tags: gemma, amd, machinelearning, llm
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/gpu-vllm-mi300x-2b/article-aiter/devto-mi300x-aiter-cover.923b77d8.jpg
 ---
 
 This article provides a step by step guide to turning on AMD's AITER kernels for vLLM on one AMD Instinct MI300X, serving Gemma 4 12B in fp8, and reading from the server's own boot log what the switch replaced. Every log, report and script is committed.
 
-`VLLM_ROCM_USE_AITER=1` made Gemma 4 12B slower in every cell measured, by 0.6% to 2.6%, against the same build served the same day on the same droplet and image. The boot log explains it. Attention, where AITER usually helps most, never leaves Triton, because Gemma 4's full-attention layers use 512-wide heads. The fp8 matrix multiplies do move to AITER, which has no tuned settings for any of the model's six weight shapes and runs them on defaults.
+`VLLM_ROCM_USE_AITER=1` made Gemma 4 12B slower in every cell measured, by 0.6% to 2.6%, against the same build served the same day on the same droplet and image. The boot log explains it. Attention, where AITER usually helps most, stays on Triton, because vLLM falls back to Triton for Gemma 4's mix of 256- and 512-wide heads whenever no attention backend is named. The fp8 matrix multiplies do move to AITER, which has no tuned settings for any of the model's six weight shapes and runs them on defaults.
 
 https://github.com/xbill9/gemma4-dev/tree/main/gpu-vllm-mi300x-2b
 
@@ -90,13 +90,15 @@ All nine cells are slower with AITER, from 0.974x to 0.994x, median 0.981x. Repe
 
 #### Why Attention Stays on Triton
 
-vLLM picks the attention backend from the model's head sizes, and for Gemma 4 it has one choice:
+vLLM picks the attention backend from the model's head sizes. For Gemma 4, when no backend is named on the command line, it falls back to Triton:
 
 ```text
 Gemma4 model has heterogeneous head dimensions {'sliding_attention': 256, 'full_attention': 512}. FA4 not available, forcing TRITON_ATTN backend.
 ```
 
-Gemma 4 alternates sliding-window layers with 256-wide heads and full-attention layers with 512-wide heads. One backend has to serve both, and Triton is the one that does, so attention runs the same code with the flag on or off.
+Gemma 4 alternates sliding-window layers with 256-wide heads and full-attention layers with 512-wide heads, and one backend has to serve both. `VLLM_ROCM_USE_AITER=1` leaves the fallback in place, so attention runs the same code with the flag on or off.
+
+The same vLLM build carries `ROCM_AITER_UNIFIED_ATTN`, AITER's Triton unified-attention backend, which accepts any head size of 32 or more. Naming it with `--attention-backend ROCM_AITER_UNIFIED_ATTN` replaces the fallback. Its output and speed on Gemma 4 were not measured here.
 
 ---
 
@@ -131,6 +133,8 @@ The stock run here lands within 2.1% of the same build's numbers from the earlie
 
 `VLLM_ROCM_USE_AITER=1` was accepted without a warning, and the server reported the same linear kernel name with it as without it. The difference shows only in the lines around it: the operator priority list, the attention backend decision, and AITER's own tuning lookups. Diff the two boot logs before reading any throughput number.
 
+Read the attention line against the command you ran. Both runs logged `Using TRITON_ATTN backend (selected via --attention-backend)` with no such flag on the command line, because the Gemma 4 fallback writes its choice into the same setting the flag sets.
+
 ---
 
 #### Compare and Contrast
@@ -147,7 +151,7 @@ The stock run here lands within 2.1% of the same build's numbers from the earlie
 
 #### So, Which One?
 
-For Gemma 4 on this image, leave `VLLM_ROCM_USE_AITER` off. AITER can only help here once two things change: tuned fp8 settings for Gemma 4's six weight shapes, generated with the tuning scripts AITER ships, and an attention path that serves 512-wide heads. Until then the flag swaps a tuned multiply for an untuned one and leaves the rest alone.
+For Gemma 4 on this image, leave `VLLM_ROCM_USE_AITER` off. Two separate experiments could change that: tuned fp8 settings for Gemma 4's six weight shapes, generated with the tuning scripts AITER ships, and `--attention-backend ROCM_AITER_UNIFIED_ATTN`, checked for correct output before it is timed. Until then the flag swaps a tuned multiply for an untuned one and leaves the rest alone.
 
 ---
 
@@ -162,12 +166,13 @@ Powering a droplet off does not stop billing. Destroy it in the AMD Developer Cl
 The goal of this article was to find whether AMD's AITER kernels speed up Gemma 4 on an AMD MI300X. The key to the solution was running the same fp8 build with and without `VLLM_ROCM_USE_AITER=1` back to back on one droplet and one image digest, and diffing the two boot logs to see what the flag replaced. The results were:
 
 - ❌ AITER made Gemma 4 12B fp8 slower in every one of nine cells, by 0.6% to 2.6%
-- ⚠️ Attention stays on Triton either way: Gemma 4's 512-wide full-attention heads force it
+- ⚠️ Attention stays on Triton either way: vLLM falls back to it for Gemma 4 when no backend is named
+- ⚠️ AITER's unified attention backend accepts Gemma 4's 512-wide heads in this build and has to be named with `--attention-backend`
 - ⚠️ The fp8 multiplies move to AITER, which has no tuned settings for any of the model's six weight shapes
 - 🟢 RMSNorm moves to AITER
 - 🟢 The stock numbers reproduce within 2.1% on a different droplet a day apart
 
-Scope: one MI300X droplet in AMD Developer Cloud's atl1 region, vLLM `0.31.1rc1.dev23+g43b4aaea3` at `vllm/vllm-openai-rocm@sha256:ec62abec…`, Gemma 4 12B in fp8 only, both runs on 2026-10-09 with three repeats per cell. bf16, the other sizes and a tuned AITER configuration were not run. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
+Scope: one MI300X droplet in AMD Developer Cloud's atl1 region, vLLM `0.31.1rc1.dev23+g43b4aaea3` at `vllm/vllm-openai-rocm@sha256:ec62abec…`, Gemma 4 12B in fp8 only, both runs on 2026-10-09 with three repeats per cell. bf16, the other sizes, a tuned AITER configuration and AITER's unified attention backend were not run. The repacked checkpoint is unofficial and derived from Google's release under Apache 2.0. Parts of the analysis and writing were done with AI assistance (Claude); every figure comes from the committed output files.
 
 The strategy for testing AITER with Gemma 4 on an AMD MI300X was validated with an incremental step by step approach.
 

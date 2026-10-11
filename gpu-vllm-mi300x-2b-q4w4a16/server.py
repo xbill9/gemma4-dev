@@ -115,6 +115,9 @@ GPU_MEMORY_UTILIZATION = os.environ.get("GPU_MEMORY_UTILIZATION", "0.90")
 # Empty serves the checkpoint as published (bf16). "fp8" quantizes online at
 # load to e4m3fnuz, which is what CDNA 3 needs — never pull an e4m3fn checkpoint.
 VLLM_QUANTIZATION = os.environ.get("VLLM_QUANTIZATION", "")
+# Empty leaves the attention backend to vLLM, which for Gemma 4 falls back to
+# TRITON_ATTN. Set it (e.g. ROCM_AITER_UNIFIED_ATTN) to pass --attention-backend.
+ATTENTION_BACKEND = os.environ.get("ATTENTION_BACKEND", "")
 # Empty drops the flag: a text-only checkpoint (Gemma4ForCausalLM) has no
 # multimodal inputs to limit. Text-only also means verify_capabilities skips
 # the vision probe rather than counting a missing tower as a failure.
@@ -433,6 +436,8 @@ def _serve_argv() -> list[str]:
         argv += ["--limit-mm-per-prompt", LIMIT_MM_PER_PROMPT]
     if VLLM_QUANTIZATION:
         argv += ["--quantization", VLLM_QUANTIZATION]
+    if ATTENTION_BACKEND:
+        argv += ["--attention-backend", ATTENTION_BACKEND]
     return argv
 
 

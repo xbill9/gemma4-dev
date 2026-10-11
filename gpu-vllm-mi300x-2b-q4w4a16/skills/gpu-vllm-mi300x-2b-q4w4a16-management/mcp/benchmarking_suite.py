@@ -34,6 +34,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 PROJECT_DIR = Path(__file__).resolve().parent
+# Where runs/ and reports/ go. The MI300X data-type sweeps of E4B, 12B, 26B-A4B and 31B serve
+# every arm through this rig's server.py and file each arm in the rig named for its checkpoint.
+OUTPUT_DIR = Path(os.environ.get("SUITE_OUTPUT_DIR") or PROJECT_DIR).resolve()
 
 # The sibling grid: four concurrencies against four context lengths, 128 output
 # tokens throughout. Cells that do not fit max_model_len are recorded
@@ -288,7 +291,8 @@ def build_report(
             **({"pricing": facts["pricing"]} if facts.get("pricing") else {}),
         },
         "model": {
-            "id": srv.VLLM_MODEL,
+            # A checkpoint served from a local path on the droplet is reported by its repo name.
+            "id": os.environ.get("REPORT_MODEL_ID") or srv.VLLM_MODEL,
             "family": "gemma-4",
             "parameters_b": float(os.environ.get("MODEL_PARAMETERS_B", "2")),
             # A checkpoint stored quantized (the repacks) is described by tpu.env, because
@@ -483,19 +487,19 @@ async def main() -> int:
             print(f"  c{cell['concurrency']:<3} in{cell['input_len']:<6} out{cell['output_len']:<5} {cell['status']}")
         return 0
 
-    run_dir = PROJECT_DIR / "benchmarks" / "runs" / args.run_id
+    run_dir = OUTPUT_DIR / "benchmarks" / "runs" / args.run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     facts = await collect_facts(srv, args.droplet)
     sweep = await run_sweep(srv, args.droplet, cells, run_dir, repeat=args.repeat, seed_base=args.seed_base)
     report = build_report(srv, args.run_id, sweep, facts, operator=args.operator, repeat=args.repeat)
 
-    reports_dir = PROJECT_DIR / "benchmarks" / "reports"
+    reports_dir = OUTPUT_DIR / "benchmarks" / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
     out = reports_dir / f"{args.run_id}.json"
     out.write_text(json.dumps(report, indent=2) + "\n")
-    print(f"\nwrote {out.relative_to(PROJECT_DIR)}")
-    print(f"      {run_dir.relative_to(PROJECT_DIR)}/ ({len(list(run_dir.glob('*.log')))} cell logs)")
+    print(f"\nwrote {out.relative_to(OUTPUT_DIR)}")
+    print(f"      {run_dir.relative_to(OUTPUT_DIR)}/ ({len(list(run_dir.glob('*.log')))} cell logs)")
 
     failed = [c for c in sweep if c.get("status") == "failed"]
     if failed:

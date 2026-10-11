@@ -115,6 +115,9 @@ GPU_MEMORY_UTILIZATION = os.environ.get("GPU_MEMORY_UTILIZATION", "0.90")
 # Empty serves the checkpoint as published (bf16). "fp8" quantizes online at
 # load to e4m3fnuz, which is what CDNA 3 needs — never pull an e4m3fn checkpoint.
 VLLM_QUANTIZATION = os.environ.get("VLLM_QUANTIZATION", "")
+# Empty leaves the attention backend to vLLM, which for Gemma 4 falls back to
+# TRITON_ATTN. Set it (e.g. ROCM_AITER_UNIFIED_ATTN) to pass --attention-backend.
+ATTENTION_BACKEND = os.environ.get("ATTENTION_BACKEND", "")
 # Empty drops the flag: a text-only checkpoint (Gemma4ForCausalLM) has no
 # multimodal inputs to limit. Text-only also means verify_capabilities skips
 # the vision probe rather than counting a missing tower as a failure.
@@ -128,6 +131,9 @@ CHAT_TEMPLATE = os.environ.get("CHAT_TEMPLATE", "/app/vllm/examples/tool_chat_te
 # The render groups on the Debian 13 GPU image. Passed as --group-add so the
 # container can open /dev/kfd without running privileged.
 RENDER_GIDS = os.environ.get("RENDER_GIDS", "44,991")
+# Comma-separated KEY=VALUE pairs passed into the model server's container, e.g.
+# "VLLM_ROCM_USE_AITER=1". Empty by default: the server runs on the image's defaults.
+VLLM_DOCKER_ENV = os.environ.get("VLLM_DOCKER_ENV", "")
 
 mcp = MCPServer(MCP_SERVER_NAME)
 READ_ONLY = ToolAnnotations(readOnlyHint=True, idempotentHint=True)
@@ -264,6 +270,12 @@ def _ssh_argv(ip: str, command: Optional[str] = None) -> list[str]:
         "StrictHostKeyChecking=accept-new",
         "-o",
         "ConnectTimeout=10",
+        # A dropped connection otherwise leaves ssh waiting forever on a remote
+        # command that is already gone (a 4B sweep cell hung 10 h this way).
+        "-o",
+        "ServerAliveInterval=30",
+        "-o",
+        "ServerAliveCountMax=6",
         "-p",
         SSH_PORT,
     ]
@@ -290,6 +302,8 @@ async def run_command(cmd: list[str], timeout: int = 120) -> tuple[int, str, str
             stderr.decode(errors="replace"),
         )
     except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
         return 124, "", f"timed out after {timeout}s"
     except FileNotFoundError:
         return 127, "", f"not found: {cmd[0]}"
@@ -391,8 +405,12 @@ def _serve_argv() -> list[str]:
         f"{HF_CACHE}:/root/.cache/huggingface",
         "-p",
         f"{VLLM_PORT}:{VLLM_PORT}",
-        VLLM_IMAGE,
     ]
+    for pair in VLLM_DOCKER_ENV.split(","):
+        pair = pair.strip()
+        if pair:
+            argv += ["-e", pair]
+    argv.append(VLLM_IMAGE)
     if not _is_official_image(VLLM_IMAGE):
         argv += ["vllm", "serve"]
     argv += [
@@ -418,6 +436,8 @@ def _serve_argv() -> list[str]:
         argv += ["--limit-mm-per-prompt", LIMIT_MM_PER_PROMPT]
     if VLLM_QUANTIZATION:
         argv += ["--quantization", VLLM_QUANTIZATION]
+    if ATTENTION_BACKEND:
+        argv += ["--attention-backend", ATTENTION_BACKEND]
     return argv
 
 
