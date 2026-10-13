@@ -78,10 +78,23 @@ r=5, each cell gated on the GPU at ≤40 °C.
 Against the parent's tg128 81.59–81.92 and pp512 344–345 on the same file:
 about **1.42x decode and 11x prefill**, indicative only (see above).
 
-**Not measured:** concurrency, a context sweep with `sweep.py`,
-`GGML_CUDA_FORCE_MMQ`, speculative decoding, and a CPU-only arm here. With
-~6.3 GiB free at the serving setting, this card has room for many more slots or
-a far longer context than the parent; that is the obvious next run.
+**Concurrency, `benchmarks/runs/2026-10-13-concurrency-3050oem/`** —
+`sweep.py`, c=1–64, 5 repeats, one server at `-c 65536 --parallel 64`
+(1024 tokens per slot, 2612 MiB):
+
+| | c=1 | c=16 | c=64 |
+| --- | ---: | ---: | ---: |
+| 512 in / 128 out, aggregate tok/s | 93.28 | 316.07 | 358.05 (3.84x) |
+| 128 in / 512 out, aggregate tok/s | 104.74 | 505.42 | 618.12 (5.90x) |
+
+- Prefill still serves one request at a time: TTFT about doubles per doubling
+  of c. The card prefills fast enough that decode batching shows through anyway;
+  the 1650 Ti's 512/128 output stalled at 1.47x c=1.
+- 512/128 spreads are wide at c=8–32 (15–26%, low tail). 128/512 stays under 5%.
+- Clock pinned at 1890 MHz, 68 °C peak; prompt cache 0 tokens.
+
+**Not measured:** a context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
+and a CPU-only arm here.
 
 ## Inherited and still true here
 
