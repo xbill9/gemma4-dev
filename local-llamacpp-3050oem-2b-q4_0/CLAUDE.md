@@ -45,6 +45,8 @@ Release, `FORCE_MMQ` off, into `~/llama.cpp/build/`. Two things about this host:
 - **`nvcc` is not on PATH.** The toolkit is at `/usr/local/cuda`; run
   `export PATH=/usr/local/cuda/bin:$PATH` before `make build`. The target says so
   if you forget.
+- **`make draft` needs `python3-torch`, `python3-safetensors`,
+  `python3-sentencepiece`, `python3-transformers`** (apt) for llama.cpp's converter.
 - **System python has no pip by default.** `cmake`, `python3-pip`,
   `python3-huggingface-hub`, `python3-dotenv`, `python3-httpx` and `ruff` came
   from apt; `mcp==2.2.0` from `pip install --break-system-packages`.
@@ -105,7 +107,18 @@ serves one user (`benchmarks/runs/2026-10-13-long-context-3050oem/`): 3610 MiB
 in all, short chats 0.997x. Generation with 8k / 32k / 65k / 120k tokens already
 in the conversation: 107 / 91 / 75 / 58 tok/s.
 
-**Not measured:** a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
+**Speculative decoding is ON since 2026-10-13**
+(`benchmarks/runs/2026-10-13-spec-mtp-3050oem/`): Google's E2B QAT assistant
+drafter, converted to Q8_0 GGUF by `make draft`, run as `--spec-type draft-mtp
+--spec-draft-n-max 2`. Generation 1.39x overall greedy (1.20x story .. 1.85x
+code), 1.36x sampled; 3/4/6 drafted tokens are worse and 6 is a net loss. Costs
+230 MiB and 3.6% of prompt speed. **Greedy output differs from serving without
+it** (each arm deterministic; they part at a near-tie word), so any benchmark
+or reference comparison that needs byte-identical greedy text must empty
+`SPEC_DRAFT_MODEL` first. The first-light, concurrency and context runs above
+were measured without the drafter.
+
+**Not measured:** drafting with `--parallel` > 1, a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
 and a CPU-only arm here.
 
 ## Inherited and still true here

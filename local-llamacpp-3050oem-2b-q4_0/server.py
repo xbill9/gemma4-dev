@@ -68,6 +68,9 @@ REASONING = os.environ.get("REASONING", "off")
 METRICS = os.environ.get("METRICS", "0")
 # Passed as -ot when set. tpu.env puts per_layer_token_embd on the card; see there.
 OVERRIDE_TENSORS = os.environ.get("OVERRIDE_TENSORS", "")
+# Speculative decoding with Google's E2B assistant drafter; tpu.env has the numbers.
+SPEC_DRAFT_MODEL = os.environ.get("SPEC_DRAFT_MODEL", "")
+SPEC_DRAFT_N_MAX = os.environ.get("SPEC_DRAFT_N_MAX", "2")
 
 RUN_DIR = RIG_DIR / "run"
 PID_FILE = RUN_DIR / "llama-server.pid"
@@ -227,6 +230,9 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
         cmd.append("--metrics")
     if OVERRIDE_TENSORS:
         cmd += ["-ot", OVERRIDE_TENSORS]
+    if SPEC_DRAFT_MODEL:
+        cmd += ["-md", SPEC_DRAFT_MODEL, "--spec-type", "draft-mtp", "-ngld", "all",
+                "--spec-draft-n-max", SPEC_DRAFT_N_MAX]
     # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
     # disabling it forces the 1.32 GB per-layer embedding tensor to be
     # materialised and turns a comfortable fit into an OOM.

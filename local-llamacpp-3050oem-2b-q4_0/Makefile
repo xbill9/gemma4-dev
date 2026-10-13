@@ -23,7 +23,7 @@ CUDA_ARCH ?= 86
 # threads; the 2026-10-13 build ran at -j10. Override with BUILD_JOBS=N.
 BUILD_JOBS ?= 10
 
-.PHONY: all help install build download test lint clean serve stop status metrics query info bench-validate
+.PHONY: all help install build download draft test lint clean serve stop status metrics query info bench-validate
 
 all: help
 
@@ -34,6 +34,7 @@ help:
 	@echo "  make install       - pip install -r requirements.txt (system python3)"
 	@echo "  make build         - build llama.cpp with CUDA (sm_$(CUDA_ARCH), -j$(BUILD_JOBS))"
 	@echo "  make download      - fetch the GGUF to MODEL_PATH and check MODEL_SHA256"
+	@echo "  make draft         - fetch + convert Google's speculative-decoding drafter"
 	@echo "  make info          - resident-vs-lazy split, read off the artifact"
 	@echo "  make serve         - run llama-server in the foreground"
 	@echo "  make status        - is it up?"
@@ -75,6 +76,16 @@ download:
 	python3 -c "from huggingface_hub import hf_hub_download; hf_hub_download('$(MODEL_NAME)', '$(notdir $(MODEL_PATH))', local_dir='$(dir $(MODEL_PATH))')"
 	echo "$(MODEL_SHA256)  $(MODEL_PATH)" | sha256sum -c -
 
+# Google's drafter for speculative decoding, converted to GGUF with llama.cpp's own
+# converter (needs python3-torch, -safetensors, -sentencepiece, -transformers from apt).
+# The sha256 check pins the conversion; a newer llama.cpp converter may change the bytes.
+DRAFT_HF_DIR ?= $(HOME)/models/hf/$(notdir $(SPEC_DRAFT_HF))
+draft:
+	python3 -c "from huggingface_hub import snapshot_download; snapshot_download('$(SPEC_DRAFT_HF)', revision='$(SPEC_DRAFT_HF_REVISION)', local_dir='$(DRAFT_HF_DIR)')"
+	@mkdir -p $(dir $(SPEC_DRAFT_MODEL))
+	python3 $(LLAMA_CPP_DIR)/convert_hf_to_gguf.py $(DRAFT_HF_DIR) --outtype q8_0 --outfile $(SPEC_DRAFT_MODEL)
+	echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c - || echo "sha256 differs: converter version changed; re-measure before trusting it"
+
 info:
 	python3 inspect_gguf.py
 
@@ -94,7 +105,8 @@ serve:
 	  --parallel $(PARALLEL_SLOTS) \
 	  --reasoning $(REASONING) \
 	  $(if $(filter 1,$(METRICS)),--metrics,) \
-	  $(if $(OVERRIDE_TENSORS),-ot '$(OVERRIDE_TENSORS)',)
+	  $(if $(OVERRIDE_TENSORS),-ot '$(OVERRIDE_TENSORS)',) \
+	  $(if $(SPEC_DRAFT_MODEL),-md $(SPEC_DRAFT_MODEL) --spec-type draft-mtp -ngld all --spec-draft-n-max $(SPEC_DRAFT_N_MAX),)
 
 status:
 	@curl -fsS $(ENDPOINT)/health && echo "  <- healthy" || echo "not serving at $(ENDPOINT)"

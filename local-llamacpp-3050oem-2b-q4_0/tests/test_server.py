@@ -337,7 +337,8 @@ class TestServerCommandMatchesMakefile(unittest.TestCase):
 
     def test_same_flag_set(self):
         with patch.object(server, "METRICS", "1"), \
-             patch.object(server, "OVERRIDE_TENSORS", r"per_layer_token_embd\.weight=CUDA0"):
+             patch.object(server, "OVERRIDE_TENSORS", r"per_layer_token_embd\.weight=CUDA0"), \
+             patch.object(server, "SPEC_DRAFT_MODEL", "/m/draft.gguf"):
             cmd = server._server_command()
         self.assertEqual({t for t in cmd if t.startswith("-")}, self._makefile_flags())
 
@@ -360,6 +361,16 @@ class TestServerCommandMatchesMakefile(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("-ot") + 1], value)
         with patch.object(server, "OVERRIDE_TENSORS", ""):
             self.assertNotIn("-ot", server._server_command())
+
+    def test_spec_draft_flags(self):
+        with patch.object(server, "SPEC_DRAFT_MODEL", "/m/draft.gguf"), \
+             patch.object(server, "SPEC_DRAFT_N_MAX", "2"):
+            cmd = server._server_command()
+        self.assertEqual(cmd[cmd.index("-md") + 1], "/m/draft.gguf")
+        self.assertEqual(cmd[cmd.index("--spec-type") + 1], "draft-mtp")
+        self.assertEqual(cmd[cmd.index("--spec-draft-n-max") + 1], "2")
+        with patch.object(server, "SPEC_DRAFT_MODEL", ""):
+            self.assertNotIn("-md", server._server_command())
 
     def test_never_disables_mmap(self):
         self.assertNotIn("--no-mmap", server._server_command())
