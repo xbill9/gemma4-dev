@@ -118,6 +118,10 @@ or reference comparison that needs byte-identical greedy text must empty
 `SPEC_DRAFT_MODEL` first. The first-light, concurrency and context runs above
 were measured without the drafter.
 
+**Answer quality against E4B**: see `local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-10-13-quality-e2b-vs-e4b-3050oem/`.
+This build scored suite 0.683 (E2B bf16 on TPU: 0.683), GSM8K 0.898 (bf16: 0.910),
+BFCL 0.925 (bf16: 0.927). E4B is +4.8 suite and +3.5 GSM8K points, level on BFCL.
+
 **Not measured:** drafting with `--parallel` > 1, a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
 and a CPU-only arm here.
 

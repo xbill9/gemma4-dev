@@ -42,9 +42,15 @@ Host, build and toolchain notes are the sister rig's; read its `CLAUDE.md`.
 - **By conversation length** (no draft): 60 / 56 / 47 / 39 / 30 tok/s at
   0 / 8k / 32k / 65k / 120k tokens, 0.52x E2B at every length.
 
+**Answer quality against E2B** (`benchmarks/runs/2026-10-13-quality-e2b-vs-e4b-3050oem/`,
+both Q4_0 builds, same flags, no drafter): Nimble suite 0.730 vs 0.683 (+0.048,
+range +0.035 to +0.061), GSM8K 0.933 vs 0.898 (+0.035), BFCL 0.910 vs 0.925
+(−0.015, range includes zero). Each build matches its TPU reference within range,
+so the gap is the model's.
+
 **Carried from the E2B rig, not re-measured here:** flash attention, f16 KV
 over q8_0, thread count. **Not measured:** concurrency, drafting with
-`--parallel` > 1, answer quality against E2B.
+`--parallel` > 1, quality with the drafter on.
 
 ## Inherited and still true here
 
