@@ -93,7 +93,8 @@ serve:
 	  -tb $(THREADS_BATCH) \
 	  --parallel $(PARALLEL_SLOTS) \
 	  --reasoning $(REASONING) \
-	  $(if $(filter 1,$(METRICS)),--metrics,)
+	  $(if $(filter 1,$(METRICS)),--metrics,) \
+	  $(if $(OVERRIDE_TENSORS),-ot '$(OVERRIDE_TENSORS)',)
 
 status:
 	@curl -fsS $(ENDPOINT)/health && echo "  <- healthy" || echo "not serving at $(ENDPOINT)"

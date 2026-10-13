@@ -66,6 +66,8 @@ PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
 # Thinking on/off/auto for the whole server; tpu.env explains why it is off.
 REASONING = os.environ.get("REASONING", "off")
 METRICS = os.environ.get("METRICS", "0")
+# Passed as -ot when set. tpu.env puts per_layer_token_embd on the card; see there.
+OVERRIDE_TENSORS = os.environ.get("OVERRIDE_TENSORS", "")
 
 RUN_DIR = RIG_DIR / "run"
 PID_FILE = RUN_DIR / "llama-server.pid"
@@ -223,6 +225,8 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
     # become the benchmark decode source.
     if METRICS == "1":
         cmd.append("--metrics")
+    if OVERRIDE_TENSORS:
+        cmd += ["-ot", OVERRIDE_TENSORS]
     # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
     # disabling it forces the 1.32 GB per-layer embedding tensor to be
     # materialised and turns a comfortable fit into an OOM.

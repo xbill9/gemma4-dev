@@ -93,13 +93,20 @@ about **1.42x decode and 11x prefill**, indicative only (see above).
 - 512/128 spreads are wide at c=8–32 (15–26%, low tail). 128/512 stays under 5%.
 - Clock pinned at 1890 MHz, 68 °C peak; prompt cache 0 tokens.
 
+**`per_layer_token_embd` is ON THE CARD since 2026-10-13**
+(`benchmarks/runs/2026-10-13-ple-offload-3050oem/`): `-ot` via
+`OVERRIDE_TENSORS` in `tpu.env`. Prefill 1.036x at pp512 and 1.024x at pp2048,
+decode 1.001x, for 1260 MiB (serving total 2770 MiB of 8192). The 1650 Ti
+measured no gain from the same move. `-ub 2048` adds nothing. The first-light
+and concurrency runs above were made with the table on the host.
+
 **Not measured:** a context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
 and a CPU-only arm here.
 
 ## Inherited and still true here
 
-- **Never pass `--no-mmap`.** `per_layer_token_embd` is `TENSOR_READ_LAZY`,
-  which requires mmap. A test asserts it.
+- **Never pass `--no-mmap`.** Even with `per_layer_token_embd` on the card,
+  `token_embd`'s 216 MiB input copy is read from the mmap. A test asserts it.
 - **Never lower `N_GPU_LAYERS` "to be safe."** Full offload uses under a fifth of
   the card.
 - Gemma 4 reasons, and llama.cpp routes the thinking block to

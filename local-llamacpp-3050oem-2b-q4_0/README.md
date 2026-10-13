@@ -38,11 +38,10 @@ documentation — never copy a slot value into a flag.
 
 ## Memory
 
-The file is 2.62 GB; only 1.20 GiB of it has to be resident.
-`per_layer_token_embd` (1.321 GB, 51% of the file) is created by llama.cpp with
-`TENSOR_READ_LAZY` and served with `GET_ROWS` out of the mmap. **Never pass
-`--no-mmap`**, and never lower `N_GPU_LAYERS` "to be safe": full offload uses
-under a fifth of this card.
+The file is 2.62 GB. llama.cpp would leave `per_layer_token_embd` (1.321 GB, 51%
+of the file) in the mmap, but with 8 GiB to spare `tpu.env` puts it on the card
+(`OVERRIDE_TENSORS`, passed as `-ot`): 3.6% faster prefill, same decode, 2770 MiB
+in use. **Never pass `--no-mmap`**: `token_embd`'s input copy still reads from it.
 
 ## Layout
 
