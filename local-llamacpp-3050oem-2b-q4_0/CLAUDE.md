@@ -100,7 +100,12 @@ decode 1.001x, for 1260 MiB (serving total 2770 MiB of 8192). The 1650 Ti
 measured no gain from the same move. `-ub 2048` adds nothing. The first-light
 and concurrency runs above were made with the table on the host.
 
-**Not measured:** a context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
+**Context is 131,072 since 2026-10-13**, the trained maximum, because this rig
+serves one user (`benchmarks/runs/2026-10-13-long-context-3050oem/`): 3610 MiB
+in all, short chats 0.997x. Generation with 8k / 32k / 65k / 120k tokens already
+in the conversation: 107 / 91 / 75 / 58 tok/s.
+
+**Not measured:** a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
 and a CPU-only arm here.
 
 ## Inherited and still true here

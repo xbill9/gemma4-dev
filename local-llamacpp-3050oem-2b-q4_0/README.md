@@ -41,7 +41,7 @@ documentation — never copy a slot value into a flag.
 The file is 2.62 GB. llama.cpp would leave `per_layer_token_embd` (1.321 GB, 51%
 of the file) in the mmap, but with 8 GiB to spare `tpu.env` puts it on the card
 (`OVERRIDE_TENSORS`, passed as `-ot`): 3.6% faster prefill, same decode, 2770 MiB
-in use. **Never pass `--no-mmap`**: `token_embd`'s input copy still reads from it.
+in use, 3610 MiB with the full 131,072-token context the rig serves. **Never pass `--no-mmap`**: `token_embd`'s input copy still reads from it.
 
 ## Layout
 
