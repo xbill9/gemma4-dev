@@ -60,7 +60,7 @@ for model in ("e2b", "e4b"):
     for t in LOCAL:
         try:
             w = {arm: wall(model, arm, t) for arm in ("none", "q8", "q4x")}
-        except (FileNotFoundError, KeyError, ValueError):
+        except (FileNotFoundError, KeyError, ValueError, IndexError):
             continue
         res.setdefault("wall", {})[f"{model}-{t}"] = w
         md.append(f"| {model} | {t} | {w['none']:.0f} | {w['q8']:.0f} | {w['q4x']:.0f} | "

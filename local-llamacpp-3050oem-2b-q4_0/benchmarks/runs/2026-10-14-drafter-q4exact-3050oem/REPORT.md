@@ -78,5 +78,15 @@ E2B, against the 2026-10-13 no-drafter run:
 On GSM8K, Q8_0 and Q4_0 disagree on 42 problems, 19 against 23. The same-day no-drafter control
 measures how much two runs at 8 concurrent requests differ with no drafter at all.
 
-E4B with the Q8_0 drafter: GSM8K 0.9310 against 0.9325 without it, BFCL 0.915 against 0.910;
-GSM8K wall time 1,342 s against 2,267 s. The exact Q4_0 arm and both controls are still running.
+E4B, against the 2026-10-13 no-drafter run:
+
+| | no drafter | Q8_0 | exact Q4_0 | Q4_0 − Q8_0 (95% range) |
+| --- | ---: | ---: | ---: | --- |
+| GSM8K | 0.9325 | 0.9310 | 0.9325 | +0.0015 (−0.005 to +0.008) |
+| BFCL simple | 0.9100 | 0.9150 | 0.9150 | +0.0000 (−0.007 to +0.007) |
+| GSM8K wall time | 2,267 s | 1,342 s | 1,345 s | |
+| acceptance over GSM8K + BFCL | — | 0.8374 | 0.8382 | |
+
+Every drafted arm's difference from the no-drafter run has a 95% range that includes zero, except
+E4B BFCL with Q8_0, whose range touches it (+0.000 to +0.0125). The same-day no-drafter control is
+still running.
