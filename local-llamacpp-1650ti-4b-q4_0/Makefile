@@ -25,7 +25,7 @@ CUDA_ARCH ?= 75
 # and never touches swap, in 10m09. Override with BUILD_JOBS=N if you know better.
 BUILD_JOBS ?= 6
 
-.PHONY: all help install build test lint clean serve stop status metrics query info bench-validate
+.PHONY: all help install build draft test lint clean serve stop status metrics query info bench-validate
 
 all: help
 
@@ -37,6 +37,7 @@ help:
 	@echo "  the two do not fit together -- stop one before serving the other."
 	@echo "  make install       - pip install -r requirements.txt (system python3)"
 	@echo "  make build         - build llama.cpp with CUDA (sm_$(CUDA_ARCH), -j$(BUILD_JOBS))"
+	@echo "  make draft         - fetch the exact Q4_0 speculative-decoding drafter"
 	@echo "  make info          - resident-vs-lazy split, read off the artifact"
 	@echo "  make serve         - run llama-server in the foreground"
 	@echo "  make status        - is it up?"
@@ -71,6 +72,13 @@ build:
 	cmake --build $(LLAMA_CPP_DIR)/build --config Release -j$(BUILD_JOBS) --target llama-server llama-bench
 	@echo "built at commit $$(git -C $(LLAMA_CPP_DIR) rev-parse --short HEAD) — record it as LLAMA_CPP_COMMIT in tpu.env"
 
+# The exact Q4_0 drafter from Hugging Face at the pinned revision, checked against
+# SPEC_DRAFT_SHA256. Built from Google's bf16 drafter by gguf_exact.py in
+# local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-q4exact-3050oem.
+draft:
+	python3 -c "from huggingface_hub import hf_hub_download; hf_hub_download('$(SPEC_DRAFT_HF)', '$(notdir $(SPEC_DRAFT_MODEL))', revision='$(SPEC_DRAFT_HF_REVISION)', local_dir='$(dir $(SPEC_DRAFT_MODEL))')"
+	echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c -
+
 info:
 	python3 inspect_gguf.py
 
@@ -89,7 +97,8 @@ serve:
 	  -tb $(THREADS_BATCH) \
 	  --parallel $(PARALLEL_SLOTS) \
 	  --reasoning $(REASONING) \
-	  $(if $(filter 1,$(METRICS)),--metrics,)
+	  $(if $(filter 1,$(METRICS)),--metrics,) \
+	  $(if $(SPEC_DRAFT_MODEL),-md $(SPEC_DRAFT_MODEL) --spec-type draft-mtp -ngld all --spec-draft-n-max $(SPEC_DRAFT_N_MAX),)
 
 status:
 	@curl -fsS $(ENDPOINT)/health && echo "  <- healthy" || echo "not serving at $(ENDPOINT)"

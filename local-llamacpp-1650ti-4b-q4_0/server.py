@@ -71,6 +71,9 @@ PARALLEL_SLOTS = os.environ.get("PARALLEL_SLOTS", "1")
 # Thinking on/off/auto for the whole server; tpu.env explains why it is off.
 REASONING = os.environ.get("REASONING", "off")
 METRICS = os.environ.get("METRICS", "0")
+# Speculative decoding with Google's E4B assistant drafter; tpu.env has the numbers.
+SPEC_DRAFT_MODEL = os.environ.get("SPEC_DRAFT_MODEL", "")
+SPEC_DRAFT_N_MAX = os.environ.get("SPEC_DRAFT_N_MAX", "2")
 
 RUN_DIR = RIG_DIR / "run"
 PID_FILE = RUN_DIR / "llama-server.pid"
@@ -213,6 +216,9 @@ def _server_command(context_size: Optional[str] = None) -> list[str]:
     # become the benchmark decode source.
     if METRICS == "1":
         cmd.append("--metrics")
+    if SPEC_DRAFT_MODEL:
+        cmd += ["-md", SPEC_DRAFT_MODEL, "--spec-type", "draft-mtp", "-ngld", "all",
+                "--spec-draft-n-max", SPEC_DRAFT_N_MAX]
     # NOTE: no --no-mmap, ever. TENSOR_READ_LAZY "requires mmap for now", so
     # disabling it forces the 1.32 GB per-layer embedding tensor to be
     # materialised and turns a comfortable fit into an OOM.

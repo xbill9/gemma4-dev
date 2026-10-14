@@ -336,9 +336,20 @@ class TestServerCommandMatchesMakefile(unittest.TestCase):
         return set(re.findall(r"(?<![\w-])(--?[a-z][\w-]*)", recipe))
 
     def test_same_flag_set(self):
-        with patch.object(server, "METRICS", "1"):
+        with patch.object(server, "METRICS", "1"), \
+             patch.object(server, "SPEC_DRAFT_MODEL", "/m/draft.gguf"):
             cmd = server._server_command()
         self.assertEqual({t for t in cmd if t.startswith("-")}, self._makefile_flags())
+
+    def test_spec_draft_flags(self):
+        with patch.object(server, "SPEC_DRAFT_MODEL", "/m/draft.gguf"), \
+             patch.object(server, "SPEC_DRAFT_N_MAX", "1"):
+            cmd = server._server_command()
+        self.assertEqual(cmd[cmd.index("-md") + 1], "/m/draft.gguf")
+        self.assertEqual(cmd[cmd.index("--spec-type") + 1], "draft-mtp")
+        self.assertEqual(cmd[cmd.index("--spec-draft-n-max") + 1], "1")
+        with patch.object(server, "SPEC_DRAFT_MODEL", ""):
+            self.assertNotIn("-md", server._server_command())
 
     def test_measured_levers_come_from_tpu_env(self):
         with patch.object(server, "FLASH_ATTENTION", "1"), \

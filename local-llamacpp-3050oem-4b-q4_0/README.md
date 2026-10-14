@@ -28,7 +28,7 @@ make install                          # pip install -r requirements.txt into the
 export PATH=/usr/local/cuda/bin:$PATH # nvcc is not on PATH on this host
 make build                            # llama.cpp with CUDA for sm_86 (shared with the E2B rig)
 make download                         # the E4B GGUF to MODEL_PATH, sha256-checked
-make draft                            # Google's E4B drafter, converted to GGUF
+make draft                            # the exact Q4_0 E4B drafter, sha256-checked
 make serve                            # llama-server in the foreground on 0.0.0.0:8080
 make query                            # one chat completion
 ```

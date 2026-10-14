@@ -17,6 +17,11 @@ byte, with every weight matrix, both embedding tables and `per_layer_model_proj`
 
 **E4B is not a 4B model.** 4.5B effective, 8.0B total (`@MODELS.md`). llama-bench reports 7.46 B.
 
+**Speculative decoding is ON since 2026-10-14** with Google's E4B QAT assistant drafter as
+exact Q4_0 (`make draft` fetches it from Hugging Face, SHA-256 in `tpu.env`): 2 drafted tokens: 38.5 → 55.1 tok/s (1.43x), level with 1 token; 3 tokens 1.32x.
+Costs 72–74 MiB of VRAM. Empty `SPEC_DRAFT_MODEL` for byte-comparable greedy runs
+(`local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-1650ti/`).
+
 ## It fits, with ~820 MiB to spare — MEASURED 2026-09-30
 
 | | Google's E4B GGUF | exact rebuild | E2B exact v2, for scale |

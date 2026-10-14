@@ -34,7 +34,7 @@ help:
 	@echo "  make install       - pip install -r requirements.txt (system python3)"
 	@echo "  make build         - build llama.cpp with CUDA (sm_$(CUDA_ARCH), -j$(BUILD_JOBS))"
 	@echo "  make download      - fetch the GGUF to MODEL_PATH and check MODEL_SHA256"
-	@echo "  make draft         - fetch + convert Google's speculative-decoding drafter"
+	@echo "  make draft         - fetch the exact Q4_0 speculative-decoding drafter"
 	@echo "  make info          - resident-vs-lazy split, read off the artifact"
 	@echo "  make serve         - run llama-server in the foreground"
 	@echo "  make status        - is it up?"
@@ -76,15 +76,12 @@ download:
 	python3 -c "from huggingface_hub import hf_hub_download; hf_hub_download('$(MODEL_NAME)', '$(notdir $(MODEL_PATH))', local_dir='$(dir $(MODEL_PATH))')"
 	echo "$(MODEL_SHA256)  $(MODEL_PATH)" | sha256sum -c -
 
-# Google's drafter for speculative decoding, converted to GGUF with llama.cpp's own
-# converter (needs python3-torch, -safetensors, -sentencepiece, -transformers from apt).
-# The sha256 check pins the conversion; a newer llama.cpp converter may change the bytes.
-DRAFT_HF_DIR ?= $(HOME)/models/hf/$(notdir $(SPEC_DRAFT_HF))
+# The exact Q4_0 drafter from Hugging Face at the pinned revision, checked against
+# SPEC_DRAFT_SHA256. Built from Google's bf16 drafter by gguf_exact.py in
+# local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-q4exact-3050oem.
 draft:
-	python3 -c "from huggingface_hub import snapshot_download; snapshot_download('$(SPEC_DRAFT_HF)', revision='$(SPEC_DRAFT_HF_REVISION)', local_dir='$(DRAFT_HF_DIR)')"
-	@mkdir -p $(dir $(SPEC_DRAFT_MODEL))
-	python3 $(LLAMA_CPP_DIR)/convert_hf_to_gguf.py $(DRAFT_HF_DIR) --outtype q8_0 --outfile $(SPEC_DRAFT_MODEL)
-	echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c - || echo "sha256 differs: converter version changed; re-measure before trusting it"
+	python3 -c "from huggingface_hub import hf_hub_download; hf_hub_download('$(SPEC_DRAFT_HF)', '$(notdir $(SPEC_DRAFT_MODEL))', revision='$(SPEC_DRAFT_HF_REVISION)', local_dir='$(dir $(SPEC_DRAFT_MODEL))')"
+	echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c -
 
 info:
 	python3 inspect_gguf.py

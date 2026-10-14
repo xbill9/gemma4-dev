@@ -33,6 +33,12 @@ Host, build and toolchain notes are the sister rig's; read its `CLAUDE.md`.
 | VRAM at -c 131072 with drafter | 6,662 MiB | 3,840 |
 | KV cache at 131,072 tokens | 2,088 MiB | 780 |
 
+- **Drafter since 2026-10-14: exact Q4_0** (59 MB, from
+  `xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf`), replacing the Q8_0
+  conversion: 100.0 against 100.4 tok/s, same acceptance, GSM8K and BFCL level with
+  no drafter at `--parallel 8`, 38 MiB less VRAM
+  (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-q4exact-3050oem/`).
+  The table above was measured with the Q8_0 drafter.
 - **Drafting:** 2 tokens is best overall (1.54x story .. 2.21x code); 3 is
   level and best on code; 4 is worse. **Greedy output at 2 and 3 drafted
   tokens is byte-identical to no drafting** (18 of 18), unlike E2B; at 4 it
@@ -49,8 +55,7 @@ range +0.035 to +0.061), GSM8K 0.933 vs 0.898 (+0.035), BFCL 0.910 vs 0.925
 so the gap is the model's.
 
 **Carried from the E2B rig, not re-measured here:** flash attention, f16 KV
-over q8_0, thread count. **Not measured:** concurrency, drafting with
-`--parallel` > 1, quality with the drafter on.
+over q8_0, thread count. **Not measured:** concurrency.
 
 ## Inherited and still true here
 

@@ -45,8 +45,10 @@ Release, `FORCE_MMQ` off, into `~/llama.cpp/build/`. Two things about this host:
 - **`nvcc` is not on PATH.** The toolkit is at `/usr/local/cuda`; run
   `export PATH=/usr/local/cuda/bin:$PATH` before `make build`. The target says so
   if you forget.
-- **`make draft` needs `python3-torch`, `python3-safetensors`,
-  `python3-sentencepiece`, `python3-transformers`** (apt) for llama.cpp's converter.
+- **Rebuilding the drafter from Google's bf16** (`gguf_exact.py` in
+  `benchmarks/runs/2026-10-14-drafter-q4exact-3050oem/`) needs `python3-torch`,
+  `python3-safetensors`, `python3-sentencepiece`, `python3-transformers` (apt).
+  `make draft` only downloads.
 - **System python has no pip by default.** `cmake`, `python3-pip`,
   `python3-huggingface-hub`, `python3-dotenv`, `python3-httpx` and `ruff` came
   from apt; `mcp==2.2.0` from `pip install --break-system-packages`.
@@ -118,11 +120,17 @@ or reference comparison that needs byte-identical greedy text must empty
 `SPEC_DRAFT_MODEL` first. The first-light, concurrency and context runs above
 were measured without the drafter.
 
+**The exact Q4_0 drafter replaced the Q8_0 conversion on 2026-10-14**
+(`benchmarks/runs/2026-10-14-drafter-q4exact-3050oem/`): 59 MB against 98, closer to
+Google's weights, same speed (151.1 against 150.1 tok/s), same acceptance, GSM8K and
+BFCL level with each other and with no drafter at `--parallel 8`, 40 MiB less VRAM.
+`make draft` now downloads it from Hugging Face instead of converting.
+
 **Answer quality against E4B**: see `local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-10-13-quality-e2b-vs-e4b-3050oem/`.
 This build scored suite 0.683 (E2B bf16 on TPU: 0.683), GSM8K 0.898 (bf16: 0.910),
 BFCL 0.925 (bf16: 0.927). E4B is +4.8 suite and +3.5 GSM8K points, level on BFCL.
 
-**Not measured:** drafting with `--parallel` > 1, a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
+**Not measured:** a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
 and a CPU-only arm here.
 
 ## Inherited and still true here

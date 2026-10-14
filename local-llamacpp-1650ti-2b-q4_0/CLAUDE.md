@@ -62,6 +62,11 @@ pairable with a run made on `f95b0d9`** except 2026-09-22, which re-ran both arm
 card with this binary and these flags, on the same port 8080. It holds 2848 MiB, so **the two rigs cannot
 serve at the same time** — stop this one first. Its numbers are its own; see its `CLAUDE.md`.
 
+**Speculative decoding is ON since 2026-10-14** with Google's E2B QAT assistant drafter as
+exact Q4_0 (`make draft` fetches it from Hugging Face, SHA-256 in `tpu.env`): 1 drafted token: 79.0 → 93.2 tok/s (1.18x), acceptance 0.62; 2 tokens 1.11x, 3 tokens 1.02x.
+Costs 72–74 MiB of VRAM. Empty `SPEC_DRAFT_MODEL` for byte-comparable greedy runs
+(`local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-1650ti/`).
+
 ## This rig is one arm of a control
 
 `local-llamacpp-cpu-2b-q4_0` is the other arm: the same GGUF served by the same

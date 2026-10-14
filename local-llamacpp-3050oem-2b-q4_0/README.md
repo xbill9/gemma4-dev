@@ -27,7 +27,7 @@ make install                          # pip install -r requirements.txt into the
 export PATH=/usr/local/cuda/bin:$PATH # nvcc is not on PATH on this host
 make build                            # llama.cpp with CUDA for sm_86, -j10
 make download                         # the GGUF to MODEL_PATH, sha256-checked
-make draft                            # Google's speculative-decoding drafter, converted to GGUF
+make draft                            # the exact Q4_0 speculative-decoding drafter, sha256-checked
 make info                             # resident-vs-lazy memory split, read off the artifact
 make serve                            # llama-server in the foreground; Ctrl-C is a full teardown
 make status                           # is it up?
@@ -47,8 +47,9 @@ in use, 3610 MiB with the full 131,072-token context the rig serves.
 ## Speculative decoding
 
 `make serve` runs Google's drafter for this checkpoint
-(`google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant`, converted by `make draft`)
-as a 2-token draft-mtp speculator: about **1.39x faster generation** (1.20x on
+(`google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant`), stored as exact Q4_0 on its
+QAT grid and fetched from `xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf` by
+`make draft`, as a 2-token draft-mtp speculator: about **1.39x faster generation** (1.20x on
 stories, 1.85x on code), 3840 MiB in all. Greedy replies differ slightly from
 serving without it; empty `SPEC_DRAFT_MODEL` in `tpu.env` to turn it off. **Never pass `--no-mmap`**: `token_embd`'s input copy still reads from it.
 
