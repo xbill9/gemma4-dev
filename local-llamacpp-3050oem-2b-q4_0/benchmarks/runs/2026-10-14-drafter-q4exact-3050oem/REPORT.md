@@ -1,9 +1,6 @@
 # 2026-10-14 — exact Q4_0 drafter against Q8_0 and bf16, RTX 3050 OEM
 
-**Status: speed and E2B accuracy complete; E4B accuracy and the same-day no-drafter control
-are running.** This file is updated when they finish.
-
-**Answer so far: the exact Q4_0 drafter is as fast as the Q8_0 one, guesses the same tokens,
+**Answer: the exact Q4_0 drafter is as fast as the Q8_0 one, guesses the same tokens,
 and scores the same, at 60% of the file size.** Drafter precision does not move acceptance at
 all: Google's bf16 weights, unchanged, accept the same share of drafted tokens as either
 4-bit or 8-bit, and run slower.
@@ -75,9 +72,6 @@ E2B, against the 2026-10-13 no-drafter run:
 | GSM8K wall time | 1,760 s | 1,150 s | 1,167 s | |
 | acceptance over GSM8K + BFCL | — | 0.7974 | 0.7972 | |
 
-On GSM8K, Q8_0 and Q4_0 disagree on 42 problems, 19 against 23. The same-day no-drafter control
-measures how much two runs at 8 concurrent requests differ with no drafter at all.
-
 E4B, against the 2026-10-13 no-drafter run:
 
 | | no drafter | Q8_0 | exact Q4_0 | Q4_0 − Q8_0 (95% range) |
@@ -87,6 +81,23 @@ E4B, against the 2026-10-13 no-drafter run:
 | GSM8K wall time | 2,267 s | 1,342 s | 1,345 s | |
 | acceptance over GSM8K + BFCL | — | 0.8374 | 0.8382 | |
 
-Every drafted arm's difference from the no-drafter run has a 95% range that includes zero, except
-E4B BFCL with Q8_0, whose range touches it (+0.000 to +0.0125). The same-day no-drafter control is
-still running.
+## Same-day no-drafter control (`run_control.sh`)
+
+Both models again with no drafter, same flags, after the drafted arms. Full tables in
+`accuracy/COMPARE.md`, numbers in `accuracy/compare.json`.
+
+| | E2B GSM8K | E2B BFCL | E4B GSM8K | E4B BFCL |
+| --- | ---: | ---: | ---: | ---: |
+| no drafter, 2026-10-13 | 0.8976 | 0.9250 | 0.9325 | 0.9100 |
+| no drafter, today | 0.8984 | 0.9250 | 0.9340 | 0.9100 |
+| Q8_0 drafter | 0.8992 | 0.9225 | 0.9310 | 0.9150 |
+| exact Q4_0 drafter | 0.9022 | 0.9225 | 0.9325 | 0.9150 |
+
+- **Every drafted arm is level with today's no-drafter run**: each paired difference's 95% range
+  includes zero, except E4B BFCL with Q8_0 (+0.005, range +0.000 to +0.013, 2 problems).
+- **The no-drafter baseline reproduces in score but not in text.** Two no-drafter E2B runs disagree on
+  59 GSM8K problems (29 against 30) and give the same text on only 175 of 1,319; E4B, 20 problems and
+  366. At 8 concurrent requests, batch composition changes greedy text from run to run. Q8_0 and Q4_0
+  drafters disagree on 42 E2B problems and 16 E4B problems, which is within that run-to-run variation.
+- **Drafting finishes the work faster at 8 concurrent requests**: GSM8K 1.54x (Q8_0) and 1.51x (Q4_0)
+  on E2B, 1.69x on E4B for both; BFCL 1.18–1.22x.
