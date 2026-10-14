@@ -80,7 +80,10 @@ download:
 # SPEC_DRAFT_SHA256. Built from Google's bf16 drafter by gguf_exact.py in
 # local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-q4exact-3050oem.
 draft:
-	python3 -c "from huggingface_hub import hf_hub_download; hf_hub_download('$(SPEC_DRAFT_HF)', '$(notdir $(SPEC_DRAFT_MODEL))', revision='$(SPEC_DRAFT_HF_REVISION)', local_dir='$(dir $(SPEC_DRAFT_MODEL))')"
+	@mkdir -p $(dir $(SPEC_DRAFT_MODEL))
+	@echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c --quiet - 2>/dev/null || \
+	  curl -fL -o $(SPEC_DRAFT_MODEL).part https://huggingface.co/$(SPEC_DRAFT_HF)/resolve/$(SPEC_DRAFT_HF_REVISION)/$(notdir $(SPEC_DRAFT_MODEL))
+	@test ! -f $(SPEC_DRAFT_MODEL).part || mv $(SPEC_DRAFT_MODEL).part $(SPEC_DRAFT_MODEL)
 	echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c -
 
 info:
