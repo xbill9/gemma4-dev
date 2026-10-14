@@ -51,6 +51,38 @@ byte-identical copy — five rigs on one row is one measurement, not five.
 | `2026-09-30-emb4-sweep-e4b-t4` | xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4 | nvidia-t4×1 | on-demand / gcp | vllm 0.29.0 | 2-D (2ctx × 4conc) | 131 | — | 1.1 | ok | gpu-vllm-t4-4b-q4w4a16emb4 |
 | `2026-09-30-paired-sweep-1650ti` | xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf | NVIDIA GeForce GTX 1650 Ti with Max-Q Design×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 33 | — | 1.1 | ok | local-llamacpp-1650ti-4b-q4_0 |
 | `2026-09-30-paired-sweep-cpu` | xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf | Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz×1 | — | llama.cpp b318-f95b0d9 | 2-D (4ctx × 1conc) | 8 | — | 1.1 | ok | local-llamacpp-cpu-4b-q4_0 |
+| `2026-10-07-dtype-sweep-mi300x` | google/gemma-4-12B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 4,066 | — | 1.1 | ok | gpu-vllm-mi300x-12b |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-12B-it-qat-q4_0-fp8-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 4,952 | — | 1.1 | ok | gpu-vllm-mi300x-12b-fp8 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-12B-it-qat-q4_0-fp8-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 4,793 | — | 1.1 | ok | gpu-vllm-mi300x-12b-fp8emb4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 1,568 | — | 1.1 | ok | gpu-vllm-mi300x-12b-q4w4a16 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 1,548 | — | 1.1 | ok | gpu-vllm-mi300x-12b-q4w4a16emb4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-12B-it-qat-w8a8-int8 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 2,528 | — | 1.1 | ok | gpu-vllm-mi300x-12b-w8a8 |
+| `2026-10-07-dtype-sweep-mi300x` | google/gemma-4-26B-A4B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 3,621 | — | 1.1 | ok | gpu-vllm-mi300x-26b |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-26B-A4B-it-qat-q4_0-fp8-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 4,468 | — | 1.1 | ok | gpu-vllm-mi300x-26b-fp8 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 2,378 | — | 1.1 | ok | gpu-vllm-mi300x-26b-q4w4a16 |
+| `2026-10-07-dtype-sweep-mi300x` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 11,866 | — | 1.1 | ok | gpu-vllm-mi300x-2b |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 12,080 | — | 1.1 | ok | gpu-vllm-mi300x-2b-fp8 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 11,766 | — | 1.1 | ok | gpu-vllm-mi300x-2b-fp8emb4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 12,129 | — | 1.1 | ok | gpu-vllm-mi300x-2b-fp8fnuz |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-q4_0-fp8fnuz-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 11,759 | — | 1.1 | ok | gpu-vllm-mi300x-2b-fp8fnuzemb4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 3,764 | — | 1.1 | ok | gpu-vllm-mi300x-2b-q4w4a16 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 3,762 | — | 1.1 | ok | gpu-vllm-mi300x-2b-q4w4a16emb4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-ple4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 3,754 | — | 1.1 | ok | gpu-vllm-mi300x-2b-q4w4a16ple4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-w8a8-int8 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 5,355 | — | 1.1 | ok | gpu-vllm-mi300x-2b-w8a8 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E2B-it-qat-w8a8-ct-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 5,271 | — | 1.1 | ok | gpu-vllm-mi300x-2b-w8a8emb4 |
+| `2026-10-07-dtype-sweep-mi300x` | google/gemma-4-31B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 1,749 | — | 1.1 | ok | gpu-vllm-mi300x-31b |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-31B-it-qat-q4_0-fp8-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 2,340 | — | 1.1 | ok | gpu-vllm-mi300x-31b-fp8 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-31B-it-qat-q4_0-w4a16-ct-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 783 | — | 1.1 | ok | gpu-vllm-mi300x-31b-q4w4a16 |
+| `2026-10-07-dtype-sweep-mi300x` | google/gemma-4-E4B-it | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 7,990 | — | 1.1 | ok | gpu-vllm-mi300x-4b |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E4B-it-qat-q4_0-fp8-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 8,854 | — | 1.1 | ok | gpu-vllm-mi300x-4b-fp8 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E4B-it-qat-q4_0-fp8-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 8,318 | — | 1.1 | ok | gpu-vllm-mi300x-4b-fp8emb4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 2,597 | — | 1.1 | ok | gpu-vllm-mi300x-4b-q4w4a16 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-emb4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 2,558 | — | 1.1 | ok | gpu-vllm-mi300x-4b-q4w4a16emb4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E4B-it-qat-q4_0-w4a16-ct-text-ple4 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 2,580 | — | 1.1 | ok | gpu-vllm-mi300x-4b-q4w4a16ple4 |
+| `2026-10-07-dtype-sweep-mi300x` | xbill9/gemma-4-E4B-it-qat-w8a8-int8 | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 3,905 | — | 1.1 | ok | gpu-vllm-mi300x-4b-w8a8 |
+| `2026-10-07-embeddinggemma2-t4` | google/embeddinggemma-2 | nvidia-t4×1 | — / gcp | vllm 0.31.1rc1.dev63+gd169… | 2-D (4ctx × 3conc) | 0 | — | 1.1 | ok | gpu-vllm-t4-embed2 |
+| `2026-10-09-aiter-mi300x` | xbill9/gemma-4-12B-it-qat-q4_0-fp8-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 4,780 | — | 1.1 | ok | gpu-vllm-mi300x-12b-fp8 |
+| `2026-10-09-stock-mi300x` | xbill9/gemma-4-12B-it-qat-q4_0-fp8-text | amd-mi300x×1 | on-demand / digitalocean | vllm 0.31.1rc1.dev23+g43b4… | 2-D (3ctx × 3conc) | 4,874 | — | 1.1 | ok | gpu-vllm-mi300x-12b-fp8 |
 
 ## Sweep run directories
 
@@ -146,6 +178,20 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-31b-w4a16 | `2026-06-09-vllm-grid-cloudrun-l4` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-31b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-4b-w4a16 | `2026-07-12-vllm-grid-gce-l4` | 2 | 0 | 0 | yes | **no** |
+| gpu-vllm-mi300x-12b | `2026-10-07-dtype-sweep-mi300x` | 36 | 1 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b | `2026-10-09-aiter-mi300x` | 3 | 1 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b | `2026-10-09-stock-mi300x` | 3 | 1 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-fp8 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-fp8 | `2026-10-09-aiter-mi300x` | 35 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-fp8 | `2026-10-09-stock-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-fp8emb4 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-q4w4a16 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-q4w4a16emb4 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-w8a8 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-12b-w8a8emb4 | `2026-10-07-dtype-sweep-mi300x` | 5 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-26b | `2026-10-07-dtype-sweep-mi300x` | 36 | 1 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-26b-fp8 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-26b-q4w4a16 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-16-vllm-sweep-mi300x` | 36 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-16-vllm-sweep-mi300x-seedcollision` | 38 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-17-vllm-sweep-mi300x` | 36 | 0 | 0 | **no** | **no** |
@@ -154,10 +200,37 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-bf16ctl` | 18 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-bf16` | 18 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-2b | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | 19 | 0 | 0 | yes | **no** |
+| gpu-vllm-mi300x-2b | `2026-10-07-dtype-sweep-mi300x` | 42 | 1 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b | `2026-10-09-aiter-mi300x` | 2 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-fp8 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-fp8emb4 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-fp8fnuz | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-fp8fnuzemb4 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-q4w4a16 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-q4w4a16emb4 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-q4w4a16ple4 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-w8a8 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-2b-w8a8emb4 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-31b | `2026-10-07-dtype-sweep-mi300x` | 36 | 1 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-31b-fp8 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-31b-q4w4a16 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b | `2026-10-07-dtype-sweep-mi300x` | 36 | 1 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b-fp8 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b-fp8emb4 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b-q4w4a16 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b-q4w4a16emb4 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b-q4w4a16ple4 | `2026-10-07-dtype-sweep-mi300x` | 33 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b-w8a8 | `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-4b-w8a8emb4 | `2026-10-07-dtype-sweep-mi300x` | 5 | 0 | 0 | **no** | **no** |
+| gpu-vllm-mi300x-embed2 | `2026-10-09-embed2-mi300x` | 32 | 2 | 0 | **no** | **no** |
 | gpu-vllm-t4-2b | `2026-09-18-qat-vs-bf16-t4` | 107 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-09-29-emb4-sweep-t4` | 67 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 14 | 9 | 0 | **no** | **no** |
 | gpu-vllm-t4-4b-q4w4a16emb4 | `2026-09-30-emb4-sweep-e4b-t4` | 61 | 0 | 0 | yes | **no** |
+| gpu-vllm-t4-embed2 | `2026-10-07-first-serve-t4` | 17 | 0 | 0 | yes | **no** |
+| gpu-vllm-t4-embed2 | `2026-10-08-beir-retrieval-t4` | 10 | 0 | 0 | **no** | **no** |
+| gpu-vllm-t4-embed2 | `2026-10-08-embed-sweep-t4` | 6 | 0 | 0 | **no** | **no** |
+| gpu-vllm-t4-embed2 | `2026-10-08-jev-tasks-t4` | 6 | 0 | 0 | **no** | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
@@ -173,14 +246,24 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 8 | 0 | 0 | **no** | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-concurrency-3050oem` | 15 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-first-light-3050oem` | 19 | 12 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-long-context-3050oem` | 11 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-ple-offload-3050oem` | 7 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-spec-mtp-3050oem` | 17 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-first-light-3050oem` | 7 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-quality-e2b-vs-e4b-3050oem` | 52 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-spec-mtp-3050oem` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-22-paired-sweep-cpu` | 12 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-google-vs-v2-cpu` | 5 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-paired-sweep-cpu` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-4b-q4_0 | `2026-09-30-paired-sweep-cpu` | 10 | 0 | 0 | yes | **no** |
-| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 17 | 1 | 0 | yes | **no** |
+| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 16 | 1 | 0 | yes | **no** |
 | local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-v2-i71360p` | 9 | 1 | 0 | yes | **no** |
+| local-llamacpp-sc7180p-2b-q4_0 | `2026-10-11-first-light-sc7180p` | 21 | 19 | 0 | yes | **no** |
+| local-llamacpp-sdm850-2b-q4_0 | `2026-10-11-first-light-sdm850` | 15 | 13 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
 | local-pytorch-cpu-2b | `2026-09-04-first-light-pytorch-cpu` | 2 | 1 | 0 | yes | **no** |
@@ -397,26 +480,61 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-l4-2b-w4a16 | 0 | 1 |
 | gpu-vllm-l4-31b-w4a16 | 0 | 2 |
 | gpu-vllm-l4-4b-w4a16 | 0 | 1 |
-| gpu-vllm-mi300x-2b | 7 | 8 |
-| gpu-vllm-mi300x-2b-fp8 | 0 | 0 |
-| gpu-vllm-mi300x-2b-fp8emb4 | 0 | 0 |
-| gpu-vllm-mi300x-2b-q4w4a16 | 0 | 0 |
-| gpu-vllm-mi300x-2b-q4w4a16emb4 | 0 | 0 |
-| gpu-vllm-mi300x-2b-q4w4a16ple4 | 0 | 0 |
-| gpu-vllm-mi300x-2b-w8a8 | 0 | 0 |
-| gpu-vllm-mi300x-2b-w8a8emb4 | 0 | 0 |
-| gpu-vllm-mi300x-31b | 0 | 0 |
-| gpu-vllm-mi300x-31b-q4w4a16 | 0 | 0 |
+| gpu-vllm-mi300x-12b | 1 | 3 |
+| gpu-vllm-mi300x-12b-fp8 | 3 | 3 |
+| gpu-vllm-mi300x-12b-fp8emb4 | 1 | 1 |
+| gpu-vllm-mi300x-12b-q4w4a16 | 1 | 1 |
+| gpu-vllm-mi300x-12b-q4w4a16emb4 | 1 | 1 |
+| gpu-vllm-mi300x-12b-w8a8 | 1 | 1 |
+| gpu-vllm-mi300x-12b-w8a8emb4 | 0 | 1 |
+| gpu-vllm-mi300x-26b | 1 | 1 |
+| gpu-vllm-mi300x-26b-fp8 | 1 | 1 |
+| gpu-vllm-mi300x-26b-fp8emb4 | 0 | 0 |
+| gpu-vllm-mi300x-26b-q4w4a16 | 1 | 1 |
+| gpu-vllm-mi300x-26b-q4w4a16emb4 | 0 | 0 |
+| gpu-vllm-mi300x-26b-w8a8 | 0 | 0 |
+| gpu-vllm-mi300x-26b-w8a8emb4 | 0 | 0 |
+| gpu-vllm-mi300x-2b | 8 | 10 |
+| gpu-vllm-mi300x-2b-fp8 | 1 | 1 |
+| gpu-vllm-mi300x-2b-fp8emb4 | 1 | 1 |
+| gpu-vllm-mi300x-2b-fp8fnuz | 1 | 1 |
+| gpu-vllm-mi300x-2b-fp8fnuzemb4 | 1 | 1 |
+| gpu-vllm-mi300x-2b-q4w4a16 | 1 | 1 |
+| gpu-vllm-mi300x-2b-q4w4a16emb4 | 1 | 1 |
+| gpu-vllm-mi300x-2b-q4w4a16ple4 | 1 | 1 |
+| gpu-vllm-mi300x-2b-w8a8 | 1 | 1 |
+| gpu-vllm-mi300x-2b-w8a8emb4 | 1 | 1 |
+| gpu-vllm-mi300x-31b | 1 | 1 |
+| gpu-vllm-mi300x-31b-fp8 | 1 | 1 |
+| gpu-vllm-mi300x-31b-fp8emb4 | 0 | 0 |
+| gpu-vllm-mi300x-31b-q4w4a16 | 1 | 1 |
+| gpu-vllm-mi300x-31b-q4w4a16emb4 | 0 | 0 |
+| gpu-vllm-mi300x-31b-w8a8 | 0 | 0 |
+| gpu-vllm-mi300x-31b-w8a8emb4 | 0 | 0 |
+| gpu-vllm-mi300x-4b | 1 | 1 |
+| gpu-vllm-mi300x-4b-fp8 | 1 | 1 |
+| gpu-vllm-mi300x-4b-fp8emb4 | 1 | 1 |
+| gpu-vllm-mi300x-4b-q4w4a16 | 1 | 1 |
+| gpu-vllm-mi300x-4b-q4w4a16emb4 | 1 | 1 |
+| gpu-vllm-mi300x-4b-q4w4a16ple4 | 1 | 1 |
+| gpu-vllm-mi300x-4b-w8a8 | 1 | 1 |
+| gpu-vllm-mi300x-4b-w8a8emb4 | 0 | 1 |
+| gpu-vllm-mi300x-embed2 | 0 | 1 |
 | gpu-vllm-t4-2b | 0 | 1 |
 | gpu-vllm-t4-2b-w4a16 | 1 | 2 |
 | gpu-vllm-t4-4b-q4w4a16emb4 | 1 | 1 |
+| gpu-vllm-t4-embed2 | 1 | 4 |
 | local-jax-cpu-2b | 0 | 1 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 10 |
 | local-llamacpp-1650ti-4b-q4_0 | 2 | 4 |
+| local-llamacpp-3050oem-2b-q4_0 | 0 | 5 |
+| local-llamacpp-3050oem-4b-q4_0 | 0 | 3 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-cpu-4b-q4_0 | 1 | 1 |
 | local-llamacpp-i71360p-2b-q4_0 | 0 | 2 |
 | local-llamacpp-i71360p-4b-q4_0 | 0 | 0 |
+| local-llamacpp-sc7180p-2b-q4_0 | 0 | 1 |
+| local-llamacpp-sdm850-2b-q4_0 | 0 | 1 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
 | local-pytorch-cpu-2b | 0 | 1 |
 | local-vllm-cpu-2b | 0 | 0 |
@@ -468,6 +586,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-4b-w8a8 | 0 | 1 |
 | tpu-vllm-v5e1-4b-w8a8emb4 | 0 | 4 |
 | tpu-vllm-v5e1-4b-w8a8rtn | 0 | 1 |
+| tpu-vllm-v5e1-embed2 | 0 | 0 |
 | tpu-vllm-v5e4-12b-w8a8emb4 | 0 | 3 |
 | tpu-vllm-v5e4-2b-q4_0 | 0 | 2 |
 | tpu-vllm-v5e4-2b-q4w4a16emb4 | 0 | 1 |

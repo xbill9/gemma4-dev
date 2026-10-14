@@ -15,4 +15,8 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
+| `2026-10-13-concurrency-3050oem` | 15 | 0 | 0 | yes |
 | `2026-10-13-first-light-3050oem` | 19 | 12 | 0 | yes |
+| `2026-10-13-long-context-3050oem` | 11 | 0 | 0 | yes |
+| `2026-10-13-ple-offload-3050oem` | 7 | 0 | 0 | yes |
+| `2026-10-13-spec-mtp-3050oem` | 17 | 1 | 0 | yes |

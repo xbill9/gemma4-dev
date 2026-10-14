@@ -16,6 +16,7 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-18-vllm-sweep-mi300x-bf16ctl.json` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand | ok | — |
 | `2026-09-18-vllm-sweep-mi300x-v0191-bf16.json` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand | ok | — |
 | `2026-09-18-vllm-sweep-mi300x-v0191-fp8.json` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand | ok | — |
+| `2026-10-07-dtype-sweep-mi300x.json` | google/gemma-4-E2B-it | amd-mi300x×1 | on-demand | ok | — |
 
 ## Run directories in this rig
 
@@ -29,3 +30,5 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-18-vllm-sweep-mi300x-bf16ctl` | 18 | 0 | 0 | **no** |
 | `2026-09-18-vllm-sweep-mi300x-v0191-bf16` | 18 | 0 | 0 | **no** |
 | `2026-09-18-vllm-sweep-mi300x-v0191-fp8` | 19 | 0 | 0 | yes |
+| `2026-10-07-dtype-sweep-mi300x` | 42 | 1 | 0 | **no** |
+| `2026-10-09-aiter-mi300x` | 2 | 0 | 0 | **no** |

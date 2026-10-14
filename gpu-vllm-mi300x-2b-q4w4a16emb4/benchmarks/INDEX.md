@@ -9,10 +9,10 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | File | Model | Hardware measured | Deployment | Valid | Also in |
 |---|---|---|---|---|---|
-| _none_ | | | | | |
+| `2026-10-07-dtype-sweep-mi300x.json` | xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 | amd-mi300x×1 | on-demand | ok | — |
 
 ## Run directories in this rig
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
-| _none_ | | | | |
+| `2026-10-07-dtype-sweep-mi300x` | 34 | 0 | 0 | **no** |
