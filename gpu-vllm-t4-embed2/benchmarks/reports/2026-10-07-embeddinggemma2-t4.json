@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-10-07-embeddinggemma2-t4",
+    "date": "2026-10-07",
+    "source": "gpu-vllm-t4-embed2/benchmarks/runs/2026-10-07-first-serve-t4/REPORT.md"
+  },
+  "hardware": {
+    "accelerator": "nvidia-t4",
+    "chips": 1,
+    "hbm_gb_per_chip": 16.1,
+    "machine_type": "n1-standard-2",
+    "host": {
+      "cloud": "gcp",
+      "zone": "us-west2-b"
+    }
+  },
+  "model": {
+    "id": "google/embeddinggemma-2",
+    "family": "embeddinggemma-2",
+    "parameters_b": 0.271,
+    "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "weights_dtype": "float32",
+    "quantization": "none",
+    "max_model_len": 8192
+  },
+  "software": {
+    "engine": "vllm",
+    "version": "0.31.1rc1.dev63+gd169c5a90",
+    "backend": "cuda",
+    "tensor_parallel_size": 1
+  },
+  "throughput": {
+    "workload": {
+      "tool": "scripts/bench.py (urllib + threads, /v1/embeddings)",
+      "dataset": "synthetic unique tokens, document prefix",
+      "output_len": 0,
+      "runs_per_point": 1
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 478,
+        "output_len": 0,
+        "status": "ok",
+        "request_rate_rps": 8.18,
+        "output_tok_per_s": 0,
+        "total_tok_per_s": 3909,
+        "raw": {
+          "input_tok_per_s": 3909,
+          "p50_latency_ms": 120,
+          "p99_latency_ms": 141,
+          "requests": 64
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 478,
+        "output_len": 0,
+        "status": "ok",
+        "request_rate_rps": 8.86,
+        "output_tok_per_s": 0,
+        "total_tok_per_s": 4234,
+        "raw": {
+          "input_tok_per_s": 4234,
+          "p50_latency_ms": 451,
+          "p99_latency_ms": 456,
+          "requests": 64
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 538,
+        "output_len": 0,
+        "status": "ok",
+        "request_rate_rps": 6.68,
+        "output_tok_per_s": 0,
+        "total_tok_per_s": 3594,
+        "raw": {
+          "input_tok_per_s": 3594,
+          "p50_latency_ms": 2383,
+          "p99_latency_ms": 2465,
+          "requests": 64
+        }
+      },
+      {
+        "concurrency": 1,
+        "input_len": 2058,
+        "output_len": 0,
+        "status": "ok",
+        "request_rate_rps": 1.06,
+        "output_tok_per_s": 0,
+        "total_tok_per_s": 2191,
+        "raw": {
+          "input_tok_per_s": 2191,
+          "p50_latency_ms": 940,
+          "p99_latency_ms": 948,
+          "requests": 32
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 2058,
+        "output_len": 0,
+        "status": "ok",
+        "request_rate_rps": 1.07,
+        "output_tok_per_s": 0,
+        "total_tok_per_s": 2212,
+        "raw": {
+          "input_tok_per_s": 2212,
+          "p50_latency_ms": 3721,
+          "p99_latency_ms": 3735,
+          "requests": 32
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 2298,
+        "output_len": 0,
+        "status": "ok",
+        "request_rate_rps": 0.9,
+        "output_tok_per_s": 0,
+        "total_tok_per_s": 2067,
+        "raw": {
+          "input_tok_per_s": 2067,
+          "p50_latency_ms": 16700,
+          "p99_latency_ms": 20060,
+          "requests": 32
+        }
+      }
+    ]
+  },
+  "memory": {
+    "weights_gib": 1.63
+  },
+  "startup": {
+    "time_to_healthy_s": 177,
+    "notes": "text + vision; 96 s text only, 202 s on a later start"
+  },
+  "notes": [
+    "Embedding model: output_tok_per_s is 0 by construction and total_tok_per_s is INPUT tokens/s.",
+    "parameters_b is the text encoder (271.0M); the vision tower (167.8M) was also loaded.",
+    "Parity vs sentence-transformers 6.1.0: 1-cos <= 7.0e-9 (text).",
+    "Encoder-attention clamp applied (patch_triton_encoder_turing.py)."
+  ]
+}

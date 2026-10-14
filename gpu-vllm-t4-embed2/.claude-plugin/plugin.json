@@ -1,0 +1,21 @@
+{
+  "name": "gpu-vllm-t4-embed2",
+  "description": "Manage vLLM serving of EmbeddingGemma 2 (google/embeddinggemma-2, Gemma 4-derived multimodal embedding model, 768-d with Matryoshka 512/256/128) on one NVIDIA Tesla T4 (Turing, SM 7.5) already attached to a Compute Engine VM, via the gpu-vllm-t4-embed2 MCP server: host capacity across three filesystems, stack verification against the rig's own PYTHONUSERBASE, the encoder-attention Triton clamp float32 needs on Turing, server lifecycle, and embedding tools that add the model's trained task prefixes (embed_text, rank_documents, verify_embeddings). Pooling runner on /v1/embeddings at float32, text + image. Measured 2026-10-07: 1-cos <= 7e-9 against sentence-transformers.",
+  "version": "0.1.0",
+  "author": {
+    "name": "xbill9",
+    "url": "https://github.com/xbill9"
+  },
+  "homepage": "https://github.com/xbill9/gemma4-dev",
+  "repository": "https://github.com/xbill9/gemma4-dev",
+  "license": "Apache-2.0",
+  "keywords": ["gcp", "compute-engine", "t4", "turing", "sm75", "vllm", "triton", "embeddings", "embeddinggemma", "gemma", "mcp"],
+  "mcpServers": {
+    "gpu-vllm-t4-embed2": {
+      "command": "python3",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/server.py"
+      ]
+    }
+  }
+}

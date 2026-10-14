@@ -1,0 +1,13 @@
+--- a/tpu_inference/kernels/flash_attention/kernel.py
++++ b/tpu_inference/kernels/flash_attention/kernel.py
+@@ -170,7 +170,9 @@
+     if sliding_window is not None:
+         row_ids = jnp.arange(padded_len_q)[:, None]
+         col_ids = jnp.arange(padded_len_kv)[None, :]
+-        mask = jnp.abs(row_ids - col_ids) <= sliding_window
++        # vLLM's ENCODER_ONLY convention is |q-k| <= W-1 (the CUDA backends'
++        # window_size=(W-1, W-1)); models pass W+1 to get HF's inclusive W.
++        mask = jnp.abs(row_ids - col_ids) < sliding_window
+         ab = jnp.where(mask, 0.0, -1e4).astype(q_bhtd.dtype)
+         ab = jnp.expand_dims(ab, axis=(0, 1))
+         ab = jnp.tile(ab, (1, num_heads, 1, 1))

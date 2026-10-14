@@ -1,0 +1,16 @@
+--- a/tpu_inference/kernels/flash_attention/kernel.py
++++ b/tpu_inference/kernels/flash_attention/kernel.py
+@@ -102,6 +102,13 @@
+     k_len, num_kv_heads, _ = k.shape
+     assert k.shape == v.shape
+     assert q_len == k_len, "For encoder_only, token lengths should be the same"
++    # GQA: the kernel requires one K/V head per query head, so repeat K/V
++    # across each query-head group (EmbeddingGemma2: 4 query heads over
++    # 2 KV heads on sliding layers, 1 on full-attention layers).
++    if num_kv_heads != num_heads:
++        assert num_heads % num_kv_heads == 0, (num_heads, num_kv_heads)
++        k = jnp.repeat(k, num_heads // num_kv_heads, axis=1)
++        v = jnp.repeat(v, num_heads // num_kv_heads, axis=1)
+ 
+     if sm_scale is None:
+         sm_scale = head_size**-0.5

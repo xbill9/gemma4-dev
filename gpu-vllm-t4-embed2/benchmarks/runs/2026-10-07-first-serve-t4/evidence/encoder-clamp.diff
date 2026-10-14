@@ -1,0 +1,26 @@
+--- /opt1/tmp/triton_prefill_attention.py.orig	2026-10-07 23:08:14.970754195 +0000
++++ /opt1/pyuser-embed2/lib/python3.13/site-packages/vllm/v1/attention/ops/triton_prefill_attention.py	2026-10-07 23:22:31.668882430 +0000
+@@ -247,6 +247,17 @@
+     BLOCK = get_block_size(q.dtype)
+     if Lk >= 512:
+         BLOCK = min(BLOCK, 32)
++    # gpu-vllm-t4-embed2: Turing encoder-attention clamp
++    # head_dim 256 needs BLOCK 16 in fp32; head_dim 512 fits no fp32 tile at all,
++    # so that kernel runs in fp16 (fp32 accumulate) and writes back. See the rig.
++    _turing_out = None
++    if current_platform.is_cuda() and not current_platform.has_device_capability(80):
++        if Lk >= 256:
++            BLOCK = min(BLOCK, 16)
++        if q.dtype == torch.float32 and Lk >= 512:
++            _turing_out = o
++            q, k, v = q.half(), k.half(), v.half()
++            o = torch.empty_like(q)
+ 
+     sm_scale = 1.0 / (Lq**0.5) if softmax_scale is None else softmax_scale
+     # rescale with 1/ln(2) for triton exp2
+@@ -297,3 +308,5 @@
+         num_stages=1,
+         Lk=Lk,
+     )
++    if _turing_out is not None:
++        _turing_out.copy_(o)

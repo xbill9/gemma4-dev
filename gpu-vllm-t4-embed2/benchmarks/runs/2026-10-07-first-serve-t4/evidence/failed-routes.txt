@@ -1,0 +1,11 @@
+# stock kernel, --dtype float32 (2026-10-07 23:07)
+(APIServer pid=25905) INFO 10-07 23:06:24 [api_utils.py:286] non-default args: {'host': '127.0.0.1', 'model': 'google/embeddinggemma-2', 'runner': 'pooling', 'dtype': 'float32', 'max_model_len': 8192, 'limit_mm_per_prompt': {'image': 0, 'audio': 0, 'video': 0}}
+(EngineCore pid=26061) ERROR 10-07 23:07:48 [core.py:1447]     raise_(OutOfResources(self.metadata.shared, max_shared, "shared memory"))
+(EngineCore pid=26061) ERROR 10-07 23:07:48 [core.py:1447] triton.runtime.errors.OutOfResources: out of resource: shared memory, Required: 69632, Hardware limit: 65536. Reducing block sizes or `num_stages` may help.
+
+# FLEX_ATTENTION, default (23:12)
+(EngineCore pid=26981) ERROR 10-07 23:12:17 [core.py:1447] torch._dynamo.exc.InternalTorchDynamoError: RuntimeError: Error: accessing tensor output of CUDAGraphs that has been overwritten by a subsequent run. Stack trace: File "/opt1/pyuser-embed2/lib/python3.13/site-packages/torch/nn/attention/flex
+torch._dynamo.exc.InternalTorchDynamoError: RuntimeError: Error: accessing tensor output of CUDAGraphs that has been overwritten by a subsequent run. Stack trace: File "/opt1/pyuser-embed2/lib/python3.13/site-packages/torch/nn/attention/flex_attention.py", line 1941, in create_block_mask
+
+# FLEX_ATTENTION + reduce-overhead removed + num_stages 1 (23:20)
+(EngineCore pid=28766) ERROR 10-07 23:20:56 [core.py:1449]         f"No valid triton configs. {type(exc).__name__}: {exc}"

@@ -665,6 +665,34 @@ tokens**, where the margin collapses toward zero and any numerical perturbation 
 fusion-drift divergence between two `window_kv` settings looked like a cache-correctness bug and was
 this. Hold `window_kv` fixed across any A/B — greedy decoding is not bit-reproducible across it.
 
+## EmbeddingGemma 2 — `google/embeddinggemma-2`, an encoder rather than a decoder
+
+Released 2026-10-06. Read from the checkpoint's `config.json` and vLLM PR #60254 on 2026-10-07. Rigs:
+`*-embed2` (`NAMING.md`, slot 4).
+
+- **Architecture: `EmbeddingGemma2Model`, bidirectional.** The text encoder is adapted from the Gemma 4 decoder,
+  but its attention is `ENCODER_ONLY`. Nothing is causal, nothing is generated, and **there is no KV cache**, so
+  every KV figure in this file is irrelevant to it.
+- **Text encoder.** 24 layers, hidden 512, intermediate 2,048, 4 query heads. Per-layer inputs of width 512
+  (PLE, as in E2B). Vocabulary 262,144. **Same two-geometry pattern as E2B**: sliding window 512 with head_dim
+  256 and 2 KV heads, and every sixth layer (5, 11, 17, 23) full attention with head_dim 512 and 1 KV head.
+  RoPE θ is 10k on the sliding layers and 1M on the full ones.
+- **Output.** Mean pooling then L2 normalisation, 768-d. Matryoshka-trained at 512/256/128; Google's guide
+  says any width from 128 to 768 works and recommends those four. **`config.json` declares no
+  `matryoshka_dimensions`**, so vLLM refuses `dimensions` until it is overridden.
+- **Towers.** Text is 271.0M parameters. Vision adds 167.8M (`gemma4_vision`, 16 layers, 280 soft tokens per
+  image) and audio adds 305.6M (`gemma4_audio`, 12 layers). All three ship in **one bf16 safetensors file
+  of 1,488,915,288 B**, and serving flags decide which towers load.
+- **Context.** 8,192 tokens shared across modalities.
+- **Task prefixes are part of the input**, not metadata. Queries take `task: search result | query: `,
+  documents take `title: none | text: `, and the full table is in `config_sentence_transformers.json`.
+  vLLM's `/v1/embeddings` does not add them.
+- **Dtype.** Google says float16 is incompatible, so use bf16 or fp32. On a part with no bf16 (Turing),
+  that means fp32, and vLLM's Triton encoder kernel needs a patch there (`gpu-vllm-t4-embed2`).
+- **Measured** (`gpu-vllm-t4-embed2/benchmarks/runs/2026-10-07-first-serve-t4`). At fp32 the weights take
+  1.03 GiB with text only and 1.63 GiB with the vision tower. vLLM matches sentence-transformers to
+  1−cos ≤ 7.0e-9.
+
 ## Weight footprints
 
 bf16 weight sizes, as recorded in `tpu-jax-v5e1-2b/server.py:806`:
