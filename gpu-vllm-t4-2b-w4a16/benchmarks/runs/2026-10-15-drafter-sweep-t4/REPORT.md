@@ -91,13 +91,33 @@ Acceptance at a given draft length is close across all three (2 tokens: E2B 0.49
 against a target step on each engine and card, not by how well the drafter guesses. That reading
 is inferred, not measured.
 
+## W4A16 drafters (`e?b-q4ct/`, `q4ct-sha256.txt`)
+
+`repack/repack_drafter.py` repacks the QAT drafters' 22 linears to compressed-tensors W4A16 (all
+on the 4-bit grid); the embedding stays bf16 because vLLM reads its rows directly for the
+drafter's logits, so the file shrinks only to 143,062,680 B (E2B) and 143,505,048 B (E4B) from
+157,565,344 and 159,138,208. vLLM 0.29.0 loads them beside the W4A16 target and reports
+`MarlinLinearKernel` for them. Same harness, arms none, bf16 QAT at 3, W4A16 at 3 and 4, none
+again, run back to back **without** the cool-down:
+
+| greedy, geomean of 6 prompts | E2B tok/s | acceptance | E4B tok/s | acceptance |
+| --- | ---: | ---: | ---: | ---: |
+| no drafter | 113.7 | — | 60.1 | — |
+| bf16 QAT, 3 tokens | 143.3 | 0.385 | 94.2 | 0.390 |
+| **W4A16 QAT, 3 tokens** | **141.5** | 0.387 | **94.4** | 0.390 |
+| W4A16 QAT, 4 tokens | 142.2 | 0.315 | 97.8 | 0.321 |
+| no drafter, repeated last | 105.3 | — | 60.1 | — |
+
+- W4A16 against bf16 at 3 tokens, neighbouring servers: E2B 0.987x greedy and 0.968x sampled,
+  E4B 1.002x and 0.995x, at the same acceptance. Greedy text is identical to the bf16 drafter's
+  on both models. Weights in the engine log: 3.00 against 3.01 GiB (E2B).
+- **E2B's numbers against no drafter are not usable from this run**: without the cool-down the
+  repeated no-drafter server decoded 0.926x the first (105.3 against 113.7 tok/s, card 71–81 °C
+  against 52–63 °C). E4B's repeat matched (60.1 and 60.1).
+- No reason found to serve them: the rigs keep the bf16 QAT drafter.
+
 ## Not run
 
-- **The W4A16 drafters** (`repack/repack_drafter.py`, arms in `run_q4ct.sh`): built, never served.
-  All 22 linears of each drafter recovered onto the 4-bit grid; 143,062,680 B (E2B) and
-  143,505,048 B (E4B) against 157,565,344 and 159,138,208 for bf16, because the 262,144 x 256
-  embedding stays bf16 (vLLM indexes its rows directly for the drafter's logits). About 10% of
-  quantized values differ from the source after rounding to bf16, worst relative error 0.0098
-  (`repack-report-*.json`).
+- `run_q4ct.sh`, the W4A16 drafters at 1–4 tokens with cool-down; the trimmed arms above replaced it.
 - **Serving changes**: none. Both rigs keep the QAT drafter at 3 tokens. 4 tokens is ahead greedy
   by less than this run's drift on E2B and behind sampled.

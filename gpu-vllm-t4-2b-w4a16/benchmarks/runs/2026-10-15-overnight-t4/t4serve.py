@@ -30,7 +30,7 @@ def gpu():
     return subprocess.run(["nvidia-smi", "--query-gpu=temperature.gpu,clocks.sm,memory.used",
                            "--format=csv,noheader"], capture_output=True, text=True).stdout.strip()
 
-def cool(limit=50):
+def cool(limit=int(os.environ.get("COOL_C", "50"))):
     while int(gpu().split(",")[0]) > limit:
         time.sleep(5)
 

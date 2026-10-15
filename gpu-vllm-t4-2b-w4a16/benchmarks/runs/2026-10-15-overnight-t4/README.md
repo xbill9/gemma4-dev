@@ -1,7 +1,7 @@
 # 2026-10-15 — queued T4 drafter gap jobs (not yet run)
 
-Scripts for the gaps `2026-10-15-drafter-sweep-t4` left open. **Nothing here has run**; there are
-no results in this directory.
+Scripts for the gaps `2026-10-15-drafter-sweep-t4` left open. `queue.sh` never ran; a trimmed
+plan did (`trimmed.sh`, `trimmed2.sh`, results in `REPORT.md`). Jobs 3 and 4 below have not run.
 
 | job | script | question |
 | --- | --- | --- |

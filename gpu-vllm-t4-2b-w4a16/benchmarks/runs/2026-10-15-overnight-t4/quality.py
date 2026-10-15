@@ -35,9 +35,11 @@ for arm in ARMLIST.split(","):
     srv, log = start(env, os.path.join(OUT, f"server-{TAG}-{arm}.log"), draft, n,
                      ["--enable-auto-tool-choice", "--tool-call-parser", "gemma4", "--max-logprobs", "32"])
     try:
-        if not os.environ.get("SUITE_ONLY"):
+        TASKS = "" if os.environ.get("SUITE_ONLY") else os.environ.get("TASKS", "gsm8k,bfcl")
+        if "gsm8k" in TASKS:
             run(f"gsm8k-{TAG}-{arm}", PY + ["gen_eval.py", "run", URL, MODEL, "gsm8k",
                 os.path.join(OUT, f"gsm8k-{TAG}-{arm}.jsonl"), "--concurrency", "8"], {"JEV_GEN_MAX_TOKENS": "2048"})
+        if "bfcl" in TASKS:
             run(f"bfcl-{TAG}-{arm}", PY + ["gen_eval.py", "run", URL, MODEL, "bfcl_simple",
                 os.path.join(OUT, f"bfcl-{TAG}-{arm}.jsonl"), "--concurrency", "8"])
         if arm.startswith("none") and not os.path.isdir(os.path.join(OUT, f"suite-{TAG}")):

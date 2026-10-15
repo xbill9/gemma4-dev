@@ -44,8 +44,8 @@ PROMPTS = [
     "Give a one-paragraph history of the Internet.",
     "Tell me a short story about a cat who learns to code.",
 ]
-CONC = [1, 2, 4, 8]
-REPEATS = 2
+CONC = [int(c) for c in os.environ.get("CONC", "1,2,4,8").split(",")]
+REPEATS = int(os.environ.get("REPEATS", "2"))
 os.makedirs(OUT, exist_ok=True)
 out = open(os.path.join(OUT, "results.jsonl"), "a")
 cells = open(os.path.join(OUT, "cells.jsonl"), "a")
