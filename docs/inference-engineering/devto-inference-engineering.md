@@ -97,11 +97,15 @@ Three properties of the Hub decide time to ready on every other platform:
 - **Pull time is part of start-up.** The 62 GB Gemma 4 31B checkpoint moved one rig's boot budget from 20 minutes to 90. Restoring the same files from an in-region Cloud Storage cache took 337 s.
 - **Library versions are part of the contract.** transformers 5.15 made Gemma 4's `head_dim` per layer, which breaks older vLLM builds, and EmbeddingGemma 2 needs transformers 5.19.
 
-The rigs pin both the revision and the SHA-256 of the file. `make draft` fetches the drafter at a pinned revision and checks its hash:
+The rigs pin both the revision and the SHA-256 of the file. The `draft` target in each local rig's Makefile fetches the drafter at a pinned revision and checks its hash:
 
-```
-curl -L -o $(SPEC_DRAFT_MODEL) https://huggingface.co/$(SPEC_DRAFT_HF)/resolve/$(SPEC_DRAFT_HF_REVISION)/...
-sha256sum -c
+```make
+draft:
+	@mkdir -p $(dir $(SPEC_DRAFT_MODEL))
+	@echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c --quiet - 2>/dev/null || \
+	  curl -fL -o $(SPEC_DRAFT_MODEL).part https://huggingface.co/$(SPEC_DRAFT_HF)/resolve/$(SPEC_DRAFT_HF_REVISION)/$(notdir $(SPEC_DRAFT_MODEL))
+	@test ! -f $(SPEC_DRAFT_MODEL).part || mv $(SPEC_DRAFT_MODEL).part $(SPEC_DRAFT_MODEL)
+	echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c -
 ```
 
 A later card-only commit to the repository cannot change the bytes a rig serves.
