@@ -1,6 +1,8 @@
 """Gap 2 on the RTX 3050 OEM: does drafting keep paying with a long conversation in context?
 
-    python3 longctx.py RIG_DIR OUT_DIR
+    python3 longctx.py RIG_DIR OUT_DIR [ARM,ARM,...]
+
+Naming arms runs only those and appends to results.jsonl (used to finish E4B after an interruption).
 
 One llama-server per arm at -c 131072 (the rigs' serving context) --parallel 1, serving flags.
 Context: the first D tokens of the NVIDIA driver README (/usr/share/doc/NVIDIA_GLX-1.0/README.txt,
@@ -22,7 +24,10 @@ QUESTIONS = {
     "summary": "Summarize the document above in one paragraph.",
 }
 ARMS = [("none", None, None), ("q4x-n1", "q4x", "1"), ("q4x-n2", "q4x", "2"), ("nq-n2", "nq", "2")]
-out = open(os.path.join(OUT, "results.jsonl"), "w")
+ONLY = sys.argv[3].split(",") if len(sys.argv) > 3 else None
+if ONLY:
+    ARMS = [a for a in ARMS if a[0] in ONLY]
+out = open(os.path.join(OUT, "results.jsonl"), "a" if ONLY else "w")
 texts = {}
 for arm, draft, n in ARMS:
     srv, log = start(env, 131072, D[draft] if draft else None, n, os.path.join(OUT, f"server-{arm}.log"))

@@ -15,13 +15,15 @@ E2B (`local-llamacpp-3050oem-2b-q4_0`) and E4B (`local-llamacpp-3050oem-4b-q4_0`
    (18 of 18; 0 of 18 at 2 or 3). E4B: 1 token is well behind (1.54x against 1.72x).
 2. **Drafting keeps paying, by less.** E2B at 2 tokens: 1.51x with no text ahead of the question,
    1.36x at 32k, 1.21x at 120k, where 1 token edges ahead (1.23x). Acceptance holds; each
-   verification step costs more. E4B: in progress, see below.
+   verification step costs more. E4B holds up better: 1.86x at 0, 1.64x at 32k, 1.55x at
+   120k, and 2 tokens stays ahead of 1 at every depth.
 3. **The non-QAT drafter is level or behind on llama.cpp.** E2B greedy 1.34x against 1.40x at 2
    tokens, lower acceptance at every count; E4B greedy level (1.73x against 1.72x), sampled behind
    (1.65x against 1.71x). The TPU result does not carry over.
 
 **No serving change.** Both rigs keep the exact Q4_0 QAT drafter at 2 tokens. E2B at 1 token is
-the setting to use when greedy output must match serving without a drafter.
+the setting to use when greedy output must match serving without a drafter, at `-c 8192`; at the
+serving `-c 131072` that match no longer held (see "Greedy text at `-c 131072`").
 
 ## Method
 
@@ -88,5 +90,26 @@ question is not asked at 0):
 
 ## Long conversations, E4B
 
-**In progress at commit time** (`e4b/longctx/`, partial). No drafter: 29.5 tok/s at 120,000
-tokens, half its 58 with no text ahead.
+| tokens ahead of the question | none, tok/s | q4x 1 token | q4x 2 tokens | nq 2 tokens |
+|---:|---:|---:|---:|---:|
+| 0 | 58 | 1.61x | **1.86x** | 1.83x |
+| 8,192 | 54 | 1.55x | **1.79x** | 1.78x |
+| 32,768 | 46 | 1.48x | 1.64x | **1.65x** |
+| 65,536 | 38 | 1.46x | **1.62x** | 1.59x |
+| 120,000 | 30 | 1.41x | **1.55x** | 1.48x |
+
+- By question at 120k, q4x 2 tokens: code 1.86x, summary 1.57x, story 1.23x.
+- E4B keeps more of its gain than E2B (1.55x against 1.21x at 120k): its own step costs about twice
+  E2B's, so the drafter's share of each step is smaller.
+- VRAM after the last request: 6463 MiB without a drafter, 6667 with q4x, 6705 with nq.
+- **Interrupted once.** `run.sh` and `longctx.py` stopped at 19:56 after the no-drafter arm,
+  with no END line, and an E4B server came up on port 8080 at 19:57:14 from outside the run.
+  The three drafter arms ran afterwards from `run_e4b_rest.sh` (`longctx.py ... q4x-n1,q4x-n2,nq-n2`,
+  appending to the same `results.jsonl`), 19:59–20:14, same flags and text.
+
+## Greedy text at `-c 131072`
+
+Replies identical to no drafter, of 14 per arm (`summary.txt`): E2B q4x-n1 2, q4x-n2 1, nq-n2 1;
+E4B q4x-n1 13, q4x-n2 4, nq-n2 4. At `-c 8192` (speed arms) E2B at 1 token and every E4B arm
+matched 18 of 18. Cause not investigated; the long-context servers differ in `-c` and in having
+the prompt cache on.
