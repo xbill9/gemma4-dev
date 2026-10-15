@@ -22,6 +22,12 @@ exact Q4_0 (`make draft` fetches it from Hugging Face, SHA-256 in `tpu.env`): 2 
 Costs 72–74 MiB of VRAM. Empty `SPEC_DRAFT_MODEL` for byte-comparable greedy runs
 (`local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-1650ti/`).
 
+**E4B greedy text does not repeat on this build with flash attention on** (`f95b0d9`, `-fa 1`): 10
+identical temperature-0 requests gave 10 and 6 different texts. `-fa 0` or llama.cpp `77c4540ce` repeats
+exactly; threads, CUDA graphs and the drafter do not matter; E2B repeats exactly on the same build. Any
+E4B comparison here that needs identical text must use one of those two
+(`benchmarks/runs/2026-10-14-repeatability-1650ti/`).
+
 ## It fits, with ~820 MiB to spare — MEASURED 2026-09-30
 
 | | Google's E4B GGUF | exact rebuild | E2B exact v2, for scale |
