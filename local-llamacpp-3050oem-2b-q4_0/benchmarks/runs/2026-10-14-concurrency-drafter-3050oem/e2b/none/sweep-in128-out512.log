@@ -1,0 +1,25 @@
+arm: device=gpu · pid=198449 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server
+health: {"status": "ok"}
+decode-source: auto -> stream
+c=1     104.70 tok/s aggregate  TTFT    130.7 ms  TPOT   9.36 ms  per-stream 106.86
+c=2     189.74 tok/s aggregate  TTFT    189.3 ms  TPOT  10.21 ms  per-stream  97.97
+c=4     258.81 tok/s aggregate  TTFT    327.2 ms  TPOT  14.75 ms  per-stream  67.81
+c=8     309.73 tok/s aggregate  TTFT    597.0 ms  TPOT  24.59 ms  per-stream  40.68
+c=16    508.79 tok/s aggregate  TTFT   1098.5 ms  TPOT  29.07 ms  per-stream  34.40
+c=32    590.06 tok/s aggregate  TTFT   2099.4 ms  TPOT  49.73 ms  per-stream  20.11
+c=64    625.10 tok/s aggregate  TTFT   3841.3 ms  TPOT  94.03 ms  per-stream  10.63
+
+{
+  "levels": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64
+  ],
+  "peak_output_tokens_per_second": 625.095,
+  "peak_at_concurrency": 64,
+  "scaling_1_to_peak": 5.97
+}
