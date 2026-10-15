@@ -67,7 +67,7 @@ Memory, quality and native math are the precision trade. Bandwidth, the engine a
 | Google Colab | a TPU v5e-1 notebook runtime | Step 4 |
 | AWS | Bedrock, SageMaker, EC2 g6, g5g and g4dn | Step 5 |
 | AWS Neuron | Inferentia2 and Trainium | Step 6 |
-| Microsoft Azure | Foundry and an A10 VM | Step 7 |
+| Microsoft Azure | Foundry; quota for no L4- or T4-class GPU | Step 7 |
 | AMD | one Instinct MI300X on AMD Developer Cloud | Step 8 |
 | Local GPUs | GTX 1650 Ti, RTX 3050 | Step 9 |
 | CPUs and Arm laptops | Intel laptops, Snapdragon 850, Snapdragon 7c Gen 2 | Step 10 |
@@ -301,30 +301,24 @@ Capacity was the other constraint. inf2 returned `InsufficientInstanceCapacity` 
 
 ---
 
-#### Step 7 — Microsoft Azure: Foundry and an A10 VM
+#### Step 7 — Microsoft Azure: Foundry, and No L4- or T4-Class GPU
 
-Azure's limit was quota, before capacity was ever asked. The subscription holds 36 vCPUs of the NVadsA10 v5 family in eastus and none in the T4 or A100 families, and Container Apps refused a serverless T4 outright:
+Azure's limit was quota, before capacity was ever asked. The subscription holds no quota in the T4 or A100 VM families, and Container Apps refused a serverless T4 outright:
 
 ```
 ContainerAppInvalidScaleExceedsQuota … maxium quota value of '0' for 'ManagedEnvironmentConsumptionT4Gpus'
 ```
 
-**Foundry** serves `gpt-4.1-nano` and `Phi-4-mini` as deployments on an existing account, reached through the OpenAI v1 endpoint:
+**Foundry** is the Azure path that matches the rest of this article. It serves `gpt-4.1-nano` and `Phi-4-mini` as deployments on an existing account, reached through the OpenAI v1 endpoint:
 
 | Model | tok/s, one request | $ per 1M output tokens | Notes |
 |---|---:|---:|---|
 | gpt-4.1-nano | 49.7 | 0.40 | 50K tokens per minute |
 | Phi-4-mini | 35.4 | 0.30 | answered 12 of 20; 8 timed out at 60 s |
 
-**The A10 VM** is `Standard_NV36ads_A10_v5`, and it is the only size that gets a whole A10: the smaller sizes get a sixth, a third or half of the GPU. The GPU is vGPU-backed, so it needs NVIDIA's GRID driver. vLLM 0.30.0 serves the same int4 repack as Google Cloud and AWS:
+**The only GPU VM the subscription can rent is an A10, and it belongs to a different class.** The NVadsA10 v5 family holds 36 vCPUs of quota in eastus, and `Standard_NV36ads_A10_v5` is the only size with a whole A10: the smaller sizes get a sixth, a third or half of the GPU. A whole A10 therefore comes as a 36-vCPU, 440 GB machine at $3.20 an hour, against $0.8048 for the L4 in an EC2 g6.xlarge. It has no L4- or T4-class equivalent on Azure here, so its numbers stay in this section and out of the comparisons below.
 
-| A10, int4 repack | 1 request | 4 | 16 |
-|---|---:|---:|---:|
-| Decode on the VM, tok/s | 193.5 | 746.1 | 2,551.35 |
-
-From the client it was the fastest backend in the cross-cloud run, 166.9 tok/s for one request, and at $3.20 an hour it costs $5.33 per million output tokens one request at a time. The A10's speed comes bundled with 36 vCPUs nobody asked for. The QAT checkpoint without int4 tables ran out of memory at `--gpu-memory-utilization 0.90` on the same card where the 2.86 GiB repack loaded in 22.46 s with 1,338,341 tokens of KV cache.
-
-Deleting the VM leaves its NIC, public IP and disk behind, so the teardown script deletes them by name.
+What the A10 run shows is operational. The GPU is vGPU-backed, so it needs NVIDIA's GRID driver; the datacenter driver does not bind. The QAT checkpoint without int4 tables ran out of memory at `--gpu-memory-utilization 0.90`, where the 2.86 GiB int4 repack loaded in 22.46 s. Deleting the VM leaves its NIC, public IP and disk behind, so the teardown script deletes them by name.
 
 ---
 
@@ -440,7 +434,6 @@ gcp.cloudrun      20/20   20/20   0.52   20/20  id >= 10
 gcp.tpu           20/20   20/20   1.65   20/20  id >= 10
 gcp.maas          19/20   19/20   13.0    0/20  id >= 10
 azure.foundry     20/20   20/20   3.19   19/20  id >= 10
-azure.vm          20/20   20/20   0.38   20/20  id >= 10
 ```
 
 With the engine counting, every backend except MaaS was right 20 times in 20 with the right filter. When the model counted the rows itself, MaaS was right 0 times in 20. Counting belongs in code, and the grade belongs on the filter.
@@ -453,10 +446,9 @@ One request at a time, the same 100-token prompt, list prices on the day:
 
 | Backend | Hardware | tok/s | $ per 1M output tokens |
 |---|---|---:|---:|
-| 🥇 Azure VM | A10 | 166.9 | 5.33 |
-| 🥈 AWS EC2 g6 | L4 | 132.45 | 1.69 |
-| 🥉 Cloud Run | L4 | 119.3 | 2.44 |
-| AWS Bedrock | Nova Micro | 115.85 | 0.14 |
+| 🥇 AWS EC2 g6 | L4 | 132.45 | 1.69 |
+| 🥈 Cloud Run | L4 | 119.3 | 2.44 |
+| 🥉 AWS Bedrock | Nova Micro | 115.85 | 0.14 |
 | Cloud TPU | v5e-1, flex-start | 105.3 | 1.58 |
 | AWS SageMaker | L4 | 105.2 | 2.98 |
 | Compute Engine | L4 | 94.3 | 2.29 |
@@ -473,7 +465,7 @@ How each platform answers the precision trade:
 | Colab TPU | int8 only | repack accuracy | orphaned runtimes |
 | AWS L4 | fp8, int8 | int4 repack, 2.39x stock | SageMaker per-request overhead |
 | AWS Neuron | int8 | — | no vLLM for Gemma 4 |
-| Azure A10 | int8 | int4 repack to fit | quota of 0 |
+| Azure | — | Foundry per token | quota of 0 for T4 |
 | AMD MI300X | fp8 | fp8 from 12B up | newest image cannot load |
 | Local GPUs | int8 | Q4_0 plus a drafter | prompt cache in benchmarks |
 | CPUs and Arm | dot product where present | Q4_0 repack | memory on small hosts |
