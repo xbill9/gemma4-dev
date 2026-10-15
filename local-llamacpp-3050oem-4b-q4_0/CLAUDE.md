@@ -65,9 +65,13 @@ Prompt cache off changes no score (`local-llamacpp-3050oem-2b-q4_0/benchmarks/ru
 the drafter gains 1.61–1.72x for one request, 1.08–1.24x at 2–8, and loses at 32–64 (0.79–0.92x).
 Without it output reaches 472 tok/s at 64 requests. Both arms fit 64 slots at `-c 32768`
 (6,068 / 6,372 MiB); with the drafter `-c 65536 --parallel 64` does not fit
-(`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-concurrency-drafter-3050oem/`). **Use `-kvu` for multi-request runs**: per-slot
-KV caches halved decode speed at random on this build, and the shared cache gave 1.5–1.9x more
-output at 16–64 requests.
+(`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-concurrency-drafter-3050oem/`), with `-kvu` it does (6,936 MiB). With thinking on
+the gain at 2–8 rises to 1.29–1.47x (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-thinking-3050oem/`); 1 drafted
+token loses less at 32–64 (0.87–0.98x) but gains less for one request (1.49–1.51x,
+`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-draft1-3050oem/`). **KV cache layout for multi-request runs:**
+per-slot caches (the default) halved decode speed at random on short requests; a shared cache
+(`-kvu`) avoids that but slows as the total context held grows (0.64–0.79x per-slot at 64
+requests of up to 640 tokens, `local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/`).
 
 **Carried from the E2B rig, not re-measured here:** flash attention, f16 KV
 over q8_0, thread count.

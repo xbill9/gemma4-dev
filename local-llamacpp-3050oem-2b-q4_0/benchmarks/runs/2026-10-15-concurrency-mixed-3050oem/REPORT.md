@@ -10,8 +10,9 @@ lower with the drafter at 2 requests and up. Acceptance holds at 0.43–0.50 at 
 
 **Second finding: llama-server's default per-slot KV cache halves decode speed at random under
 load on this build.** With one shared cache (`-kvu`) throughput at 16–64 requests is
-higher without the drafter (1.2–1.9x), and the drafter's gain at 8 requests reported by the 2026-10-14
-sweep was measured on per-slot caches. Every number below is from the shared-cache rerun.
+higher without the drafter (1.2–1.9x) on these short requests. Every number below is from the
+shared-cache rerun. On longer requests the shared cache is slower, and the 2026-10-14 sweep's
+drafter ratios hold with it (`../2026-10-15-concurrency-drafter-kvu-3050oem`).
 
 ## Drafter / no drafter, shared KV cache
 
@@ -69,9 +70,10 @@ Unified against per-slot, same arms (rerun ÷ first pass), greedy: E2B no drafte
 which the stall hit hardest, gain up to 2.13x.
 
 Which part of llama.cpp `77c4540ce` causes it was not traced. **The rigs serve one user
-(`--parallel 1`), so serving is unaffected**; any multi-request measurement on this build with
-per-slot caches, including `2026-10-13-concurrency-3050oem` and
-`2026-10-14-concurrency-drafter-3050oem`, should be read as possibly low at 4 requests and up.
+(`--parallel 1`), so serving is unaffected**. Rerunning `2026-10-14-concurrency-drafter-3050oem`
+with `-kvu` (`../2026-10-15-concurrency-drafter-kvu-3050oem`) gave 0.55–0.79x its output at 64
+requests: with up to 640 tokens per request the shared cache costs more than the stall, so
+neither setting is right for every load.
 
 ## Method
 

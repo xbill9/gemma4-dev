@@ -135,9 +135,13 @@ cache off changes no score** (`benchmarks/runs/2026-10-14-accuracy-cache-3050oem
 accuracy runs at the server default stand. **With several users at once the drafter
 pays clearly only for one request at a time** on mixed chat prompts
 (`benchmarks/runs/2026-10-15-concurrency-mixed-3050oem/`): 0.92–1.17x at 2–8 requests, 0.79–0.87x
-at 32–64, time to first token 6–48% lower with it. **Multi-request runs need `-kvu`** on this
-build: with per-slot KV caches decode speed halved at random, and a shared cache gave 1.2–1.6x
-more output at 16–64 requests; the concurrency runs above used per-slot caches.
+at 32–64, time to first token 6–48% lower with it. Thinking on lifts it to 1.04–1.31x at 2–8
+(`benchmarks/runs/2026-10-15-concurrency-thinking-3050oem/`); 1 drafted token loses less at 32–64
+(0.84–0.92x) and matches 2 for one request (`benchmarks/runs/2026-10-15-concurrency-draft1-3050oem/`).
+**KV cache layout for multi-request runs:** per-slot caches (the default, used by the concurrency
+runs above) halved decode speed at random on short requests; a shared cache (`-kvu`) avoids that
+but slows as the total context held grows: 0.55–0.70x per-slot at 64 requests of up to 640 tokens
+(`benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/`), 1.2–1.6x on requests under 300.
 
 **Answer quality against E4B**: see `local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-10-13-quality-e2b-vs-e4b-3050oem/`.
 This build scored suite 0.683 (E2B bf16 on TPU: 0.683), GSM8K 0.898 (bf16: 0.910),
