@@ -20,5 +20,11 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-10-13-long-context-3050oem` | 11 | 0 | 0 | yes |
 | `2026-10-13-ple-offload-3050oem` | 7 | 0 | 0 | yes |
 | `2026-10-13-spec-mtp-3050oem` | 17 | 1 | 0 | yes |
+| `2026-10-14-accuracy-cache-3050oem` | 28 | 0 | 0 | yes |
+| `2026-10-14-accuracy-fullctx-3050oem` | 28 | 0 | 0 | yes |
+| `2026-10-14-concurrency-drafter-3050oem` | 56 | 0 | 0 | yes |
+| `2026-10-14-drafter-divergence-3050oem` | 26 | 0 | 0 | yes |
 | `2026-10-14-drafter-gaps-3050oem` | 51 | 0 | 0 | yes |
-| `2026-10-14-drafter-q4exact-3050oem` | 81 | 4 | 0 | yes |
+| `2026-10-14-drafter-q4exact-3050oem` | 82 | 4 | 0 | yes |
+| `2026-10-14-overnight-3050oem` | 3 | 0 | 0 | **no** |
+| `2026-10-15-concurrency-mixed-3050oem` | 79 | 0 | 0 | yes |

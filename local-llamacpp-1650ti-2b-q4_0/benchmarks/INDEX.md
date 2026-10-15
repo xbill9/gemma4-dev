@@ -31,5 +31,7 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-29-paired-sweep-1650ti` | 13 | 0 | 0 | yes |
 | `2026-09-29-ple-offload-1650ti` | 6 | 0 | 0 | yes |
 | `2026-10-14-drafter-1650ti` | 24 | 0 | 0 | yes |
-| `2026-10-14-drafter-accuracy-1650ti` | 9 | 0 | 0 | **no** |
+| `2026-10-14-drafter-accuracy-1650ti` | 61 | 0 | 0 | yes |
 | `2026-10-14-drafter-formats-1650ti` | 28 | 0 | 0 | yes |
+| `2026-10-14-drafter-gaps-1650ti` | 46 | 0 | 0 | yes |
+| `2026-10-15-drafter-load-1650ti` | 54 | 0 | 0 | **no** |
