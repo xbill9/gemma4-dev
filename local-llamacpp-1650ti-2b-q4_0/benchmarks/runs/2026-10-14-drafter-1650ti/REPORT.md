@@ -60,5 +60,5 @@ tokens.
 | E2B | 1.18x (1 token) | 1.40x |
 | E4B | 1.43x (1 or 2 tokens) | 1.72x |
 
-The 1650 Ti rigs' `tpu.env` files do not set the drafter yet; 1 drafted token is the setting to adopt
-for E2B here, and 1 or 2 for E4B.
+Both 1650 Ti rigs serve with the exact Q4_0 drafter since `5680c97`: E2B at 1 drafted token, E4B at 2.
+Q8_0 and bf16 drafters on this card: `2026-10-14-drafter-formats-1650ti`.

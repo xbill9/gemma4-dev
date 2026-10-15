@@ -242,15 +242,20 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ngram-spec-1650ti` | 17 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-paired-sweep-1650ti` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-29-ple-offload-1650ti` | 6 | 0 | 0 | yes | **no** |
+| local-llamacpp-1650ti-2b-q4_0 | `2026-10-14-drafter-1650ti` | 24 | 0 | 0 | yes | **no** |
+| local-llamacpp-1650ti-2b-q4_0 | `2026-10-14-drafter-accuracy-1650ti` | 9 | 0 | 0 | **no** | **no** |
+| local-llamacpp-1650ti-2b-q4_0 | `2026-10-14-drafter-formats-1650ti` | 28 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-concurrency-1650ti` | 38 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes | **no** |
-| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 8 | 0 | 0 | **no** | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 10 | 0 | 0 | **no** | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-concurrency-3050oem` | 15 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-first-light-3050oem` | 19 | 12 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-long-context-3050oem` | 11 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-ple-offload-3050oem` | 7 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-spec-mtp-3050oem` | 17 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-14-drafter-gaps-3050oem` | 51 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-14-drafter-q4exact-3050oem` | 81 | 4 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-first-light-3050oem` | 7 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-quality-e2b-vs-e4b-3050oem` | 52 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-spec-mtp-3050oem` | 13 | 0 | 0 | yes | **no** |
@@ -525,9 +530,9 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-t4-4b-q4w4a16emb4 | 1 | 1 |
 | gpu-vllm-t4-embed2 | 1 | 4 |
 | local-jax-cpu-2b | 0 | 1 |
-| local-llamacpp-1650ti-2b-q4_0 | 6 | 10 |
+| local-llamacpp-1650ti-2b-q4_0 | 6 | 13 |
 | local-llamacpp-1650ti-4b-q4_0 | 2 | 4 |
-| local-llamacpp-3050oem-2b-q4_0 | 0 | 5 |
+| local-llamacpp-3050oem-2b-q4_0 | 0 | 7 |
 | local-llamacpp-3050oem-4b-q4_0 | 0 | 3 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-cpu-4b-q4_0 | 1 | 1 |
