@@ -226,6 +226,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-t4-2b | `2026-09-18-qat-vs-bf16-t4` | 107 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-09-29-emb4-sweep-t4` | 67 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 14 | 9 | 0 | **no** | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-10-15-drafter-sweep-t4` | 36 | 2 | 0 | yes | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-10-15-overnight-t4` | 8 | 0 | 0 | **no** | **no** |
 | gpu-vllm-t4-4b-q4w4a16emb4 | `2026-09-30-emb4-sweep-e4b-t4` | 61 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-07-first-serve-t4` | 17 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-08-beir-retrieval-t4` | 10 | 0 | 0 | **no** | **no** |
@@ -526,7 +528,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-4b-w8a8emb4 | 0 | 1 |
 | gpu-vllm-mi300x-embed2 | 0 | 1 |
 | gpu-vllm-t4-2b | 0 | 1 |
-| gpu-vllm-t4-2b-w4a16 | 1 | 2 |
+| gpu-vllm-t4-2b-w4a16 | 1 | 4 |
 | gpu-vllm-t4-4b-q4w4a16emb4 | 1 | 1 |
 | gpu-vllm-t4-embed2 | 1 | 4 |
 | local-jax-cpu-2b | 0 | 1 |
