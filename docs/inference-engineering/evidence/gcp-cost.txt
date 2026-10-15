@@ -1,0 +1,31 @@
+prices fetched 2026-10-12T19:57:57+00:00; bench results/2026-10-12; GKE node g2-standard-8
+
+One request at a time (bench_chat.py, 100-token answer)
+
+backend      tok/s  USD/hr  USD/month 24x7  USD / 1M output tokens
+maas          14.2       -          0 idle                    0.60  (per-token list price, input 0.150)
+tpu          105.3  0.6000             438                    1.58  (flex-start; on-demand USD 1.20/hr = 3.17)
+gce           94.3  0.7783             568                    2.29
+cloudrun     119.3  1.0465             764                    2.44  (0 when scaled to zero)
+gemini        93.3       -          0 idle                    2.50  (per-token list price, input 0.300)
+gke          104.7  0.9593             700                    2.55
+vertex        90.2  0.9190             671                    2.83
+
+Requests in parallel (parallel.py, timed from the client, 3 rounds per level)
+
+backend    parallel    tok/s  USD / 1M output tokens
+gce               1     92.2                   2.345
+gce               4    304.1                   0.711
+gce              16    859.6                   0.252
+gke               1     88.8                   3.001
+gke               4    385.0                   0.692
+gke              16   1310.0                   0.203
+tpu               1    105.4                   1.581
+tpu               4    390.8                   0.426
+tpu              16   1207.4                   0.138
+
+gce 24x7 = USD 568/month. Per-token spend matches it at:
+  gemini 0 input tokens per output token: USD 2.500 per 1M output tokens, 227M output tokens/month = 86 tok/s around the clock
+  gemini 5 input tokens per output token: USD 4.000 per 1M output tokens, 142M output tokens/month = 54 tok/s around the clock
+  maas   0 input tokens per output token: USD 0.600 per 1M output tokens, 947M output tokens/month = 360 tok/s around the clock
+  maas   5 input tokens per output token: USD 1.350 per 1M output tokens, 421M output tokens/month = 160 tok/s around the clock

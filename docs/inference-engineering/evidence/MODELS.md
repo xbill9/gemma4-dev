@@ -1,0 +1,1027 @@
+# Gemma 4 model characteristics
+
+Properties of the **checkpoints themselves** — layer structure, attention shape, KV cost, weight
+footprint. These are the same whatever serves them, so this file is canonical for the whole monorepo
+and every rig should read it rather than re-deriving the numbers.
+
+Anything that depends on a runtime, an engine build, or a chip generation does **not** belong here.
+`QUANTIZATION.md` covers what the serving stack supports, `HARDWARE.md` what the silicon can compute in,
+and measured throughput lives with the rig that measured it, under its `benchmarks/runs/`.
+
+Read out of `config.json` and the **safetensors tensor headers** on 2026-08-07, cross-checked against
+`tpu_inference` source and boot-time allocation logs. Where a claim is inferred rather than measured it
+says so. **Config fields alone were not sufficient here** — `head_dim` is a single value for a model with
+two attention geometries, and trusting it produced a 17% KV sizing error that only the weights exposed.
+
+## E2B — `google/gemma-4-E2B-it`
+
+| Field | Value |
+| :--- | ---: |
+| `num_hidden_layers` | 35 |
+| `num_kv_shared_layers` | 20 |
+| `num_attention_heads` | 8 |
+| `num_key_value_heads` | **1** |
+| `head_dim` | 256 |
+| `global_head_dim` | 512 |
+| `hidden_size` | 1536 |
+| `intermediate_size` | 6144 |
+| `vocab_size` | 262,144 |
+| `sliding_window` | 512 |
+| `layer_types` | 4x `sliding_attention`, 1x `full_attention`, repeating (period 5) |
+
+Also `tie_word_embeddings=True`, `final_logit_softcapping=30.0`, and per-layer embeddings
+(`vocab_size_per_layer_input=262144`, `hidden_size_per_layer_input=256`).
+
+### Two attention geometries, not one
+
+**Verified by reading the safetensors headers** (`model.safetensors`, filtered to
+`model.language_model.layers.*.self_attn.*`; script at
+`tpu-vllm-v5e1-2b/benchmarks/runs/2026-08-07-kv-quant-v5e1/inspect_weights.py`). Shapes are `[out, in]`:
+
+| Layer type | Count | `q_proj` | `k_proj` / `v_proj` | `o_proj` | `q_norm` / `k_norm` | head_dim |
+| :--- | ---: | :--- | :--- | :--- | :--- | ---: |
+| `sliding_attention` | 28 | 2048x1536 | **256**x1536 | 1536x2048 | 256 | **256** |
+| `full_attention` | 7 | 4096x1536 | **512**x1536 | 1536x4096 | 512 | **512** |
+
+Both keep 8 query heads and **1 KV head**; what changes is head_dim. `global_head_dim=512` is therefore
+real and applies to Q, K, V **and** the norms in full-attention layers — it is not a Q-only field.
+
+**All 35 layers carry `q_proj`, `k_proj`, `v_proj`, `o_proj`, `q_norm` and `k_norm`. Nothing is missing
+from the base checkpoint** — `layers missing k_proj: []`, `layers missing k_norm: []`. Note the scope:
+this is the **base export**, `google/gemma-4-E2B-it`. The QAT exports are a different artifact and are
+**not** described by this row — see below.
+
+> **Correction (2026-08-07).** An earlier version of this file claimed full-attention layers were
+> allocated at 256 like the rest, that KV cost 15 KiB/token, and that layers 15-34 "legitimately have no
+> K projection and no `k_norm`". The weights refute all three **as claims about the base checkpoint**.
+
+> **Amended 2026-08-07: that correction was then over-applied.** It was read as evidence that the
+> `k_norm`-missing failure on the **QAT** exports is unexplained. It is not evidence about those
+> exports at all — the headers above are the base repo's. Reading *both* repos shows the base ships
+> `self_attn.k_norm` for all 35 layers while **the QAT export ships it only for the 15 non-KV-shared
+> layers**, both configs declaring `num_kv_shared_layers: 20`. Those readings are compatible: the base
+> carries tensors layers 15-34 never use, and the QAT export drops them.
+>
+> Since KV sharing is a **runtime** property, a base-checkpoint header count can never settle a
+> question about the QAT export in either direction. That inference is what produced both the original
+> error and the overshoot; don't make it a third time. `QUANTIZATION.md` holds the full re-diagnosis
+> and the loading evidence — this file states only what the checkpoints contain.
+
+**A caution when reading tensor names:** the checkpoint also contains `model.audio_tower.layers.N.*` and
+a vision tower, each with its own independent layer numbering and its own `self_attn.*`. A regex matching
+`layers\.(\d+)\.` collides with them and silently overwrites language-model values for low indices.
+Always anchor on `model.language_model.`.
+
+### Which layers hold a cache
+
+The split is `first_shared = num_hidden_layers - num_kv_shared_layers` = **35 - 20 = 15**:
+
+- **Layers 0-14** own the 15 KV cache tensors the runtime allocates.
+- **Layers 15-34** are marked KV-shared and read an earlier layer's cache.
+
+This is a **runtime** property, not a checkpoint one — the weights above show K/V projections present for
+all 35 layers, so the sharing is in how the model is executed, not in what was shipped. Whether layers
+15-34's `k_proj`/`v_proj` are loaded-but-unused (~38 MB of dead weights at bf16) has **not** been
+verified.
+
+The source is *the last preceding layer of the same attention type* (sliding vs full). With the period-5
+`layer_types` pattern, full-attention layers sit at 4, 9, 14, 19, 24, 29, 34, so within layers 0-14 the
+last full is **14** and the last sliding is **13**. Therefore:
+
+> **All 20 shared layers resolve to exactly two source caches** — layer 13 for the 16 sliding ones,
+> layer 14 for the 4 full ones (19, 24, 29, 34).
+
+Not a rolling window and not paired layers. Twenty layers reading two tensors.
+
+### KV cost: 18 KiB/token at bf16
+
+The 15 cached layers are **not** homogeneous. Layers 0-14 contain three full-attention layers (4, 9, 14)
+at head_dim 512 and twelve sliding layers at 256:
+
+```
+12 sliding x 1 KV head x 2 (K,V) x 256 x 2 bytes = 12 x 1,024 = 12,288 B
+ 3 full    x 1 KV head x 2 (K,V) x 512 x 2 bytes =  3 x 2,048 =  6,144 B
+                                                    total     = 18,432 B = 18 KiB/token
+```
+
+**Independently cross-checked on two generations:**
+
+| | tokens | x 18,432 B | matches |
+| :--- | ---: | ---: | :--- |
+| v5e-1 | 321,376 | 5.52 GiB | `total_hbm_avail_gb=5.52GiB` in the boot log — exact |
+| v6e-1 | 1,151,744 | 19.77 GiB | 19.79 GiB measured pool — 0.1% |
+
+At the old 15 KiB/token figure the v5e number would be 4.60 GiB against 5.52 GiB available, i.e. 17% of
+the KV budget unexplained. **18 KiB/token is right and 15 KiB/token was wrong**, on both chips.
+
+> **Two derived figures elsewhere inherit the old error and need correcting:** the "KV cache 4.60 GiB
+> (derived)" row in `tpu-vllm-v5e1-2b/benchmarks/runs/2026-08-06-vllm-sweep-v5e1/REPORT.md` (should be
+> ~5.52 GiB), and any per-token sizing that used 15 KiB.
+
+**Resolved 2026-08-07: the allocation is correct; the log line is misleading.** The boot log reports a
+single KV layout for all 15 tensors — `num_kv_cache_groups=1`,
+`regular_attn_shape=(num_blocks, (32, 1, 2, 256))` — for a model that demonstrably needs two shapes,
+which looked like it could be silent truncation of the full-attention layers. It is not. In
+`tpu_inference/runner/kv_cache_manager.py` each layer's cache is built from **that layer's own spec**:
+
+```python
+kv_cache = create_kv_caches(..., num_kv_heads=layer_spec.num_kv_heads,
+                                 head_size=layer_spec.head_size, ...)   # per layer
+kv_caches.append(kv_cache)
+metadata["regular_attn"].count += 1
+if metadata["regular_attn"].shape is None:        # <- first layer only, never updated
+    metadata["regular_attn"].shape = kv_cache.shape
+```
+
+`count` increments for all 15 tensors but `shape` is written **once, from the first layer** — layer 0,
+which is sliding, hence 256. So the printed shape describes layer 0 alone and says nothing about layers
+4, 9 and 14. Heterogeneous per-layer caches are allocated correctly, and the 18 KiB/token memory
+arithmetic is the accurate reading.
+
+**Take this as a warning about the log, not the allocator:** `regular_attn_shape` is a first-wins sample
+presented as if it described the group. On any hybrid-attention model it under-reports, and it is what
+produced the 15 KiB/token error above. Size KV from the config geometry and check it against
+`total_hbm_avail_gb`, not from this line.
+
+**Do not extrapolate 18 KiB/token to other sizes either.** A 35-layer model paying KV for only 15 layers
+with a single KV head is still an extraordinarily cheap configuration. Any model without KV sharing, or
+with real KV heads, costs multiples of this per token.
+
+### 18 KiB/token is the GEOMETRY. Whether you pay it depends on the engine's SWA policy
+
+**MEASURED 2026-09-04 on llama.cpp and Ollama** (`local-ollama-1650ti-2b-q4_0`, whose daemon log prints
+the allocation directly), at `n_ctx = 8192`:
+
+```
+llama_kv_cache_iswa: creating non-SWA KV cache, size = 8192 cells
+llama_kv_cache: size = 48.00 MiB ( 8192 cells,  3 layers)   K (f16) 24.00  V (f16) 24.00
+llama_kv_cache_iswa: creating     SWA KV cache, size = 1024 cells
+llama_kv_cache: size = 12.00 MiB ( 1024 cells, 12 layers)   K (f16)  6.00  V (f16)  6.00
+```
+
+**The per-layer geometry above is confirmed to the byte** — 24 MiB ÷ 3 ÷ 8192 = 1024 B of K per cell for
+a full-attention layer (1 head × 512 × 2), and 6 MiB ÷ 12 ÷ 1024 = 512 B for a sliding one (1 head × 256
+× 2). Nothing in the derivation is wrong.
+
+**What differs is the allocation.** `llama_kv_cache_iswa` sizes the sliding cache at the **window**, not
+at `n_ctx` — 1024 cells whatever the context is. So on that engine the cost is **6 KiB/token plus a flat
+12 MiB**, and the 18 KiB/token figure over-predicts:
+
+| `n_ctx` | 18 KiB/token predicts | llama.cpp allocates | over by |
+| ---: | ---: | ---: | ---: |
+| 8,192 | 144 MiB | 60 MiB | 2.4x |
+| 32,768 | 576 MiB | 204 MiB | 2.8x |
+| ∞ | 18 KiB/token | → 6 KiB/token | → 3.0x |
+
+**So the number to use depends on which question you are asking.** 18 KiB/token is what the checkpoint
+*needs* if every cached layer holds the full context, which is what the TPU path does and what the two
+v5e/v6e cross-checks above confirm. 6 KiB/token + 12 MiB is what llama.cpp and Ollama *allocate*. Both
+are correct; neither is a correction of the other.
+
+**This confirms the mechanism the open discrepancy below proposes, and does not close it.** vLLM's
+9,622 B/token on an L4 is a 1.92x gap; a pure window cap predicts **3.0x** at large context. The policy
+is real and is now measured on one engine — but the magnitude still does not match vLLM's, so that block
+stays open.
+
+**Practical rule: this error is always a floor error, so it never OOMs — it silently wastes budget you
+thought you had spent.** Read the engine's own allocation log before sizing context from this section.
+
+> **OPEN DISCREPANCY — the vLLM CUDA path reports about half this, 2026-08-30.** Serving E2B under
+> stock vLLM 0.28.0 on an NVIDIA L4 (`gpu-vllm-g6-2b`, `benchmarks/runs/2026-08-30-first-serve-g6/`),
+> the engine allocated a **9.65 GiB KV pool** and reported **1,076,849 tokens** of capacity —
+> **9,622 B/token, a 1.92x gap against the 18,432 B derived above.**
+>
+> **Neither number has been shown wrong, and neither should be edited to match the other.** The
+> 18 KiB derivation is geometry plus two exact TPU cross-checks. The 9.4 KiB figure is a
+> *divided-out average* — pool ÷ reported capacity — taken on a **different serving stack**
+> (`vllm` on CUDA, not `tpu_inference`). The most likely reconciliation is that vLLM v1 charges
+> sliding-window layers only their **window** rather than the full context, in which case the two
+> figures answer different questions and 1.92x is close to what a 12-sliding/3-full split would
+> predict. That is a hypothesis, **not a measurement** — it needs vLLM's KV-cache-group accounting
+> read before anyone relies on it.
+>
+> **The leading hypothesis does not survive a third stack, 2026-09-16.** Serving the same
+> checkpoint under vLLM **0.29.1rc1.dev187+gaf1c01499.rocm100** on one AMD MI300X
+> (`gpu-vllm-mi300x-2b`, `benchmarks/reports/2026-09-16-vllm-sweep-mi300x.json`), the engine
+> allocated a **155.04 GiB KV pool** and reported **9,026,017 tokens** —
+> **18,443.7 B/token, 0.06% off the 18,432 B derived above.**
+>
+> That is the same `vllm` v1 engine, one minor version newer, on ROCm rather than CUDA. If vLLM
+> charged sliding-window layers only their window **as an engine-level policy**, this run would
+> report about half too. It reports the geometry figure to four significant figures. **So the
+> mechanism is not "the vLLM path", and the block above should no longer be read as a
+> CUDA-versus-TPU split** — it is one L4 measurement that neither of the other two stacks
+> reproduces.
+>
+> What it does not do is explain the L4 number, which still has no account and is still not
+> shown wrong. Candidates the MI300X run cannot distinguish between: the L4's much smaller pool
+> interacting with block allocation, a different `kv_cache_dtype` or attention backend
+> (`TRITON_ATTN` here), a chunked-prefill or sliding-window config difference, or vLLM 0.28.0
+> behaviour that 0.29.1 changed. **Read the L4 run's own config before assuming which.**
+>
+> Practical consequence for sizing: **on the vLLM CUDA path, do not budget KV at 18 KiB/token** —
+> you will under-provision context by ~2x. Size from the engine's own allocation log, which is the
+> rule this section already gives for the TPU path.
+
+### Three head mismatches
+
+1. **Query:KV is 8:1** — `num_attention_heads=8` against `num_key_value_heads=1`. This is full **MQA**,
+   not merely GQA.
+2. **Heads do not tile the hidden size** — `8 x 256 = 2048` against `hidden_size = 1536`. The Q
+   projection is rectangular. Anything computing `head_dim = hidden_size / num_heads` gets 192 and is
+   wrong.
+3. **`global_head_dim=512` vs `head_dim=256` is real, and it applies to K/V.** Confirmed in the weights:
+   full-attention layers ship `k_proj`/`v_proj` at 512x1536 and norms at 512, against 256 for sliding.
+   **A single `head_dim` does not describe this model.** Anything that reads one value and applies it to
+   all 35 layers under-counts the seven full-attention layers by 2x — which is exactly how the
+   15 KiB/token error arose. The v6e reconciliation that first flagged this was correct.
+
+### Single KV head does not shard
+
+`num_key_value_heads=1` cannot be split across chips. Runtimes pad `num_kv_heads` up to a multiple of
+the tensor-parallel size, so at TP=4 you pay **4x the KV memory to store the same head replicated**.
+A larger topology does not divide E2B's KV cost; it multiplies it. Check the target model's
+`num_key_value_heads` before assuming more chips solves a memory problem. The same holds for attention
+compute: at TP=4 every chip runs the whole attention kernel, so on a multi-chip host E2B serves fastest
+data-parallel, one engine per chip (measured on v5e-4, `HARDWARE.md` §v5e-4).
+
+### RMSNorm has NO `1 + weight` convention — unlike Gemma 1, 2 and 3
+
+**Measured 2026-09-02.** `Gemma4RMSNorm.forward` is `normed_output * self.weight` — a plain scale.
+Gemma 1/2/3 all use `(1 + weight)`, which is why every GGUF converter for those adds 1 when writing and
+every reader subtracts 1 when loading (`Gemma2TensorProcessor` in transformers is exactly that `-1`).
+
+**Gemma 4 does neither, and the artifacts confirm it rather than merely implying it.** The F32 norm
+tensors in `google/gemma-4-E2B-it-qat-q4_0-gguf` are bit-identical to the bf16 tensors in the
+`-qat-q4_0-unquantized` safetensors — `blk.0.attn_norm` and `layers.0.input_layernorm` both start
+9.375, 7.9375, 10.6875 with mean +10.67993. No offset is applied in either direction.
+
+Two consequences:
+
+- **transformers omitting `gemma4` from `TENSOR_PROCESSORS` is correct, not a bug.** It falls back to the
+  identity processor, which is what Gemma 4 wants. Do not "fix" it by pointing `gemma4` at
+  `Gemma2TensorProcessor`; that would subtract 1 from every norm in the model.
+- **Never carry a Gemma 2/3 loader convention into a Gemma 4 port.** The values look plausible either way —
+  a norm weight near 10 is not obviously wrong at 9 — so this fails silently as a quality regression rather
+  than as an error.
+
+## Family overview
+
+Nothing structural is shared across sizes. Every row below differs from E2B in a way that changes
+loading, KV sizing, or both.
+
+| | E2B | **E4B** | 12B | **26B A4B** | **31B** |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Layers | 35 | **42** | **48** | **30** | **60** |
+| Attention pattern | `i%5==4` full (28s/7f) | **`i%6==5` full (35s/7f)** | `i%6==5` full (40s/8f) | `i%6==5` full (25s/5f) | `i%6==5` full (50s/10f) |
+| `num_kv_shared_layers` | 20 | **18** | **0** | **0** | **0** |
+| Layers owning KV | 15 of 35 | **24 of 42** | all 48 | all 30 | all 60 |
+| `num_key_value_heads` | 1 | **2** | 8 | 8 | 16 |
+| `num_global_key_value_heads` | null (→1) | **null (→2)** | **1** | **2** | **4** |
+| `head_dim` / `global_head_dim` | 256 / 512 | 256 / 512 | 256 / 512 | 256 / 512 | 256 / 512 |
+| `hidden_size` | 1536 | **2560** | **3840** | 2816 | **5376** |
+| `intermediate_size` | 6144 | — | **15360** | 2112 | — |
+| `sliding_window` | 512 | 512 | **1024** | **1024** | **1024** |
+| `attention_k_eq_v` | false | false | **true** | **true** | **true** |
+| Per-layer embeddings (PLE) | yes | yes | **no** | **no** (`hidden_size_per_layer_input=0`) | **no** |
+| `use_double_wide_mlp` | true | — | **false** | **false** | **false** |
+| Dense or sparse | dense | dense | dense | **sparse MoE** | dense |
+| **KV per token, bf16** | **18 KiB** | **56 KiB** | **336 KiB** allocated on vLLM TPU (see §12B) | ~cheap (see §26B) | — |
+
+Dashes are unrecorded, not "same as E2B". **`num_kv_shared_layers=0` on every size above E4B means the
+KV-sharing logic above simply does not apply to them** — every layer owns its KV.
+
+**`num_global_key_value_heads` is the one field with no pattern to extrapolate** — null, null, 1, 2, 4
+across the five sizes. Never carry one size's value onto another.
+
+E2B/E4B config values read from the published `config.json` (public even though the weights are gated).
+
+Sources: `~/tpu-jax-26b/docs/gemma4-quirks.md` §15–21 and `~/tpu-jax-31b/docs/gemma4-quirks.md` §12,
+verified against the HF reference and by reading checkpoint bytes on a CPU box; the 12B column from
+`tpu-jax-v6e1-12b-w4a16/docs/12b-exploration-2026-07-31.md`, read off `config.json` on the device.
+The `~/tpu-jax-*` repos sit outside this monorepo and predate the naming scheme; the facts are
+reproduced here so the monorepo is self-contained.
+
+> **One line in the 12B exploration note contradicts this table, and the table wins.** That note's
+> comparison lists E2B at `num_key_value_heads` 4 and `num_global_key_value_heads` 4. The safetensors
+> headers say **1** — full MQA — and the boot-time allocation arithmetic agrees to 0.1% on two chip
+> generations. Its 12B column was read from `config.json` and is sound; its E2B column was filled in
+> from memory.
+
+## E4B — KV is 3.1x E2B's, not comparable
+
+E4B shares the 256/512 split by layer type, so it *looks* like a scaled E2B. It is not: **three separate
+things move at once, and they multiply.**
+
+| | E2B | E4B | effect on KV |
+| :--- | ---: | ---: | :--- |
+| Layers | 35 | 42 | more |
+| `num_kv_shared_layers` | 20 | 18 | **fewer shared** |
+| Layers owning KV | **15** | **24** | 1.6x |
+| `num_key_value_heads` | **1** | **2** | **2x per layer** |
+| head_dim by type | 256 / 512 | 256 / 512 | unchanged |
+
+**Cache sharing.** `first_shared = 42 - 18 = 24`, so layers **0-23 own a cache** and layers **24-41**
+share. E4B caches 57% of its layers against E2B's 43%. The mapping rule is the same — last preceding
+layer of matching type — and within 0-23 the last full is **23** and the last sliding is **22**, so all 18
+shared layers again resolve to just **two** source caches (3 full → L23, 15 sliding → L22).
+
+**Head type.** The 256/512 split is identical to E2B: full-attention layers are 512-wide, sliding are 256.
+The `layer_types` array is `i % 6 == 5` — full at 5, 11, 17, 23, 29, 35, 41 — so **4 of the 24 cached
+layers are full-attention** (5, 11, 17, 23) and 20 are sliding. What changed is the head *count*:
+`num_key_value_heads = 2`, and `num_global_key_value_heads` is null so full layers fall back to 2 as well.
+E2B's single KV head is the anomaly, not the family norm.
+
+```
+20 sliding x 2 KV heads x 2 (K,V) x 256 x 2 B = 20 x 2,048 = 40,960 B
+ 4 full    x 2 KV heads x 2 (K,V) x 512 x 2 B =  4 x 4,096 = 16,384 B
+                                                 total     = 57,344 B = 56 KiB/token
+```
+
+**56 KiB/token against E2B's 18 — 3.1x.** Sizing E4B's context budget from E2B experience overstates it
+by more than 3x. On a v5e-1 with int8 weights (~7.5 GiB, leaving ~7.0 GiB of the 14.49 usable) that is
+**~131,000 KV tokens**, against E2B's measured 321,376 — so roughly 8 concurrent streams at 16K context,
+not 20.
+
+**Geometry confirmed against an allocation log, 2026-09-30** (`local-llamacpp-1650ti-4b-q4_0`, llama.cpp,
+8192 context): 128.00 MiB for 4 full layers × 8192 cells and 40.00 MiB for 20 sliding layers — exactly the
+per-layer figures above. llama.cpp caps the sliding layers at 1024 cells whatever `n_ctx` is, so its total is
+168 MiB rather than 8192 × 56 KiB = 448 MiB; the 56 KiB/token figure still holds for engines that size
+sliding layers at full context. Not yet checked against a vLLM `GPU KV cache size` line.
+
+## `attention_k_eq_v` — full-attention layers ship no `v_proj`
+
+**Set `true` on the 12B, the 26B and the 31B; `false` on E2B and E4B.** Where set, the full-attention
+layers carry `q_proj`, `k_proj`, `k_norm`, `o_proj` and **no `v_proj` at all** — one projection feeds
+both K and V.
+
+- 31B: all **ten** full-attention layers, verified key by key on the checkpoint.
+- 26B: all **five** full-attention layers.
+- 12B: all **eight** full-attention layers.
+
+**Every dense size at 12B and above sets it** — treat it as the family default above E4B rather than a
+big-model curiosity, and expect it on any new size until the config says otherwise.
+
+Loading any of them without handling it yields exactly ten (or five, or eight) missing tensors, and
+**a loader that tolerates `None` produces a silently broken model that still emits fluent text**. The
+fix is to alias V to K — the same arrays, not copies.
+
+This is a checkpoint-shape fact, so it is the first thing to check when a big-model load reports missing
+tensors. It is **not** the explanation for E2B: E2B sets the flag `false` and ships `v_proj` on all
+fifteen non-shared layers.
+
+The KV cache still stores K and V separately where the flag is set — redundant but correct. Collapsing it
+would save one of the two planes on those layers, worth ~4.5% of the 31B's KV.
+
+## 12B — the MatFormer features switched off
+
+`google/gemma-4-12B-it-qat-w4a16-ct`, ported to the pure-JAX engine on a v6e-1, 2026-07-31.
+Artifacts in `tpu-jax-v6e1-12b-w4a16/`.
+
+**It needed zero code changes to load.** The 12B is the same `gemma4_unified` architecture as E2B with
+every MatFormer feature switched *off* — no PLE, no KV sharing, no double-wide MLP. `config_from_hf`
+already resolved all of it, because `pick()` tests `is not None` and so the `0`s that disable those
+features survive rather than being treated as absent. RoPE, logit softcapping (30.0), tied embeddings
+and the 262,144 vocab are identical to E2B. See the family table above for the full field list.
+
+`attention_k_eq_v` is **true** here too, so the eight full-attention layers ship no `v_proj` — the same
+load-time surprise documented for the 26B and 31B above.
+
+There is no `lm_head` tensor and no `embed_tokens_per_layer`; the checkpoint is one 10.26 GB
+`model.safetensors` including the vision and audio towers. At W4A16 it is **8.15 GB resident**.
+
+**The `'111111'` digit output on bare prompts is not an engine defect.** Without `<bos>` and the Gemma 4
+chat template, the HF PyTorch reference emits the same digit strings. It is a prompt-formatting
+requirement of the IT QAT checkpoint. Formatted, JAX and the reference reach 100% exact token parity.
+**The 31B does not share this** — it recovers the `<|channel>thought` scaffolding on its own from a
+bare prompt, so a bare-prompt smoke test that passes on the 31B proves nothing about the 12B.
+
+**Every 12B checkpoint declares `Gemma4UnifiedForConditionalGeneration`**, including the QAT ones, and
+the `-qat-q4_0-unquantized` config matches `-it` field for field (48 layers, hidden 3840, 0 KV-shared
+layers, no `quantization_config`, 11,959,730,224 BF16 parameters; read from the Hub 2026-09-26). So
+`-q4_0-unquantized` loads anywhere bf16 12B loads, at bf16's memory and speed, with the QAT weights. On
+vLLM's JAX path all of them need `--hf_overrides '{"architectures": ["Gemma4ForCausalLM"]}'`
+(`QUANTIZATION.md`).
+
+> **Do not quote that rig's per-token KV figure.** Its `REPORT.md` charges the `attention_k_eq_v`
+> layers for a V it also states is free (16 KiB/token where 8 KiB follows if V really is K), and adds
+> that to a *window-capped* sliding-layer figure as though both were uncapped rates. The stated
+> 336 KiB/token inherits both errors. Derive KV from this file and confirm against a boot allocation
+> log.
+
+**12B KV on vLLM's TPU path: 336 KiB/token, confirmed against boot logs** (2026-09-30, one v5e chip,
+`tpu-vllm-v5e1-12b-*/benchmarks/runs/2026-09-30-12bctx*`). From the table above, bf16:
+
+```
+40 sliding layers x 8 KV heads x 256 x (K+V) x 2 B  = 320 KiB/token   (unwindowed: tpu_inference turns windows off)
+ 8 full layers    x 1 KV head  x 512 x  K    x 2 B  =   8 KiB/token   if V is not stored
+                                            x (K+V)  =  16 KiB/token   if it is
+```
+
+The boot logs bound the allocation at 333-338 KiB/token (5.11 GiB held 62 blocks of 256 tokens, 4.48
+GiB held 54), which admits 336 and excludes 328: **the allocator stores a V cache for the eight
+`attention_k_eq_v` layers even though V is K.** So 336 is the number to size 12B against on this stack,
+and the rig figure above is right for the allocation, though not for the geometry it claimed. On one
+v5e chip that is 9,728 tokens beside W8A8 + int4 tables and 13,824 beside the int4 build
+(`QUANTIZATION.md`).
+
+## 26B A4B — sparse MoE, and the odd one out twice over
+
+`google/gemma-4-26B-A4B-it` — **26.5B total, ~4B active**, 128 experts, top-8.
+
+| field | value |
+| :--- | ---: |
+| `num_hidden_layers` | 30 (25 sliding / 5 full) |
+| `hidden_size` | 2816 |
+| `intermediate_size` (dense MLP) | 2112 |
+| `num_experts` / `top_k_experts` | 128 / 8 |
+| `moe_intermediate_size` (per expert) | 704 |
+| `num_attention_heads` | 16 |
+| `num_key_value_heads` | 8 |
+| `num_global_key_value_heads` | 2 |
+| `sliding_window` | 1024 |
+
+### The MoE block runs *alongside* the dense MLP, not instead of it
+
+`enable_moe_block: true` does **not** swap the feed-forward block for an expert bank. Every layer keeps
+its ordinary `mlp` **and** gains a 128-expert bank, and the two outputs are summed before a shared
+post-norm:
+
+```
+residual = h
+dense = post_feedforward_layernorm_1( mlp( pre_feedforward_layernorm(h) ) )
+moe   = post_feedforward_layernorm_2( experts( pre_feedforward_layernorm_2(h) ) )
+h     = residual + post_feedforward_layernorm(dense + moe)
+```
+
+Both branches read `h`, the post-attention residual — not each other's output. That is why the 26B
+carries a full-width dense MLP *on top of* 128 experts, and why its feed-forward block has **five** norms
+rather than two.
+
+**The router reads the RAW residual; the experts read a normalized copy.** Passing the normalized tensor
+to both is the obvious simplification and it is wrong — the router opens with its own scale-less RMSNorm,
+so composing it with a learned-weight RMSNorm first reweights the channels the router sees and changes
+which experts fire. **Measured cost of getting this wrong: 0.36 relative error, with router parity tests
+and expert parity tests both still green.** Only end-to-end comparison caught it.
+
+**Small differences compound down this block rather than washing out.** Peano AI's Axon reports the
+same structure from the training side on CUDA: the 26B's sampler-vs-trainer log-prob gap holds near
+0.010 against ~0.005 for dense models, and routing replay, a different training backend, and swapping
+vLLM's fused expert kernel for a plain per-expert loop all leave it where it is. Their account is the
+architecture — two parallel branches summed into a chain of RMSNorms with large weights carry a
+rounding difference forward layer by layer. **Those two numbers are a gap between two CUDA training
+engines and stay theirs**; what carries here is the mechanism, the same one the 0.36 above came out
+of. Source: <https://peano-labs.ai/blog/axon> (2026-06-15).
+
+In the router tail, the per-expert scale is applied **after** renormalization, so the final top-k weights
+do *not* sum to 1. "Fixing" that changes the model.
+
+### KV is not the constraint here — prefill temporaries are
+
+Because the full-attention layers carry only 2 KV heads and the sliding layers window at 1024, KV on the
+26B is unusually cheap: ~110 KiB/token at int8 unwindowed, ~0.15 GB at 4K context with windowed KV. This
+is the opposite of the usual failure mode and inverts how you size the model.
+
+### No `-w4a16-ct` checkpoint exists for this size
+
+Enumerated from the Hub 2026-07-31 — **the suffix set is not uniform across sizes**:
+
+| size | `-w4a16-ct` | `-q4_0-unquantized` | `-q4_0-gguf` | mobile |
+| :--- | :---: | :---: | :---: | :---: |
+| E2B, E4B | yes | yes | yes | yes |
+| 12B, 31B | yes | yes | yes | — |
+| **26B A4B** | **no** | yes | yes | — |
+
+`google/gemma-4-26B-A4B-it-qat-w4a16-ct` 404s. GGUF targets llama.cpp, so the only usable export is
+`-q4_0-unquantized`: **51.61 GB of BF16**.
+
+**Google's QAT model card states the gap outright** (read 2026-09-26, from the `-q4_0-unquantized`
+README): unquantized QAT checkpoints and GGUF are "Available for Gemma 4 E2B, E4B, 12B, 26B A4B, and
+31B"; compressed tensors (w4a16) are "Available for Gemma 4 E2B, E4B, 12B, and 31B". No reason is given.
+The full 26B list under `google` on 2026-09-26: `-it`, the base model, `-it-qat-q4_0-unquantized`,
+`-it-qat-q4_0-gguf`, and two **drafter models** for speculative decoding, `-it-assistant` and
+`-it-qat-q4_0-unquantized-assistant` (420M BF16 parameters each, `Gemma4AssistantForCausalLM`).
+
+A likely cause, inferred and unconfirmed: compressed-tensors quantizes modules its config targets as
+`"Linear"`, and the 26B's experts are fused 3-D `nn.Parameter`s (layout below), not Linear modules. A
+standard export would leave 88% of the weights at bf16 unless the experts are first split per expert,
+which is what `cyankiwi/gemma-4-26B-A4B-it-AWQ-4bit` did. llama.cpp stores stacked expert tensors
+natively, so GGUF needed no such step.
+
+It fits a v6e-1 anyway because **"unquantized" describes the container, not the values.** Those are QAT
+weights already sitting on a Q4_0 grid — verified by range-reading the shards, with all 256 sampled groups
+of 32 lying exactly on a 4-bit grid across expert, attention, MLP, router and embedding tensors. Group
+size 64 fails the same test (3/128), which pins the group at **32** rather than leaving it assumed.
+Repacking to W4A16 at load gives **15.27 GB resident**.
+
+**Repacked to compressed-tensors W4A16, 2026-09-26** (`jev-tpu-31b/repack_q4_0.py`, CPU only, 388 s):
+48.07 GiB → **15.29 GiB**, in cyankiwi's layout (per-expert `experts.{i}.{gate,up,down}_proj`,
+`pack-quantized` int4, group 32, bf16 `weight_scale`, explicit ignore list for router, vision tower and
+`lm_head`). Attention, dense MLP and experts are quantized; embeddings, router, norms and the vision
+tower are copied. Its `verify` rereads both checkpoints and computes, rather than samples:
+
+| tensor kind | groups of 32 | levels off the source grid | values bit-identical | worst relative error |
+| :--- | ---: | ---: | ---: | ---: |
+| experts gate/up | 475,791,360 | 0 | 92.6% | 7.8e-3 |
+| experts down | 237,895,680 | 0 | 92.6% | 7.8e-3 |
+| dense MLP | 16,727,040 | 0 | 92.0–92.5% | 1.0e-2 |
+| attention q/k/o/v | 34,693,120 | 0 | 89.7–90.4% | 1.1e-2 |
+
+Every group of the whole model recovers onto a 4-bit grid, and all 748 copied tensors are byte-identical.
+The values that differ do so by the bf16 scale (at most 2.8 bf16 steps); the levels do not. The
+checkpoint is `gs://aisprint-491218-bucket/jev-tpu-31b/models/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`, and is
+public on Hugging Face as [`xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct)
+(2026-09-26; file sizes checked against the local copy after upload; card: `jev-tpu-31b/hf/MODEL_CARD.md`).
+
+**HBM budget on one v6e chip.** Arithmetic from that checkpoint's tensor headers, then the allocation
+log of run `2026-09-26-moe2`:
+
+| on the chip | GiB |
+| :--- | ---: |
+| experts, int4, with GMM_TP's 704 → 768 padding and f32 scales | 14.10 |
+| embeddings, bf16 | 1.38 |
+| attention and dense MLP, int4 | 0.86 |
+| text weights | 16.36 |
+| vision tower, bf16 | 1.07 |
+| **arithmetic total** | **17.43** |
+| **measured, `total_hbm_used_gb`** | **17.43** |
+
+**The vision tower is resident.** 26B loads through the JAX `Gemma4ForConditionalGeneration`
+(`gemma4_mm.py`), which builds the SigLIP encoder even with `--limit-mm-per-prompt` at 0; only the
+text-only `Gemma4ForCausalLM` skips `vision` tensors. The measured 11.32 GiB left holds **53,888 KV
+tokens**, vLLM's own count (KV dtype and why a derived byte count does not reconcile: `QUANTIZATION.md`). `RedHatAI/gemma-4-26B-A4B-it-FP8-dynamic`, the only other 26B that serves on one
+chip, measured 27.99 GiB with 0.75 GiB left: 3,456 tokens. Unmeasured savings still on the table: the
+vision tower (1.07 GiB) if a text-only class loads the 26B, expert scales kept bf16 on the chip
+(1.33 GiB measured on v5e once stored as `[E, 1, groups, N]`: see "The 26B W4A16 repack on a v5e-1"), and int4 embeddings (the grid covers them; the repack leaves them bf16 to match cyankiwi).
+
+Two ways to destroy those weights while "just repacking" them, both silent:
+
+1. **`d = amax/8` is the wrong step.** Many blocks peak below level ±8, so the derived step is a fraction
+   of the true one and the block gets requantized onto a grid that does not contain its own values —
+   median relative error 4.9e-2. Searching for the level the peak actually occupies, plus least-squares
+   refinement, gives exactly 0 error for 93.1% of values.
+2. **Packing after the transpose.** W4A16 packs nibbles along the last axis and the Q4_0 grid runs along
+   `in`. Packing a transposed weight groups across `out`, where no grid exists — a real requantization
+   dressed as a repack. Packing must happen in the loader, before the transpose.
+
+## 26B A4B — expert tensor layout
+
+Supplements the §26B section above with the shape traps, which are checkpoint facts rather than wiring.
+
+Expert weights are `nn.Parameter`, not `nn.Linear`, so **the keys carry no `.weight` suffix**:
+
+| key | shape | meaning |
+| :--- | :--- | :--- |
+| `layers.N.experts.gate_up_proj` | `[128, 1408, 2816]` | `[E, 2*moe_inter, hidden]` |
+| `layers.N.experts.down_proj` | `[128, 2816, 704]` | `[E, hidden, moe_inter]` |
+
+- **Gate and up are fused** into one `[2I, H]` tensor per expert — first `I` rows gate, last `I` up.
+  Splitting on the wrong axis or the wrong half silently swaps them, and `gelu(up) * gate` is a
+  plausible-looking model that is not this one.
+- **They stay in `[E, out, in]` orientation**, unlike every rank-2 projection, which loaders transpose
+  to `[in, out]`. Transposing them is actively harmful — it is what makes the Q4_0 repack group across
+  `out`, where no grid exists (see `QUANTIZATION.md`).
+
+**Prefill does 16x the expert FLOPs.** Decode gathers only the 8 selected banks per token; prefill
+cannot — at T tokens that would re-read T x 8 banks — so it dequantizes the whole 128-expert bank once
+and masks. Optimal in bytes moved, 128/8 = **16x wasteful in FLOPs**. That ratio is arithmetic from E
+and K, not a measurement. Fixing it needs expert-sorted dispatch, deliberately not attempted because
+capacity-padded dispatch **drops tokens** when an expert is oversubscribed — a silent drop being
+precisely the failure mode this codebase keeps producing.
+
+## 31B — dense, 60 layers
+
+`google/gemma-4-31B-it` — 31.0B, 62 GB at bf16. Has `-w4a16-ct` and `-q4_0-unquantized` QAT exports.
+
+- **60 layers**, `[s,s,s,s,s,f]` repeating — full attention at `i % 6 == 5`, so **10 full / 50 sliding**.
+- `num_kv_shared_layers = 0` — every layer owns its KV. Sliding layers dominate the KV budget.
+- `num_global_key_value_heads = 4` (the 26B uses 2 — **do not carry it over**), `global_head_dim = 512`.
+  At layer 5 the packed `k_proj` is `[2048, 672]`, i.e. 4 x 512, with `k_norm` `[512]`.
+- `attention_k_eq_v = true` — see above; ten missing `v_proj` on load is expected, not corruption.
+- `use_bidirectional_attention = "vision"` — selects bidirectional attention for **image** tokens only.
+  Text decoding is unaffected, so the causal-only text path is correct. Absent/`null` on E2B.
+- `store_full_length_kv` is **not a checkpoint field** in any config — it is a reference-implementation
+  concept. Don't look for it.
+
+**Not verified on TPU.** The 26B facts above are checked against the reference and the checkpoint bytes
+on CPU; as of the source doc, nothing was measured on a TPU. Treat performance claims for either large
+model as unmeasured.
+
+## 31B — the residual stream is clamped at both ends
+
+Behavioural structure measured on `gemma-4-31B-it-qat-w4a16-ct`, v6e-1, 2026-08-01. Workings in
+`tpu-jax-v6e1-31b-w4a16/benchmarks/runs/2026-07-31-gemma4-31b-v6e1/MODEL-INTEL.md`. The config facts
+are in the §31B section above; this is what the model *does* when it runs.
+
+Each layer ends with `h *= layer_scalar`, one learned scalar per layer over the whole residual stream.
+It is a **three-phase clamp**, not a smooth schedule: ~10-14x suppression at layers 0-1, essentially
+pass-through at 2-4, and **~31x suppression at layer 59** (`layer_scalar` = 0.0317). Full-attention
+layers are damped 14% harder than sliding ones (0.6891 vs 0.8010).
+
+It exists because **the pre-norms are enormous**: `input_layernorm` averages 23.5 with individual
+channels reaching **1248**, `pre_feedforward_layernorm` averages 40.8 — while the post-norms are
+sub-unit (0.47, 0.74). Each block amplifies hugely going in and is scaled back coming out.
+
+Consequently the residual stream **shrinks** with depth — RMS 10.06 at layer 0 to 1.239 at layer 59,
+**0.12x**. Most transformers grow it.
+
+### Massive activations, and why the first two tokens are load-bearing
+
+- **max/median ratio in the residual stream: mean 1,214x, peak 15,665x** (layer 7).
+- **78% of layers put their peak activation on `<bos>` or `<|turn>`** — position 1 in 32/60 layers,
+  position 0 in 15/60. Two channels (ch3770, ch1682) account for 57% of layers.
+- The sinks are **sparse in (position, channel) space** — mean |h| at position 0 is only 1.3x the other
+  positions. Whole positions are not large; specific channels at those positions are.
+- **The norm-weight outlier channels and the activation outlier channels do not overlap.** Static
+  top channels are ch1081/1400/1924/4206 (pre-norms) and a tight band at ch33-47 (post-norms); runtime
+  ones are ch3770/1682/2130/3067. You cannot predict one population from the other.
+
+Three consequences:
+
+1. **Per-tensor activation quantization will not survive this model.** A 15,665x in-tensor dynamic
+   range leaves nothing for the other channels. Per-(batch, head, position) KV scales are the right
+   shape, and this is the reason.
+2. **Do not trim or drop the leading tokens**, and never evict positions 0-1 from the **full**
+   layers' cache — layer 11 spends **44% of its entire attention budget** there.
+3. **Windowing the sliding layers' KV is provably safe.** A sliding layer is masked to
+   `(p - 1024, p]` regardless of `window_kv` — the ring buffer is memory, the mask is semantics — so
+   past 1024 tokens **50 of 60 layers cannot attend to position 0 at all**. Measured sink mass on
+   sliding layers is *exactly* 0.000000, against 0.2365 on the full layers.
+
+That last point explains the rest: **the 10 full-attention layers are the model's only sink pathway and
+only long-range pathway beyond 1024 tokens**, which is why they produce 33-37% larger outputs and are
+damped harder. The design tension is that this pathway runs through the *narrowest* KV in the model —
+4 KV heads against the sliding layers' 16, plus `attention_k_eq_v`. Most load-bearing, least capacity,
+no redundancy. If a mixed-precision KV scheme is ever worth doing on this model, **this** is the split
+that matters.
+
+### Output is a point mass on real prompts
+
+top-1 probability **1.0000**, entropy **0.000 nats**, top-1-to-top-2 margin **15.28**, max logit 27.9
+against the 30.0 softcap (so `tanh` is well into saturation without clipping any logit).
+
+**Greedy decoding is therefore extremely stable on real input and meaningless to evaluate on random
+tokens**, where the margin collapses toward zero and any numerical perturbation flips the argmax. A ~3%
+fusion-drift divergence between two `window_kv` settings looked like a cache-correctness bug and was
+this. Hold `window_kv` fixed across any A/B — greedy decoding is not bit-reproducible across it.
+
+## EmbeddingGemma 2 — `google/embeddinggemma-2`, an encoder rather than a decoder
+
+Released 2026-10-06. Read from the checkpoint's `config.json` and vLLM PR #60254 on 2026-10-07. Rigs:
+`*-embed2` (`NAMING.md`, slot 4).
+
+- **Architecture: `EmbeddingGemma2Model`, bidirectional.** The text encoder is adapted from the Gemma 4 decoder,
+  but its attention is `ENCODER_ONLY`. Nothing is causal, nothing is generated, and **there is no KV cache**, so
+  every KV figure in this file is irrelevant to it.
+- **Text encoder.** 24 layers, hidden 512, intermediate 2,048, 4 query heads. Per-layer inputs of width 512
+  (PLE, as in E2B). Vocabulary 262,144. **Same two-geometry pattern as E2B**: sliding window 512 with head_dim
+  256 and 2 KV heads, and every sixth layer (5, 11, 17, 23) full attention with head_dim 512 and 1 KV head.
+  RoPE θ is 10k on the sliding layers and 1M on the full ones.
+- **Output.** Mean pooling then L2 normalisation, 768-d. Matryoshka-trained at 512/256/128; Google's guide
+  says any width from 128 to 768 works and recommends those four. **`config.json` declares no
+  `matryoshka_dimensions`**, so vLLM refuses `dimensions` until it is overridden.
+- **Towers.** Text is 271.0M parameters. Vision adds 167.8M (`gemma4_vision`, 16 layers, 280 soft tokens per
+  image) and audio adds 305.6M (`gemma4_audio`, 12 layers). All three ship in **one bf16 safetensors file
+  of 1,488,915,288 B**, and serving flags decide which towers load.
+- **Context.** 8,192 tokens shared across modalities.
+- **Task prefixes are part of the input**, not metadata. Queries take `task: search result | query: `,
+  documents take `title: none | text: `, and the full table is in `config_sentence_transformers.json`.
+  vLLM's `/v1/embeddings` does not add them.
+- **Dtype.** Google says float16 is incompatible, so use bf16 or fp32. On a part with no bf16 (Turing),
+  that means fp32, and vLLM's Triton encoder kernel needs a patch there (`gpu-vllm-t4-embed2`).
+- **Measured** (`gpu-vllm-t4-embed2/benchmarks/runs/2026-10-07-first-serve-t4`). At fp32 the weights take
+  1.03 GiB with text only and 1.63 GiB with the vision tower. vLLM matches sentence-transformers to
+  1−cos ≤ 7.0e-9.
+
+## Weight footprints
+
+bf16 weight sizes, as recorded in `tpu-jax-v5e1-2b/server.py:806`:
+
+```python
+_BF16_WEIGHTS_GB = {"E2B": 10.2, "E4B": 16.0, "12B": 24.0, "26B": 52.0, "31B": 62.0}
+```
+
+| Model | Params | bf16 | GiB | int8 | int4 | v5e-1 (14.49 GiB)? | v6e-1 (~28 GiB)? |
+| :--- | :--- | ---: | ---: | ---: | ---: | :--- | :--- |
+| E2B | 2B effective / ~5B total | 10.2 GB | 9.5 | ~4.8 | ~2.4 | bf16 fits (8.97 measured) | yes |
+| **E4B** | 4.5B effective / 8.0B total | 16.0 GB | **14.9** | ~7.5 | ~3.7 | needs int8 | bf16 fits |
+| 12B | 12B | 24.0 GB | 22.4 | ~11.2 | ~5.6 | needs int4 | bf16 fits |
+| **26B A4B** | 26.5B total / **~4B active** | 51.61 GB | 48.1 | ~24 | **15.29 on disk, 17.43 resident** | **yes, with loader changes** (below) | **yes, repacked** |
+| 31B | 31.0B | 62.0 GB | 57.7 | ~29 | ~14.4 | no | multi-chip |
+
+int8/int4 columns are arithmetic halving/quartering **except** the 26B, whose int4 figures are measured:
+15.29 GiB is the W4A16 repack's safetensors on disk, 17.43 GiB its `total_hbm_used_gb` on one v6e chip
+(§26B, HBM budget).
+
+### The 12B QAT W4A16 repack on a v5e-1: level with bf16, above Google's export
+
+`google/gemma-4-12B-it-qat-q4_0-unquantized` repacked to W4A16 by `jev-tpu-31b/repack_q4_0.py` is exact:
+340,623,360 groups, none off the source grid, 89.6% of values bit-identical, the rest within the bf16
+scale (max 1.09e-2 relative); 7.68 GiB on disk against 22.28, 7.59 GiB resident on a v5e chip against
+9.46 for `-qat-w4a16-ct`. Published as [`xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-w4a16-ct).
+
+MEASURED 2026-09-29 (`jev-tpu-v5e1`, run `2026-09-28-12b3-v5e1`), suite paired record for record: 0.758
+against 0.752 for Google's `-qat-w4a16-ct` on the same v5e chip (+0.6 points, 95% range +0.0 to +1.2),
+against 0.757 for its bf16 source on v6e (+0.1), and against 0.760 for the bf16 12B on v6e (−0.1, −0.7 to
++0.5). So Google's W4A16 export costs about 0.6 points that the Q4_0 grid values do not, consistent with
+the 6.67% weight-level difference measured on the 31B (`QUANTIZATION.md`).
+
+On one v5e chip it takes the gmm_v2 VMEM headroom (`GMM_V2_TILE_VMEM_FRACTION=0.85`) and four compile
+buckets; its compiled model is 3.98 GiB, leaving about 3.9 GiB for KV. 33 output tok/s at concurrency 1,
+388 at 16 (v6e: 992 at 16); first-token latency 62.9 ms median.
+
+### The 26B W4A16 repack on a v5e-1: serves with four loader changes
+
+[`xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct)
+**serves on one v5e chip** (16 GB nominal, 15.75 GiB total, `HARDWARE.md` §v5e-1), MEASURED 2026-09-28
+(`jev-tpu-v5e1`, run `2026-09-28-lowmem7-v5e1`): suite 0.754 against 0.753 for the same checkpoint on
+one v6e chip, paired record for record (difference +0.001, 95% range −0.004 to +0.005), every task within
+0.003. As the image loads it, it does not fit: the safetensors alone are 15.29 GiB.
+
+**Tensor inventory**, from the headers of all 31 safetensors files on Hugging Face (2026-09-28, 35,923
+tensors, range-read):
+
+| group | GiB on disk |
+| :--- | ---: |
+| experts, int4 packed | 10.635 |
+| expert scales, bf16, group 32 | 1.329 |
+| `embed_tokens`, bf16 `[262144, 2816]`, tied to the LM head | 1.375 |
+| vision tower, bf16 | 1.067 |
+| attention and dense MLP, int4 packed plus scales | 0.862 |
+| norms, router and other bf16 | 0.021 |
+| **total** | **15.290** |
+
+As served on v6e the experts take 14.10 GiB on the chip: gate/up are padded 704 → 768 (down is not), and
+every expert scale is widened to f32. That model of the load reproduces §26B's 14.10, 16.36 and 17.43
+exactly.
+
+**The changes and what each measured on v5e** (`jev-tpu-v5e1/patches/lowmem.diff`, each behind its own
+switch, off by default):
+
+| change | weights on chip, GiB |
+| :--- | ---: |
+| as served on v6e, vision tower resident | 17.43 |
+| text-only class (`Gemma4ForCausalLM` via `--hf-overrides`) | 16.36 |
+| + gate/up unpadded, gmm1 unfused (`W4A16_MOE_NO_PAD`) | **15.55** measured |
+| + expert scales bf16, stored `[E, 1, groups, N]` (`W4A16_MOE_BF16_SCALES`) | **14.22** measured |
+| + `embed_tokens` int8 with a bf16 scale per 32 columns (`EMBED_INT8_GROUP=32`) | **13.58** measured |
+
+With 13.58 GiB of weights, a 17-block KV cache (2,176 tokens: `--max-model-len 2048` is the floor, 0.46
+GiB) and the compiled model (about 1.26 GiB, 1.15 of it XLA "overlays"), the chip is full to within a few
+hundred MiB. At 14.22 GiB it was 199 MB over at compile time (15.94 of 15.75 GiB used).
+
+Five things about this model on this chip, each found by a run:
+
+- **gmm_v2 cannot read bf16 scales on v5e** ("Strided load with non 32-bit data" in Mosaic, from the
+  zero-stride sublane broadcast), so the scales are stored bf16 and widened to f32 per layer in the
+  forward. That costs 190–235 µs per MoE layer on v5e.
+- **A bf16 scale shaped `[E, groups, 1, N]` costs as much HBM as f32**: the size-1 dim second from minor is
+  padded to bf16's two-row sublane packing. `[E, 1, groups, N]` does not pay it.
+- **`create_jit_model` asks for 16.00 GiB of temporaries** after loading. Without Qwix it is an identity;
+  `SKIP_IDENTITY_MODEL_JIT` skips it.
+- **The host, not the chip, is the last limit**: compiling the eight backbone buckets peaked at 45.7 GB of
+  the v5e host's 48 GB plus 2.75 GB of swap, and without swap the engine was OOM-killed.
+- **Concurrency-1 latency is 68.2 ms median against 27.1 ms on v6e**, and the boot takes 30 minutes.
+
+The int8 embedding is the only change that alters served values (per-value error at most half a step of
+its group's amax/127). The embeddings are on the Q4_0 grid, so a 4-bit store at group 32 would be exact in
+the same sense as the experts and would save a further 0.34 GiB; it is not built.
+
+The other route on v5e is **four chips at TP=4** (`v5litepod-4`), the split that serves on a v6e-4;
+unmeasured on v5e.
+
+### The E2B W4A16 QAT export does NOT quantize the PLE, and that is 56.5% of it
+
+**MEASURED 2026-09-04** by range-reading the safetensors header of
+`google/gemma-4-E2B-it-qat-w4a16-ct` (2,504 tensors, 8.316 GB; nothing downloaded whole):
+
+| group | GB | % | note |
+| :--- | ---: | ---: | :--- |
+| **`embed_tokens_per_layer.weight`** | **4.698** | **56.5%** | **one BF16 tensor, NOT quantized** |
+| `embed_tokens` / `lm_head` | 1.611 | 19.4% | BF16, not quantized |
+| transformer body | 1.040 | 12.5% | this is the part that is actually 4-bit |
+| audio tower | 0.610 | 7.3% | BF16 |
+| vision tower | 0.335 | 4.0% | BF16 |
+
+**So "w4a16" describes 12.5% of the file.** The `quantization_config.ignore` list and the dtypes agree:
+`pack-quantized`, 4-bit int, group 32, applied to the linears only. This is why the export is 8.32 GB
+against the bf16 build's 10.25 — **a 19% cut, not 75%** — and why `weights / 4` under-predicts this
+family by ~3x. It is the same fact this file already records as the reason the int4 column
+under-predicts, now confirmed per-tensor on the artifact rather than inferred.
+
+**The practical consequence is that the single biggest tensor is also the cheapest one to move off
+the device.** `embed_tokens_per_layer` is an indexed gather, never a matmul — the "Resident is not
+streamed" section below says so, and llama.cpp acts on it: `TENSOR_READ_LAZY` keeps the same tensor
+out of VRAM entirely and still reaches 73 tok/s on a 4 GiB card
+(`local-llamacpp-1650ti-2b-q4_0`). Any engine that can leave that one tensor in host memory changes
+its own residency by 4.7 GB, and the access pattern is already proven to survive it.
+
+**The int4 column UNDER-predicts by ~19%, and the reason generalises to every size.** MEASURED
+2026-08-23 on a T4G (`gpu-jax-g5g-2b/docs/larger-models-on-t4g.md`): E2B at `ple_bits=4` came to
+**3.054 GB against the 2.4 GiB (= 2.58 GB) this table predicts**. Mind the units — the int8/int4
+columns quarter the **GiB** column, not the GB one, and comparing 3.054 GB against "2.4" as though it
+were GB turns a 19% error into an apparent 27% one. Quartering everything is wrong in two places at
+once — **`embed_tokens` stays at the storage dtype** rather than being quantized, and **the per-group
+scales are extra**. Budget an int4 target as:
+
+```
+quartered transformer weights  +  embed_tokens at full width  +  per-group scales
+```
+
+not as `bf16 / 4`. The bf16 column is the safer of the two: it **over**-predicts, by ~6-9% (E2B
+measured 8.97 GiB on a v5e-1 and 9.257 GB on a T4G against 10.2 GB here). **For sizing a new rig,
+treat the bf16 column as a ceiling and the int4 column as a floor** — the error runs in opposite
+directions, so a plan that survives both is safe and one that needs the int4 figure to be exact is not.
+
+### The E2B repack, and its text-only build: the towers are 0.88 GiB of it
+
+`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct` (revision `da64116`) is `-qat-q4_0-unquantized` repacked by
+`jev-tpu-31b/repack_q4_0.py`. **MEASURED 2026-09-29** from its safetensors headers, 7.00 GiB:
+
+| group | GiB | % | stored |
+| :--- | ---: | ---: | :--- |
+| `embed_tokens_per_layer` (PLE) | 4.375 | 62.5% | BF16 |
+| decoder layers | 0.977 | 14.0% | int4 packed + BF16 norms |
+| `embed_tokens` (tied `lm_head`) | 0.750 | 10.7% | BF16 |
+| audio tower | 0.563 | 8.0% | BF16 |
+| vision tower + `embed_vision` / `embed_audio` | 0.320 | 4.6% | BF16 |
+
+**`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text`** (commit `92b99ae`, public) is the same checkpoint
+with every `model.{vision_tower,audio_tower,embed_vision,embed_audio}.*` tensor dropped (1,411
+tensors) by `jev-tpu-31b/text_only.py`: 1,092 tensors, **6.11 GiB** (6,559,356,230 B), every one
+byte-identical to the source, config = the source `text_config` with
+`architectures: ["Gemma4ForCausalLM"]` and `ignore: ["lm_head"]`. vLLM's `Gemma4ForCausalLM` maps
+`model.language_model.*` itself, so no tensor is renamed.
+
+On `gpu-vllm-t4-2b` (vLLM 0.29.0) it loads with `MarlinLinearKernel` in **6.33 GiB** and, once the
+compile cache is warm, holds **711,539** KV tokens against 707,617 for the multimodal repack under
+`--language-model-only` — the towers were already skipped there, so the win is on disk and in the
+download, not on the GPU. **The PLE is still 4.375 GiB of BF16 and is now 72% of the file**; it is
+the only large lever left, and `QUANTIZATION.md` records why vLLM cannot offload it.
+
+**It can be quantized instead, losslessly in the levels.** E2B's PLE table and `embed_tokens` are on
+the QAT 4-bit grid (group 32 along each row; 0 of 73,400,320 PLE groups off it, against 0 of 6,720
+sampled groups *on* it in the bf16 base model). Packed int4 by `jev-tpu-31b/embed_int4.py`, the PLE is
+**1.230 GiB** with scales and the text-only checkpoint **2.96 GiB**; vLLM 0.29 loads it in 3.19 GiB.
+Packing `embed_tokens` as well, with `lm_head` untied as an int4 copy
+(`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4`), gives **2.64 GiB** on disk and 2.86 GiB
+loaded — every large E2B tensor 4-bit, so for this build weights/4 is roughly right again. Details
+and the T4 measurement in `QUANTIZATION.md`, "vLLM 0.29 CAN quantize the PLE".
+
+### On llama.cpp, 58% of the E2B GGUF never reaches the accelerator
+
+**MEASURED 2026-09-03 on `local-llamacpp-1650ti-2b-q4_0`** (GTX 1650 Ti, 4096 MiB). This is a
+property of how llama.cpp loads E2B, so it holds wherever llama.cpp serves this checkpoint.
+
+`google/gemma-4-E2B-it-qat-q4_0-gguf` is 3.334 GB of tensor data across 541 tensors, and
+`per_layer_token_embd.weight` alone is **1.927 GB of it — 58%**. That tensor is
+`[8960, 262144]`: `hidden_size_per_layer_input=256` x 35 layers = 8960, against
+`vocab_size_per_layer_input=262144`. It is the per-layer-embedding table this file describes
+above, and it is most of the gap between E2B's ~5B total and 2B effective params.
+
+**llama.cpp does not make it resident.** `src/models/gemma4.cpp` creates it with
+`TENSOR_READ_LAZY` — "read rows on demand instead of loading whole tensor; requires mmap for now"
+(`src/llama-model-loader.h`) — and it is a `GGML_OP_GET_ROWS` lookup rather than a matmul
+(`src/llama-arch.cpp`), so rows are pulled from the mapped file on the host as tokens need them.
+
+Measured, `-ngl 99 -c 8192 -ctk f16 -ctv f16`:
+
+```
+1342 MiB  resident weights (3.334 GB total - 1.927 GB lazy PLE)
++ 144 MiB  KV, 8192 tokens x 18 KiB/token
++ ~130 MiB  CUDA context + compute buffers
+= 1616 MiB predicted        1618 MiB measured (nvidia-smi, per-process)
+```
+
+**Two consequences, and both have already caught a rig:**
+
+- **Never size a llama.cpp E2B deployment from the file size on disk.** 3.35 GB against a 4 GiB
+  card reads as "will not fit"; the real requirement is ~1.6 GiB and it fits with 2.3 GiB spare.
+  A rig that lowers `--n-gpu-layers` on the strength of the disk figure is slower for no reason.
+- **`--no-mmap` inverts the result.** `TENSOR_READ_LAZY` requires mmap, so disabling it forces the
+  1.93 GB tensor to be materialised and turns a comfortable fit into an OOM.
+
+**This corrects a derived figure in `gpu-llamacpp-g5g-2b-q4_0`**, whose table gives
+*Resident: 3.35 GB* for this artifact and computes "freeing ~6.9 GB of a 14.07 GB budget" from it.
+Resident is ~1.4 GB and the freeing is ~8.8 GB. Note that rig's *other* row is right and agrees
+exactly: 1.407 GB "streamed per decode step" is the same set of tensors under the correct label.
+
+**Do not extrapolate the 58% to other sizes.** It is a property of the `E` checkpoints — 12B, 26B
+and 31B have `hidden_size_per_layer_input=0` and no such tensor at all (see the family table
+above), so their GGUF footprint is resident in full.
+
+### Google's E2B GGUF moves the QAT values; an exact Q4_0 rebuild is 2.64 GB
+
+**MEASURED 2026-09-29 on `local-llamacpp-i71360p-2b-q4_0`** (llama.cpp `fc07d781e`, CPU). A property
+of the artifacts, so it holds wherever they are served.
+
+`google/gemma-4-E2B-it-qat-q4_0-gguf` (`675cff4`) stores the QAT weights off their trained grid in
+two ways. Its Q4_0 layers use llama.cpp's `amax/8` step, which is wrong for any block whose peak is
+below level 8 (the rule the W4A16 repacks already correct, §26B above); values in those blocks move by
+up to one full step, and 51% of `blk.0.attn_q` values equal the `-q4_0-unquantized` source. Its two
+embedding tables are Q6_K, off by up to 28% of a grid step, although both are on the Q4_0 grid.
+
+Rebuilt with Google's metadata byte for byte and every layer matrix and embedding table as Q4_0 on the
+trained step, no block is off the grid and 96.84% of values are bit-identical to the source:
+
+| against a bf16 GGUF of the same weights (wikitext-2, 16 x 512) | Google GGUF | exact rebuild |
+|---|---|---|
+| file | 3,349,516,256 B | 2,640,154,592 B |
+| mean KL divergence | 0.054303 | 0.001753 |
+| same top token | 87.18% | 98.06% |
+| PPL / PPL(bf16) | 1.0892 | 1.0213 |
+
+Generation is 1.069x / 1.074x Google's file in the two run orders. `per_layer_model_proj`, F16 in
+Google's file, is QAT data too (0 of 430,080 groups off the grid); stored as Q4_0 it takes the file to
+2,620,370,912 B with mean KL divergence 0.001683 ± 0.000066 against 0.001761 ± 0.000077 before, on
+the native build. With the embeddings at Q4_0,
+`per_layer_token_embd` is 1.321 GB and **50% of the file**, not 58%: the lazy share above is a
+property of Google's Q6_K file. Published as `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf` (v2 since Hub
+revision `74b2c92`; v1 at `e5d65c8`); build script
+and evidence in the rig's `benchmarks/runs/2026-09-29-exact-gguf-i71360p/`.
+
+**REPRODUCED 2026-09-29 on `local-llamacpp-1650ti-2b-q4_0`** (i7-10750H + GTX 1650 Ti, llama.cpp
+`f95b0d9`). The rebuild on a second machine is **bit-identical** (same SHA-256 `25f21f14…`), and the
+CPU KL divergence above reproduces to every printed digit on a different build and CPU. On CUDA
+(`-ngl 99`) it holds as well: mean KLD 0.054244 → 0.001485, same top token 87.21% → 98.09%.
+Resident VRAM falls by 99 MiB (the `token_embd` Q6_K → Q4_0 difference, 1341.78 → 1242.78 MiB), and
+tg128 is **1.093-1.100x** in all four passes of an ABBA run, with pp512 unchanged. Evidence in
+`benchmarks/runs/2026-09-29-exact-gguf-1650ti/`. v2 (`per_layer_model_proj` at Q4_0, `419db9a6…`) also rebuilds
+bit-identically there. On CUDA it is **1.016-1.019x v1 on decode and 1.2-1.9% on prefill** in all four
+ABBA passes (1.11-1.12x Google's file), where the i7-1360P's CPU saw no stable difference. Its KLD
+ties v1's (0.00168 vs 0.00148). Evidence in `benchmarks/runs/2026-09-29-exact-gguf-v2-1650ti/`.
+
+**The `E` prefix is load-bearing.** E4B is *not* a 4B dense model — 4.5B effective, 8.0B total. Reading
+`E4B` as "4B" understates its weights by roughly 2x, which is the difference between fitting a 16 GB
+accelerator and not.
+
+**Sparse ≠ small on disk.** The 26B's ~4B *active* parameters set its compute cost, not its memory: all
+26.5B must be resident because any token can route to any expert. It is the largest checkpoint here after
+the 31B, and the "A4B" in the name describes throughput, not footprint.
+
+### Resident is not streamed — the number a decode roofline needs
+
+**A decode ceiling is measured bandwidth ÷ bytes STREAMED per token, and on the `E` and `A` sizes that
+is nowhere near the resident footprint.** Dividing the resident figure by bandwidth understates the
+ceiling, and the error is large enough to invert a conclusion: it did exactly that in
+`gpu-pytorch-g5g-2b` on 2026-08-29, where a 31.3 tok/s "floor" made a rig look near the hardware limit
+when it was at 13% of it, and briefly made a sibling's legitimate measurement look impossible.
+
+**E2B, computed from the config fields above and cross-checked against measurement:**
+
+| Component | Params | fp16 | Streamed per decode step? |
+| :--- | ---: | ---: | :--- |
+| Transformer matmuls, 35 layers | 1.854 B | 3.709 GB | yes |
+| LM head / `embed_tokens` (tied) | 0.403 B | 0.805 GB | yes — full-vocab matmul |
+| **PLE table** (262144 x 256 x 35) | **2.349 B** | **4.698 GB** | **no — indexed gather** |
+| | | **4.514 GB streamed** | of 10.209 GB resident |
+
+**Do not forget `use_double_wide_mlp`.** E2B sets it `true`, which **doubles `intermediate_size`
+on the `num_kv_shared_layers` (20 of 35) layers** — see `tpu-jax/ports/gemma4/jax_e_model.py` and
+tpu-inference's `test_double_wide_mlp`. Using the plain `3 x intermediate_size x hidden_size` MLP
+for all 35 layers understates the streamed figure by 1.13 GB, and was the first error made when
+this section was written.
+
+**The arithmetic reconciles against a measurement.** Text-only total is 1.854 + 0.403 + 2.349 =
+4.606 B params = **9.212 GB**, against the JAX sibling's **measured 9.257 GB** of text-only
+resident weights — **0.49% apart**. That reconciliation is the check that catches a missed
+structural field; without it the double-wide error is invisible.
+
+**Confirmed two ways, from a rig that changed it and measured.**
+`gpu-jax-g5g-2b/benchmarks/runs/2026-08-26-quant-levers-fixed-g5g/` quantised the PLE table and
+recorded `ple0` → `ple4` at **−3.505 GB** of resident weights (9.257 → 5.752); the arithmetic above
+predicts −3.523 GB, 0.5% off. And **decode did not move**: 12.80 / 12.80 / 12.80 across a 38%
+reduction in resident weights. That report's conclusion — *"the table is a gather, never a matmul, so
+decode never streams it"* — is the general rule, not a JAX-port detail.
+
+A third check on the same rig: `int8_lm_head` halves the tied head (805 → 403 MB, −11.9% of streamed
+bytes) for **+2.3%** throughput (12.80 → 13.10), not the ~13% a bandwidth-bound decode would give. On
+T4G none of the three runtimes tested is actually bandwidth-bound at `B=1`.
+
+**Per size — and note what is NOT known:**
+
+| Size | PLE? | Resident vs streamed |
+| :--- | :--- | :--- |
+| **E2B** | yes | **4.514 GB streamed of 10.209 GB resident** — computed and cross-checked above |
+| **E4B** | yes | **Same trap, magnitude UNRECORDED.** `hidden_size_per_layer_input` and `intermediate_size` are dashes in the family table, so this cannot be computed here. Read them off `config.json` before building a roofline. |
+| 12B, 31B | no | resident ≈ streamed; the plain division is correct |
+| **26B A4B** | no | **Same trap, different cause.** ~4B active of 26.5B resident — decode gathers only the 8 selected expert banks per token (see §26B). All 26.5B must be resident; far less streams. |
+
+**The `E` prefix is load-bearing in two directions.** It understates weights when you read `E4B` as
+4B (above) — and it *over*states streamed bytes when you feed the resident figure into a roofline.
+`RIG-ANALYSIS.md` carries the method rule.
+
+E2B's measured on-device figure is **8.97 GiB**, about 6% under the table's 10.2 GB — so treat the
+arithmetic entries as close estimates, not exact allocations. `~/tpu-jax-v5e1-2b/server.py` reserves
+3.5 GB per chip for the libtpu/XLA runtime plus the activation working set (measured 2.0 + 1.5 GB on a
+v6e-1), which is why the v6e-1 column above is ~28 GiB rather than 31.24.
+
+Host RAM does not predict HBM. For CPU debugging: ~8 GiB handles E2B/E4B, ~64 GiB loads the 31B and lets
+you inspect its parameter tree but OOMs on a forward pass, ~128 GiB runs it. XLA:CPU allocates roughly 2x
+what the weights occupy.
+
+## Naming
+
+The repo's directory slot is size only — `2b`, `4b`, `12b`, lowercase, no `E` prefix — while
+`MODEL_NAME` carries the real checkpoint id (`google/gemma-4-E2B-it`). Weight encoding is a separate
+optional slot. See `NAMING.md`; do not encode a model characteristic in a directory name from memory.

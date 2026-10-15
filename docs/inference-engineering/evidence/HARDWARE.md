@@ -1,0 +1,773 @@
+# Accelerator characteristics
+
+Properties of the **silicon** — memory, bandwidth, and which numeric formats the matrix units actually
+support. Independent of model and runtime, so this file is canonical for the monorepo and rigs should
+read it rather than restating the numbers.
+
+The companion files: `MODELS.md` for checkpoint properties, `QUANTIZATION.md` for what the serving stack
+can actually do with the formats below, `NAMING.md` for how these values are spelled in directory names,
+and each rig's `benchmarks/runs/` for what was measured on it.
+
+## Native numeric format support — the table that decides quantization strategy
+
+| Generation | bf16 | int8 | **fp8** | Notes |
+| :--- | :---: | :---: | :---: | :--- |
+| v5e | yes | yes (2x bf16) | **no** | Google publishes bf16 and Int8 peaks only |
+| v5p | yes | yes | **treat as no** | The v5p page lists bf16 **and FP8 at the same 459 TFLOPs**. Equal peaks buy no compute win even if the path is real, so no quantization conclusion changes. Unmeasured here — see the v5p note below |
+| v6e (Trillium) | yes | yes (2x bf16) | **no** | same pattern — verified 2026-08-10, see below |
+| v7 (Ironwood / TPU7x) | yes | yes | **yes** | first TPU with fp8 in the MXU |
+
+**This is the single most consequential fact for quantization work.** On v5e and v6e:
+
+- **int8 is the only low-precision format with a compute win.** Both generations quote int8 at exactly
+  2x their bf16 peak, the signature of a genuinely native MXU path.
+- **The v6e fp8 absence is now confirmed at the source, not inferred.** Google's v6e page lists exactly
+  three peak-compute rows — `bf16: 918 TFLOPs`, `Int8: 1836 TOPs`, and a per-Pod bf16 figure — and **no
+  fp8 row anywhere** (checked 2026-08-10). This was previously read off a second-hand spec set.
+- **fp8 is storage-only.** Values widen back to bf16 before the matmul, so fp8 can buy footprint and
+  bandwidth but never FLOPS. A benchmark showing no speedup from fp8 on these chips is the expected
+  result, not a misconfiguration.
+- **4-bit has no MXU path either.** int4 weights buy footprint and bandwidth, then unpack for compute.
+
+On v7 that inverts: fp8 becomes a compute format and the reasoning above stops applying. **Do not carry
+a v5e/v6e quantization conclusion forward to Ironwood without rechecking it.**
+
+## Per-chip specifications
+
+v5p sits in its own table further down — it is a different product line (the "p" scale-up part, not the
+"e" efficiency part), and folding it into a v5e-vs-v6e ratio column would invite exactly the wrong comparison.
+
+| Spec | v5e | v6e (Trillium) | Ratio |
+| :--- | ---: | ---: | ---: |
+| HBM capacity | 16 GB | 32 GB | 2.0x |
+| HBM bandwidth | 800 GiBps | 1,638 GBps | **1.907x** — units differ, see note |
+| Peak bf16 | 197 TFLOPs | 918 TFLOPs | 4.66x |
+| Peak Int8 | 393 TOPs | 1,836 TOPs | 4.67x |
+| TensorCores | 1 (4 MXUs, 128x128) | 1 (2 MXUs, 256x256 — but see below) | |
+| ICI bandwidth | 400 GBps bidirectional, 4 ports | 800 GBps bidirectional, 4 ports | 2.0x |
+| Single-chip machine type | `ct5lp-hightpu-1t` | `ct6e-standard-1t` | |
+| Single-chip VM | — | 44 vCPU, 176 GB RAM | |
+| Peak bf16 per Pod | — | 234.9 PFLOPs (256 chips) | |
+| On-demand list | ~$1.20 / chip-hr | ~$2.70 / chip-hr | 2.25x |
+
+**Both columns are now verified directly against Google**, v5e against
+[the v5e page](https://docs.cloud.google.com/tpu/docs/v5e) on 2026-08-07 and v6e against
+[the v6e page](https://docs.cloud.google.com/tpu/docs/v6e) on 2026-08-10. The v6e FLOPS and bandwidth
+rows were previously carried second-hand via `tpu-vllm-v5e1-2b/v5e.md` and that caveat is now
+withdrawn — every number above matched. MXU dimensions come from
+[the system-architecture page](https://docs.cloud.google.com/tpu/docs/system-architecture-tpu-vm):
+"An MXU is composed of either 256 x 256 (TPU v6e and TPU7x) or 128 x 128 (TPU versions prior to v6e)
+multiply-accumulators in a systolic array." The on-demand rate was read from the Cloud Billing Catalog
+on 2026-08-07; v7 fp8 support is from Google's TPU7x documentation and remains less directly verified.
+
+**The v6e MXU *count* does not survive an arithmetic check — do not build on that row.** Google's v6e
+page states "Each TensorCore has 2 matrix-multiply units (MXU), a vector unit, and a scalar unit."
+Two 256x256 MXUs is 131,072 MACs, exactly 2x v5e's four 128x128 (65,536) — but the published peak is
+**4.66x**, which would need a 2.33x clock increase on top. Four 256x256 MXUs closes it almost exactly:
+262,144 MACs x 2 flops x 1.75 GHz = **917.5 TFLOPs** against a published 918. Google's own launch blog
+says only that they "expanded the size of matrix multiply units (MXUs) and increased the clock speed",
+naming no count. The **918 TFLOPs figure itself is sound** — it cross-checks against the same page's
+234.9 PFLOPs-per-Pod row (918 x 256 = 235.0 PFLOPs). So treat peak compute as reliable and the MXU
+count as unresolved; nothing in this monorepo depends on it.
+
+**Rates are per-region, and the provisioning-model ranking is not fixed.** The $2.70 v6e figure holds
+across the US regions; europe-west4 quotes $2.97 and europe-west2 / asia-northeast1 / asia-south1 quote
+$3.24. In us-east5, **flex-start ($1.35/chip-hr) is cheaper than spot ($1.4033)** — the reverse of the
+v5e ordering, where spot undercut flex-start. Never assume spot is cheapest; read the catalog. The
+`estimate_deployment_cost` tool in the vLLM rigs does exactly that and reports nothing rather than
+guessing when no SKU matches.
+
+**Units trap — confirmed on both pages 2026-08-10.** Google quotes v5e bandwidth as **`800 GiBps`** and
+v6e as **`1638 GBps`**, and the mismatch is real, not a transcription slip: the v5e page uses GiBps for
+HBM while using GBps for ICI on the same table. Normalized, 800 GiBps = **858.99 GB/s**, so the true
+ratio is **1.907x** — against a naive 1638/800 = 2.047x. Google's launch blog saying Trillium "doubled"
+HBM bandwidth is the naive reading. **Don't quote "2x the bandwidth"**; the 7% matters when the
+workload is bandwidth-bound, which decode is.
+
+**Shape trap:** v6e is 2.25x the price for 2x memory, ~1.9x bandwidth, but **4.7x the raw FLOPS**. For a
+decode-bound workload — which is bandwidth-bound, not FLOPS-bound — v5e is priced close to right. The
+4.7x only pays for prefill-heavy or long-context work that actually burns the matrix units.
+
+## Usable memory, measured
+
+Nominal capacity is not what you get, on either generation.
+
+### v5e-1 — 16 GB nominal
+
+Measured on `v5litepod-1` with vLLM:
+
+| | GiB |
+| :--- | ---: |
+| Total HBM | 15.75 |
+| Usable at `gpu_memory_utilization=0.92` | **14.49** |
+
+**14.49 GiB is the number to size against**, not 16. Weights plus KV must fit inside it. See `MODELS.md`
+for per-model weight footprints — the short version is that only E2B fits at bf16, and the 26B A4B
+W4A16 repack serves only with four loader changes that bring it to 13.58 GiB (`MODELS.md`, "The 26B W4A16
+repack on a v5e-1"). Its compile also needs more than the host's 48 GB: it peaked at 45.7 GB plus 2.75 GB of
+swap.
+
+**bf16 layout trap.** A bf16 array whose second-from-minor dim is 1 is padded to bf16's two-row sublane
+packing, so it takes as much HBM as the same array in f32 (measured 2026-09-28 on the 26B's expert scales,
+`[E, groups, 1, N]`). Put the size-1 dim elsewhere. Mosaic on v5e also rejects a zero-stride load of
+non-32-bit data, which is how gmm_v2 broadcasts its scales.
+
+**Scoped VMEM limit: 115.20M per kernel.** Measured 2026-09-27 on `v5litepod-1`
+(`jev-tpu-v5e1/results/2026-09-27-v5e1-w4a16-logs/`). The W4A16 `gmm_v2` kernel from
+vllm-project/tpu-inference#3653 picks tiles that exceed it: 117.62M for a 12B layer (`k=15360, n=3840`)
+at 128 tokens, which stopped 12B W4A16 from serving, and 115.92M for 31B `down` at 64 tokens in the
+matmul bench. HBM headroom does not help; the tile has to shrink.
+
+**int32 gather trap: a packed table's rows must be a multiple of 128 wide.** Gathering two or more rows
+from an int32 table whose row width is not a multiple of 128 reads the whole table, so a step costs the
+same at 4 ids as at 512. A single-row gather is unaffected. Measured 2026-09-29 on `v5litepod-1`, JAX
+0.11.0, int4 tables packed eight to an int32 (`jev-tpu-v5e1/tpu/lookup_bench.py`; output in
+`tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-09-29-lookup-v5e1/`):
+
+| Table | Unpadded, 4-512 ids | Padded to 128, 4-512 ids | One id, either | Size, unpadded → padded |
+| :--- | ---: | ---: | ---: | ---: |
+| E2B per-layer embeddings | 4.19-4.22 ms | 0.05-0.06 ms | 0.05 ms | 1,260 → 1,344 MiB |
+| E2B `embed_tokens` | 0.87-0.88 ms | 0.05-0.06 ms | 0.05 ms | 216 → 320 MiB |
+| 12B `embed_tokens` | 1.71-1.72 ms | 0.06-0.07 ms | 0.07 ms | 540 → 576 MiB |
+
+Served, the unpadded int4-table builds decoded one request at 85-110 tok/s against 150-243 padded (E2B,
+same chip and flags). Not measured on v6e.
+
+**The int4 `lm_head` through gmm_v2 is 1.7-3.2x the bf16 head, except where it does not compile.** E2B's
+262,144 x 1,536 head on `v5litepod-1` (`jev-tpu-v5e1/tpu/lm_head_bench.py`; output in
+`tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-09-29-lmh-v5e1/`):
+3.21x bf16 at 1 token, 1.87x at 16, 1.68x at 64, relative error 0.32%; at 4 tokens the kernel's tile
+needs 129.07M of VMEM against 128M and fails to compile, the same failure class as the scoped limit above.
+
+### v5e-4 — four 16 GB chips on one host
+
+`v5litepod-4`, topology `2x2`, the same `v2-alpha-tpuv5-lite` runtime as v5e-1. The host is
+`ct5lp-hightpu-4t`: 112 vCPU and 192 GiB of RAM, against `ct5lp-hightpu-1t`'s 24 vCPU and 48 GiB. Each chip
+reports 15.75 GiB to vLLM, as on v5e-1. Flex-start was accepted in `us-west4-a` on 2026-10-02 and granted
+five slices within five minutes; the v5e quota is 512 chips per zone in 44 zones.
+
+**Four chips pay off only when a model is memory-bound on one.** Measured 2026-10-02 at TP=4 on the
+`tpu-vllm-v5e4-*` rigs (`benchmarks/runs/2026-10-02-rig-boot-v5e4` in each):
+
+- **12B** (`12b-w8a8emb4`): 2.25x / 2.09x / 1.70x the v5e-1 rig's output tok/s at 1 / 4 / 16 requests, and
+  122,624 KV tokens against 9,728. Its 8 sliding-layer KV heads split to 2 per chip; the single global head is
+  copied, 96 KiB per chip per token against 336 KiB on one chip.
+  Its context limit on v5e-4 is 122,368 tokens at `--gpu-memory-utilization 0.92` (vLLM refuses 131,072: the
+  KV pool sets the cap, below the model's 262,144); raising the limit from 8,192 costs 3-10% throughput. At 16
+  requests of ~3,600-token prompts v5e-4 delivers 5.9x one chip, whose 9,728-token pool makes them queue
+  (`tpu-vllm-v5e4-12b-w8a8emb4/benchmarks/runs/2026-10-02-longctx-v5e4`).
+- **E2B**: 1.09x / 1.11x / 1.06x (`2b-w8a8`) and 1.46x / 1.37x / 1.22x (`2b-q4w4a16emb4`) of the v5e-1 rigs
+  booted the same day with identical serving arguments. The single KV head is copied to every chip
+  (`MODELS.md`), so the KV pool grows only by the weight room each chip frees: 1.90x for W8A8
+  (6.88 → 1.75 GiB per chip), 1.09x for the int4-table build, whose embedding tables are replicated.
+  Against the `jev-tpu-v5e1` sweep's numbers (`--max-num-seqs 16`, `--max-model-len 2048`, no parsers),
+  E2B reads 0.5-0.9x: those settings are worth about 2x at 16 requests on one chip, so a sweep number never
+  pairs with a rig run.
+- **E2B belongs on four one-chip engines, not TP=4** (2026-10-02, `tpu-vllm-v5e4-2b-w8a8/benchmarks/runs/2026-10-02-tp-vs-replicas-v5e4`). On one
+  VM with identical arguments, `--data-parallel-size 4 --tensor-parallel-size 1` delivers 1.39x TP=4's output at
+  16 requests, 2.52x at 64 and 3.36x at 256, and 1.77x on 2,048-token prompts; one request runs at one chip's
+  speed (0.93x) and each engine has the one-chip pool. A profile shows why: the attention decode kernel stays
+  803 / 839 / 831 ms at TP=1 / 2 / 4 because the single KV head is read whole on every chip, the matmuls split
+  (443 → 130 ms), and collectives add 243 ms at TP=4.
+- **Attention cost follows `--max-model-len`, not the context in use.** The kernel's KV block is sized by the
+  limit, so E2B's 512-token sliding-window layers run 16,384-token blocks at a 16,384 limit (666 of 803 ms).
+  One chip at 16 requests: 1,387 tok/s at 16,384, 2,056 at 8,192, 2,478 at 4,096, 2,744 at 2,048 (1.98x). This
+  is what the `jev-tpu-v5e1` sweep's 2,048 limit was worth; `--max-num-seqs 16` alone is 0.92x.
+
+### v6e-1 — 32 GB nominal
+
+Measured on `ct6e-standard-1t` serving E2B under vLLM at 65,536 context. The allocation is recorded in
+`tpu-vllm-v6e1-2b/gemma4-e2b-v6e1-demo.html`, cross-checked against the comparison table in
+`tpu-vllm-v5e1-2b/v5e.md`:
+
+| | GiB |
+| :--- | ---: |
+| Total HBM | 31.24 |
+| E2B weights, resident | 8.97 |
+| KV cache pool | **19.79** |
+| Reserved headroom | 2.48 |
+
+**The KV pool is what the generation buys.** 19.79 GiB against roughly 5.5 GiB left over on a v5e-1
+after the same weights — about 3.6x — measured as 1,151,744 KV tokens against ~290K derived on v5e.
+Read that beside the shape trap above: v6e costs 2.25x for ~1.9x the bandwidth, so it is not the way to
+buy decode throughput. It is the way to buy context. What runs out on v5e is memory.
+
+**Sizing caution:** this is one run at one `gpu_memory_utilization`, not a ceiling like the v5e row
+above. Take 31.24 GiB total as the firm number and re-measure the split for another model or context
+length.
+
+#### 31.24 GiB and 33.55 GB are the same number
+
+This repo quotes both. **XLA prints GiB and `memory_analysis()` returns bytes**, so `31.24G` in an OOM
+message is 31.24 **GiB** = 33.55 GB — the figure the JAX-engine reports for the 12B/26B/31B all use.
+Mixing the two produced a wrong ratio (3.70x instead of 3.98x) that disagreed with an independent
+measurement until the units were fixed. Same trap as the GiBps/GBps row above, one level down.
+
+Two further cautions when reading memory on this chip, both from the 31B work
+(`tpu-jax-v6e1-31b-w4a16/docs/gemma4-31b-quirks.md` §C):
+
+- **XLA compares *temporaries alone* against the whole chip** and does not subtract resident weights.
+  `available HBM (31.24G)` in an error message is not headroom.
+- **`peak_bytes_in_use` does not capture intra-call transients** — it returned exactly `bytes_in_use`
+  on every sample. A resident-memory series cannot be used to infer peak; call `memory_analysis()` on
+  the compiled executable, which predicted every pass/fail exactly.
+- **An HLO instruction's output shape says nothing about allocation.** Ranking instructions by output
+  size suggested the 31B's `f32[262144,5376]` lm_head (5.637 GB) was the temp floor; the decode step
+  contains the same three instructions at a total temp of 0.146 GB. They are fused, not materialized.
+
+## v5p — the scale-up part
+
+Sourced from [the v5p page](https://docs.cloud.google.com/tpu/docs/v5p) and the live TPU API on 2026-08-10.
+**Nothing below is measured** — no rig here has booted a v5p yet. `tpu-vllm-v5p1-2b` is the first to target one.
+
+| Spec | v5p | vs v5e |
+| :--- | ---: | ---: |
+| HBM capacity | **95 GiB** | 5.9x |
+| HBM bandwidth | 2,765 GBps | ~3.5x |
+| Peak bf16 | 459 TFLOPs | 2.33x |
+| TensorCores per chip | **2** | 2x |
+| MXUs | 4 per TensorCore | |
+| ICI bandwidth | 1,200 GBps bidirectional | 3.0x |
+| Chips per host | 4 (`ct5p-hightpu-4t`) | |
+| Smallest slice | **2x2x1 — 4 chips, 8 cores** | no 1-chip v5p *in the TPU API* — but see the CE-catalog caveat below |
+| Pod | 8,960 chips; 6,144 max schedulable | |
+
+**Two TensorCores per chip is the fact that leaks into everything else.** It is why the slice is named for
+8 when it holds 4 chips, why the quota metric counts cores rather than chips, and why a chip-count intuition
+carried over from v5e/v6e is wrong by 2x at every step.
+
+**95 GiB per chip changes which constraints bind.** The v5e-1 `--gpu-memory-utilization` ceiling recorded
+above is a 1.26 GiB absolute-headroom failure on a 16 GiB chip; on v5p the same fraction leaves tens of GiB,
+so that result does not transfer. The mechanism — compiled program images live outside the knob's budget —
+still does.
+
+**"v5p is in three zones" and "v5p is in nine zones" are both true and measure different things.** Clarified
+2026-08-10 after the two figures collided. The chip is installed far more widely than this project can reach:
+
+| Set | Count | Zones |
+| :--- | ---: | :--- |
+| **Hardware** — `v5p-8` published by the TPU API | **≥9** | `europe-west1-b`, `-d`, `europe-west4-b`, `us-central1-a`, `us-east1-d`, `us-east5-a`, `-b`, `-c`, `us-south1-a` |
+| **Quota** — a stated `TPUV5PPerProjectPerZoneForTPUAPI` value (128 cores) | 10 | `europe-west4-a`, `-b`, `-c`, `us-central1-a`, `-b`, `-c`, `-f`, `us-east1-b`, `-c`, `us-east5-a` |
+| **Reachable** — the intersection | **3** | `us-central1-a`, `us-east5-a`, `europe-west4-b` |
+| **Flex-start** | **1** | `us-east5-a` |
+
+The two sets barely overlap: the project holds quota in seven zones with no v5p installed, and the chip sits
+in six zones where the project has no stated quota. **Three is the operational number and nine is the
+hardware number** — say which one you mean, because "v5p exists in three zones" is false about the chip and
+true about this project.
+
+```
+gcloud compute tpus accelerator-types list --zone=<zone> --filter="type=v5p-8"
+```
+
+Filter on the **exact slice name**. `v5p-4` does not exist (see the two-TensorCore note above), so a check
+written against the directory spelling matches nothing everywhere and reads as "no v5p anywhere" — the same
+class of silent failure as a stale quota id.
+
+**`europe-west1-c` is the one zone where the two catalogs disagree** — it publishes all four `ct5p-*` machine
+types to Compute Engine while the TPU API reports no v5p accelerator type at all (verified twice, 2026-08-10;
+the zone does carry `v5litepod-*`, so the API itself is answering). Record which catalog a zone finding came
+from.
+
+The Google [regions-zones page](https://docs.cloud.google.com/tpu/docs/regions-zones) names three v5p zones,
+so it matches the *reachable* set by coincidence and understates the hardware set — **the same understatement
+already recorded for v6e**, where the page names 8 against the API's 18. Read the API for both.
+
+## Spelling: v5e is `v5litepod` to gcloud, v6e is just `v6e`, v5p counts cores
+
+**This table is the Cloud TPU API path only** — the one all rigs but `tpu-vllm-v5p1-2b` still use. For the
+Compute Engine spellings (machine types, image family, `compute.googleapis.com` quota ids, UPPERCASE
+provisioning models) see the mapping table above; nothing in the rows below applies there.
+
+| Context | v5e single chip | v6e single chip | v5p smallest slice (4 chips) |
+| :--- | :--- | :--- | :--- |
+| Prose, directory names | `v5e-1` / `v5e1` | `v6e-1` / `v6e1` | `v5p-4` / `v5p4` — no such rig exists; CE's 1-chip shape is `v5p1` |
+| `ACCELERATOR_TYPE`, gcloud | **`v5litepod-1`** | `v6e-1` | **`v5p-8`** |
+| Flex-start runtime version | `v2-alpha-tpuv5-lite` | `v2-alpha-tpuv6e` | **`v2-alpha-tpuv5`** |
+| `gcloud ... --type` / `--topology` | `v5litepod` / `1x1` | `v6e` / `1x1` | `v5p` / `2x2x1` |
+| TPU API quota id | `TPUV5sLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPerProjectPerZoneForTPUAPI` | `TPUV5PPerProjectPerZoneForTPUAPI` |
+| Spot (preemptible) quota id | `TPUV5sPreemptibleLitepodPerProjectPerZoneForTPUAPI` | `TPUV6EPreemptiblePerProjectPerZoneForTPUAPI` | `TPUV5PPreemptiblePerProjectPerZoneForTPUAPI` |
+| Quota unit | chips | chips | **cores** — a `v5p-8` draws 8 |
+| Billing catalog family | `TpuV5e` / `DWS Defined Duration V5e` | `TpuV6e` | `TpuV5p` / `DWS Defined Duration V5p` |
+
+**The v5e rename does not generalize.** v6e keeps its marketing name everywhere, and the quota ids drop
+the `Litepod` that the v5e ids carry — so nothing in this table survives a chip retarget by analogy, and
+a stale quota id fails quietly by matching no rows rather than erroring. v6e column verified against the
+live TPU API and Cloud Quotas on 2026-08-07; v5p column on 2026-08-10.
+
+**Three generations, three different spellings of the same idea, and no two agree.** v5e renames the family
+(`v5litepod`), v6e renames nothing, v5p keeps the family name but changes what the *number* counts. v5p also
+capitalises the generation in its quota ids (`TPUV5P…`) where v5e uses lowercase (`TPUV5s…`), and drops the
+`Litepod` infix entirely. Deriving any of these by analogy produces a plausible string that matches nothing.
+
+"v5e-1" is fine in prose and required in directory names; it is never valid in a gcloud argument. v6e is
+the trap in reverse — the slot value and the gcloud value coincide at `v6e`, but the *directory* spelling
+`v6e1` still is not a gcloud value. `NAMING.md` covers the directory form. Rigs spell `ACCELERATOR_TYPE`
+inconsistently across siblings (`v5litepod-1` vs `v5e-1`) — read the rig's own env file, never copy a
+sibling's.
+
+## Provisioning: the Cloud TPU API is deprecated, and only some chips have a way out
+
+Recorded 2026-08-10. This is a property of the **chip generation**, not of any rig — which generations have a
+second control plane is decided by Google per generation, so it belongs here rather than in a rig's
+`CLAUDE.md`.
+
+[Introduction to Cloud TPU](https://docs.cloud.google.com/tpu/docs/intro-to-tpu) and
+[Cloud TPU resources in Compute Engine](https://docs.cloud.google.com/tpu/docs/tpus-in-compute-engine):
+
+> The Cloud TPU API is no longer under active development. This includes the Google Cloud CLI for the Cloud
+> TPU API and the Cloud Client Libraries for the Cloud TPU API.
+
+Bug fixes and security updates only. **No sunset date is published**, so nothing breaks on a deadline — the
+forcing function is forward-looking: *"New hardware generations, starting with TPU7x (Ironwood), are supported
+only through Compute Engine or GKE."*
+
+### Which generation has which control plane
+
+| Generation | Cloud TPU API (`gcloud compute tpus …`) | Compute Engine (`gcloud compute instances …`) | GCE machine types **published** |
+| :--- | :---: | :---: | :--- |
+| v5e | yes | **no** (create refused) | `ct5lp-hightpu-1t`, `-4t`, `-8t` — **26 zones, and unusable from this path** |
+| v5p | yes | yes | `ct5p-hightpu-1t-tpu`, `-2t-tpu`, `-4t` |
+| v6e | yes | yes | `ct6e-standard-1t`, `-4t`, `-8t` (each also as `-…-tpu`) |
+| v7 / TPU7x | **no** | yes | `tpu7x-standard-4t` |
+
+**The last column is what the catalog publishes, not what you can create.** For v5e those are different
+things, and an earlier version of this table wrote `—` in that cell — which was wrong twice over: the
+machine types do exist, and their existing is not evidence of a path.
+
+**v5e is the one generation with no exit, and this is now measured rather than inferred.** Probed
+2026-08-11 with `instances create --machine-type=ct5lp-hightpu-1t` in `us-east1-b`, a zone that publishes
+the type, deliberately chosen because `TPU_LITE_PODSLICE_V5` there is **0** so the create could not
+succeed even if accepted:
+
+```
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+ - This user agent is not allowed to use the machine type [ct5lp-hightpu-1t].
+```
+
+**That is not a quota error**, which is what a zero-quota zone would otherwise produce, and it is not a
+does-not-exist error either. The type is refused to this caller. The control is the same command shape with
+`ct6e-standard-1t`, which provisioned a live instance the same day.
+
+`ct5lp-*` is in the catalog because **GKE node pools are created with exactly those strings** — that is
+the consumer, and it explains the whole apparent contradiction: a v5e-covering image family
+(`ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e`), a `compute.googleapis.com` v5e quota metric
+(`TPU-LITE-PODSLICE-V5-per-project-zone`), v5e machine types in `machine-types list`, and no
+`instances create` path, all at once. The Cloud TPU API and GKE are themselves built on Compute Engine, so
+CE-shaped artifacts for v5e are expected whether or not `instances create` will take them. **Do not reason
+from catalog presence to creatability for any generation** — check it with a create into a zero-quota zone,
+which costs nothing and settles it.
+
+Note also that v5e publishes **no `-tpu` variant at all**, where v5p and v6e both do. Suggestive, not
+load-bearing: the bare forms are the documented creatable ones for v6e, so bare-vs-`-tpu` does not predict
+creatability and must not be used to argue this point.
+
+So `tpu-vllm-v5e1-2b` (the live-demo rig), `tpu-jax-v5e1-2b`, `tpu-pytorch-v5e1-2b`,
+`tpu-pytorch-v5e1-12b` and the two v5e encoding rigs stay on the deprecated API for as long as they exist.
+v5p and v6e rigs can move; v7 rigs will have no choice.
+
+### Mapping between the two
+
+| Cloud TPU API | Compute Engine |
+| :--- | :--- |
+| `queued-resources create --provisioning-model=flex-start` | `instances create --provisioning-model=FLEX_START` |
+| `--accelerator-type=v6e-1` / `v5p-8` | `--machine-type=ct6e-standard-1t` / `ct5p-hightpu-4t` |
+| `--runtime-version=v2-alpha-tpuv6e` | `--image-family=ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e --image-project=ubuntu-os-accelerator-images` |
+| `--valid-until-duration` (bounds the *request*) | `--request-valid-for-duration` |
+| `--max-run-duration` (flex-start only) | `--max-run-duration` + `--instance-termination-action=DELETE` |
+| spot via `TPUV6EPreemptible…` quota | `--provisioning-model=SPOT` |
+| QR → derived `<resource_id>-node` | the instance **is** the node — no indirection |
+
+`--provisioning-model` on `instances create` takes `FLEX_START | RESERVATION_BOUND | SPOT | STANDARD`, and
+`--request-valid-for-duration` is documented as the FLEX_START wait knob specifically. TPU7x adds an
+allowlist on spot, flex-start, and calendar-mode reservations; **v5p and v6e are not gated**.
+
+**Flex-start works on the CE path** despite [Request TPU Flex-start VMs](https://docs.cloud.google.com/tpu/docs/request-using-flex-start)
+still saying *"You must use the queued resources API to use TPU Flex-start VMs."* That page sits inside the
+deprecated API's own doc set and describes flex-start *within* that API; the Compute Engine
+[provisioning models](https://docs.cloud.google.com/compute/docs/instances/provisioning-models) page lists
+TPU v5p, v6e and TPU7x as flex-start machine series with no such requirement. Treat the TPU-docs sentence as
+unreconciled, not as a constraint.
+
+### The two catalogs are different evidence
+
+The rig-level "three gates" framing (see `tpu-vllm-v6e1-2b/CLAUDE.md`) needs one amendment: **gate 1 now has
+two sources that do not always agree.**
+
+- For v6e they agree exactly — `ct6e-standard-1t` and `ct6e-standard-1t-tpu` are each listed in the **same 18
+  zones** as `v6e-1` in the TPU API, against 37 zones reporting quota. **Re-read 2026-08-19: the machine-type
+  side is now 19 zones**, and all six `ct6e-standard-{1,4,8}t[-tpu]` shapes publish in the same 19. The
+  accelerator-type side was not re-counted, so whether the two still agree exactly is unverified — the
+  machine-type list is the one that moved.
+- For v5p they disagree in `europe-west1-c` (machine types yes, accelerator type no) — see the v5p table above.
+
+So a migration that swaps `accelerator-types list` for `machine-types list` as its availability check is not a
+like-for-like swap. Gate 2 (provisioning model accepted for that type in that zone) and gate 3 (capacity right
+now) are unchanged, and neither is answered by either catalog.
+
+**There are two machine-type families and what distinguishes them is undocumented.** `ct6e-standard-1t` and
+`ct6e-standard-1t-tpu` are identical in vCPU, memory and zone coverage, differing only in
+`guestAcceleratorType` (`ct6e` vs `tpu-v6e`). v5p publishes `-tpu` shapes at 1, 2 and 4 chips but a bare
+shape only at 4.
+
+**Do not read the bare form as "legacy" — an earlier revision of this file did, and it was wrong.** Google's
+own Compute Engine quickstart creates `--machine-type=ct6e-standard-4t`, the *bare* form, and the CE
+machine-types page documents `ct6e-standard-{1,4,8}t` and `ct5p-hightpu-4t`, all bare. The bare shapes are
+the documented, directly-creatable ones; what the `-tpu` variants are for is not written down anywhere yet
+found. Record the exact string in `tpu.env`; they are not known to be interchangeable.
+
+### Can v5e use the Compute Engine path? **No — verified 2026-08-11**
+
+**Settled by running it.** `gcloud compute instances create --machine-type=ct5lp-hightpu-1t` is rejected at
+validation, before any resource exists:
+
+```
+ERROR: (gcloud.compute.instances.create) Could not fetch resource:
+ - This user agent is not allowed to use the machine type [ct5lp-hightpu-1t].
+```
+
+Run from `gce-vllm-v5e1-2b` in `us-west4-a`, `FLEX_START`, image family
+`ubuntu-accel-2204-amd64-tpu-v5e-v5p-v6e`. Nothing was created and nothing billed.
+
+**Read the error text carefully — it is the useful part.** It is not "no capacity in this zone" and not a
+quota denial. The API surface refuses the machine type outright, so the rejection says nothing about
+`us-west4-a` and would repeat in all 26 zones. "User agent" here means the calling surface: `instances
+create` is not an allowed consumer of `ct5lp`, while GKE — which requests the same machine type by name for
+a node pool — is.
+
+**The rejection is v5e-specific, not a project-wide GCE problem.** Same project, same command shape, v6e:
+`gce-vllm-v6e1-2b  europe-west4-a  ct6e-standard-1t  RUNNING  FLEX_START`. So the Compute Engine path is
+live here; v5e alone is excluded from it.
+
+That confirms the documented exclusion, and retires the evidence table this section used to carry. All four
+"for" signals had one innocent explanation and it was the right one — the Cloud TPU API and GKE are both
+implemented *on* Compute Engine, so a v5e-covering image family, a v5e-shaped CE quota metric, `ct5lp` in
+the machine-type catalog, and the OS-images page framing those images as Compute Engine images are all
+exactly what you see whether or not `instances create` accepts `ct5lp`. None of them was evidence.
+
+Two corollaries worth keeping:
+
+- **Catalog presence is not creatability, and the insert-path validator does not distinguish them.** A free
+  `instance-templates create` probe with `--machine-type=ct5lp-hightpu-1t` **succeeds** (a bogus
+  `ct5lp-hightpu-99t` control is correctly rejected with `must provide existing machine type`). So the
+  property validator only checks catalog existence. Do not read a template accepting a machine type as
+  evidence that an instance will.
+- Corrected 2026-08-10 and still true: the missing `ct5lp-*-tpu` shape was never the reason. The bare shapes
+  are the creatable ones (above), so that variant's absence proves nothing either way. The real answer came
+  from running the command.
+
+**The six v5e rigs therefore have no migration path off the deprecated Cloud TPU API**, and stay `tpu-*`.
+When the API is finally sunset, v5e capacity in this project is reachable only through GKE.
+
+**A single-chip v5p exists in the CE catalog** — `ct5p-hightpu-1t-tpu`, 52 vCPU / 112 GB / 1 chip — where the
+TPU API's floor is `v5p-8` at 4 chips. **`tpu-vllm-v5p1-2b` was built on it on 2026-08-10** and is the only
+rig here off the deprecated control plane: `gcloud compute instances` throughout, at
+`TENSOR_PARALLEL_SIZE=1`, which removed that rig's TP=4 KV-replication risk and 4x of its chip bill. Its
+`CLAUDE.md` has the full mapping.
+
+**Listed is still not provisionable** — nothing has attempted creation, so capacity is unproven and so are
+the two settings the TPU API used to supply implicitly and CE makes you state: the **boot disk** (CE defaults
+far too small for the vLLM image plus the model) and **`--scopes`** (TPU VMs defaulted to cloud-platform;
+a plain instance does not, and without it the boot-time Secret Manager fetch fails 30 minutes into its retry
+loop). Those are the likely first failures, not the machine type.
+
+`NAMING.md` now records `v5p1` as a valid slot value — one the TPU API alone could not express.
+
+## Other targets in this monorepo
+
+- **v6e-1** — several benchmark artifacts in this repo were measured on v6e and travelled with forks.
+  A report's hardware short-name is the hardware *measured*, not the rig hosting the file.
+- **L4** — the five `gpu-vllm-l4-*` artifact rigs. SM 8.9 (Ada), 24 GB. Their serving flags assume
+  native bf16 and fp8; see the T4G section below for why that does not generalize backwards.
+- **T4G** — see below. The only part here whose required build (aarch64 + SM 7.5) is not published.
+- **MI300X** — see below. The only AMD part here, and the first row in this file where fp8 is a
+  genuine *compute* format rather than storage.
+
+## T4G — NVIDIA Turing on an Arm host (EC2 G5g)
+
+Served by `gpu-vllm-g5g-2b`. Platform slot `gpu`, hardware slot **`g5g`** — the EC2 instance family
+rather than the GPU SKU, which is the one carve-out in `NAMING.md` to the "slot 3 is the GPU SKU" rule.
+Two reasons, both specific to this part: `t4g` collides with AWS's `t4g.*` Graviton2 **CPU** instances,
+and G5g is the only Graviton+GPU family AWS ships, so the family name maps 1:1 onto Graviton2 + T4G and
+pins the aarch64 host as well — which is half of what breaks here.
+
+**The chip is still a T4G**, and this section is about the chip. Only the directory slot is `g5g`.
+
+All figures below **measured on the part** 2026-08-12 (`g5g.4xlarge`, driver 595.71.05), not
+read off a spec sheet. Run recorded in `gpu-vllm-g5g-2b/benchmarks/runs/2026-08-12-first-serve-g5g/`.
+
+| | |
+| --- | --- |
+| Architecture | Turing, **compute capability 7.5** |
+| SMs | 40 |
+| Host | AWS Graviton2, **aarch64** |
+| GPUs per instance | 1 on `g5g.xlarge`–`8xlarge`; 2 on `g5g.16xlarge` and `g5g.metal` |
+
+### Memory: GDDR6, not HBM — the only part in this file that isn't
+
+**Every other accelerator here has HBM. This one does not**, and it is the first thing to reset
+when carrying TPU intuition across. GDDR6 on a 256-bit bus, and the bandwidth gap that follows is
+the single most important number for decode work.
+
+| | Value | Note |
+| --- | ---: | --- |
+| Capacity, `nvidia-smi` | **15,360 MiB** | not the 16 GB the marketing says |
+| Capacity, visible to torch | 14,913 MiB | what you actually size against |
+| Bus width | 256-bit | |
+| Memory clock | 5,001 MHz | |
+| **Theoretical peak** | **320.1 GB/s** | 5.001 GHz x 256 bit / 8 x 2 (DDR) — reproduces the published 320 |
+| **Measured, streaming read** | **277.0 GB/s** | 87% of peak — the realistic decode ceiling |
+| **Measured, copy (r+w)** | 234.3 GB/s | 73% of peak |
+| **Measured, in-place scale** | 232.3 GB/s | 73% of peak |
+
+**Quote 277 GB/s, not 320.** Decode is bandwidth-bound, so the achieved streaming-read figure is
+the bound that matters. Against the TPU rows at the top of this file: v5e is 800 GiBps
+(**858.99 GB/s** normalized) and v6e is 1,638 GB/s, so T4G has roughly **a third of v5e's
+bandwidth and a sixth of v6e's**. That is the honest frame for its ~43 tok/s on E2B — it is a
+bandwidth-limited part behaving like one, not a broken deployment.
+
+### Shared memory: 48 KiB by default, 64 KiB if a kernel asks
+
+This is the quirk that actually blocked Gemma 4, and **the two numbers are both real**:
+
+| | Bytes | |
+| --- | ---: | --- |
+| Default static limit per block | **49,152** (48 KiB) | what `torch.cuda.get_device_properties().shared_memory_per_block` reports |
+| Opt-in maximum per block | **65,536** (64 KiB) | reachable via the dynamic shared-memory attribute; what Triton measures against |
+| Ampere and later, for contrast | 164 KiB+ | |
+
+So a kernel that needs more than 48 KiB must opt in, and it still cannot exceed 64 KiB. Triton's
+unified-attention kernel asks for **98,304 bytes** at `head_size=512` — Gemma 4's global-attention
+width — and is refused with `OutOfResources ... Hardware limit: 65536`. There is no flag for this;
+the tile sizes have to come down. `gpu-vllm-g5g-2b/docs/turing-aarch64-gap.md` carries the patch.
+
+**Do not cite 64 KiB as "the shared memory per block" without the qualifier.** A reader who checks
+torch will see 48 KiB and conclude the doc is wrong.
+
+### Native format support — the oldest part in this repo, and it shows
+
+| Format | T4G (SM 7.5) | L4 (SM 8.9), for contrast |
+| --- | :---: | :---: |
+| fp16 | **yes** | yes |
+| bf16 | **no** | yes |
+| fp8 | **no** | yes |
+| int8 | yes (Turing tensor cores) | yes |
+
+**bf16 arrives with Ampere (SM 8.0); fp8 with Ada/Hopper.** T4G predates both. This is the same shape
+of finding as the v5e/v6e rows at the top of this file — *quantization and dtype conclusions do not
+carry forward across generations* — except that here the direction is backwards: every other GPU rig
+in this monorepo targets L4 and hardcodes `--dtype bfloat16 --kv-cache-dtype fp8`, and both of those
+are unavailable one generation earlier. `--dtype bfloat16` on T4G is a hard failure, not a slow path.
+
+FlashAttention also requires SM 8.0+, so the Turing-capable vLLM attention backend is `XFORMERS`.
+
+### TU117 is Turing without tensor cores, and fp16 there is a 4x PENALTY
+
+**MEASURED 2026-09-04 on the GTX 1650 Ti (Max-Q) in `local-llamacpp-1650ti-2b-q4_0`'s host**, torch
+2.15.0.dev20260904+cu130, square matmul, 10 warm-up iterations then best of 3:
+
+| N | fp32 | fp16 | bf16 | fp16 / fp32 |
+| ---: | ---: | ---: | ---: | ---: |
+| 1024 | 1.41 | **0.41** | 1.87 | **0.29x** |
+| 2048 | 1.72 | **0.41** | 1.61 | **0.24x** |
+| 4096 | 1.68 | **0.41** | 1.59 | **0.25x** |
+
+TFLOP/s. **fp16 is pinned at 0.41 across a 64x range in FLOP count**, and that flatness is the
+diagnostic: it is a fixed-rate path, not a cache or occupancy effect. bf16 tracks fp32 (0.93–1.33x).
+
+**The table above is right for the T4 and wrong for the GTX 16-series, and the difference is tensor
+cores.** T4/T4G is TU104 and has them; TU116/TU117 does not — Nvidia cut both the RT and the tensor
+cores from that die. Same compute capability 7.5, different silicon. So:
+
+- **`float16` is the recommended Turing compute dtype in `@QUANTIZATION.md`'s table, and that
+  recommendation does not transfer to TU116/TU117.** It is correct where fp16 reaches tensor cores
+  and a 4x regression where it does not.
+- **`bf16` is not a "hard failure" on this part.** The T4G paragraph above says `--dtype bfloat16`
+  fails rather than running slowly; under torch on TU117 it runs at parity with fp32. That paragraph
+  is about vLLM's dtype validation refusing the flag, not about the silicon being unable — worth
+  keeping distinct, because the remedies differ.
+- **This is a torch/cuBLAS matmul measurement, not a serving measurement.** It says what the part
+  delivers for a dense GEMM; it does not by itself predict a decode loop, which on this card is
+  bandwidth- and launch-bound rather than matmul-bound (`local-llamacpp-1650ti-2b-q4_0` measured
+  `GGML_CUDA_FORCE_MMQ` — llama.cpp's own suggestion for a tensor-core-less device — moving decode
+  by −1%).
+
+**Practical rule: never pick a compute dtype for a `7.5` device without asking which die it is.**
+The compute capability is shared; the tensor cores are not, and the penalty for guessing wrong here
+is 4x on the format the shared capability number recommends.
+
+### The packaging gap: aarch64 and SM 7.5 are not published together
+
+**This is the property that makes T4G unlike every other GPU here, and it is a fact about the
+ecosystem's binaries rather than about the silicon.** Read directly from the published image config of
+`vllm/vllm-openai:v0.27.1` on 2026-08-12 — one manifest list, two platforms:
+
+| Manifest | `NVARCH` | `TORCH_CUDA_ARCH_LIST` | SM 7.5? |
+| --- | --- | --- | :---: |
+| `linux/amd64` | `x86_64` | `7.5 8.0 8.6 8.9 9.0 10.0 12.0` | **yes** |
+| `linux/arm64` | `sbsa` | `8.0 8.7 8.9 9.0 10.0 11.0 12.0` | **no** |
+
+The arm64 build targets the ARM+NVIDIA parts that actually ship at volume — A100, Jetson Orin, GH200,
+Blackwell. T4G is the one combination that falls between the two images, and vLLM's Dockerfile sets
+**no `+PTX`** (deliberately, with a comment explaining that vLLM filters torch's global PTX flag), so
+there is no JIT fallback. The failure is `no kernel image is available for execution on the device`.
+
+The Dockerfile's *default* `torch_cuda_arch_list` does include 7.5 — the release pipeline overrides it
+per platform. So rebuilding the arm64 image with `--build-arg torch_cuda_arch_list=7.5` is the
+supported route, and it is what the rig's `serving='build'` path does.
+
+**One layer below that is not yet verified first-hand.** PyTorch's own aarch64/SBSA CUDA wheels appear
+to be built for 9.0/10.0/12.0, also without 7.5. If that holds, rebuilding vLLM is *necessary but not
+sufficient* and a from-source PyTorch is needed too. The rig's `verify_gpu_arch` tool measures it on a
+live instance (`torch.cuda.get_arch_list()` plus a real matmul) rather than settling it by argument;
+update this section when it runs. Detail in `gpu-vllm-g5g-2b/docs/turing-aarch64-gap.md`.
+
+CUDA 13 is **not** an additional obstacle: 13.0 dropped Maxwell, Pascal and Volta, and Turing survived
+that cut as the new floor. The toolchain can target this GPU; only the shipped binaries do not.
+
+## inf2 — AWS Inferentia2
+
+Served by `tpu-pytorch-inf2-2b`. Takes platform slot `tpu` per `NAMING.md` (a dedicated inference
+accelerator on a VM), with the part in the hardware slot.
+
+Measured on `inf2.xlarge`, 2026-07-31/08-01, with jax 0.6.2 / jax-neuronx 0.6.2.1.0.6446 /
+neuronx-cc 2.24.8799.0 / Neuron runtime 2.31.24. Full workings in
+`tpu-pytorch-inf2-2b/docs/neuron-jax-quirks.md`.
+
+| Spec | Value | How known |
+| :--- | ---: | :--- |
+| HBM **per NeuronCore** | **16 GiB** | `hbm_limit_bytes` = 17,179,869,184, reported identically whether one core or two is visible |
+| HBM per chip | 32 GB | 16 GiB × 2 cores |
+| NeuronCores per `inf2.xlarge` | 2 | |
+| HBM bandwidth | ~820 GB/s | published, **not calibrated here** — used only as an order-of-magnitude bound |
+
+**The 16 GiB is per core, not a pool.** `NEURON_RT_NUM_CORES=1` therefore withholds a *device*, not
+memory — a single-device engine always had its 16 GiB. Setting it to 2 cut parameter load from 263.0 s
+to **68.8 s (3.8x)** and exposed the second core, but changed serving latency not at all: a visible
+device that a single-device engine never targets cannot help.
+
+A second process can claim the other core with `NEURON_RT_VISIBLE_CORES=1`, which is useful for
+probing a live deployment. With `NEURON_RT_NUM_CORES=2` the server claims both and that stops working.
+
+### Native format support: worse than the TPU rows above, not better
+
+**There is no compressed-compute path at all.** `_CAPS.pallas` is `False`, so a fused W4A16 kernel
+cannot lower — neuronx-cc will not accept Mosaic — and the W4A16 implementation is forced to
+`"reference"`, which **materializes a dense BF16 copy of every weight before the matmul**:
+
+| variant | s/call | compile s |
+| :--- | ---: | ---: |
+| W4A16 reference (dequantize + matmul) | **0.027** | 39.5 |
+| dense BF16 matmul | **0.001** | 3.9 |
+
+**27x per call, 10x compile.** So on this part 4-bit weights are *stored* compressed and *read* dense,
+and it happens silently — the loud fallback warning only fires when `"auto"` or `"fused"` degrades at
+runtime, and the default is already `"reference"`.
+
+**Buffer donation also fails at runtime**, removing the lever that keeps a large argument in place on
+TPU. Do not "fix" that by closing over the parameters instead: measured, that is strictly worse — JAX
+captures them as lowering constants and parks the whole tree in host RAM permanently.
+
+### Three failure modes with no TPU equivalent
+
+1. **A too-large gather returns zeros, not an error.** Above roughly 4–5 GB in a single device tensor,
+   a gather that "ran" can yield an all-zero result and execution continues. Zero logits make `argmax`
+   return token 0 — the pad id, which is in the EOS set — so the server returns a clean `200 OK` with
+   `finish_reason: "stop"` and **zero completion tokens**. Nothing in the response, the logs or
+   `/metrics` indicates a fault. The same gather is exactly correct at every geometry that fits
+   (0.81 GB `embed_tokens` included). **The gather primitive is fine; the allocation is not.** Check a
+   norm, never a shape.
+2. **Eager ops invoke the compiler at runtime.** A bare `jnp.full` reaches `RunNeuronCCImpl` — the
+   first symptom was `FileNotFoundError: 'neuronx-cc'` raised from an array *construction*. Fixed
+   shapes are cached and free; a **new** shape costs ~3.9 s per call. Anything shape-varying in a
+   per-token path is a compile per token.
+3. **Per-buffer dispatch has a cliff above ~128 buffers.** At a constant 2.05 GB total split across N
+   arrays: 8 arrays → 0.008 s/call, 128 → 0.008, **512 → 0.418**. A 52x jump at identical total bytes.
+   A Gemma 4 E2B parameter pytree has several hundred leaves and sits past the cliff.
+
+**Do not carry TPU intuition here.** Sizes and dtypes matter in ways they do not on TPU, and the
+platform announces itself with `Platform 'neuron' is experimental and not all JAX functionality may be
+correctly supported!` — and then means it.
+
+
+## MI300X — AMD CDNA 3 (AMD Developer Cloud, DigitalOcean underneath)
+
+Served by `gpu-vllm-mi300x-2b`; the general MI300 tooling is a separate repo, `~/amd-gputools`.
+Platform slot `gpu`, hardware slot **`mi300x`**. **The only AMD part in this monorepo** and the only
+one whose control plane is neither Google Cloud nor EC2.
+
+All figures below **measured on the part** 2026-09-16 on `debian-gpu-mi300x1-192gb-devcloud-atl1`,
+not read off a spec sheet.
+
+| | |
+| --- | --- |
+| Arch | `gfx942:sramecc+:xnack-`, CDNA 3, Aqua Vanjaram, `1002:74b5` |
+| Compute Units | **304** across 8 XCDs; 4 SIMDs/CU → 1216 matrix cores, 19456 shader cores |
+| Wavefront | **64**, not 32 — warp-level intuition from CUDA does not port |
+| Clock | 2100 MHz max |
+| Cache | L1 32 KB, L2 4 MB, **L3 / Infinity 256 MB** |
+| VRAM | 205,822,885,888 B = **191.7 GiB**, HBM3, 8192-bit |
+| Bandwidth | 5.3 TB/s spec; **3.76 TB/s measured** device-to-device copy, under load |
+
+It presents as an SR-IOV **VF** (`AMD Instinct MI300X VF`) but is not a partition: all 304 CUs and
+the whole 191.7 GiB are there.
+
+### Native format support
+
+| Format | MI300X (gfx942) | Note |
+| --- | :---: | :--- |
+| bf16 | **yes** | 1307.4 TFLOP/s peak — the baseline |
+| fp16 | yes | same matrix cores, same peak; not a change from bf16 |
+| fp8 `e4m3fnuz` | **yes** | 2614.9 TFLOP/s peak; **1.77x bf16 at 8192³, 1.50x at E2B decode shapes** |
+| fp8 `e4m3fn` | **no** | `HIPBLAS_STATUS_NOT_SUPPORTED` — the OCP flavour NVIDIA publishes |
+| int8 | runs, M > 16 only | equal peak on paper; **0.40–0.69x bf16 at 8192³, refuses M ≤ 16** — no win |
+| fp4 / MX | **no** | torch: `only supported on gfx950,gfx1250`. CDNA 4 |
+
+**This is the first row in this file where fp8 is a genuine compute format**, and it inverts the
+v5e/v6e conclusion at the top: there fp8 is storage-only and int8 is the sole compute win. Here fp8
+is the sole compute win and int8 measures *slower than bf16*. **Do not carry a TPU quantization
+conclusion onto this part** — and note the inversion runs opposite to the T4G finding too.
+
+The `fnuz` spelling is the expensive part. CDNA 3 uses the no-NaN / unsigned-zero fp8 variants, so
+**an fp8 checkpoint published for H100 is not drop-in** — `e4m3fn` raises rather than falling back.
+vLLM keys on `"gfx94"` in `is_fp8_fnuz()`. Quantize online from bf16 instead of hunting a checkpoint.
+
+Measured 8192³ matmul, 30 iterations, torch 2.12.0+rocm10.0.0, card concurrently serving:
+bf16 664.3 / fp16 662.5 / **fp8 1172.5** / int8 455.6 TFLOP/s. `QUANTIZATION.md` carries the stack
+side of this.
+
+**Decode shapes, 2026-09-18** (`gpu-vllm-mi300x-2b/benchmarks/runs/2026-09-18-gemm-decode-shapes-mi300x/REPORT.md`). 8192³ is the
+friendliest shape a GEMM gets and decode never runs it, so the comparison was rerun at M = 1, 8, 64
+against every E2B linear shape, weights cold (rotated past the 256 MB Infinity Cache), replayed from
+a HIP graph as vLLM decodes. Summed per token, **fp8 is 1.50x / 1.52x / 1.49x bf16** at M = 1 / 8 /
+64. Per shape it ranges from **0.86x** (the 2560x1536 sliding QKV, where fp8 is *slower*) to 1.81x
+(the 262144x1536 LM head): the win tracks how bandwidth-bound the bf16 kernel already was, ~37% of
+measured copy bandwidth at the small end and 95% at the LM head. The 8192³ control reran at 1.78x.
+
+**int8 is worse than the row above first said.** `torch._int_mm` raises for M ≤ 16 (`self.size(0)
+needs to be greater than 16`), so batch-1 decode has no int8 GEMM at all; at M = 64 it is 0.20x bf16
+per token, and the 8192³ control measured 0.40x against the 0.69x of 2026-09-16 — same torch, a
+different nightly under the same tag, unexplained.
+
+**Time decode GEMMs from a graph, never eagerly.** Timed eagerly from Python, every small shape
+floors at ~17 us bf16 / ~20 us fp8 whatever its size — host dispatch, which graph-captured decode
+never pays — and fp8 read 0.97x bf16 per token, the opposite conclusion. Graph replay was 1.30–1.46x
+faster in bf16 alone. A microbenchmark of a skinny GEMM that does not use graphs is measuring Python.
+
+**And the GEMM win does not reach a served token.** End to end on vLLM 0.19.1, `--quantization fp8`
+serves E2B at **0.53x–0.80x** bf16 output throughput across concurrency 1–64 (`gpu-vllm-mi300x-2b/benchmarks/runs/2026-09-18-vllm-sweep-mi300x-v0191-fp8/REPORT.md`).
+That is a property of the serving stack's fp8 path on gfx942 today, not of the matrix cores — but it
+is the number that decides whether to turn fp8 on, and the answer on this card is no.
+
+### CUDA equivalents, for reading the rest of this file
+
+| AMD | NVIDIA |
+| --- | --- |
+| Compute Unit (304) | SM (132 on H100) |
+| Matrix Core (1216) | Tensor Core (528) |
+| wavefront = 64 | warp = 32 |
+| `gfx942` | `sm_90` |
+
+The closest NVIDIA part is H100 SXM / H200. On paper MI300X has 2.4x an H100's memory, 1.6x its
+bandwidth and 2.6x its dense fp16 peak; software closes much of that, and a plain torch bf16 matmul
+reached 50.8% of peak here.

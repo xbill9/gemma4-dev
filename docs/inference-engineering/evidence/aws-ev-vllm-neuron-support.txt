@@ -1,0 +1,30 @@
+# github.com/vllm-project/vllm-neuron README.md (main), fetched 2026-10-05T03:09:16Z via gh api; releases list below
+## Supported Models
+
+Models listed below are tested end-to-end on Neuron hardware with correctness validation and performance benchmarking.
+
+| Family | Model | Type | Instance | Correctness | Perf Test | Perf Tuning |
+|---|---|---|---|---|---|---|
+| Llama 3 | 1B, 8B, 70B | Text | Trn2, Trn3 | ✅ | ✅ | In progress |
+| GPT-OSS | 20B, 120B | Text | Trn2, Trn3 | ✅ | ✅ | In progress |
+| Qwen3-VL | 32B (Dense) | Multimodal | Trn2, Trn3 | ✅ | ✅ | In progress |
+| Qwen3-Embedding | 8B | Embedding | Trn2, Trn3 | ✅ | ✅ | In progress |
+
+- **Correctness** — Accuracy validation passing (logit comparison, dataset accuracy validation)
+- **Perf Test** — Performance benchmark tests tracked across releases
+- **Perf Tuning** — Active optimization work being done
+
+> **Note:** This list includes only the models currently supported in the latest plugin version and does not include models under development or on roadmap.
+
+Starting with 0.21.0, the vLLM Neuron plugin version follows the format `<vLLM version>.<plugin version>` (e.g., `0.21.0.1.0.0` means vLLM 0.21.0, plugin version 1.0.0). Model implementations live directly in the plugin and NxD Inference is no longer a dependency. Customers on 0.5.x can migrate using the [migration guide](docs/getting-started/migration-nxdi-to-vllm-neuron.md).
+
+| vLLM-Neuron Plugin | vLLM Version | Neuron SDK | NxD Inference | Instance Support | Status | Documentation |
+|---|---|---|---|---|---|---|
+| 0.24.0.1.1.0 (latest) | 0.24.0 | 2.32 | Not required | Trn2, Trn3 | Beta | [vLLM Neuron docs](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/vllm-neuron/docs/index.html) |
+| 0.21.0.1.0.0 | 0.21.0 | 2.31 | Not required | Trn2, Trn3 | Beta | [vLLM Neuron docs](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/vllm-neuron/docs/index.html) |
+| 0.5.3 | 0.16.0 | 2.31 | 0.10.x | Trn1, Trn2, Trn3, Inf2 | Maintenance | [NxDI + vLLM on Neuron docs](https://awsdocs-neuron.readthedocs-hosted.com/en/latest/libraries/nxd-inference/index.html) |
+
+
+v0.24.0.1.1.0	2026-08-17T20:19:38Z
+v0.21.0.1.0.0	2026-07-20T18:38:10Z
+0.5.3	2026-07-16T00:09:36Z

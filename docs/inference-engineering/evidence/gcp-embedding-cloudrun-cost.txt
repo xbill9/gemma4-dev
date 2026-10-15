@@ -1,0 +1,31 @@
+prices fetched 2026-10-10, us-central1
+
+variant        billing    USD/hour up
+cpu-repack     request         0.1044
+cpu-original   request         0.1224
+l4-original    instance        1.0465
+
+variant        runs          query ms            docs/s  USD / 1M queries       USD / 1M docs
+cpu-original      3     251 (227-251)     0.9 (0.7-0.9)              8.93 39.05 (38.37-47.72)
+cpu-repack        3      121 (88-128)     1.1 (1.0-1.6)              3.91 25.87 (18.17-27.69)
+l4-original       3        56 (54-59) 333.1 (322.7-339.1)             16.27    0.87 (0.86-0.90)
+
+L4 cost per 1M docs when the instance is busy part of the time it is up (vs cpu-repack, median runs):
+  busy  L4 USD / 1M docs   cpu-repack USD / 1M docs
+  100%              0.87                      25.87
+   50%              1.75                      25.87
+   25%              3.49                      25.87
+   10%              8.73                      25.87
+    5%             17.46                      25.87
+    1%             87.28                      25.87
+break-even: the L4 is cheaper per document while busy more than 3.4% of the time it is up
+
+USD per 1M input tokens, documents of 141 tokens (median runs):
+cpu-original     0.2770
+cpu-repack       0.1835
+l4-original      0.0062  at 100% busy
+l4-original      0.0619  at 10% busy
+jev (hosted)     0.0420  list price
+l4-original matches Jev's price per input token while busy 14.7% of the time it is up; at 100% busy Jev costs 6.8x as much
+cpu-original costs 6.6x Jev's price per input token
+cpu-repack costs 4.4x Jev's price per input token

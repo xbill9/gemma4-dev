@@ -1,0 +1,23 @@
+sm: deploying gemma-4-e2b-strands in us-east-2 (InService in ~8 min)
+strands-demo-g5g: launched i-0d20e4c651d93d173	us-east-1a
+{
+  "endpoint": "gemma-4-e2b-strands",
+  "model_id": "xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4",
+  "instance_type": null,
+  "instance_pools": [
+    "ml.g6.xlarge",
+    "ml.g6.2xlarge",
+    "ml.g6.4xlarge"
+  ],
+  "image": "763104351884.dkr.ecr.us-east-2.amazonaws.com/vllm:0.31.0-gpu-py312-cu130-ubuntu24.04-sagemaker-v1.0",
+  "role": "arn:aws:iam::<account-id>:role/sagemaker-gemma-execution-role",
+  "status": "Creating"
+}
+strands-demo-trn1: no capacity in us-east-2 (subnet-0b0f0d29473b0a624), trying the next zone
+strands-demo-inf2: launched i-095444cd1e266afb1	us-east-2a
+strands-demo-trn1: no capacity in us-east-2 (subnet-04bce993deca43788), trying the next zone
+strands-demo-g6: no capacity in us-east-2 (subnet-0b0f0d29473b0a624), trying the next zone
+strands-demo-trn1: launched i-088eb22729e0bb2ce	us-east-2c
+strands-demo-g6: launched i-01ae6ce81a5cceb41	us-east-2b
+
+Next: stage/forward.sh (once the instances are up), then: source stage/demo.env && python3 stage/check.py

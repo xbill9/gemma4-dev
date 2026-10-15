@@ -1,0 +1,16 @@
+Orchestrator: Amazon Bedrock (us.amazon.nova-micro-v1:0)
+Backends as tools: bedrock, g6, sagemaker, inf2, trn1
+
+Here is the scoreboard with the responses from each backend, ordered by the fastest response time:
+
+| Backend | Answer | Seconds | Tokens/s |
+|---------|--------|---------|----------|
+| vLLM on EC2 g6 (L4) | Paris | 0.154 | 13.0 |
+| Trainium (trn1, hand-ported) | Paris | 0.196 | 5.1 |
+| Inferentia2 (inf2, hand-ported) | Paris | 0.242 | 4.1 |
+| Amazon Bedrock | Paris | 0.51 | 3.9 |
+| SageMaker endpoint (vLLM, L4) | Paris | 0.569 | 3.5 |
+
+All backends have correctly identified the capital of France as "Paris". The fastest response came from the Trainium (trn1, hand-ported) backend.
+
+[harness] 5 backend calls made; not asked by the agent: none

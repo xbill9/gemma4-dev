@@ -1,0 +1,23 @@
+strands-demo-run-cache sent=20:08:21 http=000 total_s=0.000012
+strands-demo-run-eager sent=20:08:20 http=200 total_s=202.416431
+strands-demo-run sent=20:08:19 http=200 total_s=483.243549
+
+## Start-up breakdown from Cloud Logging
+# strands-demo-run
+2026-10-12T20:08:19.135075Z	Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or
+2026-10-12T20:13:11.774743Z	(EngineCore pid=98) INFO 10-12 20:13:11 [model_runner.py:428] Model loading took 2.86 GiB memory and 185.766595 seconds
+2026-10-12T20:15:15.991989Z	(EngineCore pid=98) INFO 10-12 20:15:15 [monitor.py:53] torch.compile took 118.56 s in total
+2026-10-12T20:15:59.441101Z	(APIServer pid=1) INFO:     Application startup complete.
+# strands-demo-run-eager
+2026-10-12T20:08:20.279230Z	Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or
+2026-10-12T20:11:08.527896Z	(EngineCore pid=98) INFO 10-12 20:11:08 [model_runner.py:428] Model loading took 2.86 GiB memory and 90.127746 seconds
+2026-10-12T20:11:31.023980Z	(APIServer pid=1) INFO:     Application startup complete.
+strands-demo-run-cache sent=20:40:08 http=200 total_s=240.101454
+# strands-demo-run-cache
+2026-10-12T20:40:08.377324Z	Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or
+2026-10-12T20:43:00.598166Z	(EngineCore pid=62) INFO 10-12 20:43:00 [model_runner.py:428] Model loading took 2.86 GiB memory and 93.713716 seconds
+2026-10-12T20:43:09.640929Z	(EngineCore pid=62) INFO 10-12 20:43:09 [monitor.py:53] torch.compile took 6.24 s in total
+2026-10-12T20:43:55.336088Z	(APIServer pid=1) INFO:     Application startup complete.
+cache                     138.6                120.6
+# eager decode, measured 20:44:44 (the first request also cold-starts the service)
+eager                      17.8                 17.2

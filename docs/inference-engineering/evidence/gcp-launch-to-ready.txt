@@ -1,0 +1,13 @@
+# Launch to ready, 2026-10-12, computed from the timestamps shown (UTC). Sources in the last column.
+
+backend   minutes  what                                                                   source
+vertex       18.9  model upload, first image copy through the Docker Hub proxy            upload started (model createTime) -> endpoint create began (up2.log)
+vertex        2.5  model upload, image already cached                                     gcloud ai models upload start -> return
+vertex       24.4  deploy-model to serving, g2-standard-4 + L4                            vertex2.log: deploy-model issued -> returned rc=0
+cloudrun      6.6  deploy to serving, L4, image from Docker Hub                           up7.log: deploy start -> deployed
+cloudrun      4.0  deploy to serving, --enforce-eager variant                             run-variants.log
+gke           8.8  Autopilot cluster create                                               CREATE_CLUSTER operation start -> end
+gke           7.7  Deployment apply to vLLM ready, L4 node already up                     kubectl apply -> 'Application startup complete'
+gce           9.6  instance create to vLLM ready (second VM, fixed startup script)        gce-r2-timing.txt: creationTimestamp -> 'Application startup complete'
+tpu           0.4  v5e-1 flex-start request to node created                               queued-resources create -> node createTime
+tpu          13.3  vLLM TPU start script to ready (image pull, load, XLA compile 390.96 s) startup script rerun -> 'Application startup complete'

@@ -1,0 +1,32 @@
+Demo 1: how many of 11 ids are 10 or more? (answer 8)
+
+backend     engine correct  right filter  errors  median s  rows correct  median s  filters sent
+gemini           20/20         20/20           0      2.95     20/20          3.13  id >= 10
+maas             19/20         19/20           1     13.23      0/20         19.87  id >= 10
+vertex           20/20         20/20           0      0.92     20/20          1.39  id >= 10
+cloudrun         20/20         20/20           0      0.52     20/20          1.02  id >= 10
+gke              20/20         20/20           0       0.7     20/20          1.22  id >= 10
+gce              20/20         20/20           0      0.89     20/20          1.35  id >= 10
+tpu              20/20         20/20           0      1.65     20/20           1.1  id >= 10
+
+Same prompt, 100-token limit, one request at a time (bench_chat.py)
+
+backend     median s  median tok/s    tok/s range  tokens
+cloudrun       0.704         119.3  117.1-122.2     84-84
+tpu            0.921         105.3  105.1-105.8     97-97
+gke            0.803         104.7   76.3-105.9     84-84
+gce            0.891          94.3   89.2-99.7      84-84
+gemini         1.029          93.3   89.3-105.3     94-96
+vertex         0.932          90.2   88.9-96.5      84-84
+maas           7.077          14.2    4.0-32.6    100-100
+
+Demo 1 seconds per agent run, both tool sets pooled
+
+backend     runs  median s   max s
+gemini        40      3.05    3.50
+maas          40     13.56  297.84
+vertex        40      1.27    2.21
+cloudrun      40      0.97    1.39
+gke           40      1.11    1.86
+gce           40      1.23    1.66
+tpu           40      1.51    1.96

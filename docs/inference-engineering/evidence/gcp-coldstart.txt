@@ -1,0 +1,21 @@
+# Cloud Run cold start from zero, strands-demo-run-00004-w2r, us-east4, L4, min-instances 0, max-instances 1
+# The service had no traffic from about 19:00 and had scaled to zero. Lines below are from Cloud Logging.
+# Startup probe: httpGet /health, initialDelaySeconds=60, periodSeconds=60 (stage/up.sh).
+
+## Requests (httpRequest log entries: time received, method, path, status, latency)
+2026-10-12T19:19:40.507479Z	POST	https://strands-demo-run-fgasxpwzoq-uk.a.run.app/v1/chat/completions	200	361.843611842s
+2026-10-12T19:24:43.990520Z	GET	https://strands-demo-run-fgasxpwzoq-uk.a.run.app/metrics	429	0s
+2026-10-12T19:25:13.212526Z	POST	https://strands-demo-run-fgasxpwzoq-uk.a.run.app/v1/chat/completions	429	0s
+
+## Instance and vLLM start-up
+2026-10-12T19:19:40.532090Z	Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+2026-10-12T19:20:55.116357Z	(EngineCore pid=98) INFO 10-12 19:20:55 [core.py:123] Initializing a V1 LLM engine (v0.30.0) with config: model='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', speculative_config=None, tokenizer='x
+2026-10-12T19:22:12.989778Z	(EngineCore pid=98) INFO 10-12 19:22:12 [default_loader.py:430] Loading weights took 1.05 seconds
+2026-10-12T19:22:14.236742Z	(EngineCore pid=98) INFO 10-12 19:22:14 [model_runner.py:428] Model loading took 2.86 GiB memory and 77.896787 seconds
+2026-10-12T19:24:02.725524Z	(EngineCore pid=98) INFO 10-12 19:24:02 [backends.py:393] Compiling a graph for compile range (1, 2048) takes 88.45 s
+2026-10-12T19:24:12.926565Z	(EngineCore pid=98) INFO 10-12 19:24:12 [monitor.py:53] torch.compile took 116.09 s in total
+2026-10-12T19:24:32.328930Z	(EngineCore pid=98) INFO 10-12 19:24:32 [model_runner.py:1066] Graph capturing finished in 16 secs, took 0.47 GiB
+2026-10-12T19:24:43.990520Z	The request was aborted because there was no available instance. Additional troubleshooting documentation can be found at: https://cloud.google.com/run/docs/troubleshooting#abort-request
+2026-10-12T19:24:46.039324Z	(EngineCore pid=98) INFO 10-12 19:24:46 [model_runner.py:1066] Graph capturing finished in 8 secs, took 0.28 GiB
+2026-10-12T19:24:52.957321Z	(APIServer pid=1) INFO:     Application startup complete.
+2026-10-12T19:25:13.212526Z	The request was aborted because there was no available instance. Additional troubleshooting documentation can be found at: https://cloud.google.com/run/docs/troubleshooting#abort-request

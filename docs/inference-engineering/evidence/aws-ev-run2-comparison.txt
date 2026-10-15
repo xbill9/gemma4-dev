@@ -1,0 +1,19 @@
+Median tok/s, same prompt and max_tokens=100: first run (results/2026-10-05) vs second run (results/2026-10-05-stage)
+backend      first  second  change %   first n / second n
+bedrock      111.9  115.85     +3.5%   5 / 10
+g6           131.5  132.45     +0.7%   5 / 10
+g5g           37.2    35.8     -3.8%   5 / 10
+sagemaker    106.3   105.2     -1.0%   5 / 10
+inf2          36.4    36.6     +0.5%   5 / 10
+trn1          37.1    36.9     -0.5%   5 / 10
+
+Distinct completions per backend over its 10 repeats (temperature 0):
+  bedrock    9
+  g6         1
+  g5g        1
+  sagemaker  1
+  inf2       1
+  trn1       1
+g6 == sagemaker (same weights, same GPU type, vLLM 0.30 both): True
+inf2 == trn1 (same image digest): True
+g6 == g5g: False  inf2 == g6: False

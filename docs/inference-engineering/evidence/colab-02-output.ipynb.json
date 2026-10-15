@@ -1,0 +1,1203 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "id": "c000-743da26e",
+      "metadata": {
+        "id": "c000-743da26e"
+      },
+      "source": [
+        "##### Copyright 2026 The colab-jax Authors.\n",
+        "\n",
+        "Licensed under the Apache License, Version 2.0 (the \"License\");\n",
+        "you may not use this file except in compliance with the License.\n",
+        "You may obtain a copy of the License at\n",
+        "[apache.org/licenses/LICENSE-2.0](https://www.apache.org/licenses/LICENSE-2.0).\n",
+        "\n",
+        "Unless required by applicable law or agreed to in writing, software\n",
+        "distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT\n",
+        "WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c001-a81b3043",
+      "metadata": {
+        "id": "c001-a81b3043"
+      },
+      "source": [
+        "<table align=\"left\"><td>\n",
+        "  <a target=\"_blank\" href=\"https://colab.research.google.com/github/xbill9/colab-jax/blob/main/notebooks/02_e2b_repack_vs_stock_on_jax.ipynb\">\n",
+        "    <img src=\"https://www.tensorflow.org/images/colab_logo_32px.png\" />Run in Google Colab\n",
+        "  </a>\n",
+        "</td><td>\n",
+        "  <a target=\"_blank\" href=\"https://github.com/xbill9/colab-jax/blob/main/notebooks/02_e2b_repack_vs_stock_on_jax.ipynb\">\n",
+        "    <img src=\"https://www.tensorflow.org/images/GitHub-Mark-32px.png\" />View source on GitHub\n",
+        "  </a>\n",
+        "</td></table>"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c002-01a6fdd8",
+      "metadata": {
+        "id": "c002-01a6fdd8"
+      },
+      "source": [
+        "# Gemma 4 E2B on JAX: Google's W4A16 export against an exact repack of the QAT weights\n",
+        "\n",
+        "**Author:** William McLean, Google Developer Expert\n",
+        "\n",
+        "**Based on:** the E2B measurements in\n",
+        "[`gemma4-dev/QUANTIZATION.md`](https://github.com/xbill9/gemma4-dev/blob/main/QUANTIZATION.md)\n",
+        "and the repack's model card,\n",
+        "[`xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct).\n",
+        "\n",
+        "### Who this notebook is for\n",
+        "\n",
+        "JAX developers who load quantized checkpoints, and engineers who choose which 4-bit build of a\n",
+        "model to serve. Terms are explained where they first appear. Notebook 01 covers the JAX mechanics\n",
+        "used here, but this notebook does not depend on it.\n",
+        "\n",
+        "### The study in one paragraph\n",
+        "\n",
+        "Google trained Gemma 4 E2B with quantization-aware training (QAT): during training, every weight\n",
+        "was held on a 4-bit grid, so the model learned to work with exactly those values. Google publishes\n",
+        "the result twice. `-qat-q4_0-unquantized` stores the grid values in bf16. `-qat-w4a16-ct` packs\n",
+        "them as int4 for serving, but its recipe re-rounds every group of 32 weights onto a new grid whose\n",
+        "step is the group's largest weight divided by 7.5. That step never equals the trained one, so every\n",
+        "weight moves. The repack stores the trained levels and the trained step instead. Served by vLLM on\n",
+        "one v5e chip, the two 4-bit builds run at the same speed, and the repack scores 2.4 points higher\n",
+        "on a 3,880-record test suite (95% range +1.4 to +3.4), within 0.6 points of bf16.\n",
+        "\n",
+        "### What this notebook does\n",
+        "\n",
+        "It takes all three checkpoints and asks, on your chip, with a pure-JAX engine:\n",
+        "\n",
+        "1. **Are the weights the trained ones?** Compare each 4-bit build with the QAT values, tensor by\n",
+        "   tensor.\n",
+        "2. **Does the difference reach the output?** Run all three through the same forward pass on the\n",
+        "   same text and compare each 4-bit model's next-token distribution with the QAT model's.\n",
+        "3. **What does each cost?** Disk, HBM and decode speed.\n",
+        "\n",
+        "### The three rules used throughout\n",
+        "\n",
+        "1. **Every result is measured here.** Numbers from the source work appear beside yours as context,\n",
+        "   never in place of them.\n",
+        "2. **Only the weights change.** All three checkpoints go through the same loader, the same forward\n",
+        "   pass, the same text and the same prompt.\n",
+        "3. **The QAT checkpoint is the reference.** Both 4-bit builds claim to hold the QAT model, so each\n",
+        "   is compared with `-qat-q4_0-unquantized`, not with the other.\n",
+        "\n",
+        "### How each section is organized\n",
+        "\n",
+        "* **What the source measured:** the earlier result and where it was measured.\n",
+        "* **What we are testing:** the claim, and the evidence that checks it.\n",
+        "* A code cell to run.\n",
+        "* **What you should see:** the expected result, and what a different one would mean.\n",
+        "\n",
+        "### Before you start\n",
+        "\n",
+        "* **Runtime.** Runtime, then Change runtime type, then TPU. The target is a single v5e chip\n",
+        "  (16 GB of HBM). Everything also fits on v6e.\n",
+        "* **No token.** All three checkpoints are public and ungated, and the engine is a public GitHub\n",
+        "  repo. Nothing asks for a Hugging Face token.\n",
+        "* **Disk and time.** About 26 GB of downloads. The whole notebook takes 20 to 40 minutes, most of\n",
+        "  it downloading and compiling.\n",
+        "* **Safety.** Nothing is uploaded and nothing outside the Colab VM changes."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c003-c76f78b9",
+      "metadata": {
+        "id": "c003-c76f78b9"
+      },
+      "source": [
+        "## 1. Setup and version check\n",
+        "\n",
+        "**What we are testing.** Nothing yet. This section records the chip, the JAX version and the room\n",
+        "available, because every number below depends on them.\n",
+        "\n",
+        "The engine is [`tpu-jax`](https://github.com/xbill9/tpu-jax), a Gemma 4 E2B decoder in pure JAX\n",
+        "with no PyTorch in the path. Cell 1.2 clones it at a fixed commit, so the code you run is the code\n",
+        "this notebook was written against. Its 4-bit path dequantizes each weight with plain XLA ops and\n",
+        "then multiplies; no custom kernel is involved."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "id": "c004-2e5dde4b",
+      "metadata": {
+        "id": "c004-2e5dde4b",
+        "outputId": "27bbc083-9cfb-4bc1-fcf1-90954450fd4e",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.13/dist-packages/jax/_src/cloud_tpu_init.py:86: UserWarning: Transparent hugepages are not enabled. TPU runtime startup and shutdown time should be significantly improved on TPU v5e and newer. If not already set, you may need to enable transparent hugepages in your VM image (sudo sh -c \"echo always > /sys/kernel/mm/transparent_hugepage/enabled\")\n",
+            "  warnings.warn(\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "JAX 0.7.2\n",
+            "1 device(s): TPU v5 lite (tpu)\n",
+            "HBM 16.91 GB   host RAM 50.5 GB   free disk 195 GB\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 1.1: chip, memory and disk\n",
+        "import gc\n",
+        "import os\n",
+        "import pathlib\n",
+        "import shutil\n",
+        "import subprocess\n",
+        "import sys\n",
+        "import time\n",
+        "\n",
+        "import jax\n",
+        "import jax.numpy as jnp\n",
+        "import numpy as np\n",
+        "\n",
+        "print(\"JAX\", jax.__version__)\n",
+        "dev = jax.devices()[0]\n",
+        "print(f\"{len(jax.devices())} device(s): {dev.device_kind} ({dev.platform})\")\n",
+        "if dev.platform != \"tpu\":\n",
+        "    raise RuntimeError(\"This notebook needs a TPU runtime: Runtime > Change runtime type > TPU\")\n",
+        "\n",
+        "HBM_LIMIT = dev.memory_stats()[\"bytes_limit\"]\n",
+        "host_ram = os.sysconf(\"SC_PAGE_SIZE\") * os.sysconf(\"SC_PHYS_PAGES\")\n",
+        "disk_free = shutil.disk_usage(os.path.expanduser(\"~\")).free\n",
+        "print(f\"HBM {HBM_LIMIT / 1e9:.2f} GB   host RAM {host_ram / 1e9:.1f} GB   free disk {disk_free / 1e9:.0f} GB\")\n",
+        "assert disk_free > 30e9, \"need about 30 GB free disk for the three checkpoints\"\n",
+        "\n",
+        "\n",
+        "def host_used_gb():\n",
+        "    \"\"\"Host RAM in use on the whole VM, as Colab's RAM meter counts it.\"\"\"\n",
+        "    info = dict(line.split(\":\", 1) for line in open(\"/proc/meminfo\"))\n",
+        "    kb = int(info[\"MemTotal\"].split()[0]) - int(info[\"MemAvailable\"].split()[0])\n",
+        "    return kb / 1e6\n",
+        "\n",
+        "\n",
+        "def file_cache_gb():\n",
+        "    \"\"\"Host RAM holding cached file contents, which the line above does not count.\"\"\"\n",
+        "    info = dict(line.split(\":\", 1) for line in open(\"/proc/meminfo\"))\n",
+        "    return int(info[\"Cached\"].split()[0]) / 1e6\n",
+        "\n",
+        "\n",
+        "def flush_file_cache():\n",
+        "    \"\"\"Write the downloads to disk and drop the checkpoint files from the VM's file cache.\n",
+        "\n",
+        "    Linux keeps recently written and read files in RAM and frees that memory on demand, but Colab\n",
+        "    can count it against the session and crash it. Flushing after each step keeps it from piling up.\n",
+        "    \"\"\"\n",
+        "    from huggingface_hub.constants import HF_HUB_CACHE\n",
+        "\n",
+        "    os.sync()\n",
+        "    try:\n",
+        "        with open(\"/proc/sys/vm/drop_caches\", \"w\") as f:\n",
+        "            f.write(\"1\\n\")\n",
+        "    except OSError:  # not allowed: ask the kernel to drop each checkpoint file instead\n",
+        "        for f in pathlib.Path(HF_HUB_CACHE).rglob(\"blobs/*\"):\n",
+        "            fd = os.open(f, os.O_RDONLY)\n",
+        "            os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)\n",
+        "            os.close(fd)"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 2,
+      "id": "c005-0ef42baf",
+      "metadata": {
+        "id": "c005-0ef42baf",
+        "outputId": "8719d7bc-9437-49c5-9993-1c5771184975",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "tpu-jax at 4b9f8e9\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 1.2: the pure-JAX engine, pinned, and the readers it needs\n",
+        "import importlib.util\n",
+        "\n",
+        "missing = [\n",
+        "    p for p in (\"safetensors\", \"huggingface_hub\", \"tokenizers\", \"datasets\") if importlib.util.find_spec(p) is None\n",
+        "]\n",
+        "if missing:\n",
+        "    subprocess.run([sys.executable, \"-m\", \"pip\", \"install\", \"-q\", *missing], check=True)\n",
+        "\n",
+        "TPU_JAX_COMMIT = \"4b9f8e94619f1995206617e07e3c4ac62685d47b\"\n",
+        "ENGINE_DIR = pathlib.Path(\"/content/tpu-jax\" if os.path.isdir(\"/content\") else os.path.expanduser(\"~/tpu-jax-src\"))\n",
+        "if not (ENGINE_DIR / \".git\").exists():\n",
+        "    subprocess.run([\"git\", \"clone\", \"-q\", \"https://github.com/xbill9/tpu-jax\", str(ENGINE_DIR)], check=True)\n",
+        "subprocess.run([\"git\", \"-C\", str(ENGINE_DIR), \"checkout\", \"-q\", TPU_JAX_COMMIT], check=True)\n",
+        "sys.path.insert(0, str(ENGINE_DIR))\n",
+        "\n",
+        "from jax_engine import JaxGemmaEngine  # noqa: E402\n",
+        "from ports.gemma4.jax_e_model import make_prefill_causal_mask, qat_w4a16_unpack_dequant_jax  # noqa: E402\n",
+        "\n",
+        "print(\n",
+        "    \"tpu-jax at\",\n",
+        "    subprocess.run(\n",
+        "        [\"git\", \"-C\", str(ENGINE_DIR), \"rev-parse\", \"--short\", \"HEAD\"], capture_output=True, text=True\n",
+        "    ).stdout.strip(),\n",
+        ")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c006-dc80c70d",
+      "metadata": {
+        "id": "c006-dc80c70d"
+      },
+      "source": [
+        "**What you should see.** One device whose kind contains `v5 lite` (or `v6`), about 16.9 GB of HBM\n",
+        "on v5e, and `tpu-jax at 4b9f8e9`. If the device is not a TPU, the first cell stops."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c007-a8a75645",
+      "metadata": {
+        "id": "c007-a8a75645"
+      },
+      "source": [
+        "## 2. The three checkpoints\n",
+        "\n",
+        "**What the source measured.** Google's E2B W4A16 export is 8.32 GB and the repack 7.51 GB. Most of\n",
+        "the difference is one tensor: Google's export stores `lm_head.weight`, a byte-for-byte copy of the\n",
+        "token embedding, although the config ties the two (`tie_word_embeddings: true`). The engine never\n",
+        "reads it, but it is downloaded, and on vLLM it was resident: 0.75 GiB of HBM.\n",
+        "\n",
+        "**What we are testing.** The size of each download, and whether Google's `lm_head` is identical to\n",
+        "the embedding it duplicates. Each checkpoint is pinned to a Hub revision, so the bytes you\n",
+        "download are the bytes measured here."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 3,
+      "id": "c008-cfba808c",
+      "metadata": {
+        "id": "c008-cfba808c",
+        "outputId": "2ca5d935-28c4-4d91-ba9e-47fae9535e1e",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "qat     google/gemma-4-E2B-it-qat-q4_0-unquantized     10.21 GB  (1 s)\n",
+            "stock   google/gemma-4-E2B-it-qat-w4a16-ct              8.32 GB  (0 s)\n",
+            "repack  xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct         7.51 GB  (0 s)\n",
+            "\n",
+            "host RAM in use: 6.6 of 50.5 GB   file cache 1.6 GB, 1.6 GB after flushing\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 2.1: download the three checkpoints (about 26 GB; 5 to 15 minutes)\n",
+        "# Each download runs in its own Python process. The downloader can hold several GB of host RAM\n",
+        "# after it finishes, and the VM only gets that back when the process exits. Downloading inside\n",
+        "# the notebook left too little RAM to load the checkpoints later.\n",
+        "DOWNLOAD = \"\"\"\n",
+        "import sys\n",
+        "from huggingface_hub import snapshot_download\n",
+        "print(snapshot_download(sys.argv[1], revision=sys.argv[2], allow_patterns=[\"*.safetensors\", \"*.json\"]))\n",
+        "\"\"\"\n",
+        "\n",
+        "CHECKPOINTS = {\n",
+        "    \"qat\": (\"google/gemma-4-E2B-it-qat-q4_0-unquantized\", \"6befbaca7398925921802abd1f277b495b78b738\"),\n",
+        "    \"stock\": (\"google/gemma-4-E2B-it-qat-w4a16-ct\", \"971342c08f607aa7779983f6b5289778b5d271a7\"),\n",
+        "    \"repack\": (\"xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct\", \"da64116ff640f56cddb2d4fe20f31e816da22ce9\"),\n",
+        "}\n",
+        "paths, disk_bytes = {}, {}\n",
+        "for name, (repo, rev) in CHECKPOINTS.items():\n",
+        "    t0 = time.perf_counter()\n",
+        "    proc = subprocess.run([sys.executable, \"-c\", DOWNLOAD, repo, rev], capture_output=True, text=True)\n",
+        "    if proc.returncode != 0:\n",
+        "        raise RuntimeError(f\"download of {repo} failed:\\n{proc.stderr[-2000:]}\")\n",
+        "    paths[name] = proc.stdout.strip().splitlines()[-1]\n",
+        "    disk_bytes[name] = sum(f.stat().st_size for f in pathlib.Path(paths[name]).glob(\"*.safetensors\"))\n",
+        "    print(f\"{name:7s} {repo:45s} {disk_bytes[name] / 1e9:6.2f} GB  ({time.perf_counter() - t0:.0f} s)\")\n",
+        "cached = file_cache_gb()\n",
+        "flush_file_cache()\n",
+        "print(\n",
+        "    f\"\\nhost RAM in use: {host_used_gb():.1f} of {host_ram / 1e9:.1f} GB   \"\n",
+        "    f\"file cache {cached:.1f} GB, {file_cache_gb():.1f} GB after flushing\"\n",
+        ")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 4,
+      "id": "c009-177cb3b4",
+      "metadata": {
+        "id": "c009-177cb3b4",
+        "outputId": "6ffd1efd-ba79-4fca-af5e-9818c3a66857",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "qat      1951 tensors     0 packed int4   lm_head stored: False\n",
+            "stock    2504 tensors   276 packed int4   lm_head stored: True\n",
+            "repack   2503 tensors   276 packed int4   lm_head stored: False\n",
+            "\n",
+            "stock lm_head identical to embed_tokens: True   (0.805 GB)\n",
+            "stock minus repack on disk: 0.805 GB\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 2.2: what each file holds, and the duplicate lm_head\n",
+        "from safetensors import safe_open\n",
+        "\n",
+        "\n",
+        "def tensor_index(path):\n",
+        "    \"\"\"Map every tensor name in a checkpoint directory to the shard that holds it.\"\"\"\n",
+        "    out = {}\n",
+        "    for f in sorted(pathlib.Path(path).glob(\"*.safetensors\")):\n",
+        "        with safe_open(f, framework=\"flax\") as h:\n",
+        "            out.update(dict.fromkeys(h.keys(), f))\n",
+        "    return out\n",
+        "\n",
+        "\n",
+        "def read(name, key):\n",
+        "    with safe_open(index[name][key], framework=\"flax\") as h:\n",
+        "        return h.get_tensor(key)\n",
+        "\n",
+        "\n",
+        "index = {name: tensor_index(p) for name, p in paths.items()}\n",
+        "EMBED = \"model.language_model.embed_tokens.weight\"\n",
+        "for name in CHECKPOINTS:\n",
+        "    packed = sum(k.endswith(\".weight_packed\") for k in index[name])\n",
+        "    print(\n",
+        "        f\"{name:7s} {len(index[name]):5d} tensors   {packed:3d} packed int4   lm_head stored: {'lm_head.weight' in index[name]}\"\n",
+        "    )\n",
+        "\n",
+        "lm_head, embed = read(\"stock\", \"lm_head.weight\"), read(\"stock\", EMBED)\n",
+        "dup_bytes = lm_head.size * lm_head.dtype.itemsize\n",
+        "print(\n",
+        "    f\"\\nstock lm_head identical to embed_tokens: {bool(jnp.array_equal(lm_head, embed))}   ({dup_bytes / 1e9:.3f} GB)\"\n",
+        ")\n",
+        "print(f\"stock minus repack on disk: {(disk_bytes['stock'] - disk_bytes['repack']) / 1e9:.3f} GB\")\n",
+        "del lm_head, embed"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c010-302c1215",
+      "metadata": {
+        "id": "c010-302c1215"
+      },
+      "source": [
+        "**What you should see.** Both 4-bit builds hold the same number of packed tensors, because they\n",
+        "quantize the same set of linear layers. Only the stock build stores `lm_head`, and it is identical\n",
+        "to `embed_tokens`. That one tensor (0.805 GB) accounts for the size difference between the two\n",
+        "builds. The bf16 QAT checkpoint is the largest, and it is still 4-bit data, as\n",
+        "Section 3 shows."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c011-3043f6cd",
+      "metadata": {
+        "id": "c011-3043f6cd"
+      },
+      "source": [
+        "## 3. Are the weights the trained ones?\n",
+        "\n",
+        "**What the source measured.** Across 24 E2B tensors from the first, middle and last layers (every\n",
+        "projection kind, 5.7 million groups of 32), Google's scale was max|w| / 7.5 in 100.00% of groups\n",
+        "and equal to the trained step in 0.000%. Its values carried 6.65 to 6.67% relative error against\n",
+        "the QAT values. The repack was checked the same way on the 12B, where none of 340,623,360 groups\n",
+        "fell off the grid.\n",
+        "\n",
+        "**What we are testing.** The same 24 tensors, read from all three files and compared on the chip.\n",
+        "For each 4-bit build, the cell dequantizes the packed weights with the engine's own function (the\n",
+        "one the forward pass uses) and compares the result with the QAT values:\n",
+        "\n",
+        "* **relative error:** size of the difference, divided by size of the weights;\n",
+        "* **identical:** share of values that are bit-for-bit the QAT value;\n",
+        "* **step = max/7.5:** share of groups whose scale is the largest weight divided by 7.5, the rule\n",
+        "  Google's recipe records (`observer: memoryless_minmax`);\n",
+        "* **peak on a level:** share of groups whose largest weight lands on a whole level of the stored\n",
+        "  step. On the trained grid every weight is step × level, with level from −8 to 7.\n",
+        "\n",
+        "The mechanism in one line: if a group's largest weight sits on level *m* of the trained step *d*,\n",
+        "the min-max step is *m·d* / 7.5. Since *m* is a whole number from 1 to 8, that never equals *d*, so\n",
+        "every weight in the group is rounded a second time onto a grid the model never trained on."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 5,
+      "id": "c012-73d127b3",
+      "metadata": {
+        "id": "c012-73d127b3",
+        "outputId": "d64e1a2d-d57e-4f77-a2df-38608ec1c930",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "tensor                                           build    rel err  identical  step=max/7.5  peak on level\n",
+            "per_layer_model_projection                       stock     0.0666     12.54%       100.00%          0.00%\n",
+            "per_layer_model_projection                       repack    0.0018     74.21%         0.00%         99.89%\n",
+            "layers.0.self_attn.q_proj                        stock     0.0667     11.56%       100.00%          0.00%\n",
+            "layers.0.self_attn.q_proj                        repack    0.0019     72.77%         0.00%         99.94%\n",
+            "layers.0.self_attn.o_proj                        stock     0.0667     11.60%       100.00%          0.00%\n",
+            "layers.0.self_attn.o_proj                        repack    0.0019     73.01%         0.00%         99.88%\n",
+            "layers.0.mlp.gate_proj                           stock     0.0667     12.51%       100.00%          0.00%\n",
+            "layers.0.mlp.gate_proj                           repack    0.0018     74.36%         0.00%         99.95%\n",
+            "layers.0.mlp.up_proj                             stock     0.0667     12.34%       100.00%          0.00%\n",
+            "layers.0.mlp.up_proj                             repack    0.0018     73.89%         0.00%         99.94%\n",
+            "layers.0.mlp.down_proj                           stock     0.0667     12.56%       100.00%          0.00%\n",
+            "layers.0.mlp.down_proj                           repack    0.0018     74.34%         0.00%         99.96%\n",
+            "layers.0.per_layer_input_gate                    stock     0.0666     13.88%       100.00%          0.00%\n",
+            "layers.0.per_layer_input_gate                    repack    0.0019     75.84%         0.00%         99.88%\n",
+            "layers.0.per_layer_projection                    stock     0.0666     13.85%       100.00%          0.00%\n",
+            "layers.0.per_layer_projection                    repack    0.0018     75.52%         0.00%         99.91%\n",
+            "layers.0.self_attn.k_proj                        stock     0.0666     11.69%       100.00%          0.00%\n",
+            "layers.0.self_attn.k_proj                        repack    0.0019     72.99%         0.00%         99.95%\n",
+            "layers.0.self_attn.v_proj                        stock     0.0666     12.20%       100.00%          0.00%\n",
+            "layers.0.self_attn.v_proj                        repack    0.0018     73.85%         0.00%         99.98%\n",
+            "layers.17.self_attn.q_proj                       stock     0.0667     12.02%       100.00%          0.00%\n",
+            "layers.17.self_attn.q_proj                       repack    0.0019     73.72%         0.00%         99.94%\n",
+            "layers.17.self_attn.o_proj                       stock     0.0667     11.96%       100.00%          0.00%\n",
+            "layers.17.self_attn.o_proj                       repack    0.0019     73.21%         0.00%         99.90%\n",
+            "layers.17.mlp.gate_proj                          stock     0.0667     11.50%       100.00%          0.00%\n",
+            "layers.17.mlp.gate_proj                          repack    0.0019     72.85%         0.00%         99.91%\n",
+            "layers.17.mlp.up_proj                            stock     0.0667     11.65%       100.00%          0.00%\n",
+            "layers.17.mlp.up_proj                            repack    0.0018     72.86%         0.00%         99.95%\n",
+            "layers.17.mlp.down_proj                          stock     0.0666     11.81%       100.00%          0.00%\n",
+            "layers.17.mlp.down_proj                          repack    0.0019     73.59%         0.00%         99.89%\n",
+            "layers.17.per_layer_input_gate                   stock     0.0666     21.45%       100.00%          0.00%\n",
+            "layers.17.per_layer_input_gate                   repack    0.0017     83.40%         0.00%         99.98%\n",
+            "layers.17.per_layer_projection                   stock     0.0667     12.59%       100.00%          0.00%\n",
+            "layers.17.per_layer_projection                   repack    0.0019     73.54%         0.00%         99.94%\n",
+            "layers.34.self_attn.q_proj                       stock     0.0666     11.95%       100.00%          0.00%\n",
+            "layers.34.self_attn.q_proj                       repack    0.0019     73.66%         0.00%         99.94%\n",
+            "layers.34.self_attn.o_proj                       stock     0.0666     12.69%       100.00%          0.00%\n",
+            "layers.34.self_attn.o_proj                       repack    0.0019     74.31%         0.00%         99.93%\n",
+            "layers.34.mlp.gate_proj                          stock     0.0666     11.92%       100.00%          0.00%\n",
+            "layers.34.mlp.gate_proj                          repack    0.0019     73.41%         0.00%         99.92%\n",
+            "layers.34.mlp.up_proj                            stock     0.0667     11.89%       100.00%          0.00%\n",
+            "layers.34.mlp.up_proj                            repack    0.0018     73.25%         0.00%         99.95%\n",
+            "layers.34.mlp.down_proj                          stock     0.0666     12.53%       100.00%          0.00%\n",
+            "layers.34.mlp.down_proj                          repack    0.0019     74.44%         0.00%         99.89%\n",
+            "layers.34.per_layer_input_gate                   stock     0.0667     13.09%       100.00%          0.00%\n",
+            "layers.34.per_layer_input_gate                   repack    0.0018     75.60%         0.00%         99.95%\n",
+            "layers.34.per_layer_projection                   stock     0.0667     13.51%       100.00%          0.00%\n",
+            "layers.34.per_layer_projection                   repack    0.0019     74.94%         0.00%         99.98%\n",
+            "\n",
+            "all 24 tensors\n",
+            "  stock   groups 5,738,496   rel err 0.0667   identical 12.08%   step=max/7.5 100.00%   peak on a level 0.00%\n",
+            "  repack  groups 5,738,496   rel err 0.0019   identical 73.65%   step=max/7.5 0.00%   peak on a level 99.92%\n",
+            "\n",
+            "  repack: level the largest weight of each group sits on, share of groups\n",
+            "   1: 0.0%   2: 0.0%   3: 0.0%   4: 0.0%   5: 0.0%   6: 0.0%   7: 39.5%   8: 60.5%\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 3.1: the grid test, 24 tensors\n",
+        "LP = \"model.language_model.\"\n",
+        "TENSORS = [LP + \"per_layer_model_projection\"]\n",
+        "for layer in (0, 17, 34):\n",
+        "    projs = [\n",
+        "        \"self_attn.q_proj\",\n",
+        "        \"self_attn.o_proj\",\n",
+        "        \"mlp.gate_proj\",\n",
+        "        \"mlp.up_proj\",\n",
+        "        \"mlp.down_proj\",\n",
+        "        \"per_layer_input_gate\",\n",
+        "        \"per_layer_projection\",\n",
+        "    ]\n",
+        "    if layer < 15:  # layers 15-34 reuse an earlier layer's keys and values, so they have no k/v\n",
+        "        projs += [\"self_attn.k_proj\", \"self_attn.v_proj\"]\n",
+        "    TENSORS += [f\"{LP}layers.{layer}.{p}\" for p in projs]\n",
+        "\n",
+        "\n",
+        "@jax.jit\n",
+        "def grid_stats(qat, packed, scale):\n",
+        "    \"\"\"Compare one packed W4A16 tensor with the QAT values it should hold.\"\"\"\n",
+        "    src = qat.astype(jnp.float32)\n",
+        "    deq = qat_w4a16_unpack_dequant_jax(packed, scale).astype(jnp.float32)\n",
+        "    peak = jnp.max(jnp.abs(src.reshape(src.shape[0], -1, 32)), axis=-1)  # [out, groups]\n",
+        "    s = scale.astype(jnp.float32)\n",
+        "    live = peak > 0\n",
+        "    level = jnp.where(live, peak / s, 0.0)\n",
+        "    on_level = live & (jnp.abs(level - jnp.round(level)) < 0.05)\n",
+        "    return {\n",
+        "        \"groups\": jnp.sum(live),\n",
+        "        \"values\": src.size,\n",
+        "        \"sq_err\": jnp.sum((deq - src) ** 2),\n",
+        "        \"sq_src\": jnp.sum(src**2),\n",
+        "        \"identical\": jnp.sum(deq == src),\n",
+        "        \"minmax\": jnp.sum(live & (jnp.abs(s * 7.5 / jnp.where(live, peak, 1.0) - 1.0) <= 2.0**-8)),\n",
+        "        \"on_level\": jnp.sum(on_level),\n",
+        "        \"peak_level\": jnp.bincount(jnp.where(on_level, jnp.round(level), 0).astype(jnp.int32).ravel(), length=9),\n",
+        "    }\n",
+        "\n",
+        "\n",
+        "totals = {b: None for b in (\"stock\", \"repack\")}\n",
+        "print(f\"{'tensor':48s} {'build':7s} {'rel err':>8s} {'identical':>10s} {'step=max/7.5':>13s} {'peak on level':>14s}\")\n",
+        "for t in TENSORS:\n",
+        "    qat = read(\"qat\", t + \".weight\")\n",
+        "    for build in totals:\n",
+        "        r = jax.device_get(grid_stats(qat, read(build, t + \".weight_packed\"), read(build, t + \".weight_scale\")))\n",
+        "        totals[build] = r if totals[build] is None else {k: totals[build][k] + r[k] for k in r}\n",
+        "        print(\n",
+        "            f\"{t[len(LP) :]:48s} {build:7s} {np.sqrt(r['sq_err'] / r['sq_src']):8.4f} \"\n",
+        "            f\"{r['identical'] / r['values']:10.2%} {r['minmax'] / r['groups']:13.2%} {r['on_level'] / r['groups']:14.2%}\"\n",
+        "        )\n",
+        "\n",
+        "print(\"\\nall 24 tensors\")\n",
+        "grid = {}\n",
+        "for build, r in totals.items():\n",
+        "    grid[build] = {\n",
+        "        \"groups\": int(r[\"groups\"]),\n",
+        "        \"rel_err\": float(np.sqrt(r[\"sq_err\"] / r[\"sq_src\"])),\n",
+        "        \"identical\": float(r[\"identical\"] / r[\"values\"]),\n",
+        "        \"minmax\": float(r[\"minmax\"] / r[\"groups\"]),\n",
+        "        \"on_level\": float(r[\"on_level\"] / r[\"groups\"]),\n",
+        "    }\n",
+        "    g = grid[build]\n",
+        "    print(\n",
+        "        f\"  {build:7s} groups {g['groups']:,}   rel err {g['rel_err']:.4f}   identical {g['identical']:.2%}   \"\n",
+        "        f\"step=max/7.5 {g['minmax']:.2%}   peak on a level {g['on_level']:.2%}\"\n",
+        "    )\n",
+        "levels = totals[\"repack\"][\"peak_level\"]\n",
+        "print(\"\\n  repack: level the largest weight of each group sits on, share of groups\")\n",
+        "print(\"   \" + \"   \".join(f\"{m}: {levels[m] / levels.sum():.1%}\" for m in range(1, 9)))"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c013-2162ff75",
+      "metadata": {
+        "id": "c013-2162ff75"
+      },
+      "source": [
+        "**What you should see.** For the stock build: relative error near 0.067 on every tensor, about one\n",
+        "value in eight identical to the QAT value (the ones that happen to land on both grids), `step=max/7.5`\n",
+        "at 100%, and no group whose peak lands on a whole level. That is the signature of re-rounding by\n",
+        "min-max. For the repack: relative error near 0.002, about three values in four identical, and the\n",
+        "peak of nearly every group on a whole level. The values that differ do so by the bf16 rounding of\n",
+        "the stored step, a fraction of a percent, against 6.7% for the stock build.\n",
+        "\n",
+        "The last line shows why no fixed rule recovers the trained step: the peak sits on level 7 in some\n",
+        "groups and level 8 in others. A rule that assumes level 8 (max/8) is right for the second kind\n",
+        "only, and min-max (max/7.5) is right for neither."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c014-1d15fe00",
+      "metadata": {
+        "id": "c014-1d15fe00"
+      },
+      "source": [
+        "## 4. Does the difference reach the output?\n",
+        "\n",
+        "**What the source measured.** On a 3,880-record test suite, read by label probability and paired\n",
+        "record for record on one v5e chip under vLLM: repack 67.8%, Google's export 65.5%, a difference of\n",
+        "+2.4 points (95% range +1.4 to +3.4). The bf16 E2B release scored 68.5% on the same chip.\n",
+        "\n",
+        "**What we are testing.** A suite of that size is too slow for a notebook, so this section measures\n",
+        "something more direct. It feeds the same WikiText-2 text through all three models and compares,\n",
+        "at every position, each 4-bit model's predicted next-token distribution with the QAT model's:\n",
+        "\n",
+        "* **KL divergence:** how far the 4-bit distribution is from the QAT one. Zero means identical.\n",
+        "* **same top token:** share of positions where both models' most likely token is the same.\n",
+        "* **perplexity ratio:** the 4-bit model's perplexity on the text, divided by the QAT model's.\n",
+        "  Above 1 means it predicts the real text less well.\n",
+        "\n",
+        "All three use the same engine, loader, forward pass and causal mask; the 4-bit builds run packed,\n",
+        "as shipped. Each model is loaded, measured and released before the next, because two do not fit\n",
+        "in 16 GB at once. The QAT model's distributions are kept in host memory (8 × 512 positions, 4.3 GB)\n",
+        "for the comparison."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 6,
+      "id": "c015-f96bff20",
+      "metadata": {
+        "id": "c015-f96bff20",
+        "outputId": "3cfcfd9e-7ac6-4e8f-d0b3-c72c975f06ce",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "292,281 WikiText-2 test tokens; using 8 sequences of 512\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 4.1: the text, and the measurement helpers\n",
+        "from datasets import load_dataset\n",
+        "from tokenizers import Tokenizer\n",
+        "\n",
+        "N_SEQ, SEQ_LEN, NEW_TOKENS = 8, 512, 128\n",
+        "tok = Tokenizer.from_file(os.path.join(paths[\"qat\"], \"tokenizer.json\"))\n",
+        "BOS = tok.token_to_id(\"<bos>\")\n",
+        "assert BOS is not None, \"tokenizer has no <bos> token\"\n",
+        "\n",
+        "wiki = load_dataset(\"Salesforce/wikitext\", \"wikitext-2-raw-v1\", split=\"test\")\n",
+        "ids = tok.encode(\"\".join(wiki[\"text\"]), add_special_tokens=False).ids\n",
+        "assert len(ids) >= N_SEQ * (SEQ_LEN - 1), \"not enough WikiText-2 tokens\"\n",
+        "batch = np.array([[BOS] + ids[i * (SEQ_LEN - 1) : (i + 1) * (SEQ_LEN - 1)] for i in range(N_SEQ)], dtype=np.int32)\n",
+        "PROMPT = tok.encode(\"The history of the Roman Empire\", add_special_tokens=False).ids\n",
+        "print(f\"{len(ids):,} WikiText-2 test tokens; using {N_SEQ} sequences of {SEQ_LEN}\")\n",
+        "\n",
+        "ref_logprobs = []  # the QAT model's log-probabilities, one [SEQ_LEN, vocab] array per sequence\n",
+        "results = {}\n",
+        "\n",
+        "\n",
+        "def load(name):\n",
+        "    engine = JaxGemmaEngine(CHECKPOINTS[name][0], quant_mode=\"fp16\" if name == \"qat\" else \"w4a16\")\n",
+        "    t0 = time.perf_counter()\n",
+        "    engine.load(local_dir=paths[name])\n",
+        "    engine.bos_token_id = BOS\n",
+        "    print(\n",
+        "        f\"{name}: loaded in {time.perf_counter() - t0:.0f} s, {engine.weight_bytes / 1e9:.2f} GB of weights on the chip, \"\n",
+        "        f\"host RAM in use {host_used_gb():.1f} GB, file cache {file_cache_gb():.1f} GB\"\n",
+        "    )\n",
+        "    flush_file_cache()\n",
+        "    return engine\n",
+        "\n",
+        "\n",
+        "def logprob_fn(engine):\n",
+        "    valid = jnp.ones((1, SEQ_LEN), dtype=bool)\n",
+        "    full, sliding = (\n",
+        "        make_prefill_causal_mask(valid),\n",
+        "        make_prefill_causal_mask(valid, window=engine.config.sliding_window),\n",
+        "    )\n",
+        "    pos = jnp.arange(SEQ_LEN, dtype=jnp.int32)[None, :]\n",
+        "\n",
+        "    @jax.jit\n",
+        "    def fn(params, x):\n",
+        "        logits = engine.model(\n",
+        "            x, params, pos, attention_mask=full, sliding_attention_mask=sliding, quant_mode=engine.quant_mode\n",
+        "        )\n",
+        "        return jax.nn.log_softmax(logits[0].astype(jnp.float32), axis=-1)\n",
+        "\n",
+        "    return fn\n",
+        "\n",
+        "\n",
+        "@jax.jit\n",
+        "def compare(ref, lp):\n",
+        "    \"\"\"Per-position KL(ref || lp) and whether the top tokens agree.\"\"\"\n",
+        "    return jnp.sum(jnp.exp(ref) * (ref - lp), axis=-1), jnp.argmax(ref, -1) == jnp.argmax(lp, -1)\n",
+        "\n",
+        "\n",
+        "def measure(name):\n",
+        "    engine = load(name)\n",
+        "    fn = logprob_fn(engine)\n",
+        "    nll, kl, same = [], [], []\n",
+        "    t0 = time.perf_counter()\n",
+        "    for i in range(N_SEQ):\n",
+        "        x = jnp.asarray(batch[i : i + 1])\n",
+        "        lp = fn(engine.params, x)\n",
+        "        nll.append(np.asarray(-jnp.take_along_axis(lp[:-1], x[0, 1:, None], axis=1)[:, 0]))\n",
+        "        if name == \"qat\":\n",
+        "            ref_logprobs.append(np.asarray(lp))\n",
+        "        else:\n",
+        "            k, s = compare(jnp.asarray(ref_logprobs[i]), lp)\n",
+        "            kl.append(np.asarray(k))\n",
+        "            same.append(np.asarray(s))\n",
+        "    print(f\"{name}: {N_SEQ} x {SEQ_LEN} positions scored in {time.perf_counter() - t0:.0f} s (first one compiles)\")\n",
+        "\n",
+        "    # Greedy decode of a fixed prompt: once to compile, then three timed runs. No stop token, so every\n",
+        "    # run generates exactly NEW_TOKENS and all three models do the same work.\n",
+        "    engine.generate(PROMPT, max_new_tokens=NEW_TOKENS)\n",
+        "    runs = [engine.generate(PROMPT, max_new_tokens=NEW_TOKENS) for _ in range(3)]\n",
+        "    results[name] = {\n",
+        "        \"nll\": np.concatenate(nll),\n",
+        "        \"kl\": np.concatenate(kl) if kl else None,\n",
+        "        \"same\": np.concatenate(same) if same else None,\n",
+        "        \"tok_s\": float(np.median([stats.decode_tok_per_s for _, stats in runs])),\n",
+        "        \"greedy\": runs[0][0],\n",
+        "        \"weight_bytes\": engine.weight_bytes,\n",
+        "    }\n",
+        "    del engine, fn\n",
+        "    gc.collect()\n",
+        "    flush_file_cache()\n",
+        "    print(\n",
+        "        f\"{name}: released, {dev.memory_stats()['bytes_in_use'] / 1e9:.2f} GB still in use on the chip, \"\n",
+        "        f\"host RAM in use {host_used_gb():.1f} GB, file cache {file_cache_gb():.1f} GB\"\n",
+        "    )"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 7,
+      "id": "c016-628558b4",
+      "metadata": {
+        "id": "c016-628558b4",
+        "outputId": "3bbf55e1-b3ca-4bbe-b5a8-42b69a10b6ae",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "qat: loaded in 257 s, 9.26 GB of weights on the chip, host RAM in use 7.1 GB, file cache 25.4 GB\n",
+            "qat: 8 x 512 positions scored in 27 s (first one compiles)\n",
+            "qat: released, 0.57 GB still in use on the chip, host RAM in use 22.0 GB, file cache 13.7 GB\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 4.2: the QAT reference (bf16, 9 to 10 GB on the chip)\n",
+        "measure(\"qat\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 8,
+      "id": "c017-cb3a608b",
+      "metadata": {
+        "id": "c017-cb3a608b",
+        "outputId": "a0dce218-fb4f-40f8-d61a-103fa85bb16d",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "stock: loaded in 165 s, 6.56 GB of weights on the chip, host RAM in use 22.0 GB, file cache 18.9 GB\n",
+            "stock: 8 x 512 positions scored in 41 s (first one compiles)\n",
+            "stock: released, 0.59 GB still in use on the chip, host RAM in use 22.0 GB, file cache 10.9 GB\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 4.3: Google's W4A16 export\n",
+        "measure(\"stock\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 9,
+      "id": "c018-8c2a7844",
+      "metadata": {
+        "id": "c018-8c2a7844",
+        "outputId": "72d300bd-9864-42d7-c953-df01a64530d6",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "repack: loaded in 154 s, 6.56 GB of weights on the chip, host RAM in use 22.0 GB, file cache 18.7 GB\n",
+            "repack: 8 x 512 positions scored in 41 s (first one compiles)\n",
+            "repack: released, 0.59 GB still in use on the chip, host RAM in use 22.2 GB, file cache 11.4 GB\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 4.4: the repack\n",
+        "measure(\"repack\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 10,
+      "id": "c019-56b32dcc",
+      "metadata": {
+        "id": "c019-56b32dcc",
+        "outputId": "cc00cfc6-20d7-4fe9-a728-8a19ba284f2b",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "build     mean KL  same top token  perplexity ratio   per-sequence mean KL, min to max\n",
+            "stock     0.07141          85.96%            1.0643   0.05807 to 0.08348\n",
+            "repack    0.00021          99.29%            0.9994   0.00015 to 0.00028\n",
+            "\n",
+            "positions where the repack is closer to the QAT model than the stock build: 100.0% of 4,096\n",
+            "stock KL / repack KL: 342.6x\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 4.5: each 4-bit build against the QAT model, on the same positions\n",
+        "ref_nll = results[\"qat\"][\"nll\"].mean()\n",
+        "print(\n",
+        "    f\"{'build':7s} {'mean KL':>9s} {'same top token':>15s} {'perplexity ratio':>17s}   per-sequence mean KL, min to max\"\n",
+        ")\n",
+        "for b in (\"stock\", \"repack\"):\n",
+        "    r = results[b]\n",
+        "    per_seq = r[\"kl\"].reshape(N_SEQ, SEQ_LEN).mean(axis=1)\n",
+        "    r[\"kl_mean\"], r[\"same_top\"] = float(r[\"kl\"].mean()), float(r[\"same\"].mean())\n",
+        "    r[\"ppl_ratio\"] = float(np.exp(r[\"nll\"].mean() - ref_nll))\n",
+        "    print(\n",
+        "        f\"{b:7s} {r['kl_mean']:9.5f} {r['same_top']:15.2%} {r['ppl_ratio']:17.4f}   {per_seq.min():.5f} to {per_seq.max():.5f}\"\n",
+        "    )\n",
+        "\n",
+        "closer = float(np.mean(results[\"repack\"][\"kl\"] < results[\"stock\"][\"kl\"]))\n",
+        "print(\n",
+        "    f\"\\npositions where the repack is closer to the QAT model than the stock build: {closer:.1%} \"\n",
+        "    f\"of {results['repack']['kl'].size:,}\"\n",
+        ")\n",
+        "print(f\"stock KL / repack KL: {results['stock']['kl_mean'] / results['repack']['kl_mean']:.1f}x\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c020-20286360",
+      "metadata": {
+        "id": "c020-20286360"
+      },
+      "source": [
+        "**What you should see.** The repack's KL divergence far below the stock build's, with a higher\n",
+        "share of matching top tokens and a perplexity ratio closer to 1. The repack holds the QAT values, so\n",
+        "its remaining difference comes from the bf16 rounding of its scales and from the order in which the\n",
+        "packed path multiplies. The stock build's difference is the second rounding Section 3 measured, carried through 35\n",
+        "layers. The per-sequence range shows whether the result holds on every sequence.\n",
+        "\n",
+        "If the two builds came out level, check Section 3 first: a stock build that re-rounds every\n",
+        "weight and a repack that stores them exactly cannot give the same distributions.\n",
+        "\n",
+        "The suite result in the source is the same finding measured on tasks: 2.4 points from a difference\n",
+        "in weights alone."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c021-e6d9f6ae",
+      "metadata": {
+        "id": "c021-e6d9f6ae"
+      },
+      "source": [
+        "## 5. Speed and memory\n",
+        "\n",
+        "**What the source measured.** Under vLLM on one v5e chip, output tokens per second at 1, 4 and 16\n",
+        "concurrent requests: 136.6 / 532.3 / 1,911 for Google's export and 136.5 / 532.1 / 1,910 for the\n",
+        "repack. Weights resident: 7.17 GiB against 6.42 GiB, the difference being the duplicate `lm_head`.\n",
+        "\n",
+        "**What we are testing.** Decode speed for one request in this engine, and the bytes each build puts\n",
+        "on the chip. Both 4-bit builds have the same format and the same shapes, so they should cost the\n",
+        "same per token. The bf16 QAT model is included for scale."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 11,
+      "id": "c022-b5f3f9fe",
+      "metadata": {
+        "id": "c022-b5f3f9fe",
+        "outputId": "06a8b9c3-f56e-4cc0-cf86-6b28e984010a",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "build    disk GB  weights GB  decode tok/s  tokens equal to QAT greedy\n",
+            "qat        10.21        9.26         135.0                  128 of 128\n",
+            "stock       8.32        6.56          93.7                    5 of 128\n",
+            "repack      7.51        6.56          93.3                  128 of 128\n",
+            "\n",
+            "repack / stock decode speed: 0.996x\n",
+            "\n",
+            "--- qat ---\n",
+            " is a vast and complex tapestry, spanning over a thousand years, from its humble beginnings as a city-state in Italy to its transformation into a global superpower that shaped the Western world.\n",
+            "\n",
+            "**The Roman Republic (c. 509 BCE – 27 BCE)**\n",
+            "\n",
+            "The Roman Republic\n",
+            "\n",
+            "--- stock ---\n",
+            " is a vast and complex narrative, spanning over a thousand years, from the Roman Republic to the fall of the Western Roman Empire in 476 AD. It is a story of military conquest, political intrigue, social transformation, and cultural achievements that have profoundly shaped the Western world.\n",
+            "\n",
+            "The Roman\n",
+            "\n",
+            "--- repack ---\n",
+            " is a vast and complex tapestry, spanning over a thousand years, from its humble beginnings as a city-state in Italy to its transformation into a global superpower that shaped the Western world.\n",
+            "\n",
+            "**The Roman Republic (c. 509 BCE – 27 BCE)**\n",
+            "\n",
+            "The Roman Republic\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 5.1: decode speed, memory, and what each one wrote\n",
+        "ref_greedy = results[\"qat\"][\"greedy\"]\n",
+        "print(f\"{'build':7s} {'disk GB':>8s} {'weights GB':>11s} {'decode tok/s':>13s} {'tokens equal to QAT greedy':>27s}\")\n",
+        "for b in CHECKPOINTS:\n",
+        "    r = results[b]\n",
+        "    match = next((i for i, (a, c) in enumerate(zip(r[\"greedy\"], ref_greedy)) if a != c), len(ref_greedy))\n",
+        "    r[\"greedy_match\"] = match\n",
+        "    print(\n",
+        "        f\"{b:7s} {disk_bytes[b] / 1e9:8.2f} {r['weight_bytes'] / 1e9:11.2f} {r['tok_s']:13.1f} {match:>20d} of {len(ref_greedy)}\"\n",
+        "    )\n",
+        "print(f\"\\nrepack / stock decode speed: {results['repack']['tok_s'] / results['stock']['tok_s']:.3f}x\")\n",
+        "for b in CHECKPOINTS:\n",
+        "    print(f\"\\n--- {b} ---\\n{tok.decode(results[b]['greedy'][:60])}\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c023-5a00cab5",
+      "metadata": {
+        "id": "c023-5a00cab5"
+      },
+      "source": [
+        "**What you should see.** The two 4-bit builds within a few percent of each other in decode speed,\n",
+        "with the bf16 QAT model faster than both at one request. This engine dequantizes every packed\n",
+        "weight at every step, which costs more than reading bf16 at this size. The engine can instead\n",
+        "dequantize once at load (`dequant_at_load=True`), which trades the HBM saving for that speed. The\n",
+        "weights on the chip are the same for both 4-bit builds, because the engine never loads `lm_head`.\n",
+        "The disk column still carries it.\n",
+        "\n",
+        "The greedy text is one prompt, so read it as an illustration. A build that follows the QAT model\n",
+        "for more tokens before diverging is closer to it, which is what Section 4 measures over 4,096\n",
+        "positions."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c024-4b8b8773",
+      "metadata": {
+        "id": "c024-4b8b8773"
+      },
+      "source": [
+        "## 6. Scorecard\n",
+        "\n",
+        "**What we are testing.** Every source result next to the one you just measured. The source\n",
+        "columns came from vLLM on a v5e chip; yours came from a pure-JAX engine on whatever chip you have.\n",
+        "Each pair of columns puts the two builds side by side, so read across a pair: stock against\n",
+        "repack. The claim under test is the direction of each difference, which should hold on any chip.\n",
+        "\n",
+        "The repack is the better build where the weights differ: fidelity to the QAT model and download\n",
+        "size. Speed and memory on the chip should tie, because both builds store the same 4-bit format in\n",
+        "the same shapes and do the same work per token."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 12,
+      "id": "c025-0bce3542",
+      "metadata": {
+        "id": "c025-0bce3542",
+        "outputId": "55bdd785-c8d6-4e1d-bd03-0747c6666acd",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "                                           source (vLLM)               today (pure JAX)       \n",
+            "                                            stock         repack          stock         repack\n",
+            "relative error vs QAT values        0.0665-0.0667            n/a         0.0667         0.0019\n",
+            "groups with step = max/7.5                100.00%            n/a        100.00%          0.00%\n",
+            "groups with peak on a level                   n/a            n/a          0.00%         99.92%\n",
+            "mean KL vs QAT model                          n/a            n/a        0.07141        0.00021\n",
+            "same top token as QAT model                   n/a            n/a         85.96%         99.29%\n",
+            "perplexity ratio vs QAT model                 n/a            n/a         1.0643         0.9994\n",
+            "test suite, 3,880 records                   65.5%          67.8%        not run        not run\n",
+            "download, GB                                 8.32           7.51           8.32           7.51\n",
+            "decode tok/s, 1 request                     136.6          136.5           93.7           93.3\n",
+            "decode speed, repack / stock                              0.999x                        0.996x\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 6.1: the scorecard\n",
+        "s, r = results[\"stock\"], results[\"repack\"]\n",
+        "rows = [\n",
+        "    # (row, stock: source, repack: source, stock: today, repack: today)\n",
+        "    (\n",
+        "        \"relative error vs QAT values\",\n",
+        "        \"0.0665-0.0667\",\n",
+        "        \"n/a\",\n",
+        "        f\"{grid['stock']['rel_err']:.4f}\",\n",
+        "        f\"{grid['repack']['rel_err']:.4f}\",\n",
+        "    ),\n",
+        "    (\n",
+        "        \"groups with step = max/7.5\",\n",
+        "        \"100.00%\",\n",
+        "        \"n/a\",\n",
+        "        f\"{grid['stock']['minmax']:.2%}\",\n",
+        "        f\"{grid['repack']['minmax']:.2%}\",\n",
+        "    ),\n",
+        "    (\n",
+        "        \"groups with peak on a level\",\n",
+        "        \"n/a\",\n",
+        "        \"n/a\",\n",
+        "        f\"{grid['stock']['on_level']:.2%}\",\n",
+        "        f\"{grid['repack']['on_level']:.2%}\",\n",
+        "    ),\n",
+        "    (\"mean KL vs QAT model\", \"n/a\", \"n/a\", f\"{s['kl_mean']:.5f}\", f\"{r['kl_mean']:.5f}\"),\n",
+        "    (\"same top token as QAT model\", \"n/a\", \"n/a\", f\"{s['same_top']:.2%}\", f\"{r['same_top']:.2%}\"),\n",
+        "    (\"perplexity ratio vs QAT model\", \"n/a\", \"n/a\", f\"{s['ppl_ratio']:.4f}\", f\"{r['ppl_ratio']:.4f}\"),\n",
+        "    (\"test suite, 3,880 records\", \"65.5%\", \"67.8%\", \"not run\", \"not run\"),\n",
+        "    (\"download, GB\", \"8.32\", \"7.51\", f\"{disk_bytes['stock'] / 1e9:.2f}\", f\"{disk_bytes['repack'] / 1e9:.2f}\"),\n",
+        "    (\"decode tok/s, 1 request\", \"136.6\", \"136.5\", f\"{s['tok_s']:.1f}\", f\"{r['tok_s']:.1f}\"),\n",
+        "    (\"decode speed, repack / stock\", \"\", f\"{136.5 / 136.6:.3f}x\", \"\", f\"{r['tok_s'] / s['tok_s']:.3f}x\"),\n",
+        "]\n",
+        "print(f\"{'':34s} {'source (vLLM)':^29s} {'today (pure JAX)':^29s}\")\n",
+        "print(f\"{'':34s} {'stock':>14s} {'repack':>14s} {'stock':>14s} {'repack':>14s}\")\n",
+        "for row in rows:\n",
+        "    print(f\"{row[0]:34s} {row[1]:>14s} {row[2]:>14s} {row[3]:>14s} {row[4]:>14s}\")"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c026-2bc2b6eb",
+      "metadata": {
+        "id": "c026-2bc2b6eb"
+      },
+      "source": [
+        "**What you should see.** The weight and output rows favor the repack by a wide margin, and the\n",
+        "download row favors it by the duplicate `lm_head`. The speed ratio sits near 1.00x in both pairs:\n",
+        "a tie, as the format predicts. The absolute speeds differ between the pairs because the engines\n",
+        "differ: vLLM's int4 path against a reference dequantize-then-multiply in pure JAX. That gap says\n",
+        "nothing about either build, so compare stock with repack inside a pair, never across pairs.\n",
+        "\n",
+        "**So, which one?** The repack. It holds the weights Google trained, runs at the same speed in the\n",
+        "same format, and is smaller to download. Any loader that reads Google's `-qat-w4a16-ct` reads it\n",
+        "unchanged."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "id": "c027-ea98c32a",
+      "metadata": {
+        "id": "c027-ea98c32a"
+      },
+      "source": [
+        "## 7. Your notes\n",
+        "\n",
+        "Record where your numbers differ from the ones above, with the evidence. Suggested questions:\n",
+        "\n",
+        "* **Chip.** Which chip and JAX version (Cell 1.1)? The ratios should carry across chips; the\n",
+        "  speeds will not.\n",
+        "* **Weights.** Did Section 3 reproduce the stock build's 0.067 relative error and the repack's\n",
+        "  exact grid?\n",
+        "* **Output.** How many times larger was the stock build's KL divergence than the repack's?\n",
+        "* **Speed.** Were the two 4-bit builds level?"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 13,
+      "id": "c028-03e0c002",
+      "metadata": {
+        "id": "c028-03e0c002",
+        "outputId": "69927c2c-c6f2-4886-a643-761686afd0df",
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        }
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "\n",
+            "Chip and JAX:\n",
+            "Weights (Section 3):\n",
+            "Output (Section 4):\n",
+            "Speed (Section 5):\n",
+            "Other findings:\n",
+            "\n"
+          ]
+        }
+      ],
+      "source": [
+        "# Cell 7.1: your notes (edit this cell)\n",
+        "notes = \"\"\"\n",
+        "Chip and JAX:\n",
+        "Weights (Section 3):\n",
+        "Output (Section 4):\n",
+        "Speed (Section 5):\n",
+        "Other findings:\n",
+        "\"\"\"\n",
+        "print(notes)"
+      ]
+    }
+  ],
+  "metadata": {
+    "accelerator": "TPU",
+    "authors": [
+      {
+        "name": "William McLean"
+      }
+    ],
+    "colab": {
+      "name": "02_e2b_repack_vs_stock_on_jax.ipynb",
+      "provenance": [],
+      "toc_visible": true
+    },
+    "kernelspec": {
+      "display_name": "Python 3",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}

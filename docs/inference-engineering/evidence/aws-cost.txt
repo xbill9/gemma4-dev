@@ -1,0 +1,25 @@
+prices fetched 2026-10-12T15:02:11+00:00; bench results/rehearsal-20261012T1429Z/bench.txt
+
+One request at a time (bench_chat.py, 100-token answer)
+
+backend      tok/s  USD/hr  USD/month 24x7  USD / 1M output tokens
+bedrock      130.4       -          0 idle                    0.14  (per-token list price, input 0.035)
+g6           131.9  0.8048             588                    1.69
+sagemaker     96.5  1.1267             822                    3.24
+g5g           34.9  0.5560             406                    4.43
+inf2          36.5  0.7582             553                    5.77
+trn1          36.0  1.3438             981                   10.37
+
+Requests in parallel (compare.py, 256-token answers, google/gemma-4-E2B-it-qat-w4a16-ct)
+
+backend    parallel    tok/s  USD / 1M output tokens
+g6                1    104.8                   2.132
+g6                4    410.9                   0.544
+g6               16   1485.9                   0.150
+sagemaker         1     85.3                   3.667
+sagemaker         4    328.7                   0.952
+sagemaker        16   1077.2                   0.291
+
+g6 24x7 = USD 588/month. Bedrock spend matches it at:
+  0 input tokens per output token: USD 0.140 per 1M output tokens, 4196M output tokens/month = 1597 tok/s around the clock
+  5 input tokens per output token: USD 0.315 per 1M output tokens, 1865M output tokens/month = 710 tok/s around the clock

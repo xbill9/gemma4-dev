@@ -1,0 +1,49 @@
+# Capacity refusals, 2026-10-12. Lines are stage/up.sh output (UTC) unless marked.
+
+## Compute Engine g2-standard-4 (one L4), project quota NVIDIA_L4_GPUS=16 in every US region
+18:16:54Z gce: no capacity in us-east4-a, trying the next zone
+18:17:08Z gce: no capacity in us-east4-c, trying the next zone
+18:17:11Z gce: us-east4-b:  - Invalid value for field 'resource.machineType': 'https://compute.googleapis.com/compute/v1/projects/comglitn/zones/us-east4-b/machineTypes/g2-standard-4'. Machine type with name 'g2-standard-4' does not exist in zone 'us-east4-b'.
+18:18:16Z gce: no capacity in us-east4-a, trying the next zone
+18:18:28Z gce: no capacity in us-east4-c, trying the next zone
+18:18:42Z gce: no capacity in us-central1-a, trying the next zone
+18:19:00Z gce: no capacity in us-central1-b, trying the next zone
+18:19:14Z gce: no capacity in us-central1-c, trying the next zone
+18:19:24Z gce: no capacity in us-east1-b, trying the next zone
+18:19:38Z gce: no capacity in us-east1-c, trying the next zone
+18:19:52Z gce: no capacity in us-east1-d, trying the next zone
+18:19:52Z gce: no capacity in any of: us-east4-a us-east4-c us-central1-a us-central1-b us-central1-c us-east1-b us-east1-c us-east1-d
+18:21:56Z gce: no capacity in us-west1-a, trying the next zone
+18:22:11Z gce: no capacity in us-west1-b, trying the next zone
+18:22:23Z gce: no capacity in us-west1-c, trying the next zone
+18:22:40Z gce: no capacity in us-west4-a, trying the next zone
+18:22:51Z gce: no capacity in us-west4-c, trying the next zone
+18:23:03Z gce: launched in northamerica-northeast1-b
+
+Error text for one refusal (us-central1-a, run by hand):
+  The zone 'projects/comglitn/zones/us-central1-a' does not have enough resources available to fulfill the request.  'NULL:0/NULL:0/NULL:0 (state:STOCKOUT, sub-state:STOCKOUT, resource type:compute)'.
+
+## Cloud TPU v6e-1, project aisprint-491218 (TPU API quota: 512 v6e chips in us-east5)
+18:19:21Z tpu: no capacity in us-east5-b, trying the next zone (ERROR: (gcloud.compute.tpus.tpu-vm.create) {)
+18:20:58Z tpu: no capacity in us-east5-a, trying the next zone (ERROR: (gcloud.compute.tpus.tpu-vm.create) {)
+18:21:39Z tpu: no capacity in us-east5-c, trying the next zone (  "error": {)
+18:21:39Z tpu: no capacity in any of: us-east5-b us-east5-a us-east5-c
+18:50:43Z tpu: no capacity in us-east5-b, trying the next zone ()
+18:52:20Z tpu: no capacity in us-east5-a, trying the next zone ()
+18:53:04Z tpu: no capacity in us-east5-c, trying the next zone ()
+18:53:04Z tpu: no on-demand capacity in any of: us-east5-b us-east5-a us-east5-c; queueing a flex-start request in us-east5-b
+18:53:09Z tpu: flex-start request queued in us-east5-b
+
+Per-zone refusals (gcloud compute tpus tpu-vm create, run by hand):
+us-central1-b rc=1 User does not have permission to submit requests for accelerator type \
+us-central1-c rc=1 Insufficient capacity. Try again in a different zone or at a later time.  [EID: 0xea80307df3648381]
+us-east1-d rc=1 User does not have permission to submit requests for accelerator type \
+us-east4-a rc=1 Quota limit 'TPUV6EPerProjectPerZoneForTPUAPI' has been exceeded. Limit: 0 in zone us-east4-a.
+us-south1-a rc=1 Insufficient capacity. Try again in a different zone or at a later time.  [EID: 0xc3254c0551317b73]
+us-west1-c rc=1 Insufficient capacity. Try again in a different zone or at a later time.  [EID: 0x90944cc7b1e75e84]
+europe-west4-a rc=1 There is no more capacity in the zone \
+us-east5-b on-demand: There is no more capacity in the zone "us-east5-b"; you can try in another zone where Cloud TPU Nodes are offered
+us-central1-a on-demand: Insufficient capacity. Try again in a different zone or at a later time.
+18:39:16Z us-east5-b spot rc=1 There is no more capacity in the zone \
+18:39:58Z us-east5-a spot rc=1 There is no more capacity in the zone \
+18:40:44Z us-east5-c spot rc=1 Quota limit 'TPUV6EPreemptiblePerProjectPerZoneForTPUAPI' has been exceeded. Limit: 0 in zone us-east5-c.

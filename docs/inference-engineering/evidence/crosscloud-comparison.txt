@@ -1,0 +1,35 @@
+Demo 1 (11 ids, how many are 10 or more? answer 8), one grader for every cloud
+
+backend          engine  filter  med s    rows  filters sent
+aws.bedrock       20/20   20/20   1.05   20/20  id >= 10
+aws.sagemaker     20/20   20/20   0.56   20/20  id >= 10
+aws.g6            20/20   20/20    0.4   20/20  id >= 10
+aws.g5g           20/20   20/20    2.3   20/20  id >= 10
+gcp.gemini        20/20   20/20   2.95   20/20  id >= 10
+gcp.maas          19/20   19/20   13.0    0/20  id >= 10
+gcp.vertex        20/20   20/20   0.92   20/20  id >= 10
+gcp.cloudrun      20/20   20/20   0.52   20/20  id >= 10
+gcp.gke           20/20   20/20    0.7   20/20  id >= 10
+gcp.gce           20/20   20/20   0.89   20/20  id >= 10
+gcp.tpu           20/20   20/20   1.65   20/20  id >= 10
+azure.foundry     20/20   20/20   3.19   19/20  id >= 10
+azure.vm          20/20   20/20   0.38   20/20  id >= 10
+
+Same prompt, one request at a time (100-token cap), and list price
+
+backend         hardware                         tok/s                price  USD/1M out  USD/mo 24x7
+azure.vm        A10 (NV36ads_A10_v5)             166.9           3.2 USD/hr        5.33         2336
+aws.g6          L4 (g6.xlarge)                  132.45        0.8048 USD/hr        1.69          588
+gcp.cloudrun    L4 (Cloud Run)                   119.3        1.0465 USD/hr        2.44          764
+aws.bedrock     managed                         115.85     0.140 USD/1M out        0.14            -
+gcp.tpu         TPU v5e-1 (v5litepod-1)          105.3           0.6 USD/hr        1.58          438
+aws.sagemaker   L4 (ml.g6.xlarge)                105.2        1.1267 USD/hr        2.98          822
+gcp.gke         L4 (GKE Autopilot)               104.7        0.9593 USD/hr        2.55          700
+gcp.gce         L4 (g2-standard-4)                94.3        0.7783 USD/hr        2.29          568
+gcp.gemini      managed                           93.3     2.500 USD/1M out         2.5            -
+gcp.vertex      L4 (Vertex AI endpoint)           90.2         0.919 USD/hr        2.83          671
+azure.foundry   managed                           49.7     0.400 USD/1M out         0.4            -
+aws.trn1        Trainium (trn1.2xlarge)           36.9       1.34375 USD/hr       10.12          981
+aws.inf2        Inferentia2 (inf2.xlarge)         36.6        0.7582 USD/hr        5.75          553
+aws.g5g         T4G + Graviton2 (g5g.2xlarge)     35.8         0.556 USD/hr        4.31          406
+gcp.maas        managed                           14.2     0.600 USD/1M out         0.6            -
