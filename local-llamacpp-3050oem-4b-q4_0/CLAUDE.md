@@ -55,8 +55,19 @@ range +0.035 to +0.061), GSM8K 0.933 vs 0.898 (+0.035), BFCL 0.910 vs 0.925
 (−0.015, range includes zero). Each build matches its TPU reference within range,
 so the gap is the model's.
 
+**The drafter costs nothing in answer quality as the rig serves** (`-c 131072 --parallel 1`,
+`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-fullctx-3050oem/`): GSM8K 0.9295 with it against 0.9310 without, BFCL
+0.9125 both; GSM8K finishes 2.23x faster with it, and one request at a time the drafted replies
+match undrafted ones word for word on 1,200 of 1,319 GSM8K problems and all 400 BFCL questions.
+Prompt cache off changes no score (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-cache-3050oem/`).
+
+**Concurrency** (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-concurrency-drafter-3050oem/`): the drafter gains 1.40–1.77x
+at 8 requests and 1.09–1.16x at 32, on an easy-to-guess repeated-paragraph prompt, so the sizes
+read high. **E4B with the drafter does not fit 64 slots at `-c 65536`** in 8 GiB (without it:
+7,798 MiB); at `-c 32768 --parallel 32` it holds 6,146 MiB.
+
 **Carried from the E2B rig, not re-measured here:** flash attention, f16 KV
-over q8_0, thread count. **Not measured:** concurrency.
+over q8_0, thread count.
 
 ## Inherited and still true here
 

@@ -127,12 +127,21 @@ Google's weights, same speed (151.1 against 150.1 tok/s), same acceptance, GSM8K
 BFCL level with each other and with no drafter at `--parallel 8`, 40 MiB less VRAM.
 `make draft` now downloads it from Hugging Face instead of converting.
 
+**The drafter costs nothing in answer quality as the rig serves** (`-c 131072 --parallel 1`,
+one request at a time, `benchmarks/runs/2026-10-14-accuracy-fullctx-3050oem/`): GSM8K 0.8969
+with it against 0.9014 without, BFCL 0.9250 against 0.9225, every difference within range of
+zero and of the `--parallel 8` runs; GSM8K finishes 1.76x faster with it. **Turning the prompt
+cache off changes no score** (`benchmarks/runs/2026-10-14-accuracy-cache-3050oem/`), so
+accuracy runs at the server default stand. **With several users at once the drafter's gain
+shrinks**: 1.29–1.53x at 8 requests, level at 32–64 (0.95–1.10x), time to first token at most
+2.4% slower (`benchmarks/runs/2026-10-14-concurrency-drafter-3050oem/`, on an easy-to-guess
+repeated-paragraph prompt, so the sizes read high).
+
 **Answer quality against E4B**: see `local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-10-13-quality-e2b-vs-e4b-3050oem/`.
 This build scored suite 0.683 (E2B bf16 on TPU: 0.683), GSM8K 0.898 (bf16: 0.910),
 BFCL 0.925 (bf16: 0.927). E4B is +4.8 suite and +3.5 GSM8K points, level on BFCL.
 
-**Not measured:** a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, speculative decoding,
-and a CPU-only arm here.
+**Not measured:** a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, and a CPU-only arm here.
 
 ## Inherited and still true here
 
