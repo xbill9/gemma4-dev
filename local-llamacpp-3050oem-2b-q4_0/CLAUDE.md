@@ -132,10 +132,12 @@ one request at a time, `benchmarks/runs/2026-10-14-accuracy-fullctx-3050oem/`): 
 with it against 0.9014 without, BFCL 0.9250 against 0.9225, every difference within range of
 zero and of the `--parallel 8` runs; GSM8K finishes 1.76x faster with it. **Turning the prompt
 cache off changes no score** (`benchmarks/runs/2026-10-14-accuracy-cache-3050oem/`), so
-accuracy runs at the server default stand. **With several users at once the drafter's gain
-shrinks**: 1.29–1.53x at 8 requests, level at 32–64 (0.95–1.10x), time to first token at most
-2.4% slower (`benchmarks/runs/2026-10-14-concurrency-drafter-3050oem/`, on an easy-to-guess
-repeated-paragraph prompt, so the sizes read high).
+accuracy runs at the server default stand. **With several users at once the drafter
+pays clearly only for one request at a time** on mixed chat prompts
+(`benchmarks/runs/2026-10-15-concurrency-mixed-3050oem/`): 0.92–1.17x at 2–8 requests, 0.79–0.87x
+at 32–64, time to first token 6–48% lower with it. **Multi-request runs need `-kvu`** on this
+build: with per-slot KV caches decode speed halved at random, and a shared cache gave 1.2–1.6x
+more output at 16–64 requests; the concurrency runs above used per-slot caches.
 
 **Answer quality against E4B**: see `local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-10-13-quality-e2b-vs-e4b-3050oem/`.
 This build scored suite 0.683 (E2B bf16 on TPU: 0.683), GSM8K 0.898 (bf16: 0.910),

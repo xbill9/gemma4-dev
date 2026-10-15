@@ -61,10 +61,13 @@ so the gap is the model's.
 match undrafted ones word for word on 1,200 of 1,319 GSM8K problems and all 400 BFCL questions.
 Prompt cache off changes no score (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-cache-3050oem/`).
 
-**Concurrency** (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-concurrency-drafter-3050oem/`): the drafter gains 1.40–1.77x
-at 8 requests and 1.09–1.16x at 32, on an easy-to-guess repeated-paragraph prompt, so the sizes
-read high. **E4B with the drafter does not fit 64 slots at `-c 65536`** in 8 GiB (without it:
-7,798 MiB); at `-c 32768 --parallel 32` it holds 6,146 MiB.
+**Concurrency on mixed chat prompts** (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-mixed-3050oem/`, `-kvu`):
+the drafter gains 1.61–1.72x for one request, 1.08–1.24x at 2–8, and loses at 32–64 (0.79–0.92x).
+Without it output reaches 472 tok/s at 64 requests. Both arms fit 64 slots at `-c 32768`
+(6,068 / 6,372 MiB); with the drafter `-c 65536 --parallel 64` does not fit
+(`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-concurrency-drafter-3050oem/`). **Use `-kvu` for multi-request runs**: per-slot
+KV caches halved decode speed at random on this build, and the shared cache gave 1.5–1.9x more
+output at 16–64 requests.
 
 **Carried from the E2B rig, not re-measured here:** flash attention, f16 KV
 over q8_0, thread count.
