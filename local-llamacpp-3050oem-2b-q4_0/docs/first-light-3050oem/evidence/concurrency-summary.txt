@@ -1,0 +1,29 @@
+## in512-out128  prompt_mode=unique
+c | agg tok/s | spread% | min-max | TTFT ms | TPOT ms | per-stream | ok/req | out tokens
+1 | 93.28 (1.00x) | 0.4 | 93.2-93.6 | 213 | 9.34 | 107.03 | 1/1 | 128
+2 | 156.85 (1.68x) | 0.9 | 156.2-157.5 | 357 | 10.27 | 97.35 | 2/2 | 256
+4 | 196.09 (2.10x) | 1.4 | 195.2-197.9 | 669 | 15.64 | 63.95 | 4/4 | 512
+8 | 224.18 (2.40x) | 21.5 | 186.5-226.6 | 1373 | 25.64 | 38.99 | 8/8 | 1024
+16 | 316.07 (3.39x) | 25.6 | 253.2-318.1 | 2702 | 30.12 | 33.20 | 16/16 | 2048
+32 | 344.98 (3.70x) | 14.7 | 304.2-348.9 | 5348 | 51.71 | 19.34 | 32/32 | 4096
+64 | 358.05 (3.84x) | 0.9 | 357.4-360.5 | 8516 | 113.20 | 8.84 | 64/64 | 8192
+llamacpp:prompt_tokens_total delta 328193.0
+llamacpp:tokens_predicted_total delta 81412.0
+llamacpp:prompt_tokens_cached_total delta 0.0
+TTFT ratio per doubling: [1.68, 1.88, 2.05, 1.97, 1.98, 1.59]
+
+## in128-out512  prompt_mode=unique
+c | agg tok/s | spread% | min-max | TTFT ms | TPOT ms | per-stream | ok/req | out tokens
+1 | 104.74 (1.00x) | 0.2 | 104.6-104.9 | 135 | 9.34 | 107.02 | 1/1 | 440
+2 | 189.18 (1.81x) | 1.7 | 186.4-189.5 | 194 | 10.23 | 97.77 | 2/2 | 879
+4 | 259.73 (2.48x) | 0.7 | 258.4-260.2 | 330 | 14.74 | 67.83 | 4/4 | 1761
+8 | 310.25 (2.96x) | 4.3 | 298.7-311.7 | 607 | 24.56 | 40.71 | 8/8 | 3525
+16 | 505.42 (4.83x) | 0.7 | 502.3-506.0 | 1114 | 29.32 | 34.10 | 16/16 | 7033
+32 | 586.41 (5.60x) | 0.8 | 582.8-587.6 | 2127 | 49.98 | 20.01 | 32/32 | 14069
+64 | 618.12 (5.90x) | 1.1 | 614.1-621.0 | 3890 | 95.33 | 10.49 | 64/64 | 28130
+llamacpp:prompt_tokens_total delta 97961.0
+llamacpp:tokens_predicted_total delta 279578.0
+llamacpp:prompt_tokens_cached_total delta 0.0
+TTFT ratio per doubling: [1.44, 1.7, 1.84, 1.84, 1.91, 1.83]
+
+gpu samples 822 max temp 68 C; SM clock while >50% util min/median 1890 1890 MHz; max power 110.93 W; max mem 2637 MiB

@@ -1,0 +1,294 @@
+{
+  "schema_version": "1.1",
+  "run": {
+    "id": "2026-08-30-first-serve-g4dn",
+    "date": "2026-08-30",
+    "operator": "gpu-vllm-g4dn-2b",
+    "source": "benchmarking_suite.py on-instance via SSM against 127.0.0.1:8000",
+    "notes": "First measurement ever taken on this rig. Harness ported into the rig for this run; the eleven inherited copies elsewhere in the tree post to /v1/completions, which is empty on -it checkpoints."
+  },
+  "hardware": {
+    "accelerator": "nvidia-t4",
+    "chips": 1,
+    "topology": "1x T4 (Turing, SM 7.5)",
+    "hbm_gb_per_chip": 16,
+    "machine_type": "g4dn.xlarge",
+    "host": {
+      "cloud": "aws",
+      "zone": "us-east-1c",
+      "provisioning": "spot",
+      "instance_name": "i-050dca2ed568dcc1b"
+    },
+    "pricing": {
+      "currency": "USD",
+      "rate_per_chip_hour": 0.3559,
+      "source": "aws ec2 describe-spot-price-history, g4dn.xlarge Linux/UNIX us-east-1c, 2026-08-30T19:00Z"
+    },
+    "host_cpu": "x86_64 Intel, 4 vCPU, 16 GiB RAM (g4dn.xlarge)"
+  },
+  "model": {
+    "id": "google/gemma-4-E2B-it",
+    "family": "gemma-4",
+    "weights_dtype": "float16",
+    "quantization": "none",
+    "kv_cache_dtype": "auto",
+    "max_model_len": 16384,
+    "architecture_notes": "Heterogeneous head_dim: 28 sliding_attention layers at 256, 7 full_attention at 512. That heterogeneity is why vLLM forces TRITON_ATTN (FA4 unavailable), and the 512-wide global prefill tile is what overruns Turing's 64 KiB shared-memory limit. Checkpoint ships bf16; Turing has no bf16 datapath, so vLLM converts to float16 once at load."
+  },
+  "software": {
+    "engine": "vllm",
+    "version": "0.28.0",
+    "container_image": "vllm-openai:v0.28.0-sm75-patched (derived from vllm/vllm-openai:v0.28.0, linux/amd64 sha256:2286e8533ca8)",
+    "backend": "cuda; TRITON_ATTN (vLLM forces it for Gemma 4's heterogeneous head_dim)",
+    "tensor_parallel_size": 1,
+    "serve_args": [
+      "serve",
+      "--model",
+      "google/gemma-4-E2B-it",
+      "--host",
+      "0.0.0.0",
+      "--port",
+      "8000",
+      "--dtype",
+      "float16",
+      "--kv-cache-dtype",
+      "auto",
+      "--tensor-parallel-size",
+      "1",
+      "--gpu-memory-utilization",
+      "0.90",
+      "--max-model-len",
+      "16384",
+      "--max-num-seqs",
+      "8"
+    ],
+    "runtime_versions": "torch 2.13.0+cu130, CUDA 13.0, NVIDIA driver 595.91.07, python 3.14.4 (client) / 3.12 (image)"
+  },
+  "throughput": {
+    "workload": {
+      "tool": "benchmarking_suite.py (stdlib, streaming chat/completions)",
+      "dataset": "synthetic filler sized with vLLM /tokenize",
+      "output_len": 128,
+      "runs_per_point": 1
+    },
+    "sweep": [
+      {
+        "concurrency": 1,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 0.3309,
+        "output_tok_per_s": 42.36,
+        "total_tok_per_s": 211.78,
+        "per_stream_tok_per_s": 42.77,
+        "ttft_ms": {
+          "mean": 53.18,
+          "median": 53.309,
+          "p90": 53.659,
+          "p99": 53.659
+        },
+        "tpot_ms": {
+          "mean": 23.375,
+          "median": 23.38,
+          "p90": 23.396,
+          "p99": 23.396
+        },
+        "itl_ms": {
+          "mean": 23.374,
+          "median": 23.366,
+          "p90": 23.674,
+          "p99": 24.069
+        },
+        "raw": {
+          "requests_attempted": 4,
+          "requests_ok": 4,
+          "requests_failed": 0,
+          "wall_s": 12.088,
+          "output_tokens_total": 512,
+          "sample_completion": "This is a **description of a data collection process** for performance metrics.\n\nHere's a breakdown of what the text tells us:\n\n* **What is being measured:** Throughput and latency.\n* **What is being measured for:** Each configuration under test.\n* **How the measurements are gathered:** Measurements are repeated and aggregated across requests.\n\n**In simpler terms, the system is systematically meas",
+          "errors": []
+        }
+      },
+      {
+        "concurrency": 4,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.1,
+        "output_tok_per_s": 140.8,
+        "total_tok_per_s": 704.02,
+        "per_stream_tok_per_s": 35.88,
+        "ttft_ms": {
+          "mean": 92.689,
+          "median": 95.12,
+          "p90": 105.893,
+          "p99": 106.591
+        },
+        "tpot_ms": {
+          "mean": 27.886,
+          "median": 27.869,
+          "p90": 28.049,
+          "p99": 28.05
+        },
+        "itl_ms": {
+          "mean": 27.883,
+          "median": 27.857,
+          "p90": 28.324,
+          "p99": 28.777
+        },
+        "raw": {
+          "requests_attempted": 16,
+          "requests_ok": 16,
+          "requests_failed": 0,
+          "wall_s": 14.545,
+          "output_tokens_total": 2048,
+          "sample_completion": "This is a **description of a data collection process** for performance metrics.\n\nHere's a breakdown of what the text tells us:\n\n* **What is being measured:** Throughput and latency.\n* **What is being measured for:** Each configuration under test.\n* **How the measurements are gathered:** Measurements are repeated and aggregated across requests.\n\n**In simpler terms, the system is systematically meas",
+          "errors": []
+        }
+      },
+      {
+        "concurrency": 8,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.8943,
+        "output_tok_per_s": 242.47,
+        "total_tok_per_s": 1212.35,
+        "per_stream_tok_per_s": 31.08,
+        "ttft_ms": {
+          "mean": 129.207,
+          "median": 129.503,
+          "p90": 155.045,
+          "p99": 159.057
+        },
+        "tpot_ms": {
+          "mean": 32.192,
+          "median": 32.177,
+          "p90": 32.308,
+          "p99": 32.505
+        },
+        "itl_ms": {
+          "mean": 32.189,
+          "median": 32.095,
+          "p90": 32.728,
+          "p99": 33.477
+        },
+        "raw": {
+          "requests_attempted": 32,
+          "requests_ok": 32,
+          "requests_failed": 0,
+          "wall_s": 16.893,
+          "output_tokens_total": 4096,
+          "sample_completion": "This is a **description of a data collection process** for performance metrics.\n\nHere's a breakdown of what the text tells us:\n\n* **What is being measured:** Throughput and latency.\n* **What is being measured for:** Each configuration under test.\n* **How the measurements are gathered:** Measurements are repeated and aggregated across requests.\n\n**In simpler terms, the system is systematically meas",
+          "errors": []
+        }
+      },
+      {
+        "concurrency": 16,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.9057,
+        "output_tok_per_s": 243.93,
+        "total_tok_per_s": 1219.64,
+        "per_stream_tok_per_s": 31.1,
+        "ttft_ms": {
+          "mean": 3781.631,
+          "median": 4304.379,
+          "p90": 4327.488,
+          "p99": 4329.368
+        },
+        "tpot_ms": {
+          "mean": 32.186,
+          "median": 32.154,
+          "p90": 32.429,
+          "p99": 32.474
+        },
+        "itl_ms": {
+          "mean": 32.182,
+          "median": 32.142,
+          "p90": 32.754,
+          "p99": 33.561
+        },
+        "raw": {
+          "requests_attempted": 64,
+          "requests_ok": 64,
+          "requests_failed": 0,
+          "wall_s": 33.584,
+          "output_tokens_total": 8192,
+          "sample_completion": "This is a **description of a data collection process** for performance metrics.\n\nHere's a breakdown of what the text tells us:\n\n* **What is being measured:** Throughput and latency.\n* **What is being measured for:** Each configuration under test.\n* **How the measurements are gathered:** Measurements are repeated and aggregated across requests.\n\n**In simpler terms, the system is systematically meas",
+          "errors": []
+        }
+      },
+      {
+        "concurrency": 32,
+        "input_len": 512,
+        "output_len": 128,
+        "status": "ok",
+        "request_rate_rps": 1.8959,
+        "output_tok_per_s": 242.67,
+        "total_tok_per_s": 1213.36,
+        "per_stream_tok_per_s": 30.87,
+        "ttft_ms": {
+          "mean": 11177.583,
+          "median": 12748.775,
+          "p90": 12764.356,
+          "p99": 12811.282
+        },
+        "tpot_ms": {
+          "mean": 32.389,
+          "median": 32.394,
+          "p90": 32.562,
+          "p99": 32.615
+        },
+        "itl_ms": {
+          "mean": 32.387,
+          "median": 32.202,
+          "p90": 32.869,
+          "p99": 34.179
+        },
+        "raw": {
+          "requests_attempted": 128,
+          "requests_ok": 128,
+          "requests_failed": 0,
+          "wall_s": 67.515,
+          "output_tokens_total": 16384,
+          "sample_completion": "This is a **description of a data collection process** for performance metrics.\n\nHere's a breakdown of what the text tells us:\n\n* **What is being measured:** Throughput and latency.\n* **What is being measured for:** Each configuration under test.\n* **How the measurements are gathered:** Measurements are repeated and aggregated across requests.\n\n**In simpler terms, the system is systematically meas",
+          "errors": []
+        }
+      }
+    ]
+  },
+  "issues": [],
+  "notes": [
+    "Peak measured output throughput: 243.93 tok/s.",
+    "COMPARISON IS NOT CONTROLLED. The g5g baseline (2026-08-14-rust-frontend-g5g, Py-1) ran vLLM 0.27.2rc1.dev0 built from source on g5g.4xlarge (16 vCPU, on-demand) under `vllm bench serve` with --dataset-name random. This ran vLLM 0.28.0 from the published amd64 image on g4dn.xlarge (4 vCPU, spot) under this rig's own harness with English filler sized via /tokenize. Engine version, harness, host size and prompt content all differ. The GPUs do not: both SM 7.5, both 15360 MiB, both 5001 MHz memory clock, and both report GPU KV cache of exactly 329,579 tokens.",
+    "Because decode is GPU-bandwidth-bound and the two GPUs are spec-identical, a 42-48% throughput gap CANNOT be attributed to the host CPU -- the CPU is not the bottleneck at these rates. Engine version is the leading candidate. Do not report this as an Intel-vs-Arm result without a matched-version run."
+  ],
+  "startup": {
+    "time_to_healthy_s": 346,
+    "engine_init_s": 150.9,
+    "compile_s": 82.39,
+    "notes": "cloud-init INSTALL_COMPLETE at +195s (pull 155s, patch 176s, build 178s, verified-in-image 193s); engine init 150.90s of which 82.39s compilation; weights download 30.03s; checkpoint load 23.33s."
+  },
+  "memory": {
+    "usable_hbm_gib": 15.0,
+    "weights_gib": 9.8,
+    "notes": "nvidia-smi reports 15360 MiB. Model loading took 9.8 GiB. GPU KV cache 329,579 tokens; max concurrency 20.12x at 16,384 tokens/request -- identical to the g5g baseline's 329,579, confirming matched engine config."
+  },
+  "cost": {
+    "per_m_output_tokens": [
+      {
+        "operating_point": "saturation (c=8)",
+        "output_tok_per_s": 242.47,
+        "usd": 0.4077
+      },
+      {
+        "operating_point": "single-stream (c=1)",
+        "output_tok_per_s": 42.36,
+        "usd": 2.3338
+      }
+    ],
+    "notes": "Spot $0.3559/hr, g4dn.xlarge us-east-1c, verified via describe-spot-price-history at the time of the run. At on-demand $0.526/hr the saturation figure is $0.6026/M. Compute only -- excludes EBS and data transfer."
+  }
+}

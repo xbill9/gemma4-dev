@@ -1,0 +1,26 @@
+3050 c=1 128/512: 104.74 tok/s at 80.11 W -> 0.212 kWh/M, $0.039/M electricity
+3050 c=64 128/512: 618.12 tok/s at 110.93 W -> 0.050 kWh/M, $0.009/M electricity
+3050 c=64 512/128: 358.05 tok/s at 110.93 W -> 0.086 kWh/M, $0.016/M electricity
+3050 c=8 512/128: 224.18 tok/s at 110.93 W -> 0.137 kWh/M, $0.025/M electricity
+break-even card vs g4dn on-demand: 342 h = 14.3 days
+break-even card vs g4dn spot: 506 h = 21.1 days
+break-even card vs v5e-1 spot: 311 h = 13.0 days
+electricity per hour at peak: $0.0202
+g4dn c=1 cost per M on-demand: $3.449; c=8 $0.603
+v5e-1 c=1 spot per M: $1.338; c=64 $0.116
+3050 / g4dn c=1 512/128: 2.20x; c=8: 0.92x
+3050 c=1 128/512 vs v5e-1 c=1 ctx128: 0.87x; peak 618.12 vs 1382: 0.45x
+i7-10750H v2 tg128 -t6 mean: 18.84
+3050 tg128 116.14 / cpu 18.84 = 6.2x
+3050 tg / 1650Ti tg (81.59-81.92 mean 81.75): 1.42x
+3050 / sdm850 4 gold: 23.2x; / sc7180p 2 gold 13.9x
+tok/s per W single stream: 3050 1.45; 1650Ti 76.14..77.14 at 40.43 W -> 1.88..1.91
+E4B/E2B tg: 0.521; E4B VRAM 6430/8192 = 78%; E2B 3610/8192 = 44%
+1650Ti E4B tg ~39.8 vs 3050 E4B 60.41: 1.52x
+VRAM headroom at 131k: E2B 4582 MiB free; E4B 1762 MiB free
+1650 Ti KL divergence Google GGUF / exact v2: 0.054264 / 0.001680 = 32x
+flash attention off vs on: prompt 0.883x, generate 0.934x
+1650 Ti tg / 3050 tg: 0.70x
+i7-10750H tg / 3050 tg: 0.16x
+SC7180P tg / 3050 tg: 0.07x
+SDM850 tg / 3050 tg: 0.04x

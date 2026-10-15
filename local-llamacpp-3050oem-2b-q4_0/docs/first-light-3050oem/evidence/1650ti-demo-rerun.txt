@@ -1,0 +1,54 @@
+# Demo steps re-run 2026-10-02T11:05:23-04:00 on yoga9i, server already up
+$ gpu status
+{"status":"ok"}  <- healthy
+gpu: device=gpu · pid=7978 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server
+[wall 0.13 s]
+
+$ gpu arm
+device=gpu · pid=7978 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server
+[wall 0.11 s]
+
+$ ask What is the capital of Australia? One sentence.
+The capital of Australia is Canberra.
+[wall 0.38 s]
+
+$ git -C ~/gemma4-dev log --oneline -12 | ask summarize what this project has been working on, in 3 bullets
+Here is a 3-bullet summary of what this project has been working on:
+
+* **Article Refinement and Content Updates:** Significant effort has been dedicated to rewriting, retitling, and restructuring articles related to v5e QAT builds, specifically focusing on explaining what repacked QAT builds do and detailing the specific builds (like Q4\_0 GGUF repack) and hardware configurations (like QAT Gemma 4 on TPU v5e) involved.
+* **Benchmark and Index Maintenance:** The project has been actively working on updating and regenerating various benchmarks, indices, and documentation files (like `ROLLUP.md`, `INDEX.md`, and `INDEX.md` for local-llamacpp) to ensure the information is current and accurate.
+* **Resource and Environment Configuration:** The work also involves managing and referencing specific hardware/software configurations, such as syncing benchmarks for GPU setups (vllm-g4dn) and handling project-specific parameters like passing `--project` flags for HF tokens.
+[wall 4.26 s]
+
+$ nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+pid, process_name, used_gpu_memory [MiB]
+7978, /home/xbill/llama.cpp/build/bin/llama-server, 1488 MiB
+[wall 0.01 s]
+
+$ nvidia-smi --query-gpu=name,memory.used,memory.total,power.draw,temperature.gpu --format=csv
+name, memory.used [MiB], memory.total [MiB], power.draw [W], temperature.gpu
+NVIDIA GeForce GTX 1650 Ti with Max-Q Design, 1493 MiB, 4096 MiB, 40.43 W, 47
+[wall 0.02 s]
+
+$ ask -T -q Which is larger, 9.11 or 9.9? Explain.
+**9.9 is larger than 9.11.**
+
+Here is the explanation based on comparing the place values:
+
+1. **Whole Numbers:** Both numbers have a whole number part of **9**.
+2. **Tenths Place:**
+   * In 9.**1**1, the digit in the tenths place is **1**.
+   * In 9.**9**, the digit in the tenths place is **9**.
+3. **Comparison:** Since 9 is greater than 1, the number 9.9 is larger than 9.11.
+
+***
+
+**Alternatively, you can think of it this way:**
+
+You can add a zero to the end of 9.9 so both numbers have the same number of decimal places for a direct comparison:
+* 9.11
+* 9.90
+
+Comparing 9.11 and 9.90, the tenths digit (1) in 9.11 is smaller than the tenths digit (9) in 9.90.
+[wall 9.36 s]
+
