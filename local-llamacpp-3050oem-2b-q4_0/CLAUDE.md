@@ -116,7 +116,8 @@ drafter, converted to Q8_0 GGUF by `make draft`, run as `--spec-type draft-mtp
 code), 1.36x sampled; 3/4/6 drafted tokens are worse and 6 is a net loss. Costs
 230 MiB and 3.6% of prompt speed. **Greedy output differs from serving without
 it** (each arm deterministic; they part at a near-tie word), so any benchmark
-or reference comparison that needs byte-identical greedy text must empty
+or reference comparison that needs byte-identical greedy text must send `cache_prompt: false`
+(the prompt cache changes greedy text too, `benchmarks/runs/2026-10-14-drafter-divergence-3050oem/`) and empty
 `SPEC_DRAFT_MODEL` first. The first-light, concurrency and context runs above
 were measured without the drafter.
 

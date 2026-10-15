@@ -22,8 +22,8 @@ E2B (`local-llamacpp-3050oem-2b-q4_0`) and E4B (`local-llamacpp-3050oem-4b-q4_0`
    (1.65x against 1.71x). The TPU result does not carry over.
 
 **No serving change.** Both rigs keep the exact Q4_0 QAT drafter at 2 tokens. E2B at 1 token is
-the setting to use when greedy output must match serving without a drafter, at `-c 8192`; at the
-serving `-c 131072` that match no longer held (see "Greedy text at `-c 131072`").
+the setting to use when greedy output must match serving without a drafter, for short prompts;
+with long text ahead of the question the match no longer held (see "Greedy text at `-c 131072`").
 
 ## Method
 
@@ -112,5 +112,6 @@ question is not asked at 0):
 
 Replies identical to no drafter, of 14 per arm (`summary.txt`): E2B q4x-n1 2, q4x-n2 1, nq-n2 1;
 E4B q4x-n1 13, q4x-n2 4, nq-n2 4. At `-c 8192` (speed arms) E2B at 1 token and every E4B arm
-matched 18 of 18. Cause not investigated; the long-context servers differ in `-c` and in having
-the prompt cache on.
+matched 18 of 18. **Cause found in `2026-10-14-drafter-divergence-3050oem`: prompt length**, not
+`-c`; the speed arms' prompts were ~25 tokens. The prompt cache also changes greedy text on its own,
+with or without a drafter.

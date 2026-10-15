@@ -41,7 +41,8 @@ Host, build and toolchain notes are the sister rig's; read its `CLAUDE.md`.
   The table above was measured with the Q8_0 drafter.
 - **Drafting:** 2 tokens is best overall (1.54x story .. 2.21x code); 3 is
   level and best on code; 4 is worse. **Greedy output at 2 and 3 drafted
-  tokens is byte-identical to no drafting** (18 of 18), unlike E2B; at 4 it
+  tokens is byte-identical to no drafting** (18 of 18, ~25-token prompts; with 2k+ tokens of text ahead
+  it differs, `local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-divergence-3050oem`), unlike E2B; at 4 it
   differs. Costs 232 MiB and 3.3% of prompt speed.
 - **Per-layer table on the card:** prefill 1.023x / 1.014x (pp512 / pp2048),
   decode level, 1,492 MiB. Adopted.

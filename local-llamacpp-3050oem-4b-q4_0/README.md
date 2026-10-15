@@ -7,7 +7,7 @@ Google's E4B drafter for speculative decoding.
 
 **Status 2026-10-13: serving.** About **100 tok/s** generation with the drafter
 (58 without), 2,246 t/s prompt reading, full 131,072-token context, **6,662 MiB of
-an 8,192 MiB card**. Greedy output with the drafter matches greedy output without it.
+an 8,192 MiB card**. Greedy output with the drafter matches greedy output without it for short prompts; with long text ahead it differs.
 
 | | |
 | --- | --- |
