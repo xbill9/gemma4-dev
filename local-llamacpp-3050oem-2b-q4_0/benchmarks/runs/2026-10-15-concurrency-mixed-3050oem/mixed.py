@@ -16,10 +16,13 @@ PROMPTS = [
     "Summarize the causes of the French Revolution in one paragraph.",
 ]
 SEED = itertools.count(1)
+THINK = False   # --thinking: chat_template_kwargs enable_thinking, as sweep.py sends
 
 def one(base, model, prompt, mode):
     body = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 256,
             "cache_prompt": False, "stream": True, "stream_options": {"include_usage": True}}
+    if THINK:
+        body["chat_template_kwargs"] = {"enable_thinking": True}
     body.update({"temperature": 0} if mode == "greedy" else {"temperature": 0.8, "seed": next(SEED)})
     req = urllib.request.Request(base + "/v1/chat/completions", json.dumps(body).encode(),
                                  {"Content-Type": "application/json"})
@@ -30,7 +33,8 @@ def one(base, model, prompt, mode):
             if not line.startswith("data:") or line == "data: [DONE]":
                 continue
             ch = json.loads(line[5:])
-            if ttft is None and any((c.get("delta") or {}).get("content") for c in ch.get("choices", [])):
+            if ttft is None and any((c.get("delta") or {}).get("content") or (c.get("delta") or {}).get("reasoning_content")
+                                    for c in ch.get("choices", [])):
                 ttft = time.perf_counter() - t0
             if ch.get("timings"):
                 timings = ch["timings"]
@@ -46,7 +50,10 @@ def main():
     ap.add_argument("--levels", default="1,2,4,8,16,32,64")
     ap.add_argument("--repeats", type=int, default=5)
     ap.add_argument("--mode", choices=("greedy", "sampled"), required=True)
+    ap.add_argument("--thinking", action="store_true")
     a = ap.parse_args()
+    global THINK
+    THINK = a.thinking
     one(a.base, a.model, PROMPTS[0], a.mode)                      # warm-up, not recorded
     with open(a.out, "a") as out:
         for c in map(int, a.levels.split(",")):
@@ -56,7 +63,7 @@ def main():
                 with concurrent.futures.ThreadPoolExecutor(max_workers=c) as pool:
                     runs = list(pool.map(lambda p: one(a.base, a.model, p, a.mode), prompts))
                 wall = time.perf_counter() - t0
-                rec = {"mode": a.mode, "c": c, "rep": r, "wall_s": round(wall, 3), "runs": runs}
+                rec = {"mode": a.mode, "thinking": THINK, "c": c, "rep": r, "wall_s": round(wall, 3), "runs": runs}
                 out.write(json.dumps(rec) + "\n"); out.flush()
                 tok = sum(x["n"] for x in runs)
                 print(a.mode, c, r, round(tok / wall, 1), flush=True)
