@@ -1,5 +1,5 @@
 ---
-title: "Inference Engineering: One Model on Every Platform, and What Each One Trades"
+title: "Inference Engineering with Gemma4"
 published: false
 description: "A step by step tour of serving Gemma 4 on Hugging Face, Google Cloud, Cloud TPU, Colab, AWS, Azure, AMD and local hardware, built around one trade-off: what you give up for fewer bits, and where the chip, the engine and the batch decide whether it pays."
 tags: ai, machinelearning, gemma, cloud
