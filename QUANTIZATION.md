@@ -706,6 +706,12 @@ against the same target with no drafter:
   fastest single stream measured on this chip is `w8a8` with the `-it-assistant` drafter, 395 tok/s.
 - **The QAT drafter is slower than no drafter on every target**, at every concurrency.
 - **The drafter cannot pair with the int4-table builds**: it copies the target's bf16 `embed_tokens`.
+- **llama.cpp does not reproduce the drafter gap.** On an RTX 3050 (llama.cpp `77c4540ce`, `--spec-type draft-mtp`,
+  QAT Q4_0 targets, 2026-10-14) Google's non-QAT `-it-assistant` drafter is level with or behind the QAT drafter:
+  E2B 1.34x against 1.40x at 2 drafted tokens with lower acceptance (0.433 against 0.475), E4B 1.73x against 1.72x;
+  the QAT drafter speeds both up (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-3050oem`).
+  So the drafters' weights alone do not explain the v5e table above; vLLM's MTP path or the TPU side is the
+  difference. Which one is untested.
 
 ## The QAT checkpoint formats themselves
 
