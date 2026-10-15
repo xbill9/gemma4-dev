@@ -99,8 +99,9 @@ question is not asked at 0):
 | 120,000 | 30 | 1.41x | **1.55x** | 1.48x |
 
 - By question at 120k, q4x 2 tokens: code 1.86x, summary 1.57x, story 1.23x.
-- E4B keeps more of its gain than E2B (1.55x against 1.21x at 120k): its own step costs about twice
-  E2B's, so the drafter's share of each step is smaller.
+- E4B keeps more of its gain than E2B (1.55x against 1.21x at 120k). A likely reason, not measured:
+  E4B's own step costs about twice E2B's (29.5 against 56.2 tok/s at 120k), so the drafter's share
+  of each step is smaller.
 - VRAM after the last request: 6463 MiB without a drafter, 6667 with q4x, 6705 with nq.
 - **Interrupted once.** `run.sh` and `longctx.py` stopped at 19:56 after the no-drafter arm,
   with no END line, and an E4B server came up on port 8080 at 19:57:14 from outside the run.
