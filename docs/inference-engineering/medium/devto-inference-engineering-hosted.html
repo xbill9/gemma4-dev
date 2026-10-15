@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Inference Engineering with Gemma4</title>
+  <meta name="description" content="A step by step tour of serving Gemma 4 on Hugging Face, Google Cloud, Cloud TPU, Colab, AWS, Azure, AMD and local hardware, built around one trade-off: what you give up for fewer bits, and where the chip, the engine and the batch decide whether it pays." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step tour of inference engineering
+across every platform I have served Gemma 4 on: Hugging Face as the
+distribution layer, Google Cloud's managed and GPU paths, Cloud TPU,
+Colab, AWS from Bedrock to Trainium, Azure, an AMD Instinct MI300X, and
+local hardware from an 8 GB RTX 3050 down to a Snapdragon laptop. Each
+platform gets its own section first. A compare and contrast closes the
+article.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-cover.f243064d.jpg" alt="Inference Engineering with Gemma4" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<hr />
+<h4 id="what-is-inference-engineering">What Is Inference
+Engineering?</h4>
+<p>Training produces a set of weights. Inference engineering is
+everything between those weights and a token arriving at a user: which
+format the weights are stored in, which chip reads them, which engine
+schedules the work, how many requests share a batch, and what all of it
+costs per hour and per token.</p>
+<p>The same small model, Gemma 4 E2B, decoded at 36 tokens a second on
+one AWS chip and 132 on another on the same day. Hourly prices do not
+explain the gap. Four properties do: how many bits each weight takes,
+how fast the chip can read them, how well the serving engine uses the
+chip, and how many requests are served together.</p>
+<hr />
+<h4 id="the-trade-off-precision-what-you-trade">The Trade-Off:
+Precision, What You Trade</h4>
+<p>This is the slide the rest of the article keeps coming back to. It
+comes from my AWS Community Builders talk, "Inference on AWS", and it
+holds on every platform below.</p>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/aws-inference-strands/main/docs/slides/precision.1ac3aeaa.png"
+alt="Three panels for Gemma 4 E2B: weights in memory per format, suite accuracy per format, and which formats the L4, T4G and Neuron multiply natively" /></p>
+<p>Every format below stores the same Gemma 4 E2B:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-1.png"
+alt="Table: Format, E2B weights in memory, Suite accuracy, 3,880 records" /></p>
+<p>The slide makes three claims, and each one is a column of the
+trade:</p>
+<ul>
+<li><strong>Memory.</strong> Fewer bits per weight means less memory,
+less disk and less data to move for every token. E2B's embedding tables
+are most of its weight, so packing them to int4 takes the model from
+6.32 GiB to 2.85 GiB.</li>
+<li><strong>Quality.</strong> Formats built from Google's
+quantization-aware-trained (QAT) checkpoint stay within half a point of
+bf16. An int8 build rounded from bf16 loses 1.3 points.</li>
+<li><strong>Native math.</strong> A smaller format is faster only where
+the chip multiplies it natively. Everywhere else the weights are widened
+back to 16 bits before the multiply, and the win is bandwidth
+alone.</li>
+</ul>
+<p>The third column changes with every chip in this article:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-2.png"
+alt="Table: Chip, bf16, fp8, int8, int4" /></p>
+<p>Memory, quality and native math are the precision trade. Bandwidth,
+the engine and the batch decide how much of it reaches a served token,
+and the platform sections below measure each one.</p>
+<hr />
+<h4 id="which-platforms">Which Platforms?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-3.png"
+alt="Table: Platform, What serves the model, Sections" /></p>
+<p>The model is Gemma 4 E2B unless a section says otherwise. The larger
+sizes, E4B, 12B, 26B-A4B and 31B, appear where a platform serves
+them.</p>
+<hr />
+<h4 id="step-1--hugging-face-the-layer-every-platform-pulls-from">Step 1
+— Hugging Face: The Layer Every Platform Pulls From</h4>
+<p>Every self-hosted platform in this article starts with a download
+from Hugging Face. I use it as the registry and distribution layer: none
+of the serving here runs on Hugging Face's own Inference Endpoints,
+Spaces or Inference Providers.</p>
+<p>What gets published under <code>xbill9</code> is the precision trade
+made concrete. Google ships QAT checkpoints whose weights already sit on
+a 4-bit grid. Google's own <code>-w4a16-ct</code> export re-rounds them
+with a step of max/7.5, which matches the trained step in 0.0% of groups
+and adds a flat 6.67% error. A repack that keeps the trained grid scores
+higher:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-4.png"
+alt="Table: Model, Google -w4a16-ct, Grid-preserving repack" /></p>
+<p>The same work on llama.cpp's format gives an exact Q4_0 E2B GGUF of
+2,640,154,592 bytes against Google's 3,349,516,256, with mean KL
+divergence from the QAT model falling from 0.054303 to 0.001753 and the
+same top token rising from 87.18% to 98.06%.</p>
+<p>Three properties of the Hub decide time to ready on every other
+platform:</p>
+<ul>
+<li><strong>Exports carry quirks.</strong> Google's QAT exports omit
+<code>k_proj</code>, <code>v_proj</code> and <code>k_norm</code> for the
+20 KV-shared layers, and every <code>-w4a16-ct</code> ships an
+<code>lm_head</code> byte-identical to <code>embed_tokens</code>,
+805,306,368 bytes on E2B.</li>
+<li><strong>Pull time is part of start-up.</strong> The 62 GB Gemma 4
+31B checkpoint moved one rig's boot budget from 20 minutes to 90.
+Restoring the same files from an in-region Cloud Storage cache took 337
+s.</li>
+<li><strong>Library versions are part of the contract.</strong>
+transformers 5.15 made Gemma 4's <code>head_dim</code> per layer, which
+breaks older vLLM builds, and EmbeddingGemma 2 needs transformers
+5.19.</li>
+</ul>
+<p>The rigs pin both the revision and the SHA-256 of the file. The
+<code>draft</code> target in each local rig's Makefile fetches the
+drafter at a pinned revision and checks its hash:</p>
+<pre class="make"><code>draft:
+    @mkdir -p $(dir $(SPEC_DRAFT_MODEL))
+    @echo &quot;$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)&quot; | sha256sum -c --quiet - 2&gt;/dev/null || \
+      curl -fL -o $(SPEC_DRAFT_MODEL).part https://huggingface.co/$(SPEC_DRAFT_HF)/resolve/$(SPEC_DRAFT_HF_REVISION)/$(notdir $(SPEC_DRAFT_MODEL))
+    @test ! -f $(SPEC_DRAFT_MODEL).part || mv $(SPEC_DRAFT_MODEL).part $(SPEC_DRAFT_MODEL)
+    echo &quot;$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)&quot; | sha256sum -c -</code></pre>
+<p>A later card-only commit to the repository cannot change the bytes a
+rig serves.</p>
+<hr />
+<h4 id="mag_right-tip-pin-the-digest-not-the-tag">🔎 Tip: Pin the
+Digest, Not the Tag</h4>
+<p>The moving <code>vllm/vllm-tpu:nightly</code> tag of 2026-10-02
+failed at load on every Google QAT export, because it expects the
+KV-shared layers' tensors on every layer. The pinned digest with a small
+patch serves the same checkpoint at 200.9 tok/s. On AMD the newest
+vendor image cannot parse Gemma 4's config at all. Pin images by digest,
+pin weights by hash, and check a new image before switching to it.</p>
+<hr />
+<h4 id="step-2--google-cloud-managed-apis-and-l4-gpus">Step 2 — Google
+Cloud: Managed APIs and L4 GPUs</h4>
+<p>Google Cloud sells the model six ways short of a TPU. Every L4 path
+below served the same int4 E2B repack on vLLM 0.30.0, and the TPU row is
+in Step 3. Prices are Billing Catalog list prices fetched on
+2026-10-12:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-5.png"
+alt="Table: Path, What you run, tok/s, one request, $/hr, $ per 1M output tokens" /></p>
+<p>Timed on the server, the three L4s decode within 2.3% of each other:
+141.9 tok/s on Cloud Run, 139.9 on GKE and 143.1 on Compute Engine. The
+spread in the client column is the path each request takes.</p>
+<p>Time to ready varies far more than speed:</p>
+<ul>
+<li><strong>Compute Engine</strong>: 9.6 minutes from create to
+serving.</li>
+<li><strong>Cloud Run</strong>: 6.6 minutes to deploy. A cold start took
+361.8 s and 483.2 s with default settings, about 116 to 119 s of it in
+torch.compile. A warm Cloud Storage compile cache brought a start to
+240.1 s at 138.6 tok/s. <code>--enforce-eager</code> starts in about 202
+to 222 s and decodes at 17.2 to 17.8 tok/s.</li>
+<li><strong>GKE Autopilot</strong>: 8.8 minutes for the cluster and 7.7
+for the Deployment.</li>
+<li><strong>Vertex AI endpoint</strong>: 18.9 minutes for the first
+model upload and 24.4 to deploy it.</li>
+</ul>
+<p>Batching changes the cost per token more than the platform does:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-6.png"
+alt="Table: Path, 1 request, 4, 16, $ per 1M at 16" /></p>
+<p>A Compute Engine L4 running all month costs $568. Gemini Flash-Lite
+charges the same for 86 output tokens a second around the clock, with no
+input tokens.</p>
+<p>The gotchas were all specific to a path. Cloud Run ships NVIDIA
+driver 580, which needs <code>VLLM_ENABLE_CUDA_COMPATIBILITY=0</code>. A
+Vertex shared endpoint has a 60 s timeout and no streaming, so the agent
+runs with <code>stream=False</code>. MaaS answered one benchmark request
+in five with a 429.</p>
+<p>The precision trade shows most clearly on a Compute Engine T4, one
+Turing generation older than the L4, at 512 tokens in and 128 out:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-7.png"
+alt="Table: E2B build on one T4, Weights, KV cache, tokens, tok/s, 1 request, tok/s, 8" /></p>
+<p>The T4 has no bf16 and no int4 math. The repack wins on bandwidth
+alone: fewer bytes per token, and the memory it frees becomes KV cache.
+Gemma 4's 512-wide attention heads need 98,304 bytes of shared memory in
+vLLM's Triton kernel against Turing's 65,536, so every Turing rig
+carries a patch that halves the tile size.</p>
+<hr />
+<h4 id="mag_right-tip-quota-is-permission-to-ask">🔎 Tip: Quota Is
+Permission to Ask</h4>
+<p>Quota does not reserve a machine. The project holds quota for 16 L4s
+in every US region, and Compute Engine still reported
+<code>STOCKOUT</code> across five US regions before an L4 launched in
+<code>northamerica-northeast1-b</code>. On the same day a TPU v6e was
+refused in every zone the project can use. A launch script that tries
+every zone, then the next region, is what makes a demo day work.</p>
+<hr />
+<h4 id="step-3--cloud-tpu-where-int8-is-the-only-low-precision-win">Step
+3 — Cloud TPU: Where int8 Is the Only Low-Precision Win</h4>
+<p>Google's TPUs come in a scale-out "e" line and a scale-up "p" line.
+The two efficiency chips here:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-8.png"
+alt="Table: Spec, v5e, v6e (Trillium)" /></p>
+<p>On v5e and v6e, int8 is the only low-precision format with a compute
+win: both quote int8 at exactly twice their bf16 peak. fp8 and int4 save
+memory and bandwidth and are widened to bf16 before the multiply. TPU7x
+(Ironwood) is the first with fp8 in the matrix unit, so these
+conclusions do not carry forward to it.</p>
+<p>That shapes the precision trade on one v5e chip. Suite accuracy, then
+output tok/s at 1, 4 and 16 requests:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-9.png"
+alt="Table: E2B build on v5e-1, Suite, 1, 4, 16" /></p>
+<p>int8 from the QAT weights is both the most accurate and about 1.5x
+bf16. Upstream <code>tpu_inference</code> has no int8 W8A8 method on its
+JAX path, so these rigs serve a pinned image with patches that add int8
+W8A8, int4 embedding tables that stay packed on the device, and an int4
+<code>lm_head</code>. int4 tables need padding to 128 columns: unpadded
+builds ran at 85 to 110 tok/s against 150 to 243 padded.</p>
+<p>The largest model served on one v5e chip is the 12B, as int8 W8A8
+with int4 tables: 11.31 GiB of weights, 57.0 / 215.7 / 713.4 tok/s at 1
+/ 4 / 16 requests, and 9,728 tokens of KV cache. An fp8 KV cache doubles
+that pool to 18,944 tokens for −0.7 suite points. On E2B with an older
+image the same flag gave exactly 1.000x the capacity, so a benchmark
+reads the KV allocation from the boot log.</p>
+<p><strong>Scale out by replicas when the model has one KV
+head.</strong> E2B has a single KV head, so tensor parallelism leaves
+attention unsplit: its attention kernel cost 803, 839 and 831 ms at TP
+1, 2 and 4. On a v5e-4, four one-chip engines
+(<code>--data-parallel-size 4</code>) produced 1.39x the output of TP=4
+at 16 requests and 3.36x at 256.</p>
+<p><strong>Attention cost follows <code>--max-model-len</code>.</strong>
+At 16 requests on one chip, output went from 1,387 tok/s at a 16,384
+limit to 2,744 at 2,048.</p>
+<p>How the chip is provisioned matters as much as the chip:</p>
+<ul>
+<li><strong>The Cloud TPU API is frozen</strong> and TPU7x onward is
+Compute Engine or GKE only. v5e has no way off the TPU API: Compute
+Engine lists <code>ct5lp-hightpu-1t</code> and refuses to create
+it.</li>
+<li><strong>Serving is identical on both control planes.</strong> A
+v6e-1 got exactly 1,151,744 KV tokens through each.</li>
+<li><strong>Flex-start is narrow.</strong> v5e-1 flex-start is accepted
+only in <code>us-west4-a</code>, where it got a node in 0.4 minutes on
+2026-10-12 and was ready 13.3 minutes later, 390.96 s of it XLA
+compilation.</li>
+<li><strong>GKE adds its own minutes.</strong> A v6e-1 on GKE took about
+28 minutes from nothing to the first token and served 199 / 1,180 /
+1,508 tok/s at 1 / 8 / 32 requests.</li>
+</ul>
+<p>A one-chip v5e at the $0.60 flex-start rate served one request at
+$1.58 per million output tokens and 16 at $0.138, the cheapest
+self-hosted figure in the Google Cloud run.</p>
+<hr />
+<h4 id="step-4--google-colab-a-tpu-in-a-notebook">Step 4 — Google Colab:
+A TPU in a Notebook</h4>
+<p>Colab is the cheapest way onto a TPU. This account is eligible for a
+TPU v5e-1 and a T4, and is refused a v6e-1:</p>
+<pre><code>&quot;eligibleGpus&quot;:[&quot;T4&quot;],&quot;ineligibleGpus&quot;:[&quot;H100&quot;,&quot;G4&quot;,&quot;A100&quot;,&quot;L4&quot;],&quot;eligibleTpus&quot;:[&quot;V5E1&quot;],&quot;ineligibleTpus&quot;:[&quot;V6E1&quot;]</code></pre>
+<p>The runtime reports <code>JAX 0.7.2</code>,
+<code>1 device(s): TPU v5 lite</code> and
+<code>HBM 16.91 GB   host RAM 50.5 GB</code>. Notebooks are generated
+from <code>py:percent</code> sources and run headless with
+<code>google-colab-cli</code>, which wraps Colab's own assign,
+keep-alive and unassign calls.</p>
+<p>The notebook compares three builds of E2B in a pure-JAX engine:
+Google's bf16 QAT checkpoint, Google's 4-bit export, and the
+grid-preserving repack from Step 1.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-10.png"
+alt="Table: Build, Disk, Decode tok/s, Mean KL from QAT, Same top token, Greedy tokens equal to QAT" /></p>
+<p>The repack is 342.6x closer to the trained model at the same speed.
+On this engine the bf16 checkpoint is faster than both 4-bit builds,
+because the engine widens int4 to bf16 at every step: the precision
+trade with no native math under it. vLLM on a v5e-1 serves the two 4-bit
+builds at 136.6 and 136.5 tok/s, so the ratio between builds carries
+across engines and the absolute speed does not.</p>
+<p>Two properties of the runtime shape every notebook. Host RAM is the
+limit before HBM: downloading 26 GB inside the kernel crashed the 50.5
+GB VM, and moving downloads to a child process fixed it. And
+<code>colab new</code> must never be retried after a timeout, because a
+timed-out request can still assign a runtime that keeps billing compute
+units.</p>
+<hr />
+<h4 id="step-5--aws-bedrock-sagemaker-and-ec2-gpus">Step 5 — AWS:
+Bedrock, SageMaker and EC2 GPUs</h4>
+<p>AWS sells the model as an API, as a managed endpoint and as GPUs by
+the hour. One rehearsal on 2026-10-12 timed every path with the same
+100-token prompt:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-11.png"
+alt="Table: Backend, What serves the model, tok/s, one request, $/hr, $ per 1M output tokens" /></p>
+<p><strong>Bedrock</strong> needs an IAM permission and an inference
+profile id, and bills per token: $0.035 per million input tokens and
+$0.14 per million output for Nova Micro. At temperature 0 it returned 9
+different completions in 10 repeats, where every self-hosted backend
+returned one.</p>
+<p><strong>SageMaker</strong> runs the same vLLM container on the same
+L4 as the g6, behind three API calls: <code>create-model</code>,
+<code>create-endpoint-config</code> and <code>create-endpoint</code>.
+vLLM flags go in as <code>SM_VLLM_*</code> variables. It reached
+<code>InService</code> in about 8 to 9 minutes and adds about 0.24 s to
+each request. The repack decodes at 108.0 tok/s on it against 45.2 for
+the stock checkpoint, 2.39x, which is the precision trade on an L4 where
+int4 is widened.</p>
+<p><strong>EC2 g6</strong> was the fastest instance and the cheapest per
+token. Batching cut its cost 14x:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-12.png"
+alt="Table: Requests in parallel, g6 tok/s, g6 $ per 1M, SageMaker tok/s, SageMaker $ per 1M" /></p>
+<p>A g6 running all month costs more than Nova Micro until it averages
+710 output tokens a second around the clock, at five input tokens per
+output token.</p>
+<p><strong>EC2 g5g</strong> pairs a Graviton2 Arm host with an NVIDIA
+T4G. The arm64 vLLM image ships without Turing kernels, so it runs vLLM
+built from source for sm_75 with the shared-memory patch from Step 2. It
+took 23.7 minutes from launch to ready, most of it reading 9.54 GiB of
+weights with 11.19 GiB of free RAM. The same chip ran three engines on
+the same checkpoint:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-13.png"
+alt="Table: Engine on g5g, one request, Decode tok/s, Cold boot, Change-to-retest cycle" /></p>
+<p>vLLM is 3.18x PyTorch for one request, and 100.28 tok/s at eight
+against PyTorch's 10.08. The engine is the biggest lever on this chip,
+and the slowest engine to iterate on.</p>
+<p><strong>EC2 g4dn</strong>, a T4, served the stock checkpoint at 42.36
+tok/s for one request and plateaued at 243.93 from 16.</p>
+<hr />
+<h4 id="mag_right-tip-debug-with-the-small-model">🔎 Tip: Debug With the
+Small Model</h4>
+<p>Every path in this article was brought up with E2B first. Flags, port
+forwards, tool parsing and drivers fail the same way at any size, and
+E2B fails faster: it is ready on Trainium in 121.2 s against 220.1 s for
+the 26B.</p>
+<hr />
+<h4 id="step-6--aws-neuron-inferentia2-and-trainium">Step 6 — AWS
+Neuron: Inferentia2 and Trainium</h4>
+<p>AWS's own chips have the bandwidth and lack the software for this
+model. The Neuron rows run a hand-ported Gemma 4 image, the same digest
+on both chips:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-14.png"
+alt="Table: Backend, tok/s, one request, $/hr, $ per 1M output tokens" /></p>
+<p>AWS's per-instance figures put Inferentia2 at about 817 GB/s per chip
+and Trainium at about 613, 2.0 to 2.7 times the L4's 300. They decode at
+0.28 times the L4's speed. The reasons are all in the serving stack:</p>
+<ul>
+<li><strong>No vLLM release serves Gemma 4 on Inf2 or Trn1.</strong> The
+newest vLLM-Neuron plugin supports Trn2 and Trn3 only, and Trn1 and Inf2
+stop at vLLM 0.16, whose transformers has no <code>gemma4</code> model
+type. The hand port ignores tool definitions.</li>
+<li><strong>Everything compiles ahead of time for fixed shapes.</strong>
+The image is built for 512 tokens in total and 128 of prompt. A new
+shape costs about 3.9 s to compile.</li>
+<li><strong>Memory is per core.</strong> The 32 GB is two 16 GiB pools,
+one per NeuronCore. A single gather above roughly 4 to 5 GB returns
+zeros with no error, and the server then answers 200 with no
+tokens.</li>
+<li><strong>int4 is widened.</strong> int4 weights get a dense bf16 copy
+before each multiply, 27 times slower per call than plain bf16.</li>
+<li><strong>The host needs swap.</strong> E2B peaks at 19.53 GB of host
+memory, more than the 16 GiB on an inf2.xlarge.</li>
+</ul>
+<p>Capacity was the other constraint. inf2 returned
+<code>InsufficientInstanceCapacity</code> in us-east-2a with 80 vCPUs of
+quota free, and on one run it was refused in five zones across two
+regions before launching in us-west-2a.</p>
+<hr />
+<h4 id="step-7--microsoft-azure-foundry-and-no-l4--or-t4-class-gpu">Step
+7 — Microsoft Azure: Foundry, and No L4- or T4-Class GPU</h4>
+<p>Azure's limit was quota, before capacity was ever asked. The
+subscription holds no quota in the T4 or A100 VM families, and Container
+Apps refused a serverless T4 outright:</p>
+<pre><code>ContainerAppInvalidScaleExceedsQuota … maxium quota value of &#39;0&#39; for &#39;ManagedEnvironmentConsumptionT4Gpus&#39;</code></pre>
+<p><strong>Foundry</strong> is the Azure path that matches the rest of
+this article. It serves <code>gpt-4.1-nano</code> and
+<code>Phi-4-mini</code> as deployments on an existing account, reached
+through the OpenAI v1 endpoint:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-15.png"
+alt="Table: Model, tok/s, one request, $ per 1M output tokens, Notes" /></p>
+<p><strong>The only GPU VM the subscription can rent is an A10, and it
+belongs to a different class.</strong> The NVadsA10 v5 family holds 36
+vCPUs of quota in eastus, and <code>Standard_NV36ads_A10_v5</code> is
+the only size with a whole A10: the smaller sizes get a sixth, a third
+or half of the GPU. A whole A10 therefore comes as a 36-vCPU, 440 GB
+machine at $3.20 an hour, against $0.8048 for the L4 in an EC2
+g6.xlarge. It has no L4- or T4-class equivalent on Azure here, so its
+numbers stay in this section and out of the comparisons below.</p>
+<p>What the A10 run shows is operational. The GPU is vGPU-backed, so it
+needs NVIDIA's GRID driver; the datacenter driver does not bind. The QAT
+checkpoint without int4 tables ran out of memory at
+<code>--gpu-memory-utilization 0.90</code>, where the 2.86 GiB int4
+repack loaded in 22.46 s. Deleting the VM leaves its NIC, public IP and
+disk behind, so the teardown script deletes them by name.</p>
+<hr />
+<h4 id="step-8--amd-one-instinct-mi300x">Step 8 — AMD: One Instinct
+MI300X</h4>
+<p>AMD Developer Cloud rents one MI300X as a DigitalOcean GPU droplet at
+$1.99 an hour: 191.7 GiB of HBM3, 304 compute units, a 64-wide
+wavefront, and 3.76 TB/s of measured bandwidth. It is the first chip
+here where fp8 is a compute format, at twice the bf16 peak.</p>
+<p>The platform has its own operations surface:</p>
+<ul>
+<li><strong>The console orders the card; the API cannot.</strong>
+<code>POST /v2/droplets</code> with the devcloud size returns
+<code>422: This size is unavailable</code>.</li>
+<li><strong>A powered-off droplet keeps billing.</strong> Only
+destroying it stops the meter.</li>
+<li><strong>A fresh droplet needs firmware.</strong> <code>amdgpu</code>
+does not bind until <code>firmware-amd-graphics</code> is installed and
+the droplet rebooted, and <code>/dev/kfd</code> appears either way.
+<code>rocminfo</code> reporting a gfx agent is the reliable check.</li>
+</ul>
+<p><strong>Newer images are not safer.</strong> Gemma 4's sliding layers
+have 256-wide heads and its full-attention layers 512, and transformers
+5.15 raises on a global <code>head_dim</code> read:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-16.png"
+alt="Table: Image, vLLM, transformers, Gemma 4" /></p>
+<p>No ROCm image ships vLLM's audio extras, so audio is unreachable on
+this card.</p>
+<p><strong>Memory is never the limit.</strong> E2B's KV pool is
+9,026,017 tokens, and the heaviest benchmark cell, 64 requests at 8,192
+tokens of context, uses 5.8% of it. Long context flattens on prefill, so
+total throughput at 64 requests matched 16. At 128 tokens of context and
+64 requests it produced 10,293.6 output tok/s, $0.054 per million.</p>
+<p>The data-type sweep asked whether the precision trade pays on a card
+where everything fits. Output relative to bf16 across nine cells per
+size:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-17.png"
+alt="Table: Size, bf16 tok/s, one request, fp8 vs bf16, fp8 cells faster, int4 W4A16 vs bf16" /></p>
+<p><strong>fp8 overtakes bf16 from 12B up</strong>, where the weights
+are large enough for the fp8 matrix cores to matter. <strong>int4 lost
+everywhere.</strong> The only ROCm W4A16 kernel for this card widens to
+bf16 before every multiply. A preregistration predicted the 31B int4
+repack would cut time per output token by 1.5x to 3x. It measured 91.88
+ms against bf16's 17.19.</p>
+<p>Two more AMD results follow the same rule, that an accepted setting
+is not a faster kernel:</p>
+<ul>
+<li><strong><code>VLLM_ROCM_USE_AITER=1</code> made the 12B fp8 slower
+in all nine cells</strong>, 0.974x to 0.994x. Attention stays on Triton
+for Gemma 4's mixed head sizes, and the fp8 matrix multiplies moved to
+AITER kernels that logged 924 "not found tuned config" lines.</li>
+<li><strong><code>vllm bench serve</code> seeds every prompt at 0 by
+default</strong>, and prefix caching is on. At 8,192 tokens of context
+that measured the cache: 2.25x the throughput of unique prompts.</li>
+</ul>
+<p>The card also served EmbeddingGemma 2 at 828.7 requests a second for
+128-token inputs, and beside the 12B fp8 generator on the same card.</p>
+<hr />
+<h4 id="mag_right-tip-give-every-benchmark-cell-a-unique-prompt-seed">🔎
+Tip: Give Every Benchmark Cell a Unique Prompt Seed</h4>
+<p>A prefix cache that sees the same prompt twice answers it from
+memory. On the MI300X a default seed inflated long-context throughput
+2.25x, and on a GTX 1650 Ti the llama.cpp prompt cache answered 656 of
+661 tokens in a sweep. Seed every cell differently, or turn the cache
+off for the run.</p>
+<hr />
+<h4 id="step-9--local-gpus-a-laptop-1650-ti-and-an-8-gb-rtx-3050">Step 9
+— Local GPUs: A Laptop 1650 Ti and an 8 GB RTX 3050</h4>
+<p>Local inference runs llama.cpp on the exact Q4_0 GGUF from Step 1.
+The two cards bracket a generation:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-18.png"
+alt="Table: Card, E2B decode tok/s, E2B prefill tok/s, VRAM used" /></p>
+<p>The 3050 decodes about 1.42x faster and prefills 11x faster, and the
+prefill gap decides concurrency. llama.cpp prefills one request at a
+time on both cards. On the 1650 Ti that serial prefill fills the time,
+so 512-token prompts scale only 1.47x with more users. On the 3050 it is
+fast enough for decode batching to show:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-19.png"
+alt="Table: RTX 3050, E2B, 1 user, 64 users, Gain" /></p>
+<p><strong>Speculative decoding</strong> is the local trade that pays
+most. Google's QAT assistant drafters guess the next tokens and the full
+model checks them in one pass:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-20.png"
+alt="Table: Card and model, No drafter, With drafter, Draft length" /></p>
+<p>The drafter's precision costs nothing. An exact Q4_0 drafter of 59.2
+MB accepts the same 0.475 of drafted tokens as the 170.2 MB bf16 one,
+and runs at 151.1 tok/s against Q8_0's 150.1. The gain shrinks with
+context, E2B from 1.51x with nothing ahead of the question to 1.21x at
+120k tokens, while acceptance barely moves: verification gets more
+expensive, the guesses do not get worse.</p>
+<p>Greedy text with a drafter can differ from greedy text without one,
+and the cause is prompt length: E4B matched with no text ahead and
+differed from about 2,048 tokens of prompt on. The prompt cache changes
+greedy text by itself. A benchmark that needs byte-identical output
+turns off both.</p>
+<p>On quality, E4B beats E2B on the 3,880-record suite, 0.730 against
+0.683, and on GSM8K, 0.933 against 0.898. Each build matches its TPU
+reference, so the gap is the model and the quantization costs nothing
+measurable.</p>
+<hr />
+<h4 id="step-10--cpus-and-arm-laptops">Step 10 — CPUs and Arm
+Laptops</h4>
+<p>The CPU is where the bandwidth half of the trade is most visible. On
+an i7-10750H, llama.cpp serves E2B at 16.5 to 18.9 tok/s end to end.
+PyTorch with transformers serves bf16 at 4.85. vLLM's CPU backend cannot
+serve at all on that host: the w4a16 build needs 10.46 GB against 9.25
+GB available. On the same laptop the 1650 Ti decodes 4.37x faster than
+the CPU.</p>
+<p>Arm laptops add a fourth variable, the instruction set:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-21.png"
+alt="Table: Laptop, Cores used, E2B decode tok/s, Prefill tok/s, Note" /></p>
+<p>The 7c Gen 2 has the Arm dot-product instructions, so llama.cpp
+repacks Q4_0 for them and two cores outrun the Snapdragon 850's four.
+The repack costs 1.44 GB of memory against 192 MB on the 850, on a
+laptop with 3.4 GiB, so memory is that host's ceiling. On both
+Snapdragons decode wants only the fast cores and prefill wants all of
+them.</p>
+<hr />
+<h4 id="step-11--cross-cloud-one-agent-one-grader">Step 11 —
+Cross-Cloud: One Agent, One Grader</h4>
+<p>The cloud sections share a method. Three repositories, one per cloud,
+use the same Strands agent, prompts and grader, and a fourth loads them
+all into one agent. Every GPU row serves the same int4 repack with
+vLLM's Gemma 4 tool parser.</p>
+<p>The agent asks how many of eleven ids are 10 or more and has a
+<code>count_ids</code> tool that computes it. The grader checks the
+number and the filter sent, because a wrong filter returns an exact
+number with a clean source:</p>
+<pre><code>backend          engine  filter  med s    rows  filters sent
+aws.g6            20/20   20/20    0.4   20/20  id &gt;= 10
+gcp.cloudrun      20/20   20/20   0.52   20/20  id &gt;= 10
+gcp.tpu           20/20   20/20   1.65   20/20  id &gt;= 10
+gcp.maas          19/20   19/20   13.0    0/20  id &gt;= 10
+azure.foundry     20/20   20/20   3.19   19/20  id &gt;= 10</code></pre>
+<p>With the engine counting, every backend except MaaS was right 20
+times in 20 with the right filter. When the model counted the rows
+itself, MaaS was right 0 times in 20. Counting belongs in code, and the
+grade belongs on the filter.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p>One request at a time, the same 100-token prompt, list prices on the
+day:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-22.png"
+alt="Table: Backend, Hardware, tok/s, $ per 1M output tokens" /></p>
+<p>How each platform answers the precision trade:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/inference-engineering/medium/img/devto-inference-engineering-table-23.png"
+alt="Table: Platform, Native low-precision compute, What paid, Biggest trap" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>Start with a per-token API when one of its models does the job:
+Bedrock's Nova Micro was the cheapest per token in this article and
+costs nothing idle. Move to vLLM on an L4 for your own weights, on
+whichever cloud has capacity that day, and quantize from a QAT
+checkpoint so the smaller format keeps its accuracy. On Cloud TPU, serve
+int8 W8A8 and scale E2B with replicas. On an MI300X, serve bf16 below
+12B and fp8 from 12B up. Neuron pays off once the serving stack supports
+the model. Locally, an 8 GB RTX 3050 with an exact Q4_0 model and
+drafter serves one user at over 100 tokens a second.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to cover inference engineering across
+every platform I have served Gemma 4 on, with each platform in depth
+before comparing them. The key to the solution was one trade-off applied
+everywhere: what fewer bits save in memory, what they cost in quality,
+and whether the chip multiplies them natively. The results were:</p>
+<ul>
+<li>🟢 <strong>Formats built from QAT weights keep their
+accuracy</strong>: int8 at 0.686 against bf16's 0.683, and the
+grid-preserving int4 repack 342.6x closer to the trained model than
+Google's 4-bit export.</li>
+<li>🟢 <strong>Fewer bits pay through bandwidth even with no native
+math</strong>: 2.39x on a SageMaker L4 and 2.30x on a T4 for the int4
+repack.</li>
+<li>🟢 <strong>Native math pays where it exists</strong>: int8 at about
+1.5x bf16 on a TPU v5e, fp8 ahead of bf16 in every cell from 12B up on
+an MI300X.</li>
+<li>🟢 <strong>Batching cuts cost per token by an order of
+magnitude</strong>: $2.132 to $0.150 per million on an EC2 g6 from 1 to
+16 requests.</li>
+<li>⚠️ <strong>Bandwidth sets a ceiling the engine has to
+reach</strong>: Neuron has 2.0 to 2.7 times the L4's bandwidth and
+decodes at 0.28 times its speed.</li>
+<li>⚠️ <strong>Quota is permission to ask</strong>: Google Cloud, AWS
+and Azure each refused hardware on the day, in different ways.</li>
+<li>❌ <strong>int4 lost to bf16 on every MI300X cell</strong>, because
+the only ROCm kernel widens it before every multiply.</li>
+</ul>
+<p>Scope: each platform was measured on its own days between July and
+October 2026, mostly on Gemma 4 E2B. The cross-cloud tables come from
+2026-10-12, with AWS from 2026-10-05, and their per-token rows serve
+each cloud's own model, so those rows compare paths. vLLM versions
+differ between platforms (0.27 to 0.31, plus patched TPU and Turing
+builds and a hand-ported Neuron engine), local results come from
+llama.cpp builds at different commits, and Snapdragon and cross-card
+ratios are indicative. Accuracy figures come from one TPU v5e or one RTX
+3050 per build, and no accuracy benchmark ran on the MI300X. Prices are
+on-demand or flex-start list prices on the day each run was made.</p>
+<p>The strategy for engineering Gemma 4 inference across Hugging Face,
+Google Cloud, Cloud TPU, Colab, AWS, Azure, AMD and local hardware was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev |
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/aws-inference-strands">aws-inference-strands
+| GitHub</a></li>
+<li><a
+href="https://docs.google.com/presentation/d/1Ax8KGF8T0EYffshY7WfUM61QcHmLk0q72EE7G_hIwgM/edit">Inference
+on AWS slides | Google Slides</a></li>
+<li><a href="https://github.com/xbill9/gcp-inference">gcp-inference |
+GitHub</a></li>
+<li><a href="https://github.com/xbill9/azure-inference">azure-inference
+| GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/cross-cloud-inference">cross-cloud-inference
+| GitHub</a></li>
+<li><a href="https://github.com/xbill9/colab-jax">colab-jax |
+GitHub</a></li>
+<li><a href="https://github.com/vllm-project/vllm">vLLM |
+GitHub</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp |
+GitHub</a></li>
+<li><a href="https://github.com/strands-agents/sdk-python">Strands
+Agents | GitHub</a></li>
+<li><a href="https://cloud.google.com/tpu/docs/v6e">Cloud TPU v6e |
+Google Cloud</a></li>
+<li><a href="https://aws.amazon.com/ec2/instance-types/inf2/">Amazon EC2
+Inf2 instances | AWS</a></li>
+<li><a
+href="https://www.amd.com/en/products/accelerators/instinct/mi300/mi300x.html">AMD
+Instinct MI300X | AMD</a></li>
+<li><a href="https://www.nvidia.com/en-us/data-center/l4/">NVIDIA L4 |
+NVIDIA</a></li>
+</ul>
+</body>
+</html>
