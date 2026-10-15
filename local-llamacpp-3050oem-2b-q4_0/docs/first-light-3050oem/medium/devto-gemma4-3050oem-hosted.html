@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 on a Used 8 GB RTX 3050: 116 Tokens/s for One User, 618 for 64</title>
+  <meta name="description" content="Gemma 4 E2B and E4B on a used RTX 3050 OEM in an old desktop, step by step: single-user speed, the full 131k context, concurrency, answer quality, and how it compares on price with laptop GPUs, ARM laptops, a T4 and a TPU v5e." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step deployment guide for Gemma 4 E2B
+and E4B to a local, desktop hosted GPU enabled system: an RTX 3050 OEM
+with 8 GB, in a 2014-era Haswell-E desktop. A suite of Python MCP tools
+is built to simplify management of the llama.cpp hosted deployment.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-cover.c84e6ee4.jpg" alt="Gemma 4 on a Used 8 GB RTX 3050: 116 Tokens/s for One User, 618 for 64" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0</a></p>
+<p><strong>A used RTX 3050 OEM, listed at $179.97, serves Gemma 4 E2B at
+116 tokens per second for one user and 618 tokens per second across 64
+users, with the model's full 131,072-token context in 3.6 GB of its 8
+GB. Against an AWS T4 on demand, the card costs as much as 342 hours of
+rental.</strong></p>
+<hr />
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
+<p>Earlier rigs in this repository served Gemma 4 from rented TPUs and
+GPUs, and from hardware already on the desk: a 2021 laptop with a 4 GB
+GTX 1650 Ti, its CPU, and two Snapdragon ARM laptops. This rig asks what
+the cheapest dedicated card adds. The RTX 3050 OEM is an 8 GB Ampere
+card with tensor cores, and used ones were listed on eBay at about $145
+to $210 on 2026-10-14.</p>
+<p>The rig serves the same model file as the 1650 Ti rig, byte for byte,
+with the same server flags. The questions are single-user speed, how
+much context fits, how many users one card carries, whether the bigger
+E4B model is worth its cost, and what all of it costs against the
+alternatives.</p>
+<p>Speculative decoding with Google's drafter models is a separate
+article. Every figure here was measured without it.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An Nvidia GPU with 8 GB of memory. This one is an RTX 3050 OEM:
+GA106, compute capability 8.6, tensor cores, 120 W power limit.</li>
+<li>The CUDA toolkit (13.4 here) and <code>cmake</code>.</li>
+<li>About 7 GB of disk for both model files.</li>
+<li>A clone of <code>xbill9/gemma4-dev</code>.</li>
+</ul>
+<hr />
+<h4 id="the-hardware">The Hardware</h4>
+<pre class="text"><code>power.limit [W], clocks.max.sm [MHz], clocks.max.memory [MHz]
+120.00 W, 2100 MHz, 7001 MHz</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-1.png"
+alt="Table: GPU, Driver, CPU, Board / RAM" /></p>
+<p>The OEM 3050 came in prebuilt desktops and is a different
+configuration from the retail RTX 3050 8 GB. The host is a 2014-era X99
+board; with every layer on the card, the CPU barely matters.</p>
+<hr />
+<h4 id="step-1--build-llamacpp-for-the-card">Step 1 — Build llama.cpp
+for the Card</h4>
+<pre class="shell"><code>export PATH=/usr/local/cuda/bin:$PATH
+make build</code></pre>
+<p>The target runs <code>cmake</code> with <code>GGML_CUDA=ON</code>,
+<code>CMAKE_CUDA_ARCHITECTURES=86</code> and
+<code>GGML_NATIVE=ON</code>, then builds <code>llama-server</code> and
+<code>llama-bench</code>. It printed the commit, <code>77c4540ce</code>,
+which goes into <code>tpu.env</code> as <code>LLAMA_CPP_COMMIT</code>.
+The build took 10 minutes 24 seconds at <code>-j10</code>.</p>
+<hr />
+<h4 id="step-2--download-the-exact-qat-gguf">Step 2 — Download the Exact
+QAT GGUF</h4>
+<pre class="shell"><code>make download</code></pre>
+<p>The target downloads the file and checks it against
+<code>MODEL_SHA256</code> in <code>tpu.env</code>. The file is
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</code>, SHA-256
+<code>419db9a6bf3bc15d770c85ccf9216827aa88c64fe8f3d72fbe5674f48efe2dc8</code>.
+It is Google's quantization-aware-trained (QAT) Gemma 4 E2B with every
+trained 4-bit value packed into Q4_0 exactly. On the 1650 Ti it measured
+32x closer to bf16 by KL divergence than Google's own GGUF, and
+faster.</p>
+<hr />
+<h4 id="step-3--configure-the-server">Step 3 — Configure the Server</h4>
+<p><code>tpu.env</code> is the rig's configuration, and every value in
+it carries the measurement that set it:</p>
+<pre class="shell"><code>N_GPU_LAYERS=99
+CONTEXT_SIZE=131072
+KV_CACHE_TYPE=f16
+FLASH_ATTENTION=1
+THREADS=6
+PARALLEL_SLOTS=1
+REASONING=off
+OVERRIDE_TENSORS=per_layer_token_embd\.weight=CUDA0</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-2.png"
+alt="Table: Setting, Why" /></p>
+<hr />
+<h4 id="step-4--start-it-and-check-what-is-serving">Step 4 — Start It
+and Check What Is Serving</h4>
+<pre class="shell"><code>make serve
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+pid, process_name, used_gpu_memory [MiB]
+47321, /home/xbill/llama.cpp/build/bin/llama-server, 1510 MiB</code></pre>
+<p>That is the first-light configuration: 8,192 tokens of context and
+the per-layer table left in host memory. The MCP server's attestation
+reads the device from the running process, since a CPU-only build would
+answer on the same port:</p>
+<pre class="text"><code>device=gpu · pid=47321 · -ngl 99 · mapped: ggml-cuda, libcublas, libcuda, libcudart · /home/xbill/llama.cpp/build/bin/llama-server
+mismatch: None</code></pre>
+<p>One chat request at temperature 0, "In one sentence, what is a
+TPU?":</p>
+<pre class="text"><code>A TPU, or Tensor Processing Unit, is a specialized hardware accelerator designed to significantly speed up the training and inference of machine learning models, particularly those involving deep learning.</code></pre>
+<p>The server's own timings for that request: 34 tokens at 102.56 tokens
+per second.</p>
+<hr />
+<h4 id="step-5--measure-single-user-speed">Step 5 — Measure Single-User
+Speed</h4>
+<p><code>llama-bench</code>, a 512-token prompt and 128 generated
+tokens, five repetitions per cell, the card cooled to 40 °C before each
+cell:</p>
+<pre class="text"><code>fa1-f16-t6 pp512=3859.96±111.73 tg128=116.14±0.25 77c4540ce
+fa0-f16-t6 pp512=3408.19±110.65 tg128=108.46±0.22 77c4540ce
+fa1-q8-t6 pp512=3708.48±118.09 tg128=107.57±0.23 77c4540ce
+fa1-f16-t4 pp512=3838.78±111.16 tg128=115.87±0.22 77c4540ce
+fa1-f16-t6-rep pp512=3835.54±102.85 tg128=115.90±0.22 77c4540ce</code></pre>
+<p><strong>116.14 tokens per second generated, 3,860 tokens per second
+of prompt read.</strong> The repeated last cell lands within 0.6% of the
+first, and the card held 1890 to 1905 MHz without passing 44 °C.</p>
+<p>On the 1650 Ti the same file generates at about 81.7 tokens per
+second and reads prompts at about 345. That makes this card about 1.42x
+faster at generating and 11x faster at reading. Generating one token
+reads every weight once, so it follows memory speed, where the two cards
+are closer. Reading a prompt is matrix work, which this card runs on
+tensor cores and the 1650 Ti has none of.</p>
+<hr />
+<h4 id="step-6--keep-the-defaults-that-measure-faster">Step 6 — Keep the
+Defaults That Measure Faster</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-3.png"
+alt="Table: Setting, Prompt, Generate, Kept" /></p>
+<p>The KV cache for E2B is small, so quantizing it saves memory the card
+has plenty of and costs speed. Thread count makes no difference because
+the CPU does no model work.</p>
+<hr />
+<h4 id="step-7--move-the-per-layer-embedding-table-onto-the-card">Step 7
+— Move the Per-Layer Embedding Table onto the Card</h4>
+<p>The <code>E</code> in E2B is a per-layer embedding table,
+<code>per_layer_token_embd</code>, 1.32 GB and 51% of the file.
+llama.cpp leaves it memory-mapped in host RAM by default and reads one
+row per token. With 6 GB of the card unused, the rig moves it with
+<code>-ot</code>. Card against host, mean of two passes each, order
+host, card, card, host:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-4.png"
+alt="Table: test, host, card, card / host" /></p>
+<p>A 2.4 to 3.6% gain on prompts, nothing on generation, for 1,260 MiB.
+Both card passes beat both host passes at both prompt lengths. The 1650
+Ti measured no gain from the same move: this card reads prompts 11x
+faster, so fetching rows from host memory is a bigger share of its
+work.</p>
+<hr />
+<h4 id="step-8--serve-the-full-131k-context">Step 8 — Serve the Full
+131k Context</h4>
+<p>Gemma 4 E2B was trained to 131,072 tokens. Only its 3 full-attention
+layers keep a cache that grows with context; the 12 sliding-window
+layers stay at 1,024 cells.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-5.png"
+alt="Table: -c, KV, full-attention, KV, sliding, process on the card" /></p>
+<p>The full context costs 840 MiB over 8,192 and leaves 4.5 GB of the
+card free. Short chats do not notice: 256 generated tokens ran at 108.30
+tokens per second at 8,192 and 107.99 at 131,072.</p>
+<p>Long conversations do slow down, because every new token attends to
+everything before it:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-6.png"
+alt="Table: tokens already in the conversation, prompt t/s, generate tok/s, vs empty" /></p>
+<p>Generation stays over 100 tokens per second to about 8k tokens of
+conversation and halves by 120k.</p>
+<hr />
+<h4 id="step-9--serve-many-users-at-once">Step 9 — Serve Many Users at
+Once</h4>
+<p>For the concurrency sweep the server ran 64 slots of 1,024 tokens
+(<code>-c 65536 --parallel 64</code>), 2612 MiB on the card.
+<code>sweep.py</code> sent 1 to 64 simultaneous requests, each with a
+unique prompt, five repeats per level, median reported:</p>
+<pre class="text"><code>c=1      93.28 tok/s aggregate  TTFT    212.7 ms  TPOT   9.34 ms  per-stream 107.03
+c=4     196.09 tok/s aggregate  TTFT    669.1 ms  TPOT  15.64 ms  per-stream  63.95
+c=16    316.07 tok/s aggregate  TTFT   2702.4 ms  TPOT  30.12 ms  per-stream  33.20
+c=64    358.05 tok/s aggregate  TTFT   8516.4 ms  TPOT 113.20 ms  per-stream   8.84</code></pre>
+<p>That is 512 tokens in and 128 out. With 128 in and 512 out,
+chat-shaped traffic:</p>
+<pre class="text"><code>c=1     104.74 tok/s aggregate  TTFT    134.9 ms  TPOT   9.34 ms  per-stream 107.02
+c=4     259.73 tok/s aggregate  TTFT    330.3 ms  TPOT  14.74 ms  per-stream  67.83
+c=16    505.42 tok/s aggregate  TTFT   1114.3 ms  TPOT  29.32 ms  per-stream  34.10
+c=64    618.12 tok/s aggregate  TTFT   3890.0 ms  TPOT  95.33 ms  per-stream  10.49</code></pre>
+<p><strong>3.84x and 5.90x the single-user output at 64 users.</strong>
+Past 16 users the gain flattens while each user's speed keeps falling,
+so 16 is the practical ceiling: 34 tokens per second each, faster than
+anyone reads.</p>
+<p>llama.cpp still reads prompts one request at a time, so time to first
+token about doubles with each doubling of users. The 1650 Ti ran into
+that wall: at 512 in and 128 out its output reached only 1.47x
+single-user. This card reads prompts fast enough that batched generation
+shows through anyway.</p>
+<p>The card drew at most 110.93 W of its 120 W limit, held 1890 MHz in
+every busy sample and peaked at 68 °C. The server's prompt cache
+answered 0 tokens, so every prompt was read in full.</p>
+<hr />
+<h4 id="step-10--bring-up-e4b-on-the-same-card">Step 10 — Bring Up E4B
+on the Same Card</h4>
+<p><code>local-llamacpp-3050oem-4b-q4_0</code> is the E4B sister rig:
+same card, binary and flags, with the exact Q4_0 E4B file (SHA-256
+<code>5462cc10…</code>, 4.20 GB).</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-7.png"
+alt="Table: at 131,072 context, E2B, E4B" /></p>
+<p>E4B generates at 0.52x E2B at every conversation length and fits with
+1.7 GB to spare. The two rigs share port 8080 and do not fit on the card
+together. On the 1650 Ti, E4B fits at 8,192 context with the per-layer
+table in host memory and generates at about 39.8 tokens per second; this
+card runs it 1.52x faster with 16x the context.</p>
+<hr />
+<h4 id="step-11--measure-answer-quality">Step 11 — Measure Answer
+Quality</h4>
+<p>Both files served one at a time with identical flags, no drafter, and
+three task sets: a 13-subset classification suite (3,880 questions),
+GSM8K math (1,319 problems) and BFCL simple tool calling (400 records),
+all greedy.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-8.png"
+alt="Table: task, E2B, E4B, E4B − E2B, 95% range" /></p>
+<p>E4B is better at reading comprehension and math, and level on tool
+calling, where the range includes zero. Both 4-bit files score within
+the error ranges of their bf16 references measured on Cloud TPU: E2B
+suite 0.683 against bf16's 0.683, E4B suite level with its bf16 run. The
+quantization costs nothing measurable; the gap between the two is the
+model.</p>
+<p>The whole suite took 6.4 minutes for E2B and 11.2 for E4B on this
+card.</p>
+<hr />
+<h4 id="mag_right-tip-spend-the-spare-memory-on-context">🔎 Tip: Spend
+the Spare Memory on Context</h4>
+<p>On an 8 GB card E2B leaves more than half the memory free even at
+full context. Spend it on the 131k context and on the per-layer table,
+both measured gains or free. Quantizing the KV cache to
+<code>q8_0</code> saves memory the card does not need and costs 7.4% of
+generation.</p>
+<hr />
+<h4 id="mag_right-tip-size---parallel-against--c">🔎 Tip: Size
+<code>--parallel</code> Against <code>-c</code></h4>
+<p>llama.cpp splits <code>--ctx-size</code> across
+<code>--parallel</code> slots. <code>-c 131072 --parallel 16</code>
+gives each user 8,192 tokens; <code>-c 16384 --parallel 16</code> gives
+each 1,024. Set both together, from what each user needs.</p>
+<hr />
+<h4 id="compare-and-contrast-local-hardware">Compare and Contrast: Local
+Hardware</h4>
+<p>Gemma 4 E2B, the same exact Q4_0 file on every row except the last
+two, single user, <code>llama-bench</code> generation speed:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-9.png"
+alt="Table: Machine, Device, Generate tok/s, vs 3050" /></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-10.png"
+alt="Table: Capability, RTX 3050 OEM, GTX 1650 Ti" /></p>
+<hr />
+<h4 id="compare-and-contrast-cloud">Compare and Contrast: Cloud</h4>
+<p>The two cheapest cloud deployments of Gemma 4 E2B measured in this
+repository serve bf16 weights through vLLM: an AWS
+<code>g4dn.xlarge</code> with a T4, and one Google Cloud TPU v5e
+chip.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-11.png"
+alt="Table: Operating point, RTX 3050 OEM, T4, g4dn.xlarge, TPU v5e-1" /></p>
+<p>The one-user row compares like shapes for the 3050 and T4 (512 in,
+128 out); the TPU figure is 128 in, 128 out. The TPU is faster at every
+point and serves 2.2x the 3050's best aggregate. The 3050 generates 2.2x
+the T4's speed for one user and lands within 8% of it at 8 users.</p>
+<hr />
+<h4 id="and-priceperformance">And Price/Performance?</h4>
+<p>All of this is arithmetic from the measured speeds, the cloud rates
+recorded in those runs, a used-card listing captured on 2026-10-14, and
+the US Energy Information Administration's 2026 residential electricity
+forecast of 18.2 cents per kWh.</p>
+<p><strong>The card pays for itself in two to three weeks of continuous
+rental.</strong></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-12.png"
+alt="Table: Against, Rate, Hours to $179.97, Days" /></p>
+<p><strong>Running it costs about two cents an hour.</strong> At 110.93
+W, the most the card drew in any sample, electricity is $0.0202 per hour
+against $0.526 for the T4.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/first-light-3050oem/medium/img/devto-gemma4-3050oem-table-13.png"
+alt="Table: Per million output tokens, Cost" /></p>
+<p>The local rows leave out the card's purchase and the host it sits in;
+the cloud rows leave out storage and data transfer. A card already paid
+for wins by an order of magnitude on running cost. The TPU is the faster
+machine and the better buy only for a burst of work too big for one
+3050, or for anyone without a desktop to put the card in.</p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For a single person or a small team running Gemma 4 E2B or E4B all
+day, the used RTX 3050 OEM. It is the only local card here with tensor
+cores and 8 GB, and both together are what it takes: E4B at full context
+fits, prompts read at thousands of tokens per second, and 16 users each
+still get 34 tokens per second.</p>
+<p>The 1650 Ti laptop remains the right answer for one user who already
+owns it. The ARM laptops serve E2B, slowly. Rent the TPU for bursts of
+work.</p>
+<p>Between the two models, E4B buys 4.8 points on the classification
+suite and 3.5 on math for half the generation speed. For tool calling,
+E2B is level and twice as fast.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to bring Gemma 4 E2B and E4B up on a
+used RTX 3050 OEM and to measure what it delivers for the money against
+the other local and cloud deployments in this repository. The key to the
+solution was the exact Q4_0 QAT files, which leave enough of the 8 GB
+card free for the full context and for many users at once. The measured
+results were:</p>
+<ul>
+<li>🟢 <strong>116.14 tok/s generated and 3,860 t/s of prompt
+read</strong> for one user, E2B, 1.42x and 11x the 1650 Ti.</li>
+<li>🟢 <strong>The full 131,072-token context in 3610 MiB</strong> for
+E2B and 6430 MiB for E4B, with no cost to short chats.</li>
+<li>🟢 <strong>618.12 tok/s aggregate at 64 users</strong> (128 in / 512
+out) and 358.05 at 512 in / 128 out; 34 tok/s per user at 16.</li>
+<li>🟢 <strong>4-bit quality matches bf16</strong>: E2B suite 0.683
+against 0.683; E4B 0.730.</li>
+<li>🟢 <strong>Pays for itself in 311 to 506 hours</strong> against the
+cheapest cloud options, and runs for about $0.02 an hour in electricity
+(arithmetic).</li>
+<li>⚠️ <strong>E4B generates at 0.52x E2B</strong> for +4.8 suite and
++3.5 GSM8K points.</li>
+<li>⚠️ <strong>Long conversations halve generation speed</strong> by
+120k tokens of context.</li>
+<li>❌ <strong>A <code>q8_0</code> KV cache and flash attention off are
+both slower</strong> on this card.</li>
+</ul>
+<p>Scope: one RTX 3050 OEM in an i7-5820K desktop, llama.cpp
+<code>77c4540ce</code> with CUDA 13.4, measured 2026-10-13, without
+speculative decoding. The 1650 Ti, i7-10750H and Snapdragon figures come
+from other hosts, llama.cpp commits and days with the same model file;
+the T4 and TPU figures come from vLLM serving bf16 weights under a
+different benchmark tool; so every cross-machine ratio is indicative.
+The card price is one used listing's asking price on 2026-10-14, and the
+electricity figures use the highest power draw sampled or the
+single-user benchmark's end-of-run reading.</p>
+<p>The strategy for running Gemma 4 locally on a used RTX 3050 OEM was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0">local-llamacpp-3050oem-2b-q4_0
+| GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-4b-q4_0">local-llamacpp-3050oem-4b-q4_0
+| GitHub</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf">xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://www.eia.gov/outlooks/steo/report/elec_coal_renew.php">Short-Term
+Energy Outlook, electricity | U.S. EIA</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp |
+GitHub</a></li>
+</ul>
+</body>
+</html>
