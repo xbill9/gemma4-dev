@@ -7,6 +7,8 @@ Writes OUT_DIR/{E2B,E4B}/README.md, ORIGINAL_README.md (Google's card, from the 
 xbill9/gemma-4-E{2,4}B-it-qat-assistant-q4_0-exact-gguf. Every figure comes from the runs named
 below. Published 2026-10-14 (E2B 6188294, E4B a946809); 1650 Ti section added the same day
 (E2B 4090fee, E4B ae5013c) with huggingface_hub's create_commit of README.md and evidence/.
+2026-10-15: GTX 1650 Ti on llama.cpp 77c4540ce added (T1650B; E2B 1376f92, E4B b50bcac). ORIGINAL_README.md is copied only
+where the ~/models/hf snapshot exists; it is already on the Hub and unchanged.
 """
 import sys
 import json, os, shutil
@@ -19,6 +21,17 @@ T1650 = {
              vram=(1485, 1595, 1557, 1663), lengths=(1.180, 1.109, 1.019), x3050="1.40x at 2 tokens", best="best on this card"),
  "E4B": dict(n=2, none=38.4, q8=(53.8, 1.401, 0.493), q4=(54.5, 1.419, 0.491), bf=(49.8, 1.296, 0.502),
              vram=(2853, 2965, 2927, 3035), lengths=(1.432, 1.430, 1.321), x3050="1.72x at 2 tokens", best="level with 1 token on this card"),
+}
+# GTX 1650 Ti on llama.cpp 77c4540ce: 2026-10-14-drafter-gaps-1650ti (draft lengths, non-QAT drafter,
+# long conversations) and 2026-10-14-drafter-accuracy-1650ti (GSM8K/BFCL, 8 requests at once).
+T1650B = {
+ "E2B": dict(none=76.5, q4=(90.3, 1.179, 0.602), lengths=(1.179, 1.093, 1.010), nq=(1.159, 1.047, 0.956),
+             depths="0 / 8k / 32k / 64k / 120k", ctx="131072", ctxnote="", deep=(1.266, 1.176, 1.034, 0.965, 0.887),
+             acc=[("GSM8K, 1,319 problems", 1, 0.8992, 0.8946, "0.89x"), ("BFCL simple, 400 tool calls", 1, 0.9225, 0.9250, "0.95x")]),
+ "E4B": dict(none=38.0, q4=(56.5, 1.488, 0.635), lengths=(1.488, 1.436, 1.342), nq=(1.467, 1.415, 1.286),
+             depths="0 / 8k / 32k", ctx="49152", ctxnote=", the most that fits in 4 GB with Google's larger non-QAT drafter", deep=(1.524, 1.533, 1.454),
+             acc=[("GSM8K, 1,319 problems", 1, 0.9318, 0.9310, "0.92x"), ("GSM8K, 1,319 problems", 2, 0.9318, 0.9295, "0.88x"),
+                  ("BFCL simple, 400 tool calls", 1, 0.9100, 0.9150, "0.96x"), ("BFCL simple, 400 tool calls", 2, 0.9100, 0.9125, "0.93x")]),
 }
 M = {
  "E2B": dict(rev="ebc7e1a211354561464cb82ed6d886792138dcb6", size=59236000, q8=97836704, sha="060f5a0158f8120d25137866b90e04e21cd0d2d23de1db7a9cc3b7f00e60bd11",
@@ -71,6 +84,33 @@ Without a drafter the target runs at {s['none']} tok/s in {s['vram'][0]:,} MiB. 
 (RTX 3050: {s['x3050']}). Acceptance is about the same on both cards, so the smaller gain likely
 comes from each drafted step costing a larger share of a target step on this card (inferred, not
 measured). Use `--spec-draft-n-max {s['n']}` on a card of this class.
+"""
+    b = T1650B[k]
+    rows = "\n".join(f"| {name} | {n} | {a:.4f} | {c:.4f} | {w} |" for name, n, a, c, w in b["acc"])
+    t1650 += f"""
+#### On a GTX 1650 Ti, llama.cpp `77c4540ce`
+
+Same card on the RTX 3050's build, same prompts and method. Without a drafter the target runs at
+{b['none']} tok/s; with this drafter at 1 drafted token, {b['q4'][0]} tok/s ({b['q4'][1]:.2f}x), {b['q4'][2]:.3f} accepted.
+
+| drafted tokens per step | 1 | 2 | 3 |
+|---|---:|---:|---:|
+| This GGUF | **{b['lengths'][0]:.2f}x** | {b['lengths'][1]:.2f}x | {b['lengths'][2]:.2f}x |
+| Google's non-QAT drafter (`google/gemma-4-{k}-it-assistant`, Q8_0) | {b['nq'][0]:.2f}x | {b['nq'][1]:.2f}x | {b['nq'][2]:.2f}x |
+
+1 drafted token is best on this build; use `--spec-draft-n-max 1` here. With a long text in the
+context, this drafter at 1 token gives {' / '.join(f'{x:.2f}x' for x in b['deep'])} at {b['depths']} tokens ahead
+(`-c {b['ctx']}`{b['ctxnote']}); on the RTX 3050 it kept paying to 120k.
+
+Answer quality, 8 requests at once (`-c 32768 --parallel 8`), greedy:
+
+| | drafted tokens | no drafter | this drafter | time, x vs no drafter |
+|---|---:|---:|---:|---:|
+{rows}
+
+Every difference has a 95% bootstrap range that includes zero. With 8 requests at once the
+drafter slows the work on this card (on the RTX 3050 it sped the same work up 1.5-1.7x); it pays
+for one request at a time.
 """
     card = f"""---
 library_name: gguf
@@ -157,7 +197,8 @@ tokens per step. Every drafter precision produced the same greedy replies.
 
 `evidence/` holds the build script (`gguf_exact.py`), its per-tensor report, the RTX 3050 speed
 run's per-prompt table (`speed-summary.txt`) and the GTX 1650 Ti tables
-(`speed-summary-1650ti-precision.txt`, `speed-summary-1650ti-draft-length.txt`).
+(`speed-summary-1650ti-precision.txt`, `speed-summary-1650ti-draft-length.txt`, and on `77c4540ce`
+`speed-summary-1650ti-77c4540ce.txt`, `longctx-summary-1650ti-77c4540ce.txt`).
 
 #### License
 
@@ -165,10 +206,14 @@ Apache 2.0, as Google's source. Gemma 4 terms: https://ai.google.dev/gemma/docs/
 """
     d = os.path.join(sys.argv[1], k); os.makedirs(d + "/evidence", exist_ok=True)
     open(d + "/README.md", "w").write(card)
-    shutil.copy(f"/home/xbill/models/hf/gemma-4-{k}-it-qat-q4_0-unquantized-assistant/README.md", d + "/ORIGINAL_README.md")
+    orig = f"/home/xbill/models/hf/gemma-4-{k}-it-qat-q4_0-unquantized-assistant/README.md"
+    if os.path.exists(orig):
+        shutil.copy(orig, d + "/ORIGINAL_README.md")
     shutil.copy(RUN + "/gguf_exact.py", d + "/evidence/")
     shutil.copy(RUN + f"/build-{k}.json", d + "/evidence/build-report.json")
     shutil.copy(RUN + f"/{k.lower()}/summary.txt", d + "/evidence/speed-summary.txt")
     shutil.copy(R1650 + f"/2026-10-14-drafter-formats-1650ti/{k.lower()}/summary.txt", d + "/evidence/speed-summary-1650ti-precision.txt")
     shutil.copy(R1650 + f"/2026-10-14-drafter-1650ti/{k.lower()}/summary.txt", d + "/evidence/speed-summary-1650ti-draft-length.txt")
+    shutil.copy(R1650 + f"/2026-10-14-drafter-gaps-1650ti/{k.lower()}/speed/summary.txt", d + "/evidence/speed-summary-1650ti-77c4540ce.txt")
+    shutil.copy(R1650 + f"/2026-10-14-drafter-gaps-1650ti/{k.lower()}/longctx/summary.txt", d + "/evidence/longctx-summary-1650ti-77c4540ce.txt")
     print(repo, "ok")
