@@ -1,0 +1,7 @@
+# https://ai.google.dev/gemma/docs/mtp/mtp, read 2026-10-15 through a fetch tool's summary (not verbatim page text).
+# Drafter described as "the lightweight 4-layer MTP drafter that proposes candidate tokens".
+# Uses the target model's activations and KV cache "to get better predictions".
+# Target checks all drafted tokens in one forward pass; after the first rejected token the rest are ignored;
+# the target always produces one token itself.
+# Transformers: pass assistant_model=assistant_model to generate(); example num_assistant_tokens = 4;
+# num_assistant_tokens_schedule = "heuristic" adds 2 after a fully accepted draft, removes 1 after a rejection.
