@@ -16,9 +16,9 @@ for spec in "e2b $E2B $D2 xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf" "e4b $E4B $
     out=$HERE/$m/$arm; mkdir -p $out
     d=""; [ $arm = q4x-n2 ] && d=$drafter
     levels=1,2,4,8,16,32,64
-    if ! serve $out/llama-server.log 65536 64 $gguf $d 2; then
+    if ! serve $out/llama-server.log 65536 64 $gguf "$d" 2; then
       levels=1,2,4,8,16,32
-      serve $out/llama-server.log 32768 32 $gguf $d 2 || { state "SKIP A $m $arm"; continue; }
+      serve $out/llama-server.log 32768 32 $gguf "$d" 2 || { state "SKIP A $m $arm"; continue; }
     fi
     echo "levels=$levels" > $out/levels.txt
     nvidia-smi --query-gpu=timestamp,temperature.gpu,clocks.sm,power.draw,memory.used,utilization.gpu \

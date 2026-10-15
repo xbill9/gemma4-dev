@@ -11,7 +11,7 @@ REL=local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-fullctx-3
 for spec in "e4b-q4x $E4B $D4 google/gemma-4-E4B-it" "e4b-none $E4B - google/gemma-4-E4B-it" \
             "e2b-q4x $E2B $D2 google/gemma-4-E2B-it" "e2b-none $E2B - google/gemma-4-E2B-it"; do
   set -- $spec; arm=$1 gguf=$2 d=$3 name=$4; [ "$d" = - ] && d=""
-  serve $HERE/server-$arm.log 131072 1 $gguf $d 2 || { state "SKIP B $arm"; continue; }
+  serve $HERE/server-$arm.log 131072 1 $gguf "$d" 2 || { state "SKIP B $arm"; continue; }
   for t in bfcl_simple gsm8k; do
     state "START B $t $arm"
     (cd $J && JEV_GEN_MAX_TOKENS=2048 python3 gen_eval.py run http://127.0.0.1:8080 $name $t $HERE/$t-$arm.jsonl --concurrency 1) > $HERE/$t-$arm.log 2>&1

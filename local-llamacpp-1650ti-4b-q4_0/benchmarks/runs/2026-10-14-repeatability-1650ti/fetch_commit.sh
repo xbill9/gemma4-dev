@@ -6,5 +6,5 @@ cd "$(dirname "$0")"; HERE=$PWD
 L=xbill@192.168.0.186
 RD=overnight/2026-10-14-repeatability-1650ti
 until ssh -o BatchMode=yes $L "grep -q DONE $RD/driver.log" 2>/dev/null; do sleep 120; done
-rsync -a --exclude run.sh --exclude repeat.py --exclude summarize.py $L:$RD/ $HERE/
+scp -q -r "$L:$RD/*" $HERE/
 commit_push local-llamacpp-1650ti-4b-q4_0/benchmarks/runs/2026-10-14-repeatability-1650ti "1650ti overnight E: E4B repeatability at temperature 0 (raw results)"

@@ -11,7 +11,7 @@ J=$ROOT/jev-tpu-v5e1
 for spec in "e4b-none $E4B - google/gemma-4-E4B-it" "e4b-q4x $E4B $D4 google/gemma-4-E4B-it" \
             "e2b-none $E2B - google/gemma-4-E2B-it" "e2b-q4x $E2B $D2 google/gemma-4-E2B-it"; do
   set -- $spec; arm=$1 gguf=$2 d=$3 name=$4; [ "$d" = - ] && d=""
-  serve $HERE/server-$arm.log 32768 8 $gguf $d 2 || { state "SKIP C $arm"; continue; }
+  serve $HERE/server-$arm.log 32768 8 $gguf "$d" 2 || { state "SKIP C $arm"; continue; }
   for t in gsm8k bfcl_simple; do
     state "START C $t $arm cache off"
     (cd $J && JEV_CACHE_PROMPT=0 JEV_GEN_MAX_TOKENS=2048 python3 gen_eval.py run http://127.0.0.1:8080 $name $t $HERE/$t-$arm-nocache.jsonl --concurrency 8) > $HERE/$t-$arm-nocache.log 2>&1
