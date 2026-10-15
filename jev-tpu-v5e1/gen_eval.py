@@ -35,6 +35,8 @@ GSM8K_PROMPT = (
     "on its own last line as 'Answer: <number>'.\n\n{question}"
 )
 GSM8K_MAX_TOKENS = int(os.environ.get("JEV_GEN_MAX_TOKENS", "768"))
+# JEV_CACHE_PROMPT=0 sends llama.cpp's "cache_prompt": false (unset: the server default, on).
+CACHE_PROMPT = os.environ.get("JEV_CACHE_PROMPT")
 TYPES = {"dict": "object", "float": "number", "tuple": "array", "any": None}
 
 
@@ -202,6 +204,8 @@ def one(upstream, model, task, rec):
             "tools": tools_for(rec["functions"]),
             "tool_choice": "auto",
         }
+    if CACHE_PROMPT is not None:
+        body["cache_prompt"] = CACHE_PROMPT != "0"
     out = {"id": rec["id"], "task": task, "max_tokens": body["max_tokens"]}
     try:
         r = post(upstream, body)
