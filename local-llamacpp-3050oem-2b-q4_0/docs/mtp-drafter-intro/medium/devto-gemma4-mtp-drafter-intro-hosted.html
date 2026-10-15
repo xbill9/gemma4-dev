@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4's MTP Drafter, Explained: Speculative Decoding and a 4-Bit Drafter at 60% of the Size</title>
+  <meta name="description" content="What speculative decoding is, how Gemma 4&#x27;s multi-token prediction drafter rides on the main model, why you would add one, and an exact Q4_0 repack of Google&#x27;s QAT drafters on Hugging Face that cuts the file to 60% of the size and the memory cost by a third." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step introduction to speculative
+decoding with Gemma 4's multi-token prediction (MTP) drafter, served by
+llama.cpp on a local, desktop hosted GPU enabled system. It is the first
+of a short series: this part explains what the drafter is and why you
+would use it, and the next part has the measurements.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/mtp-drafter-intro/medium/img/devto-cover.f5d57346.jpg" alt="Gemma 4&#x27;s MTP Drafter, Explained: Speculative Decoding and a 4-Bit Drafter at 60% of the Size" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0</a></p>
+<p><strong>Gemma 4 ships a small companion model for every size, a
+drafter that guesses the next few tokens so the main model can check
+them in one pass. Google's QAT drafters are trained onto a 4-bit grid;
+stored that way they shrink from 97.8 MB to 59.2 MB and are published on
+Hugging Face.</strong></p>
+<hr />
+<h4 id="what-is-this-project-trying-to-do">What is this project trying
+to Do?</h4>
+<p>The rigs in this repository serve Gemma 4 E2B and E4B from local
+hardware: an RTX 3050 OEM in a desktop and a GTX 1650 Ti in a laptop.
+Both already run the exact 4-bit QAT builds of the main models. Google
+also publishes a drafter for each Gemma 4 model, and llama.cpp can now
+run it.</p>
+<p>This part covers three things: how speculative decoding works, how
+Gemma 4's drafter differs from the usual draft model, and the exact Q4_0
+repacks of Google's QAT drafters that these rigs serve.</p>
+<hr />
+<h4 id="why-is-generating-one-token-at-a-time-slow">Why Is Generating
+One Token at a Time Slow?</h4>
+<p>A language model writes one token per forward pass, and every pass
+reads every weight. For one user on a small GPU, the arithmetic is light
+and the memory traffic is heavy: the card spends most of each step
+moving weights, not computing with them.</p>
+<p>That leaves spare compute on every step. Checking several tokens in
+one pass reads the same weights once and does a little more arithmetic,
+so it takes little more time than producing one. Speculative decoding
+exists to use that spare capacity.</p>
+<hr />
+<h4 id="how-does-speculative-decoding-work">How Does Speculative
+Decoding Work?</h4>
+<p>Each step has two parts.</p>
+<ol type="1">
+<li><strong>Draft.</strong> A small, fast model guesses the next few
+tokens.</li>
+<li><strong>Verify.</strong> The main model, called the target, runs one
+forward pass over all the guesses at once and checks each one against
+what it would have produced.</li>
+</ol>
+<p>The target accepts guesses from the front until the first one it
+disagrees with. It discards the rest and adds one token of its own at
+that point. A step therefore always produces at least one token, and as
+many as the number drafted plus one when every guess is right.</p>
+<p>The output is the target's: every token either matches what the
+target would have chosen or is the target's own replacement. The drafter
+only changes how many tokens each expensive pass produces.</p>
+<p>Google's model card puts it this way:</p>
+<blockquote>
+<p>When used in a Speculative Decoding pipeline, the draft model
+predicts several tokens ahead, which the target model then verifies in
+parallel.</p>
+</blockquote>
+<hr />
+<h4 id="what-makes-gemma-4s-drafter-different">What Makes Gemma 4's
+Drafter Different?</h4>
+<p>A classic draft model is a smaller copy of the same family, with its
+own layers, its own KV cache and its own pass over the whole
+conversation. Gemma 4's drafter is an add-on to the target. Google calls
+the approach multi-token prediction and describes the drafter as a
+lightweight 4-layer model that uses the target model's activations and
+KV cache.</p>
+<p>The E2B drafter's <code>config.json</code> on Hugging Face shows how
+small it is:</p>
+<pre class="json"><code>&quot;architectures&quot;: [&quot;Gemma4AssistantForCausalLM&quot;],
+&quot;backbone_hidden_size&quot;: 1536,
+&quot;hidden_size&quot;: 256,
+&quot;num_hidden_layers&quot;: 4,
+&quot;num_kv_shared_layers&quot;: 4,
+&quot;layer_types&quot;: [&quot;sliding_attention&quot;, &quot;sliding_attention&quot;, &quot;sliding_attention&quot;, &quot;full_attention&quot;],
+&quot;vocab_size&quot;: 262144,
+&quot;tie_word_embeddings&quot;: true</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/mtp-drafter-intro/medium/img/devto-gemma4-mtp-drafter-intro-table-1.png"
+alt="Table: Property, What it means" /></p>
+<p>Two consequences follow. The drafter keeps no separate cache of the
+conversation, so its memory cost stays its weights and a small working
+buffer. And it starts each guess from what the target already worked out
+for the current token, which is why so small a model can guess well.</p>
+<p>The checkpoint also carries a clustered shortcut for its output layer
+(<code>num_centroids: 2048</code>). llama.cpp's converter leaves that
+out and scores the full vocabulary.</p>
+<hr />
+<h4 id="why-would-you-use-a-drafter">Why Would You Use a Drafter?</h4>
+<ul>
+<li>🟢 <strong>Faster answers for one user.</strong> On a GPU waiting on
+memory, each pass that verifies two or three tokens does the work of two
+or three passes. Google's card claims up to 3x.</li>
+<li>🟢 <strong>No retraining and no change to the main model.</strong>
+The target file, its settings and its context stay as they are; the
+drafter is one more file and two server flags.</li>
+<li>🟢 <strong>Small memory cost.</strong> The drafter shares the
+target's KV cache, so it costs its weights and a small working
+buffer.</li>
+<li>⚠️ <strong>The gain depends on the text.</strong> Predictable output
+such as code is guessed well; free-form stories are guessed less often,
+and each rejected guess is wasted work.</li>
+<li>⚠️ <strong>The gain depends on load.</strong> With many users at
+once the GPU is already busy, and spare capacity for checking guesses
+shrinks. Part 2 measures where it stops paying.</li>
+<li>⚠️ <strong>Greedy text can change at near-ties.</strong> Where two
+words score almost the same, checking several tokens in one batched pass
+can tip the choice the other way; batched arithmetic rounding
+differently is the likely cause, untested here. The answers stay the
+target's; part 2 shows the scores.</li>
+</ul>
+<hr />
+<h4 id="which-drafter-goes-with-which-model">Which Drafter Goes With
+Which Model?</h4>
+<p>Google publishes two drafters per Gemma 4 size:
+<code>-it-assistant</code> for the bf16 model and
+<code>-it-qat-q4_0-unquantized-assistant</code> for the QAT builds.
+Google's QAT model card is explicit about pairing them:</p>
+<blockquote>
+<p>When using multi-token prediction (speculative decoding) with an
+assistant model alongside a QAT target model, the assistant model must
+also be a QAT checkpoint with the same precision to ensure
+compatibility.</p>
+</blockquote>
+<p>These rigs serve the exact Q4_0 QAT builds of E2B and E4B, so they
+take the QAT drafters.</p>
+<hr />
+<h4 id="step-1--repack-the-qat-drafter-exactly">Step 1 — Repack the QAT
+Drafter Exactly</h4>
+<p>Google ships the QAT drafter as bf16, but the values already lie on a
+4-bit grid: in every weight matrix, each block of 32 holds at most 16
+distinct values. That is Q4_0's own layout, so the weights can be stored
+at 4 bits without rounding them again.</p>
+<p>llama.cpp's converter writes the drafter as Q8_0.
+<code>gguf_exact.py</code>, the same builder behind the exact main-model
+GGUFs, finds each block's trained step and stores the drafter as Q4_0
+instead. No block was off the grid.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/mtp-drafter-intro/medium/img/devto-gemma4-mtp-drafter-intro-table-2.png"
+alt="Table: E2B drafter, File, Error vs Google&#39;s bf16" /></p>
+<p>The exact Q4_0 file is 39% smaller than Q8_0 and 3.6x closer to
+Google's weights by relative error (arithmetic from the build reports).
+The E4B drafter comes out the same: 59.7 MB against 98.7 MB.</p>
+<hr />
+<h4 id="step-2--download-it-from-hugging-face">Step 2 — Download It From
+Hugging Face</h4>
+<p>Both drafters are published, with their build script and
+evidence:</p>
+<ul>
+<li><code>xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf</code></li>
+<li><code>xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf</code></li>
+</ul>
+<p>In the rig, <code>make draft</code> downloads the pinned revision and
+checks its hash:</p>
+<pre class="text"><code>060f5a0158f8120d25137866b90e04e21cd0d2d23de1db7a9cc3b7f00e60bd11  gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf
+dc965cb963e56b86fbc04db8efec83163886085e88514574650a57fa55a2ee24  gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf</code></pre>
+<hr />
+<h4 id="step-3--serve-the-target-with-the-drafter">Step 3 — Serve the
+Target With the Drafter</h4>
+<p>llama.cpp runs Gemma 4's drafter as its own speculative type,
+<code>draft-mtp</code>. Two flags added to the usual server command:</p>
+<pre class="shell"><code>llama-server -m gemma-4-E2B-it-q4_0-exact.gguf -ngl 99 -fa 1 \
+  -md gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf \
+  --spec-type draft-mtp -ngld all --spec-draft-n-max 2</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/mtp-drafter-intro/medium/img/devto-gemma4-mtp-drafter-intro-table-3.png"
+alt="Table: Flag, Meaning" /></p>
+<p>The server log confirms the drafter loaded and reports, per request,
+how many guesses the target accepted:</p>
+<pre class="text"><code>I common_speculative_init_result: loading draft model &#39;/home/xbill/models/gemma-4-E2B-it-qat-assistant/gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf&#39;
+I slot print_timing: id  0 | task 8 | draft acceptance = 0.84656 (  160 accepted /   189 generated), mean len =  2.68</code></pre>
+<p>That request was a coding prompt: 160 of 189 guesses accepted, and
+each target pass produced 2.68 tokens on average.</p>
+<hr />
+<h4 id="how-much-memory-does-the-drafter-cost">How Much Memory Does the
+Drafter Cost?</h4>
+<p>Measured on the RTX 3050 at 8,192 tokens of context, with the E2B
+target alone at 2,795 MiB:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/mtp-drafter-intro/medium/img/devto-gemma4-mtp-drafter-intro-table-4.png"
+alt="Table: Drafter added, GPU memory, Cost of the drafter" /></p>
+<p>The exact drafter costs a third less memory than the Q8_0 conversion.
+With E4B the pattern holds: +84 MiB against +122. On a 4 GB laptop card
+every one of those megabytes is context or headroom.</p>
+<p>The smaller file also leaves the guesses unchanged: Q4_0, Q8_0 and
+Google's bf16 drafter had the target accept the same share of drafted
+tokens. Part 2 covers what that means for speed.</p>
+<hr />
+<h4 id="mag_right-tip-where-the-drafter-runs">🔎 Tip: Where the Drafter
+Runs</h4>
+<p>llama.cpp's <code>draft-mtp</code> is the route measured here. Two
+others exist:</p>
+<ul>
+<li><strong>Hugging Face Transformers</strong>: pass
+<code>assistant_model=</code> to <code>generate()</code>, which is the
+route Google documents.</li>
+<li><strong>vLLM</strong>:
+<code>--speculative-config '{"method":"mtp", ...}'</code>, measured in
+this repository on a Cloud TPU v5e.</li>
+</ul>
+<hr />
+<h4 id="mag_right-tip-start-with-two-drafted-tokens">🔎 Tip: Start With
+Two Drafted Tokens</h4>
+<p>Every extra guess must be right for the one after it to count. Two
+drafted tokens per step was the best setting on the RTX 3050 for both
+models, and one on the GTX 1650 Ti laptop card. Raise it only for highly
+predictable output such as code.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/mtp-drafter-intro/medium/img/devto-gemma4-mtp-drafter-intro-table-5.png"
+alt="Table: Classic draft model, Gemma 4 MTP drafter" /></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/local-llamacpp-3050oem-2b-q4_0/docs/mtp-drafter-intro/medium/img/devto-gemma4-mtp-drafter-intro-table-6.png"
+alt="Table: E2B QAT drafter, File, GPU memory added" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For a Gemma 4 QAT target served by llama.cpp, the exact Q4_0 QAT
+drafter. It matches the target's precision as Google requires, it is the
+smallest file, the closest to Google's weights and the cheapest in
+memory, and the target accepts its guesses as often as it accepts the
+larger files'.</p>
+<p>Turn it on for one user, or a few, on a GPU that waits on memory. The
+next part measures how much faster that is, on which kinds of text, and
+where adding users makes the drafter stop paying.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to explain speculative decoding with
+Gemma 4's MTP drafter and to introduce exact 4-bit repacks of Google's
+QAT drafters. The key to the solution was Google's drafter design, a
+4-layer model that reuses the target's state and KV cache, trained onto
+the same 4-bit grid as the QAT target. The results were:</p>
+<ul>
+<li>🟢 <strong>A drafter guesses, the target verifies</strong> several
+tokens in one pass, and every token is still the target's.</li>
+<li>🟢 <strong>Gemma 4's drafter keeps no KV cache of its own</strong>:
+4 layers of width 256 that read the target's hidden state.</li>
+<li>🟢 <strong>Exact Q4_0 QAT drafters on Hugging Face</strong>: 59.2 MB
+for E2B and 59.7 MB for E4B, 39–40% smaller than llama.cpp's Q8_0
+conversion and 3.6x closer to Google's weights.</li>
+<li>🟢 <strong>+80 MiB of GPU memory for the E2B drafter</strong>,
+against +120 MiB for Q8_0 and +188 MiB for bf16.</li>
+<li>⚠️ <strong>The gain depends on the text and on the number of
+users</strong>; part 2 has the measurements.</li>
+<li>⚠️ <strong>Greedy text can change at near-ties</strong> when
+verification runs in batches.</li>
+</ul>
+<p>Scope: Google's QAT drafters for Gemma 4 E2B and E4B, repacked with
+<code>gguf_exact.py</code> and served by llama.cpp
+<code>77c4540ce</code> on one RTX 3050 OEM (8 GB) at 8,192 tokens of
+context on 2026-10-14. The descriptions of the drafter come from
+Google's model cards, its MTP documentation and the checkpoints'
+<code>config.json</code>.</p>
+<p>The strategy for adding Gemma 4's MTP drafter to a local llama.cpp
+deployment was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf">xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf">xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant">google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant
+| Hugging Face</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it-assistant">google/gemma-4-E2B-it-assistant
+| Hugging Face</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf
+| Hugging Face</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0">local-llamacpp-3050oem-2b-q4_0
+| GitHub</a></li>
+<li><a
+href="https://dev.to/gde/gemma-4-on-a-used-8-gb-rtx-3050-116-tokenss-for-one-user-618-for-64-k6h">Gemma
+4 on a Used 8 GB RTX 3050 | dev.to</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp |
+GitHub</a></li>
+</ul>
+</body>
+</html>
