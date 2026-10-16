@@ -55,7 +55,35 @@ Each rig's `make draft` downloads the drafter from Hugging Face at a pinned revi
 make draft
 ```
 
-The files are `xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf` and `xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf`. On the 3050 the Q4_0 drafter runs at the same speed as a Q8_0 conversion (151.1 against 150.1 tok/s on E2B) and keeps the same share of tokens, so its precision costs nothing. Both cards loaded the same files, checked by hash.
+The files are `xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf` and `xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf`. Both cards loaded the same files, checked by hash.
+
+---
+
+#### Why Repack the Drafter?
+
+Google ships each QAT assistant drafter as bf16 weights that already sit on a 4-bit grid: at most 16 distinct values in every group of 32. llama.cpp's converter turns them into Q8_0, which spends 8 bits on values that only ever need 4. `gguf_exact.py` stores them back as Q4_0 on the grid they were trained on, keeping the converter's file layout and metadata.
+
+| E2B drafter | Q8_0 (converter) | exact Q4_0 (repack) | bf16 (Google's weights) |
+| :--- | ---: | ---: | ---: |
+| File size | 97.8 MB | **59.2 MB** | 170.2 MB |
+| Error against Google's weights | 0.00494 | **0.00138** | 0 |
+
+The repack is 60% of the Q8_0 file and 3.6x closer to Google's weights. The E4B drafter gives the same picture (59.7 MB, error 0.00138).
+
+Each format was then served on both cards at 2 drafted tokens, six prompts, greedy. Gain against no drafter:
+
+| 2 drafted tokens | 3050 E2B | 1650 Ti E2B | 3050 E4B | 1650 Ti E4B |
+| :--- | ---: | ---: | ---: | ---: |
+| Q8_0 | 1.39x | 1.09x | 1.72x | 1.40x |
+| **exact Q4_0** | **1.40x** | **1.11x** | **1.72x** | **1.42x** |
+| bf16 | 1.23x | 0.96x | 1.59x | 1.30x |
+
+- **The repack is level with Q8_0 on speed on both cards** and uses 38–40 MiB less memory.
+- **bf16 is slowest everywhere.** On the 1650 Ti it makes E2B slower than serving without a drafter.
+- **The share of drafted tokens kept is the same for all three formats**, within 0.012 on both cards. The drafter's precision changes what each drafted step costs, never which tokens get kept.
+- **On the 3050 the repack scores level with Q8_0** on GSM8K (E2B 0.9022 against 0.8992, E4B 0.9325 against 0.9310) and gives identical BFCL answers on E2B.
+
+The 1650 Ti's format run used llama.cpp `f95b0d9`, the build its rigs serve; every other comparison here uses `77c4540ce` on both cards.
 
 ---
 
@@ -206,11 +234,12 @@ The goal of this article was to measure what Google's Gemma 4 assistant drafters
 - 🟢 One request at a time the drafter speeds up E4B 1.72x on the RTX 3050 and 1.49x on the GTX 1650 Ti, and E2B 1.40x and 1.18x
 - 🟢 Both cards keep the same share of drafted tokens, within 0.03 at every draft length
 - 🟢 GSM8K and BFCL scores are unchanged with the drafter on both cards
+- 🟢 The exact Q4_0 repack of the drafter is 60% of the Q8_0 file and level with it on speed on both cards; Google's bf16 weights are slowest on both
 - ⚠️ The best draft length differs: 2 tokens on the 3050, 1 on the 1650 Ti
 - ⚠️ With long text ahead, E2B's gain on the 1650 Ti is gone by 32k tokens; on the 3050 it holds at 1.23x at 120k
 - ❌ With 4–8 or more requests at once the drafter costs output on the 1650 Ti
 
-Scope: two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0, six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check.
+Scope: two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check.
 
 The strategy for using MCP for local accelerator comparison was validated with an incremental step by step approach.
 
@@ -221,6 +250,8 @@ The strategy for using MCP for local accelerator comparison was validated with a
 - Repository: https://github.com/xbill9/gemma4-dev
 - RTX 3050 rigs: https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0 and https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-4b-q4_0
 - GTX 1650 Ti rigs: https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0 and https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-4b-q4_0
+- Drafter repack, 3050: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-q4exact-3050oem/REPORT.md
+- Drafter formats, 1650 Ti: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-formats-1650ti/REPORT.md
 - 3050 draft length and long text: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-3050oem/REPORT.md
 - 1650 Ti draft length and long text: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-1650ti/REPORT.md
 - 3050 several requests at once: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/REPORT.md
