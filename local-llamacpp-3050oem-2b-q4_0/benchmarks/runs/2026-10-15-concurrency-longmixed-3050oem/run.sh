@@ -23,7 +23,8 @@ run_arm() {
 state "RUN START"
 for a in "${ARMS[@]}"; do run_arm 1 $a; done
 commit_push $REL "3050oem: long mixed-prompt concurrency, pass 1 (raw results)"
-for ((i=${#ARMS[@]}-1; i>=0; i--)); do run_arm 2 ${ARMS[$i]}; done
+# lib.sh serve() uses a global i; this loop must not.
+for ((k=${#ARMS[@]}-1; k>=0; k--)); do run_arm 2 ${ARMS[$k]}; done
 restore_live
 state "RUN DONE"
 commit_push $REL "3050oem: long mixed-prompt concurrency, pass 2 in reverse order (raw results)"
