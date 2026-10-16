@@ -47,30 +47,76 @@ Without a drafter the 3050 generates 1.41x faster on E2B and 1.53x on E4B. Diffe
 
 ---
 
-#### Step 1 — Fetch the Drafters
+#### Step 1 — Repack the Drafter on Its Trained Grid
 
-Each rig's `make draft` downloads the drafter from Hugging Face at a pinned revision and checks its SHA-256 against `tpu.env`:
+Google publishes the QAT assistant drafters as [google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant) and [google/gemma-4-E4B-it-qat-q4_0-unquantized-assistant](https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-unquantized-assistant). Each is a 4-layer model that reads the main model's KV cache, stored as bf16 safetensors.
+
+Quantization-aware training already put the weights on a 4-bit grid: in every group of 32 values there are at most 16 distinct levels, evenly spaced. bf16 spends 16 bits storing each of those levels.
+
+llama.cpp's `convert_hf_to_gguf.py` has no way to know that, so it writes Q8_0: 8.5 bits per weight, re-rounded onto an 8-bit grid of its own. The file shrinks, and the values move. Only 11.7% of the drafter's weights come back bit-identical.
+
+Q4_0 is 4.5 bits per weight: one fp16 step per group of 32, and a 4-bit level for each value. That is enough to hold the trained grid, provided each group's step is read off its own values. `gguf_exact.py` does this for each group:
 
 ```
-make draft
+amax = np.abs(g).max(-1, keepdims=True)
+for m in range(1, 9):                      # try steps amax/1 .. amax/8
+    cand = amax / m
+    q = np.clip(np.rint(g / cand), -8, 7)
+    good = np.abs(g - q * cand).max(-1, keepdims=True) <= amax * 2**-7
 ```
 
-The files are `xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf` and `xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf`. Both cards loaded the same files, checked by hash.
+The first step that puts every value in the group on an integer level wins. A least-squares fit then refines it, and it is rounded to fp16, Q4_0's step type. A group that fits no step stops the build, since nothing is re-rounded. On both drafters no group was off the grid.
 
----
+The script takes Google's safetensors and the converter's Q8_0 file, copies the Q8_0 file's metadata byte for byte (tokenizer, chat template, settings), and writes every weight matrix as Q4_0. That covers 23 tensors per drafter, including the token embedding, which holds 86–87% of the values rewritten:
 
-#### Why Repack the Drafter?
+```
+python3 gguf_exact.py <google-snapshot-dir> gemma-4-E2B-it-qat-assistant-q8_0.gguf gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf
+python3 gguf_exact.py <google-snapshot-dir> gemma-4-E2B-it-qat-assistant-q8_0.gguf gemma-4-E2B-it-qat-assistant-bf16.gguf --bf16
+```
 
-Google ships each QAT assistant drafter as bf16 weights that already sit on a 4-bit grid: at most 16 distinct values in every group of 32. llama.cpp's converter turns them into Q8_0, which spends 8 bits on values that only ever need 4. `gguf_exact.py` stores them back as Q4_0 on the grid they were trained on, keeping the converter's file layout and metadata.
+`--bf16` writes Google's weights unchanged into the same layout, so all three formats can be compared with identical metadata.
 
 | E2B drafter | Q8_0 (converter) | exact Q4_0 (repack) | bf16 (Google's weights) |
 | :--- | ---: | ---: | ---: |
 | File size | 97.8 MB | **59.2 MB** | 170.2 MB |
+| Bits per weight | 8.5 | **4.5** | 16 |
 | Error against Google's weights | 0.00494 | **0.00138** | 0 |
+| Values bit-identical, read back in fp32 | 11.7% | **29.4%** | 100% |
+| Values bit-identical, rounded to bf16 | — | **96.6–97.0% per tensor** | 100% |
 
-The repack is 60% of the Q8_0 file and 3.6x closer to Google's weights. The E4B drafter gives the same picture (59.7 MB, error 0.00138).
+The repack is 60% of the Q8_0 file and its error is 3.6x lower. Rounded back to bf16, the format Google stored, 97% of its values match Google's bit for bit. The E4B drafter gives the same picture: 59.7 MB, error 0.00138, 96.5–97.1% per tensor.
 
-Each format was then served on both cards at 2 drafted tokens, six prompts, greedy. Gain against no drafter:
+---
+
+#### 🔎 Tip: The Converter Drops the Masked Embedding
+
+llama.cpp's converter leaves out the checkpoint's `masked_embedding` tensors, and the repack keeps its tensor list. All three drafter files compared here lack them, so the comparison is fair. The files work with `--spec-type draft-mtp` as they are.
+
+---
+
+#### Step 2 — Fetch the Published Drafters
+
+Both repacks are on Hugging Face:
+
+- [xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf), file `gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf`, SHA-256 `060f5a0158f8120d…`
+- [xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf](https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf), file `gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf`, SHA-256 `dc965cb963e56b86…`
+
+They pair with the main models' exact Q4_0 GGUFs, built the same way: [xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf) and [xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf](https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf).
+
+Each rig's `make draft` downloads its drafter at a pinned revision and checks the hash from `tpu.env`:
+
+```
+curl -fL -o $(SPEC_DRAFT_MODEL).part https://huggingface.co/$(SPEC_DRAFT_HF)/resolve/$(SPEC_DRAFT_HF_REVISION)/$(notdir $(SPEC_DRAFT_MODEL))
+echo "$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)" | sha256sum -c -
+```
+
+Both cards loaded the same two files, checked by hash.
+
+---
+
+#### How the Repack Compares on Both Cards
+
+Each format was served on both cards at 2 drafted tokens, six prompts, greedy. Gain against no drafter:
 
 | 2 drafted tokens | 3050 E2B | 1650 Ti E2B | 3050 E4B | 1650 Ti E4B |
 | :--- | ---: | ---: | ---: | ---: |
@@ -78,16 +124,38 @@ Each format was then served on both cards at 2 drafted tokens, six prompts, gree
 | **exact Q4_0** | **1.40x** | **1.11x** | **1.72x** | **1.42x** |
 | bf16 | 1.23x | 0.96x | 1.59x | 1.30x |
 
+Memory with each drafter loaded, at `-c 8192`:
+
+| MiB | no drafter | Q8_0 | exact Q4_0 | bf16 |
+| :--- | ---: | ---: | ---: | ---: |
+| 3050 E2B | 2,795 | 2,915 | **2,875** | 2,983 |
+| 3050 E4B | 4,415 | 4,537 | **4,499** | 4,607 |
+| 1650 Ti E2B | 1,485 | 1,595 | **1,557** | 1,663 |
+| 1650 Ti E4B | 2,853 | 2,965 | **2,927** | 3,035 |
+
 - **The repack is level with Q8_0 on speed on both cards** and uses 38–40 MiB less memory.
 - **bf16 is slowest everywhere.** On the 1650 Ti it makes E2B slower than serving without a drafter.
 - **The share of drafted tokens kept is the same for all three formats**, within 0.012 on both cards. The drafter's precision changes what each drafted step costs, never which tokens get kept.
-- **On the 3050 the repack scores level with Q8_0** on GSM8K (E2B 0.9022 against 0.8992, E4B 0.9325 against 0.9310) and gives identical BFCL answers on E2B.
+- **Greedy text depends on drafting, never on the drafter's format.** At a given draft length, Q8_0, the repack and bf16 give the same 18 greedy replies, on the 3050 for both models and on the 1650 Ti for E2B (the 1650 Ti's E4B text does not repeat on `f95b0d9`, so it cannot be compared there).
+
+Answer quality on the 3050, GSM8K (1,319 problems) and BFCL simple (400 function calls), 8 requests at a time:
+
+| | no drafter | Q8_0 | exact Q4_0 |
+| :--- | ---: | ---: | ---: |
+| E2B GSM8K | 0.8984 | 0.8992 | 0.9022 |
+| E2B BFCL | 0.9250 | 0.9225 | 0.9225 |
+| E4B GSM8K | 0.9340 | 0.9310 | 0.9325 |
+| E4B BFCL | 0.9100 | 0.9150 | 0.9150 |
+
+Every drafted score is level with the same day's no-drafter run, and the repack is level with Q8_0: E2B GSM8K +0.0030 (95% range −0.0061 to +0.0129), identical BFCL answers on E2B.
+
+Google also publishes non-QAT drafters, [google/gemma-4-E2B-it-assistant](https://huggingface.co/google/gemma-4-E2B-it-assistant) and [google/gemma-4-E4B-it-assistant](https://huggingface.co/google/gemma-4-E4B-it-assistant). Their weights are on no 4-bit grid, so they were converted to Q8_0. Against the QAT targets they keep fewer drafted tokens on E2B and are level or behind at every draft length on both models: E2B 1.34x against the repack's 1.40x on the 3050, and 1.16x against 1.18x on the 1650 Ti.
 
 The 1650 Ti's format run used llama.cpp `f95b0d9`, the build its rigs serve; every other comparison here uses `77c4540ce` on both cards.
 
 ---
 
-#### Step 2 — Serve With the Drafter
+#### Step 3 — Serve With the Drafter
 
 The drafter adds four flags to the rig's normal command line:
 
@@ -101,7 +169,7 @@ llama-server -m gemma-4-E4B-it-q4_0-exact.gguf --host 127.0.0.1 --port 8080 \
 
 ---
 
-#### Step 3 — Measure One Request at a Time
+#### Step 4 — Measure One Request at a Time
 
 `speed.py` runs six prompts (code, advice, a story, an explanation, a list, a summary), 256 tokens each, three greedy repeats plus one sampled pass at temperature 0.8, with the prompt cache off. Each draft length gets its own server, the card cools before each one, and the first drafted setting runs again at the end to check for drift. The same script, prompts and llama.cpp build ran on both cards.
 
@@ -138,7 +206,7 @@ The best draft length is a property of the card as much as the model. The 3050 r
 
 ---
 
-#### Step 4 — Measure With Long Text Ahead
+#### Step 5 — Measure With Long Text Ahead
 
 `longctx.py` puts the first 0 to 120,000 tokens of the NVIDIA driver README ahead of a story, a code request or a summary of the text, and measures generation speed alone. Same document, by hash, on both cards. The 1650 Ti's E4B stops at 32,768 tokens, the most that fits in 4 GiB with a drafter loaded.
 
@@ -156,7 +224,7 @@ On the 3050 the drafter pays at every depth for both models; at 2 tokens it does
 
 ---
 
-#### Step 5 — Measure Several Requests at Once
+#### Step 6 — Measure Several Requests at Once
 
 `sweep.py` sends 1 to 16 requests at once, each with a unique prompt, in two shapes: 512 tokens in and 128 out, and 128 in and 512 out. Both cards ran it with one shared KV cache (`-kvu`); the 3050 at `-c 65536 --parallel 64`, the 1650 Ti at `-c 16384 --parallel 16`.
 
@@ -183,7 +251,7 @@ llama-server gives each slot its own KV cache by default. On llama.cpp `77c4540c
 
 ---
 
-#### Step 6 — Check the Answers
+#### Step 7 — Check the Answers
 
 GSM8K (1,319 problems) and BFCL simple (400 function calls), one request at a time, with and without the drafter:
 
