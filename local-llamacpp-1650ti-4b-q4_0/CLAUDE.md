@@ -22,6 +22,21 @@ exact Q4_0 (`make draft` fetches it from Hugging Face, SHA-256 in `tpu.env`): 2 
 Costs 72–74 MiB of VRAM. Empty `SPEC_DRAFT_MODEL` for byte-comparable greedy runs
 (`local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-1650ti/`).
 
+**What the drafter does on this card, measured on llama.cpp `77c4540ce`** (the 3050's build; the rig
+still serves on `f95b0d9`), in `local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/`:
+- **Answers are unchanged.** GSM8K and BFCL with the drafter are level with no drafter, one request at
+  a time and 8 at once. One at a time it finishes GSM8K 1.34x (E2B) and 1.78x (E4B) faster
+  (`2026-10-15-drafter-load-1650ti`, `2026-10-14-drafter-accuracy-1650ti`).
+- **It pays for 1–2 requests at once and costs from 4 (E4B) or 8 (E2B) on**; at 8 at once GSM8K
+  finishes 0.88–0.96x as fast. On the 3050 it kept paying at 8.
+- **1 drafted token is best for both models on `77c4540ce`** (E2B 1.18x, E4B 1.49x; E4B at 1 token
+  matches no drafter's greedy text). Google's non-QAT drafter is 1.4–5.3% slower at every length
+  (`2026-10-14-drafter-gaps-1650ti`).
+- **With long text in context E2B's gain is gone by 32k tokens ahead** (1.03x) and reverses beyond
+  (0.89x at 120k); E4B holds 1.45x at 32k. The rig serves at `-c 8192`, where both still pay.
+- **`-kvu` on this card** removes the random per-slot slowdowns at 2–8 requests but gives 0.59–0.81x
+  the output at 16, the reverse of the 3050 (`2026-10-15-drafter-load-1650ti`).
+
 **E4B greedy text does not repeat on this build with flash attention on** (`f95b0d9`, `-fa 1`): 10
 identical temperature-0 requests gave 10 and 6 different texts. `-fa 0` or llama.cpp `77c4540ce` repeats
 exactly; threads, CUDA graphs and the drafter do not matter; E2B repeats exactly on the same build. Any
