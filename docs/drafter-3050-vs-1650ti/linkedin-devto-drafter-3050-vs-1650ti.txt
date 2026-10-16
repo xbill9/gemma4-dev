@@ -1,0 +1,14 @@
+Do Drafters Work on Small Models? Gemma 4 E2B and E4B on Two Small GPUs
+
+Yes. Speculative decoding with Google's 59 MB QAT multi-token prediction (MTP) drafters speeds up Gemma 4 E4B 1.72x and E2B 1.40x on an 8 GB RTX 3050, and 1.49x and 1.18x on a 4 GB laptop GTX 1650 Ti, served by llama.cpp one request at a time, with unchanged GSM8K and BFCL scores.
+
+What is in it:
+
+- 🟢 One request at a time the drafter speeds up E4B 1.72x on the RTX 3050 and 1.49x on the GTX 1650 Ti, and E2B 1.40x and 1.18x
+- 🟢 Both cards keep the same share of drafted tokens, within 0.03 at every draft length
+- 🟢 GSM8K and BFCL scores are unchanged with the drafter on both cards
+- 🟢 The exact Q4_0 repack of the drafter is 60% of the Q8_0 file and level with it on speed on both cards; Google's bf16 weights are slowest on both
+
+dev.to (Google Developer Experts): https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g
+Medium: https://xbill999.medium.com/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-2d9ce13cf66b
+Substack: https://xbill9.substack.com/p/do-drafters-work-on-small-models
