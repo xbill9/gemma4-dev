@@ -22,6 +22,8 @@ The smaller model gains less. E2B is already fast per token, so each drafted ste
 
 The gain has limits. With several requests at once it shrinks on both cards, and on the 1650 Ti it turns into a loss from 4 requests (E4B) or 8 (E2B). On the 1650 Ti, E2B's gain is gone by about 32k tokens of conversation. Too many drafted tokens also cost speed on the slower card.
 
+The drafter here is an exact Q4_0 repack of Google's weights. It matches the converter's Q8_0 file on speed and answers at 60% of its size, and beats Google's bf16 weights on speed on every card and model.
+
 ---
 
 #### What Is Being Measured?
@@ -163,6 +165,26 @@ Every drafted score is level with the same day's no-drafter run, and the repack 
 Google also publishes non-QAT drafters, [google/gemma-4-E2B-it-assistant](https://huggingface.co/google/gemma-4-E2B-it-assistant) and [google/gemma-4-E4B-it-assistant](https://huggingface.co/google/gemma-4-E4B-it-assistant). Their weights are on no 4-bit grid, so they were converted to Q8_0. Against the QAT targets they keep fewer drafted tokens on E2B and are level or behind at every draft length on both models: E2B 1.34x against the repack's 1.40x on the 3050, and 1.16x against 1.18x on the 1650 Ti.
 
 The 1650 Ti's format run used llama.cpp `f95b0d9`, the build its rigs serve; every other comparison here uses `77c4540ce` on both cards.
+
+---
+
+#### Is the Repack Worth It?
+
+Yes, as the drafter file to ship. Against the two files a user would otherwise serve:
+
+| exact Q4_0 repack against | Q8_0 (converter) | bf16 (Google's weights) |
+| :--- | :--- | :--- |
+| Speed | level on both cards | faster on every card and model |
+| Share of drafted tokens kept | level, within 0.012 | level, within 0.012 |
+| GSM8K and BFCL | level | not scored |
+| File size | 60% | 35% |
+| Card memory | 38–40 MiB less | 106–108 MiB less |
+| Match to Google's weights | 3.6x lower error | 97% bit-identical in bf16 |
+
+- 🟢 **Against bf16 it is the clear choice.** It is faster everywhere, and on the 1650 Ti bf16 makes E2B slower than serving without a drafter.
+- 🟢 **Against Q8_0 it is a free improvement**: smaller, closer to the trained weights, and level on speed and answers.
+- ⚠️ **The memory it saves over Q8_0 is under 1% of either card.** It counts only on a 4 GB card running near its limit.
+- ⚠️ **Speed stays level with Q8_0** because the drafter's precision leaves the kept tokens unchanged. Every format keeps the same share, so a more exact drafter guesses as well as a rounded one and gains its speed from size alone.
 
 ---
 
