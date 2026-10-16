@@ -82,9 +82,9 @@ python3 gguf_exact.py <google-snapshot-dir> gemma-4-E2B-it-qat-assistant-q8_0.gg
 | Bits per weight | 8.5 | **4.5** | 16 |
 | Error against Google's weights | 0.00494 | **0.00138** | 0 |
 | Values bit-identical, read back in fp32 | 11.7% | **29.4%** | 100% |
-| Values bit-identical, rounded to bf16 | — | **96.6–97.0% per tensor** | 100% |
+| Values bit-identical, rounded to bf16 | — | **96.5–97.0% per tensor** | 100% |
 
-The repack is 60% of the Q8_0 file and its error is 3.6x lower. Rounded back to bf16, the format Google stored, 97% of its values match Google's bit for bit. The E4B drafter gives the same picture: 59.7 MB, error 0.00138, 96.5–97.1% per tensor.
+The repack is 60% of the Q8_0 file and its error is 3.6x lower. Rounded back to bf16, the format Google stored, 97% of its values match Google's bit for bit. The E4B drafter gives the same picture: 59.7 MB, error 0.00138, 96.4–97.1% per tensor.
 
 ---
 
@@ -243,11 +243,22 @@ Total output with the drafter divided by without:
 
 `sweep.py`'s prompt repeats one paragraph, which the drafter guesses unusually well, so these ratios run higher than on everyday chat. On mixed chat prompts the 3050 measured E4B 1.08–1.24x and E2B 0.92–1.17x at 2–8 requests, and a loss at 32–64 for both. Read the table for the trend: the 3050 keeps a gain through 16 requests here, and the 1650 Ti loses from 4 or 8.
 
+With long prompts the drafter pays further. `longmixed.py` puts a different 1,000–3,500-token stretch of the driver README ahead of each of six tasks (a summary, a bash script, a quiz and so on), 256 tokens out, greedy, at 1 to 32 requests on the 3050 (`-c 131072 --parallel 32`), in two passes run in opposite order. The drafter keeps 0.56–0.62 of its tokens with a document in context, against 0.43–0.50 on short chat. Total output with the drafter divided by without, both passes:
+
+| requests at once | 1 | 2–16 | 32 |
+| :--- | ---: | ---: | ---: |
+| 3050 E2B, per-slot cache | 1.34 | 1.02–1.14 | 1.02–1.04 |
+| 3050 E2B, shared cache | 1.26 | 1.04–1.13 | 0.96–0.97 |
+| 3050 E4B, per-slot cache | 1.54 | 1.08–1.16 | 1.03–1.05 |
+| 3050 E4B, shared cache | 1.61 | 1.08–1.18 | 0.99 |
+
+The drafter pays at every level up to 16 requests and breaks even at 32. This run covers the 3050 only.
+
 ---
 
 #### 🔎 Tip: The Shared KV Cache Has a Price on Both Cards
 
-llama-server gives each slot its own KV cache by default. On llama.cpp `77c4540ce` that layout halved generation speed at random with several requests in flight, on both cards: per-slot repeats spread 28–36% at 2 requests on the 1650 Ti. `-kvu` gives all slots one shared cache and the spread drops to about 1%. It also costs output as the total text held grows. At 16 requests in `sweep.py` the shared cache delivered 0.86–0.94x of per-slot output on the 3050 and 0.59–0.81x on the 1650 Ti. The drafter's ratio is nearly the same under either layout. All four rigs serve one request at a time, where the two layouts are identical.
+llama-server gives each slot its own KV cache by default. On llama.cpp `77c4540ce` that layout halved generation speed at random with several requests in flight, on both cards: per-slot repeats spread 28–36% at 2 requests on the 1650 Ti. `-kvu` gives all slots one shared cache and the spread drops to about 1%. It also costs output as the total text held grows. At 16 requests in `sweep.py` the shared cache delivered 0.86–0.94x of per-slot output on the 3050 and 0.59–0.81x on the 1650 Ti. The drafter's ratio is nearly the same under either layout. With 1,000–3,500-token prompts on the 3050 the per-slot cache is the faster layout and showed no random slowdown: it beat the shared cache in 204 of 232 paired batches, and the shared cache gave 0.68–0.82x of its output at 16 requests and 0.49–0.66x at 32. All four rigs serve one request at a time, where the two layouts are identical.
 
 ---
 
@@ -291,7 +302,7 @@ At temperature 0 a drafted reply can differ from the undrafted one at a near-tie
 
 Turn the drafter on for both cards when they serve one user. It costs no answers and 72–84 MiB of memory, and E4B gains the most on both: 1.72x on the 3050 and 1.49x on the 1650 Ti. Set the draft length per card, 2 tokens on the 3050 and 1 on the 1650 Ti.
 
-On the 1650 Ti, leave E2B's drafter off for long conversations past about 32k tokens and for several users at once. On the 3050, the drafter keeps paying with long text ahead, and stops paying only once many users share the card.
+On the 1650 Ti, leave E2B's drafter off for long conversations past about 32k tokens and for several users at once. On the 3050, the drafter keeps paying with long text ahead, and with long prompts it pays up to 16 users at once and breaks even at 32.
 
 ---
 
@@ -305,9 +316,10 @@ The goal of this article was to measure what Google's Gemma 4 assistant drafters
 - 🟢 The exact Q4_0 repack of the drafter is 60% of the Q8_0 file and level with it on speed on both cards; Google's bf16 weights are slowest on both
 - ⚠️ The best draft length differs: 2 tokens on the 3050, 1 on the 1650 Ti
 - ⚠️ With long text ahead, E2B's gain on the 1650 Ti is gone by 32k tokens; on the 3050 it holds at 1.23x at 120k
+- 🟢 With 1,000–3,500-token prompts on the 3050 the drafter pays at every level up to 16 requests at once
 - ❌ With 4–8 or more requests at once the drafter costs output on the 1650 Ti
 
-Scope: two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check.
+Scope: two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, six long-prompt tasks at 1–32 requests on the 3050 with both cache layouts, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check.
 
 The strategy for using MCP for local accelerator comparison was validated with an incremental step by step approach.
 
@@ -323,6 +335,7 @@ The strategy for using MCP for local accelerator comparison was validated with a
 - 3050 draft length and long text: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-3050oem/REPORT.md
 - 1650 Ti draft length and long text: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-1650ti/REPORT.md
 - 3050 several requests at once: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/REPORT.md
+- 3050 several requests at once, long prompts: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-longmixed-3050oem/REPORT.md
 - 1650 Ti several requests at once and answers: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-15-drafter-load-1650ti/REPORT.md
 - 3050 answers: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-fullctx-3050oem/REPORT.md
 - Drafters: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf and https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf
