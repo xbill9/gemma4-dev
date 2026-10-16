@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Do Drafters Work on Small Models? Gemma 4 E2B and E4B on Two Small GPUs</title>
+  <meta name="description" content="Yes. Speculative decoding with Google&#x27;s 59 MB QAT multi-token prediction (MTP) drafters speeds up Gemma 4 E4B 1.72x and E2B 1.40x on an 8 GB RTX 3050, and 1.49x and 1.18x on a 4 GB laptop GTX 1650 Ti, served by llama.cpp one request at a time, with unchanged GSM8K and BFCL scores." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to serving Gemma 4 E2B and
+E4B with Google's QAT assistant drafters through llama.cpp's speculative
+decoding, and measuring what the drafter is worth on two small NVIDIA
+cards: a desktop RTX 3050 OEM and a laptop GTX 1650 Ti. A suite of
+Python MCP tools is built to simplify management of the llama.cpp hosted
+deployment.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-cover.7d054a5b.jpg" alt="Do Drafters Work on Small Models? Gemma 4 E2B and E4B on Two Small GPUs" /></figure>
+<p>This is the second part of a short series. <a
+href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">Part
+1, Gemma 4's MTP Drafter, Explained</a>, covers how speculative decoding
+and Gemma 4's multi-token prediction (MTP) drafter work and how the
+exact Q4_0 repack is built. This part has the measurements.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p>A drafter is the guesser in speculative decoding: it proposes the
+next few tokens, and the main model checks them all in one pass.</p>
+<p><strong>Do drafters work on small models? Yes.</strong> Gemma 4 E2B
+and E4B are already small, and their drafter is a 4-layer model of 59
+MB. Served one request at a time, it makes both models faster on both
+cards, and GSM8K and BFCL scores stay the same:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-1.png"
+alt="Table: one request at a time, RTX 3050, GTX 1650 Ti" /></p>
+<p>The smaller model gains less. E2B is already fast per token, so each
+drafted step costs a larger share of what it saves (inferred from the
+draft-length results below, not measured directly). Both cards keep the
+same share of the drafted tokens, within 0.03, so the gap between the
+cards comes from the cards.</p>
+<p>The gain has limits. With several requests at once it shrinks on both
+cards, and on the 1650 Ti it turns into a loss from 4 requests (E4B) or
+8 (E2B). On the 1650 Ti, E2B's gain is gone by about 32k tokens of
+conversation. Too many drafted tokens also cost speed on the slower
+card.</p>
+<p>The drafter here is an exact Q4_0 repack of Google's weights. It
+matches the converter's Q8_0 file on speed and answers at 60% of its
+size, and beats Google's bf16 weights on speed on every card and
+model.</p>
+<hr />
+<h4 id="what-is-being-measured">What Is Being Measured?</h4>
+<p>A language model writes one token per forward pass, and every pass
+reads every weight. For one user on a small GPU, each pass spends most
+of its time moving weights, which leaves compute to spare. Speculative
+decoding uses it: a small drafter guesses the next few tokens, and the
+main model checks all of them in one pass. It keeps the guesses up to
+the first one it disagrees with and adds one token of its own, so the
+output is the main model's either way. When most guesses are kept, one
+pass yields several tokens instead of one.</p>
+<p>Gemma 4's drafter uses multi-token prediction (MTP). It is a 4-layer
+model that reads the main model's hidden state and reuses its KV cache,
+so it keeps no cache of its own and costs little more than its
+weights.</p>
+<p>MTP is one of several ways to do speculative decoding. llama.cpp
+<code>77c4540ce</code> offers ten through <code>--spec-type</code>: a
+separate small draft model (<code>draft-simple</code>),
+<code>draft-eagle3</code>, <code>draft-mtp</code>,
+<code>draft-dflash</code>, <code>draft-dspark</code>, and five n-gram
+methods. MTP is the one Google builds drafters for: E2B, E4B, 12B,
+26B-A4B and 31B each have a published assistant checkpoint (E2B's config
+names it <code>Gemma4AssistantForCausalLM</code>), which llama.cpp runs
+as <code>draft-mtp</code> and vLLM as <code>"method":"mtp"</code>. This
+article measures MTP only. <a
+href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">Part
+1</a> explains this in full.</p>
+<p>Google publishes an assistant drafter for each Gemma 4 QAT
+checkpoint. Both cards here serve the exact Q4_0 GGUFs of
+<code>gemma-4-E2B-it</code> and <code>gemma-4-E4B-it</code> with the
+drafters stored back as Q4_0 on their trained 4-bit grid, 59 MB each.
+The question is what the drafter is worth on each card, and why the two
+cards differ.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA GPU with a CUDA driver — here an RTX 3050 OEM (driver
+615.78.08) and a GTX 1650 Ti with Max-Q Design (driver 615.71.09)</li>
+<li>The CUDA toolkit, 13.4 here, and <code>cmake</code></li>
+<li>llama.cpp at a commit with <code>--spec-type draft-mtp</code> — both
+cards ran <code>77c4540ce</code> for every comparison below</li>
+<li>Python 3.10 or newer, the system <code>python3</code>, no
+virtualenv</li>
+<li>The repository cloned, with the four rigs
+<code>local-llamacpp-{3050oem,1650ti}-{2b,4b}-q4_0/</code></li>
+<li>Claude Code, or any MCP client that speaks stdio</li>
+</ul>
+<hr />
+<h4 id="the-two-cards">The Two Cards</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-2.png"
+alt="Table: RTX 3050 OEM, GTX 1650 Ti Max-Q" /></p>
+<p>Without a drafter the 3050 generates 1.41x faster on E2B and 1.53x on
+E4B. Different hosts, so treat ratios between the cards as
+indicative.</p>
+<hr />
+<h4 id="step-1--repack-the-drafter-on-its-trained-grid">Step 1 — Repack
+the Drafter on Its Trained Grid</h4>
+<p>Google publishes the QAT assistant drafters as <a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant">google/gemma-4-E2B-it-qat-q4_0-unquantized-assistant</a>
+and <a
+href="https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-unquantized-assistant">google/gemma-4-E4B-it-qat-q4_0-unquantized-assistant</a>.
+Each is a 4-layer model that reads the main model's KV cache, stored as
+bf16 safetensors.</p>
+<p>Quantization-aware training already put the weights on a 4-bit grid:
+in every group of 32 values there are at most 16 distinct levels, evenly
+spaced. bf16 spends 16 bits storing each of those levels.</p>
+<p>llama.cpp's <code>convert_hf_to_gguf.py</code> has no way to know
+that, so it writes Q8_0: 8.5 bits per weight, re-rounded onto an 8-bit
+grid of its own. The file shrinks, and the values move. Only 11.7% of
+the drafter's weights come back bit-identical.</p>
+<p>Q4_0 is 4.5 bits per weight: one fp16 step per group of 32, and a
+4-bit level for each value. That is enough to hold the trained grid,
+provided each group's step is read off its own values.
+<code>gguf_exact.py</code> does this for each group:</p>
+<pre><code>amax = np.abs(g).max(-1, keepdims=True)
+for m in range(1, 9):                      # try steps amax/1 .. amax/8
+    cand = amax / m
+    q = np.clip(np.rint(g / cand), -8, 7)
+    good = np.abs(g - q * cand).max(-1, keepdims=True) &lt;= amax * 2**-7</code></pre>
+<p>The first step that puts every value in the group on an integer level
+wins. A least-squares fit then refines it, and it is rounded to fp16,
+Q4_0's step type. A group that fits no step stops the build, since
+nothing is re-rounded. On both drafters no group was off the grid.</p>
+<p>The script takes Google's safetensors and the converter's Q8_0 file,
+copies the Q8_0 file's metadata byte for byte (tokenizer, chat template,
+settings), and writes every weight matrix as Q4_0. That covers 23
+tensors per drafter, including the token embedding, which holds 86–87%
+of the values rewritten:</p>
+<pre><code>python3 gguf_exact.py &lt;google-snapshot-dir&gt; gemma-4-E2B-it-qat-assistant-q8_0.gguf gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf
+python3 gguf_exact.py &lt;google-snapshot-dir&gt; gemma-4-E2B-it-qat-assistant-q8_0.gguf gemma-4-E2B-it-qat-assistant-bf16.gguf --bf16</code></pre>
+<p><code>--bf16</code> writes Google's weights unchanged into the same
+layout, so all three formats can be compared with identical
+metadata.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-3.png"
+alt="Table: E2B drafter, Q8_0 (converter), exact Q4_0 (repack), bf16 (Google&#39;s weights)" /></p>
+<p>The repack is 60% of the Q8_0 file and its error is 3.6x lower.
+Rounded back to bf16, the format Google stored, 97% of its values match
+Google's bit for bit. The E4B drafter gives the same picture: 59.7 MB,
+error 0.00138, 96.4–97.1% per tensor.</p>
+<hr />
+<h4 id="mag_right-tip-the-converter-drops-the-masked-embedding">🔎 Tip:
+The Converter Drops the Masked Embedding</h4>
+<p>llama.cpp's converter leaves out the checkpoint's
+<code>masked_embedding</code> tensors, and the repack keeps its tensor
+list. All three drafter files compared here lack them, so the comparison
+is fair. The files work with <code>--spec-type draft-mtp</code> as they
+are.</p>
+<hr />
+<h4 id="step-2--fetch-the-published-drafters">Step 2 — Fetch the
+Published Drafters</h4>
+<p>Both repacks are on Hugging Face:</p>
+<ul>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf">xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf</a>,
+file <code>gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf</code>, SHA-256
+<code>060f5a0158f8120d…</code></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf">xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf</a>,
+file <code>gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf</code>, SHA-256
+<code>dc965cb963e56b86…</code></li>
+</ul>
+<p>They pair with the main models' exact Q4_0 GGUFs, built the same way:
+<a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</a>
+and <a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf">xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf</a>.</p>
+<p>Each rig's <code>make draft</code> downloads its drafter at a pinned
+revision and checks the hash from <code>tpu.env</code>:</p>
+<pre><code>curl -fL -o $(SPEC_DRAFT_MODEL).part https://huggingface.co/$(SPEC_DRAFT_HF)/resolve/$(SPEC_DRAFT_HF_REVISION)/$(notdir $(SPEC_DRAFT_MODEL))
+echo &quot;$(SPEC_DRAFT_SHA256)  $(SPEC_DRAFT_MODEL)&quot; | sha256sum -c -</code></pre>
+<p>Both cards loaded the same two files, checked by hash.</p>
+<hr />
+<h4 id="how-the-repack-compares-on-both-cards">How the Repack Compares
+on Both Cards</h4>
+<p>Each format was served on both cards at 2 drafted tokens, six
+prompts, greedy. Gain against no drafter:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-4.png"
+alt="Table: 2 drafted tokens, 3050 E2B, 1650 Ti E2B, 3050 E4B, 1650 Ti E4B" /></p>
+<p>Memory with each drafter loaded, at <code>-c 8192</code>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-5.png"
+alt="Table: MiB, no drafter, Q8_0, exact Q4_0, bf16" /></p>
+<ul>
+<li><strong>The repack is level with Q8_0 on speed on both
+cards</strong> and uses 38–40 MiB less memory.</li>
+<li><strong>bf16 is slowest everywhere.</strong> On the 1650 Ti it makes
+E2B slower than serving without a drafter.</li>
+<li><strong>The share of drafted tokens kept is the same for all three
+formats</strong>, within 0.012 on both cards. The drafter's precision
+changes what each drafted step costs, never which tokens get kept.</li>
+<li><strong>Greedy text depends on drafting, never on the drafter's
+format.</strong> At a given draft length, Q8_0, the repack and bf16 give
+the same 18 greedy replies, on the 3050 for both models and on the 1650
+Ti for E2B (the 1650 Ti's E4B text does not repeat on
+<code>f95b0d9</code>, so it cannot be compared there).</li>
+</ul>
+<p>Answer quality on the 3050, GSM8K (1,319 problems) and BFCL simple
+(400 function calls), 8 requests at a time:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-6.png"
+alt="Table: no drafter, Q8_0, exact Q4_0" /></p>
+<p>Every drafted score is level with the same day's no-drafter run, and
+the repack is level with Q8_0: E2B GSM8K +0.0030 (95% range −0.0061 to
++0.0129), identical BFCL answers on E2B.</p>
+<p>Google also publishes non-QAT drafters, <a
+href="https://huggingface.co/google/gemma-4-E2B-it-assistant">google/gemma-4-E2B-it-assistant</a>
+and <a
+href="https://huggingface.co/google/gemma-4-E4B-it-assistant">google/gemma-4-E4B-it-assistant</a>.
+Their weights are on no 4-bit grid, so they were converted to Q8_0.
+Against the QAT targets they keep fewer drafted tokens on E2B and are
+level or behind at every draft length on both models: E2B 1.34x against
+the repack's 1.40x on the 3050, and 1.16x against 1.18x on the 1650
+Ti.</p>
+<p>The 1650 Ti's format run used llama.cpp <code>f95b0d9</code>, the
+build its rigs serve; every other comparison here uses
+<code>77c4540ce</code> on both cards.</p>
+<hr />
+<h4 id="is-the-repack-worth-it">Is the Repack Worth It?</h4>
+<p>Yes, as the drafter file to ship. Against the two files a user would
+otherwise serve:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-7.png"
+alt="Table: exact Q4_0 repack against, Q8_0 (converter), bf16 (Google&#39;s weights)" /></p>
+<ul>
+<li>🟢 <strong>Against bf16 it is the clear choice.</strong> It is
+faster everywhere, and on the 1650 Ti bf16 makes E2B slower than serving
+without a drafter.</li>
+<li>🟢 <strong>Against Q8_0 it is a free improvement</strong>: smaller,
+closer to the trained weights, and level on speed and answers.</li>
+<li>⚠️ <strong>The memory it saves over Q8_0 is under 1% of either
+card.</strong> It counts only on a 4 GB card running near its
+limit.</li>
+<li>⚠️ <strong>Speed stays level with Q8_0</strong> because the
+drafter's precision leaves the kept tokens unchanged. Every format keeps
+the same share, so a more exact drafter guesses as well as a rounded one
+and gains its speed from size alone.</li>
+</ul>
+<hr />
+<h4 id="step-3--serve-with-the-drafter">Step 3 — Serve With the
+Drafter</h4>
+<p>The drafter adds four flags to the rig's normal command line:</p>
+<pre><code>llama-server -m gemma-4-E4B-it-q4_0-exact.gguf --host 127.0.0.1 --port 8080 \
+  -ngl 99 -c 8192 -ctk f16 -ctv f16 -fa 1 --reasoning off --metrics \
+  -md gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf --spec-type draft-mtp -ngld all --spec-draft-n-max 2</code></pre>
+<p><code>--spec-draft-n-max</code> is the number of tokens drafted per
+step. Each rig's <code>make serve</code> builds this line from
+<code>tpu.env</code>, and an empty <code>SPEC_DRAFT_MODEL</code> serves
+without the drafter. The drafter costs 72–84 MiB of memory on either
+card.</p>
+<hr />
+<h4 id="step-4--measure-one-request-at-a-time">Step 4 — Measure One
+Request at a Time</h4>
+<p><code>speed.py</code> runs six prompts (code, advice, a story, an
+explanation, a list, a summary), 256 tokens each, three greedy repeats
+plus one sampled pass at temperature 0.8, with the prompt cache off.
+Each draft length gets its own server, the card cools before each one,
+and the first drafted setting runs again at the end to check for drift.
+The same script, prompts and llama.cpp build ran on both cards.</p>
+<pre><code>python3 speed.py &lt;rig&gt; &lt;out&gt;</code></pre>
+<hr />
+<h4 id="the-result">The Result</h4>
+<p>Greedy, geometric mean over the six prompts. "Kept" is the share of
+drafted tokens the main model accepted.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-8.png"
+alt="Table: 3050 tok/s, 3050 gain, 3050 kept, 1650 Ti tok/s, 1650 Ti gain, 1650 Ti kept" /></p>
+<p>The share of tokens kept matches across the cards at every length.
+What differs is how much each extra drafted token costs: on the 3050 E4B
+gains from 1 token to 2 and barely loses at 3, while on the 1650 Ti
+every extra token makes it slower. The likely reason is that each
+drafted step costs a larger share of a main-model step on the older card
+(inferred, not measured).</p>
+<p>The repeated setting landed within 0.3% (3050) and 2.0% (1650 Ti) of
+its first run.</p>
+<hr />
+<h4 id="mag_right-tip-pick-the-draft-length-per-card">🔎 Tip: Pick the
+Draft Length Per Card</h4>
+<p>The best draft length is a property of the card as much as the model.
+The 3050 rigs serve 2 tokens for both models. On the 1650 Ti, 1 token
+leads for both models on this build, and E2B at 3 tokens is no faster
+than serving without a drafter. A setting copied from a faster card
+loses most of the gain on a slower one.</p>
+<hr />
+<h4 id="mag_right-tip-the-same-pattern-on-a-tesla-t4">🔎 Tip: The Same
+Pattern on a Tesla T4</h4>
+<p>A Tesla T4 (Turing, 15,360 MiB) on Google Cloud shows the same answer
+under a different engine. With vLLM 0.29, the W4A16 builds of E2B and
+E4B and Google's bf16 drafters, the same six prompts one request at a
+time speed up E2B 1.29x and E4B 1.57x at 3 drafted tokens, and 1.31x and
+1.62x at 4. There the gain keeps rising to 4 drafted tokens, against 1
+on the 1650 Ti, another case of the draft length belonging to the card.
+vLLM cannot load the GGUF repack, and engine, target files and drafter
+format all differ, so the T4 numbers stay out of the tables here (<a
+href="https://github.com/xbill9/gemma4-dev/blob/main/gpu-vllm-t4-2b-w4a16/benchmarks/runs/2026-10-15-drafter-sweep-t4/REPORT.md">T4
+drafter run</a>).</p>
+<hr />
+<h4 id="step-5--measure-with-long-text-ahead">Step 5 — Measure With Long
+Text Ahead</h4>
+<p><code>longctx.py</code> puts the first 0 to 120,000 tokens of the
+NVIDIA driver README ahead of a story, a code request or a summary of
+the text, and measures generation speed alone. Same document, by hash,
+on both cards. The 1650 Ti's E4B stops at 32,768 tokens, the most that
+fits in 4 GiB with a drafter loaded.</p>
+<p>Gain at 1 drafted token, mean over the three requests:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-9.png"
+alt="Table: tokens ahead, 3050 E2B, 1650 Ti E2B, 3050 E4B, 1650 Ti E4B" /></p>
+<p>On the 3050 the drafter pays at every depth for both models; at 2
+tokens it does better still, E4B 1.86x with nothing ahead and 1.55x at
+120k. On the 1650 Ti E2B's gain is gone by 32k tokens and turns into a
+loss beyond. The share of tokens kept holds steady as the text grows on
+both cards, so the drop comes from each checking step getting dearer
+with a long context.</p>
+<hr />
+<h4 id="step-6--measure-several-requests-at-once">Step 6 — Measure
+Several Requests at Once</h4>
+<p><code>sweep.py</code> sends 1 to 16 requests at once, each with a
+unique prompt, in two shapes: 512 tokens in and 128 out, and 128 in and
+512 out. Both cards ran it with one shared KV cache (<code>-kvu</code>);
+the 3050 at <code>-c 65536 --parallel 64</code>, the 1650 Ti at
+<code>-c 16384 --parallel 16</code>.</p>
+<p>Total output with the drafter divided by without:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-10.png"
+alt="Table: requests at once, 1, 2, 4, 8, 16" /></p>
+<p><code>sweep.py</code>'s prompt repeats one paragraph, which the
+drafter guesses unusually well, so these ratios run higher than on
+everyday chat. On mixed chat prompts the 3050 measured E4B 1.08–1.24x
+and E2B 0.92–1.17x at 2–8 requests, and a loss at 32–64 for both. Read
+the table for the trend: the 3050 keeps a gain through 16 requests here,
+and the 1650 Ti loses from 4 or 8.</p>
+<p>With long prompts the drafter pays further. <code>longmixed.py</code>
+puts a different 1,000–3,500-token stretch of the driver README ahead of
+each of six tasks (a summary, a bash script, a quiz and so on), 256
+tokens out, greedy, at 1 to 32 requests on the 3050
+(<code>-c 131072 --parallel 32</code>), in two passes run in opposite
+order. The drafter keeps 0.56–0.62 of its tokens with a document in
+context, against 0.43–0.50 on short chat. Total output with the drafter
+divided by without, both passes:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-11.png"
+alt="Table: requests at once, 1, 2–16, 32" /></p>
+<p>The drafter pays at every level up to 16 requests and breaks even at
+32. This run covers the 3050 only.</p>
+<hr />
+<h4 id="mag_right-tip-the-shared-kv-cache-has-a-price-on-both-cards">🔎
+Tip: The Shared KV Cache Has a Price on Both Cards</h4>
+<p>llama-server gives each slot its own KV cache by default. On
+llama.cpp <code>77c4540ce</code> that layout halved generation speed at
+random with several requests in flight, on both cards: per-slot repeats
+spread 28–36% at 2 requests on the 1650 Ti. <code>-kvu</code> gives all
+slots one shared cache and the spread drops to about 1%. It also costs
+output as the total text held grows. At 16 requests in
+<code>sweep.py</code> the shared cache delivered 0.86–0.94x of per-slot
+output on the 3050 and 0.59–0.81x on the 1650 Ti. The drafter's ratio is
+nearly the same under either layout. With 1,000–3,500-token prompts on
+the 3050 the per-slot cache is the faster layout and showed no random
+slowdown: it beat the shared cache in 204 of 232 paired batches, and the
+shared cache gave 0.68–0.82x of its output at 16 requests and 0.49–0.66x
+at 32. All four rigs serve one request at a time, where the two layouts
+are identical.</p>
+<hr />
+<h4 id="step-7--check-the-answers">Step 7 — Check the Answers</h4>
+<p>GSM8K (1,319 problems) and BFCL simple (400 function calls), one
+request at a time, with and without the drafter:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-12.png"
+alt="Table: 3050 none, 3050 drafter, 1650 Ti none, 1650 Ti drafter" /></p>
+<p>Every difference has a 95% range that includes zero. The drafter
+finishes GSM8K 1.76x (E2B) and 2.23x (E4B) faster on the 3050 and 1.34x
+and 1.78x faster on the 1650 Ti. The 3050 ran at <code>-c 131072</code>
+with 2 drafted tokens for both models; the 1650 Ti at
+<code>-c 8192</code> with each rig's setting, 1 token for E2B and 2 for
+E4B.</p>
+<hr />
+<h4 id="mag_right-tip-greedy-text-can-change-with-the-drafter">🔎 Tip:
+Greedy Text Can Change With the Drafter</h4>
+<p>At temperature 0 a drafted reply can differ from the undrafted one at
+a near-tie word, because checking several tokens at once runs different
+GPU kernels. On both cards E2B's drafted text differs from its undrafted
+text on every prompt at 2 tokens. E4B at 1 token matches on all 18 short
+replies on both cards. On the 3050 E4B also matches at 2 tokens for
+short prompts and starts to differ from about 2,000 tokens of prompt.
+The prompt cache changes greedy text by itself as well. A test that
+needs identical text must serve without the drafter and send
+<code>cache_prompt: false</code>. The scores above show that the changed
+words do not change the answers.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/medium/img/devto-drafter-3050-vs-1650ti-table-13.png"
+alt="Table: RTX 3050 OEM, GTX 1650 Ti Max-Q" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>Drafters work on small models. Turn the drafter on for both cards
+when they serve one user. It costs no answers and 72–84 MiB of memory,
+and E4B gains the most on both: 1.72x on the 3050 and 1.49x on the 1650
+Ti. Set the draft length per card, 2 tokens on the 3050 and 1 on the
+1650 Ti.</p>
+<p>On the 1650 Ti, leave E2B's drafter off for long conversations past
+about 32k tokens and for several users at once. On the 3050, the drafter
+keeps paying with long text ahead, and with long prompts it pays up to
+16 users at once and breaks even at 32.</p>
+<hr />
+<h4 id="what-comes-next">What Comes Next</h4>
+<p>Google publishes the same two drafters, QAT and non-QAT, for the
+larger Gemma 4 models: <a
+href="https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-unquantized-assistant">12B</a>,
+<a
+href="https://huggingface.co/google/gemma-4-26B-A4B-it-qat-q4_0-unquantized-assistant">26B-A4B</a>
+and <a
+href="https://huggingface.co/google/gemma-4-31B-it-qat-q4_0-unquantized-assistant">31B</a>.
+None of them has been measured here yet, and whether they fit beside a
+drafter on these two cards is unchecked. The next measurements are the
+larger models with their drafters, and the NVIDIA L4 (Ada, compute
+capability 8.9, 24 GB), a generation newer than the 3050.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find out whether Google's Gemma 4
+assistant drafters speed up small models on small NVIDIA cards served by
+llama.cpp. They do. The key to the solution was running the same
+llama.cpp build, scripts, prompts and drafter files on both cards, one
+setting per server, and checking answer quality alongside speed. The
+results were:</p>
+<ul>
+<li>🟢 One request at a time the drafter speeds up E4B 1.72x on the RTX
+3050 and 1.49x on the GTX 1650 Ti, and E2B 1.40x and 1.18x</li>
+<li>🟢 Both cards keep the same share of drafted tokens, within 0.03 at
+every draft length</li>
+<li>🟢 GSM8K and BFCL scores are unchanged with the drafter on both
+cards</li>
+<li>🟢 The exact Q4_0 repack of the drafter is 60% of the Q8_0 file and
+level with it on speed on both cards; Google's bf16 weights are slowest
+on both</li>
+<li>⚠️ The best draft length differs: 2 tokens on the 3050, 1 on the
+1650 Ti</li>
+<li>⚠️ With long text ahead, E2B's gain on the 1650 Ti is gone by 32k
+tokens; on the 3050 it holds at 1.23x at 120k</li>
+<li>🟢 With 1,000–3,500-token prompts on the 3050 the drafter pays at
+every level up to 16 requests at once</li>
+<li>❌ With 4–8 or more requests at once the drafter costs output on the
+1650 Ti</li>
+</ul>
+<p>Scope: Gemma 4 E2B and E4B only, MTP speculative decoding only, two
+cards on two hosts, llama.cpp <code>77c4540ce</code> on both, the exact
+Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact
+Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts
+for speed, one 120k-token document for long text, <code>sweep.py</code>
+at 1–16 requests with a shared KV cache, six long-prompt tasks at 1–32
+requests on the 3050 with both cache layouts, GSM8K and BFCL simple one
+request at a time, each setting run once with a repeat check. The T4 tip
+comes from a separate vLLM run.</p>
+<p>The strategy for using MCP for local accelerator comparison was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Part 1, Gemma 4's MTP Drafter, Explained: <a
+href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0</a></li>
+<li>Repository: <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></li>
+<li>RTX 3050 rigs: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0</a>
+and <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-4b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-4b-q4_0</a></li>
+<li>GTX 1650 Ti rigs: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-2b-q4_0</a>
+and <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-4b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-4b-q4_0</a></li>
+<li>Drafter repack, 3050: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-q4exact-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-q4exact-3050oem/REPORT.md</a></li>
+<li>Drafter formats, 1650 Ti: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-formats-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-formats-1650ti/REPORT.md</a></li>
+<li>3050 draft length and long text: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-3050oem/REPORT.md</a></li>
+<li>1650 Ti draft length and long text: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-14-drafter-gaps-1650ti/REPORT.md</a></li>
+<li>3050 several requests at once: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/REPORT.md</a></li>
+<li>3050 several requests at once, long prompts: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-longmixed-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-longmixed-3050oem/REPORT.md</a></li>
+<li>1650 Ti several requests at once and answers: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-15-drafter-load-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-15-drafter-load-1650ti/REPORT.md</a></li>
+<li>Tesla T4 drafters under vLLM: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/gpu-vllm-t4-2b-w4a16/benchmarks/runs/2026-10-15-drafter-sweep-t4/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/gpu-vllm-t4-2b-w4a16/benchmarks/runs/2026-10-15-drafter-sweep-t4/REPORT.md</a></li>
+<li>3050 answers: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-fullctx-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-fullctx-3050oem/REPORT.md</a></li>
+<li>Drafters: <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf</a>
+and <a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf</a></li>
+<li>llama.cpp: <a
+href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+</ul>
+</body>
+</html>
