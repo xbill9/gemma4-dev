@@ -1,0 +1,22 @@
+{
+ "models": {
+  "xbill9/gemma-4-E2B-it-qat-q4_0-litertlm-wi4b32": {
+   "backend": "cpu",
+   "cpu_thread_count": 8,
+   "max_num_tokens": 8192,
+   "thinking": false,
+   "cache": "disk"
+  }
+ }
+}
+litert-lm serve --config run/litertlm-config.json --host 127.0.0.1 --port 8092
+Starting OpenAI-compatible API server on 127.0.0.1:8092...
+127.0.0.1 - - [15/Oct/2026 16:53:24] "GET /v1/models HTTP/1.1" 200 -
+127.0.0.1 - - [15/Oct/2026 16:53:28] "GET /v1/models HTTP/1.1" 200 -
+Using backend from config for model 'xbill9/gemma-4-E2B-it-qat-q4_0-litertlm-wi4b32': cpu
+Using cpu_thread_count from config for model 'xbill9/gemma-4-E2B-it-qat-q4_0-litertlm-wi4b32': 8
+Using max_num_tokens from config for model 'xbill9/gemma-4-E2B-it-qat-q4_0-litertlm-wi4b32': 8192
+Using cache from config for model 'xbill9/gemma-4-E2B-it-qat-q4_0-litertlm-wi4b32': disk
+Initializing engine for model: /home/xbill/models/litertlm/xbill9--gemma-4-E2B-it-qat-q4_0-litertlm-wi4b32/model.litertlm
+127.0.0.1 - - [15/Oct/2026 16:53:41] "POST /v1/chat/completions HTTP/1.1" 200 -
+make: *** [Makefile:62: serve] Terminated

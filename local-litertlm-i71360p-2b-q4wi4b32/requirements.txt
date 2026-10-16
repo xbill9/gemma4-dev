@@ -1,0 +1,24 @@
+# local-litertlm-i71360p-2b-q4wi4b32
+#
+# Install into the system python3: `pip install -r requirements.txt`.
+# Never create a virtualenv — see CLAUDE.md. (`litert-lm convert` creates one at
+# ~/.litert-lm/.venv; this rig builds with build_litertlm.py instead.)
+
+mcp>=2,<3
+httpx>=0.27.0
+python-dotenv>=1.0.0
+
+# Runtime: `litert-lm serve`. 0.18.0 needs protobuf >= 7.35, which conflicts with
+# a2a-sdk and mem0ai (both pin protobuf < 7) in the shared interpreter.
+litert-lm==0.18.0
+litert-lm-api==0.18.0
+litert-lm-builder==0.18.0
+protobuf>=7.35
+
+# Build only (build_litertlm.py): exporter, quantizer, and the tensorflow module the
+# exporter imports at load. The nightly pins typing-extensions<4.13 through xdsl;
+# reinstall typing-extensions afterwards or mcp and anthropic break.
+litert-torch-nightly==0.10.0.dev20261015
+tensorflow
+ml_dtypes
+numpy
