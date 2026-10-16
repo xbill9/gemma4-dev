@@ -72,6 +72,10 @@ token loses less at 32–64 (0.87–0.98x) but gains less for one request (1.49�
 per-slot caches (the default) halved decode speed at random on short requests; a shared cache
 (`-kvu`) avoids that but slows as the total context held grows (0.64–0.79x per-slot at 64
 requests of up to 640 tokens, `local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/`).
+**With 1,000–3,500-token prompts the drafter pays up to 16 requests** (`local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-longmixed-3050oem/`, `-c 131072 --parallel 32`):
+1.54x (per-slot) and 1.61x (shared) for one request, 1.08–1.18x at 2–16, 0.99–1.05x at 32, acceptance
+0.56–0.62. There per-slot caches are the faster layout (shared 0.61–0.66x at 32 requests) and showed no
+random slowdown. Peak 7,741 MiB with the drafter and per-slot caches.
 
 **Carried from the E2B rig, not re-measured here:** flash attention, f16 KV
 over q8_0, thread count.

@@ -142,6 +142,10 @@ at 32–64, time to first token 6–48% lower with it. Thinking on lifts it to 1
 runs above) halved decode speed at random on short requests; a shared cache (`-kvu`) avoids that
 but slows as the total context held grows: 0.55–0.70x per-slot at 64 requests of up to 640 tokens
 (`benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/`), 1.2–1.6x on requests under 300.
+**With 1,000–3,500-token prompts the drafter pays up to 16 requests**
+(`benchmarks/runs/2026-10-15-concurrency-longmixed-3050oem/`, `-c 131072 --parallel 32`): 1.26–1.34x for
+one request, 1.02–1.14x at 2–16, 0.96–1.04x at 32, acceptance 0.56–0.62. Per-slot caches are the faster
+layout there (shared 0.49–0.53x at 32 requests, time to first token up to 2x) and showed no random slowdown.
 
 **Answer quality against E4B**: see `local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-10-13-quality-e2b-vs-e4b-3050oem/`.
 This build scored suite 0.683 (E2B bf16 on TPU: 0.683), GSM8K 0.898 (bf16: 0.910),
