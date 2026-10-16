@@ -3,6 +3,7 @@ title: "Gemma 4's Drafter on Two Small GPUs: 1.72x on an RTX 3050, 1.49x on a GT
 published: false
 description: "Google's QAT assistant drafters for Gemma 4 E2B and E4B, served by llama.cpp with speculative decoding on an 8 GB RTX 3050 and a 4 GB laptop GTX 1650 Ti, same build, same prompts, same drafter files. Both cards keep the same share of drafted tokens; the older card gets less speed from them."
 tags: gemma, llamacpp, cuda, benchmarking
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/devto-cover.7d054a5b.jpg
 ---
 
 This article provides a step by step guide to serving Gemma 4 E2B and E4B with Google's QAT assistant drafters through llama.cpp's speculative decoding, and measuring what the drafter is worth on two small NVIDIA cards: a desktop RTX 3050 OEM and a laptop GTX 1650 Ti. A suite of Python MCP tools is built to simplify management of the llama.cpp hosted deployment.
