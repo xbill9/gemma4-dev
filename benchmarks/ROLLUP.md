@@ -254,6 +254,10 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 10 | 0 | 0 | **no** | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-10-14-repeatability-1650ti` | 18 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-accuracy-12b-3050oem` | 6 | 0 | 0 | **no** | **no** |
+| local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-drafter-q4exact-12b-3050oem` | 24 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-exact-gguf-12b-3050oem` | 27 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-first-light-3050oem` | 22 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-concurrency-3050oem` | 15 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-first-light-3050oem` | 19 | 12 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-long-context-3050oem` | 11 | 0 | 0 | yes | **no** |
@@ -548,6 +552,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-jax-cpu-2b | 0 | 1 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 15 |
 | local-llamacpp-1650ti-4b-q4_0 | 2 | 5 |
+| local-llamacpp-3050oem-12b-q4_0 | 0 | 4 |
 | local-llamacpp-3050oem-2b-q4_0 | 0 | 18 |
 | local-llamacpp-3050oem-4b-q4_0 | 0 | 3 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
