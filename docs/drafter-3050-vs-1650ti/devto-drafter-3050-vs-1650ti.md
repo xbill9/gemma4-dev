@@ -243,6 +243,12 @@ The best draft length is a property of the card as much as the model. The 3050 r
 
 ---
 
+#### 🔎 Tip: The Same Pattern on a Tesla T4
+
+A Tesla T4 (Turing, 15,360 MiB) on Google Cloud shows the same answer under a different engine. With vLLM 0.29, the W4A16 builds of E2B and E4B and Google's bf16 drafters, the same six prompts one request at a time speed up E2B 1.29x and E4B 1.57x at 3 drafted tokens, and 1.31x and 1.62x at 4. There the gain keeps rising to 4 drafted tokens, against 1 on the 1650 Ti, another case of the draft length belonging to the card. vLLM cannot load the GGUF repack, and engine, target files and drafter format all differ, so the T4 numbers stay out of the tables here ([T4 drafter run](https://github.com/xbill9/gemma4-dev/blob/main/gpu-vllm-t4-2b-w4a16/benchmarks/runs/2026-10-15-drafter-sweep-t4/REPORT.md)).
+
+---
+
 #### Step 5 — Measure With Long Text Ahead
 
 `longctx.py` puts the first 0 to 120,000 tokens of the NVIDIA driver README ahead of a story, a code request or a summary of the text, and measures generation speed alone. Same document, by hash, on both cards. The 1650 Ti's E4B stops at 32,768 tokens, the most that fits in 4 GiB with a drafter loaded.
@@ -343,6 +349,12 @@ On the 1650 Ti, leave E2B's drafter off for long conversations past about 32k to
 
 ---
 
+#### What Comes Next
+
+Google publishes the same two drafters, QAT and non-QAT, for the larger Gemma 4 models: [12B](https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-unquantized-assistant), [26B-A4B](https://huggingface.co/google/gemma-4-26B-A4B-it-qat-q4_0-unquantized-assistant) and [31B](https://huggingface.co/google/gemma-4-31B-it-qat-q4_0-unquantized-assistant). None of them has been measured here yet, and whether they fit beside a drafter on these two cards is unchecked. The next measurements are the larger models with their drafters, and the NVIDIA L4 (Ada, compute capability 8.9, 24 GB), a generation newer than the 3050.
+
+---
+
 #### Summary
 
 The goal of this article was to find out whether Google's Gemma 4 assistant drafters speed up small models on small NVIDIA cards served by llama.cpp. They do. The key to the solution was running the same llama.cpp build, scripts, prompts and drafter files on both cards, one setting per server, and checking answer quality alongside speed. The results were:
@@ -356,7 +368,7 @@ The goal of this article was to find out whether Google's Gemma 4 assistant draf
 - 🟢 With 1,000–3,500-token prompts on the 3050 the drafter pays at every level up to 16 requests at once
 - ❌ With 4–8 or more requests at once the drafter costs output on the 1650 Ti
 
-Scope: two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, six long-prompt tasks at 1–32 requests on the 3050 with both cache layouts, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check.
+Scope: Gemma 4 E2B and E4B only, two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, six long-prompt tasks at 1–32 requests on the 3050 with both cache layouts, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check. The T4 tip comes from a separate vLLM run.
 
 The strategy for using MCP for local accelerator comparison was validated with an incremental step by step approach.
 
@@ -375,6 +387,7 @@ The strategy for using MCP for local accelerator comparison was validated with a
 - 3050 several requests at once: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-drafter-kvu-3050oem/REPORT.md
 - 3050 several requests at once, long prompts: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-15-concurrency-longmixed-3050oem/REPORT.md
 - 1650 Ti several requests at once and answers: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-1650ti-2b-q4_0/benchmarks/runs/2026-10-15-drafter-load-1650ti/REPORT.md
+- Tesla T4 drafters under vLLM: https://github.com/xbill9/gemma4-dev/blob/main/gpu-vllm-t4-2b-w4a16/benchmarks/runs/2026-10-15-drafter-sweep-t4/REPORT.md
 - 3050 answers: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-10-14-accuracy-fullctx-3050oem/REPORT.md
 - Drafters: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf and https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf
 - llama.cpp: https://github.com/ggml-org/llama.cpp
