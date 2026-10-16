@@ -1,7 +1,7 @@
 ---
-title: "Gemma 4's Drafter on Two Small GPUs: 1.72x on an RTX 3050, 1.49x on a GTX 1650 Ti"
+title: "Do Drafters Work on Small Models? Gemma 4 E2B and E4B on Two Small GPUs"
 published: false
-description: "Google's QAT assistant drafters for Gemma 4 E2B and E4B, served by llama.cpp with speculative decoding on an 8 GB RTX 3050 and a 4 GB laptop GTX 1650 Ti, same build, same prompts, same drafter files. Both cards keep the same share of drafted tokens; the older card gets less speed from them."
+description: "Yes. Google's 59 MB QAT assistant drafters speed up Gemma 4 E4B 1.72x and E2B 1.40x on an 8 GB RTX 3050, and 1.49x and 1.18x on a 4 GB laptop GTX 1650 Ti, served by llama.cpp one request at a time, with unchanged GSM8K and BFCL scores."
 tags: gemma, llamacpp, cuda, benchmarking
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/devto-cover.7d054a5b.jpg
 ---
@@ -10,7 +10,17 @@ This article provides a step by step guide to serving Gemma 4 E2B and E4B with G
 
 https://github.com/xbill9/gemma4-dev
 
-One request at a time, the drafter speeds up E4B **1.72x** on the RTX 3050 and **1.49x** on the GTX 1650 Ti, and E2B **1.40x** and **1.18x**. Both cards keep the same share of the drafted tokens, within 0.03, so the difference comes from the cards. Answer quality is unchanged on both. With several requests at once the gain shrinks on both cards, and on the 1650 Ti it turns into a loss from 4 requests (E4B) or 8 (E2B).
+**Do drafters work on small models? Yes.** Gemma 4 E2B and E4B are already small, and their drafter is a 4-layer model of 59 MB. Served one request at a time, it makes both models faster on both cards, and GSM8K and BFCL scores stay the same:
+
+| one request at a time | RTX 3050 | GTX 1650 Ti |
+| :--- | ---: | ---: |
+| E4B | **1.72x** | **1.49x** |
+| E2B | **1.40x** | **1.18x** |
+| Answer quality | unchanged | unchanged |
+
+The smaller model gains less. E2B is already fast per token, so each drafted step costs a larger share of what it saves (inferred from the draft-length results below, not measured directly). Both cards keep the same share of the drafted tokens, within 0.03, so the gap between the cards comes from the cards.
+
+The gain has limits. With several requests at once it shrinks on both cards, and on the 1650 Ti it turns into a loss from 4 requests (E4B) or 8 (E2B). On the 1650 Ti, E2B's gain is gone by about 32k tokens of conversation. Too many drafted tokens also cost speed on the slower card.
 
 ---
 
@@ -301,7 +311,7 @@ At temperature 0 a drafted reply can differ from the undrafted one at a near-tie
 
 #### So, Which One?
 
-Turn the drafter on for both cards when they serve one user. It costs no answers and 72–84 MiB of memory, and E4B gains the most on both: 1.72x on the 3050 and 1.49x on the 1650 Ti. Set the draft length per card, 2 tokens on the 3050 and 1 on the 1650 Ti.
+Drafters work on small models. Turn the drafter on for both cards when they serve one user. It costs no answers and 72–84 MiB of memory, and E4B gains the most on both: 1.72x on the 3050 and 1.49x on the 1650 Ti. Set the draft length per card, 2 tokens on the 3050 and 1 on the 1650 Ti.
 
 On the 1650 Ti, leave E2B's drafter off for long conversations past about 32k tokens and for several users at once. On the 3050, the drafter keeps paying with long text ahead, and with long prompts it pays up to 16 users at once and breaks even at 32.
 
@@ -309,7 +319,7 @@ On the 1650 Ti, leave E2B's drafter off for long conversations past about 32k to
 
 #### Summary
 
-The goal of this article was to measure what Google's Gemma 4 assistant drafters are worth on two small NVIDIA cards served by llama.cpp. The key to the solution was running the same llama.cpp build, scripts, prompts and drafter files on both cards, one setting per server, and checking answer quality alongside speed. The results were:
+The goal of this article was to find out whether Google's Gemma 4 assistant drafters speed up small models on small NVIDIA cards served by llama.cpp. They do. The key to the solution was running the same llama.cpp build, scripts, prompts and drafter files on both cards, one setting per server, and checking answer quality alongside speed. The results were:
 
 - 🟢 One request at a time the drafter speeds up E4B 1.72x on the RTX 3050 and 1.49x on the GTX 1650 Ti, and E2B 1.40x and 1.18x
 - 🟢 Both cards keep the same share of drafted tokens, within 0.03 at every draft length
