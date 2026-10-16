@@ -1,16 +1,18 @@
 ---
 title: "Do Drafters Work on Small Models? Gemma 4 E2B and E4B on Two Small GPUs"
 published: false
-description: "Yes. Google's 59 MB QAT assistant drafters speed up Gemma 4 E4B 1.72x and E2B 1.40x on an 8 GB RTX 3050, and 1.49x and 1.18x on a 4 GB laptop GTX 1650 Ti, served by llama.cpp one request at a time, with unchanged GSM8K and BFCL scores."
+description: "Yes. Speculative decoding with Google's 59 MB QAT multi-token prediction (MTP) drafters speeds up Gemma 4 E4B 1.72x and E2B 1.40x on an 8 GB RTX 3050, and 1.49x and 1.18x on a 4 GB laptop GTX 1650 Ti, served by llama.cpp one request at a time, with unchanged GSM8K and BFCL scores."
 tags: gemma, llamacpp, cuda, benchmarking
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/drafter-3050-vs-1650ti/devto-cover.7d054a5b.jpg
 ---
 
 This article provides a step by step guide to serving Gemma 4 E2B and E4B with Google's QAT assistant drafters through llama.cpp's speculative decoding, and measuring what the drafter is worth on two small NVIDIA cards: a desktop RTX 3050 OEM and a laptop GTX 1650 Ti. A suite of Python MCP tools is built to simplify management of the llama.cpp hosted deployment.
 
-This is the second part of a short series. [Part 1, Gemma 4's MTP Drafter, Explained](https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0), covers how speculative decoding and Gemma 4's drafter work and how the exact Q4_0 repack is built. This part has the measurements.
+This is the second part of a short series. [Part 1, Gemma 4's MTP Drafter, Explained](https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0), covers how speculative decoding and Gemma 4's multi-token prediction (MTP) drafter work and how the exact Q4_0 repack is built. This part has the measurements.
 
 https://github.com/xbill9/gemma4-dev
+
+A drafter is the guesser in speculative decoding: it proposes the next few tokens, and the main model checks them all in one pass.
 
 **Do drafters work on small models? Yes.** Gemma 4 E2B and E4B are already small, and their drafter is a 4-layer model of 59 MB. Served one request at a time, it makes both models faster on both cards, and GSM8K and BFCL scores stay the same:
 
@@ -32,7 +34,9 @@ The drafter here is an exact Q4_0 repack of Google's weights. It matches the con
 
 A language model writes one token per forward pass, and every pass reads every weight. For one user on a small GPU, each pass spends most of its time moving weights, which leaves compute to spare. Speculative decoding uses it: a small drafter guesses the next few tokens, and the main model checks all of them in one pass. It keeps the guesses up to the first one it disagrees with and adds one token of its own, so the output is the main model's either way. When most guesses are kept, one pass yields several tokens instead of one.
 
-Gemma 4's drafter uses multi-token prediction (MTP). It is a 4-layer model that reads the main model's hidden state and reuses its KV cache, so it keeps no cache of its own and costs little more than its weights. [Part 1](https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0) explains this in full.
+Gemma 4's drafter uses multi-token prediction (MTP). It is a 4-layer model that reads the main model's hidden state and reuses its KV cache, so it keeps no cache of its own and costs little more than its weights.
+
+MTP is one of several ways to do speculative decoding. llama.cpp `77c4540ce` offers ten through `--spec-type`: a separate small draft model (`draft-simple`), `draft-eagle3`, `draft-mtp`, `draft-dflash`, `draft-dspark`, and five n-gram methods. MTP is the one Google builds drafters for: E2B, E4B, 12B, 26B-A4B and 31B each have a published assistant checkpoint (E2B's config names it `Gemma4AssistantForCausalLM`), which llama.cpp runs as `draft-mtp` and vLLM as `"method":"mtp"`. This article measures MTP only. [Part 1](https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0) explains this in full.
 
 Google publishes an assistant drafter for each Gemma 4 QAT checkpoint. Both cards here serve the exact Q4_0 GGUFs of `gemma-4-E2B-it` and `gemma-4-E4B-it` with the drafters stored back as Q4_0 on their trained 4-bit grid, 59 MB each. The question is what the drafter is worth on each card, and why the two cards differ.
 
@@ -368,7 +372,7 @@ The goal of this article was to find out whether Google's Gemma 4 assistant draf
 - 🟢 With 1,000–3,500-token prompts on the 3050 the drafter pays at every level up to 16 requests at once
 - ❌ With 4–8 or more requests at once the drafter costs output on the 1650 Ti
 
-Scope: Gemma 4 E2B and E4B only, two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, six long-prompt tasks at 1–32 requests on the 3050 with both cache layouts, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check. The T4 tip comes from a separate vLLM run.
+Scope: Gemma 4 E2B and E4B only, MTP speculative decoding only, two cards on two hosts, llama.cpp `77c4540ce` on both, the exact Q4_0 E2B and E4B GGUFs with Google's QAT assistant drafters as exact Q4_0 (plus Q8_0 and bf16 for the format comparison), six short prompts for speed, one 120k-token document for long text, `sweep.py` at 1–16 requests with a shared KV cache, six long-prompt tasks at 1–32 requests on the 3050 with both cache layouts, GSM8K and BFCL simple one request at a time, each setting run once with a repeat check. The T4 tip comes from a separate vLLM run.
 
 The strategy for using MCP for local accelerator comparison was validated with an incremental step by step approach.
 
