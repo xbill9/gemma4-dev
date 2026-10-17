@@ -51,7 +51,8 @@ for t in ("gsm8k", "bfcl_simple"):
     if ids:
         d = [int(bool(x[i].get("right"))) - int(bool(y[i].get("right"))) for i in ids]
         lo, hi = boot(d)
-        same = sum((x[i].get("text") or "") == (y[i].get("text") or "") for i in ids)
+        same = sum((x[i].get("text") or "", json.dumps(x[i].get("calls"), sort_keys=True))
+                   == (y[i].get("text") or "", json.dumps(y[i].get("calls"), sort_keys=True)) for i in ids)
         wx, wy = wall(os.path.join(HERE, f"{t}-q4x.log")), wall(os.path.join(HERE, f"{t}-none.log"))
         speed = f"{wy / wx:.2f}x" if wx and wy else "n/a"
         print(
@@ -64,11 +65,12 @@ for t in ("gsm8k", "bfcl_simple"):
             print(
                 f"{t:12s} E4B {a:5s} n={len(e)} acc {sum(bool(r.get('right')) for r in e.values()) / len(e):.4f} (reference)"
             )
-    z = load(os.path.join(E4B, f"{t}-e4b-none.jsonl"))
-    ids = sorted(set(y) & set(z))
-    if ids:
-        d = [int(bool(y[i].get("right"))) - int(bool(z[i].get("right"))) for i in ids]
-        lo, hi = boot(d)
-        print(
-            f"{t:12s} 12B none - E4B none: {sum(d) / len(d):+.4f} 95% [{lo:+.4f}, {hi:+.4f}] (different build and -c)"
-        )
+    for a, mine in (("q4x", x), ("none", y)):
+        z = load(os.path.join(E4B, f"{t}-e4b-{a}.jsonl"))
+        ids = sorted(set(mine) & set(z))
+        if ids:
+            d = [int(bool(mine[i].get("right"))) - int(bool(z[i].get("right"))) for i in ids]
+            lo, hi = boot(d)
+            print(
+                f"{t:12s} 12B {a} - E4B {a}: {sum(d) / len(d):+.4f} 95% [{lo:+.4f}, {hi:+.4f}] (different build and -c)"
+            )
