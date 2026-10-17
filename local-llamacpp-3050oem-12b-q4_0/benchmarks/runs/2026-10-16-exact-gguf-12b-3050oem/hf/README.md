@@ -107,6 +107,23 @@ scale. Per-tensor counts are in `evidence/build_report.json`.
 The generation gain is smaller than the E4B build's (1.06x) and E2B's (1.11x): the output layer
 is a smaller share of what a 12B reads per token (inferred, not measured).
 
+#### Benchmarks
+
+One request at a time on an RTX 3050 (8 GB), llama.cpp `7182ef71e`, `-c 24576`, thinking off,
+with and without the exact Q4_0 12B drafter
+([`xbill9/gemma-4-12B-it-qat-assistant-q4_0-exact-gguf`](https://huggingface.co/xbill9/gemma-4-12B-it-qat-assistant-q4_0-exact-gguf)).
+Gemma 4 E4B (exact Q4_0) on the same card for scale, on llama.cpp `77c4540ce`:
+
+| | this file, drafter | this file, no drafter | E4B, drafter | E4B, no drafter |
+| --- | ---: | ---: | ---: | ---: |
+| GSM8K (1,319 questions) | 0.9598 | 0.9629 | 0.9295 | 0.9310 |
+| BFCL simple (400) | 0.9500 | 0.9475 | 0.9125 | 0.9125 |
+
+Paired by question, the 12B is ahead of E4B by 0.030 on GSM8K (95% range 0.018 to 0.043) and
+0.0375 on BFCL (0.010 to 0.065) with the drafter. The drafter changes neither score and finishes
+GSM8K 2.34x faster. Method and per-question records:
+[2026-10-16-accuracy-12b-3050oem](https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-16-accuracy-12b-3050oem).
+
 #### Running it
 
 ```bash
@@ -140,7 +157,7 @@ on a 4-bit grid. It is the E2B and E4B builds' script, unchanged apart from its 
 - Tested with llama.cpp on one machine: speed, memory and three greedy chat prompts on its GPU
   (RTX 3050, CUDA), divergence on its CPU (AVX2). Other backends and runtimes were not tested,
   and divergence was not measured on CUDA.
-- Answer quality on benchmarks was not measured for this build.
+- Benchmarks: GSM8K and BFCL simple only (below), on one machine with llama.cpp `7182ef71e`.
 - The divergence figures cover 8,192 tokens of English Wikipedia text, a poor fit for this
   instruction-tuned model (see above).
 - Unofficial. Report problems here, not to Google.

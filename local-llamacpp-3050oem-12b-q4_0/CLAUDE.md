@@ -44,11 +44,14 @@ the mmap and `OVERRIDE_TENSORS` is empty. The whole model is on the card, and th
 - **Drafter:** exact Q4_0 at 2 tokens 2.01x, acceptance 0.658; Q8_0 1.90x at the same
   acceptance and 202 MiB more; 1 token 1.62x, 3 tokens 2.02x. **Greedy text with the drafter
   differs from greedy text without it** (18 of 18 replies at 2 tokens), though it repeats run to
-  run. **Answer quality is unmeasured on the 12B**, with or without the drafter.
+  run. **The answers do not change**: GSM8K and BFCL are level with and without it.
 - **Output divergence from bf16** (CPU, wikitext-2): mean KLD 0.125 for the rebuild against
   0.543 for Google's file, same top token 89.1% against 71.8%. Not comparable with E4B's 0.0010:
   bf16 perplexity on that text is 312 for the 12B, which degrades without its chat format.
-- **Answer quality** (GSM8K, BFCL, with and without the drafter): `2026-10-16-accuracy-12b-3050oem/`.
+- **Answer quality** (`2026-10-16-accuracy-12b-3050oem/`, one request at a time at the serving
+  setting): GSM8K 0.9598 with the drafter / 0.9629 without, BFCL 0.9500 / 0.9475, the drafter
+  level on both and GSM8K 2.34x faster with it. **Above E4B on both**, paired by question:
+  GSM8K +0.030 (95% +0.018 to +0.043), BFCL +0.0375 (+0.010 to +0.065), with the drafter.
 
 **Not re-measured here:** flash attention, f16 KV over q8_0, thread count, concurrency.
 

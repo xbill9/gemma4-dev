@@ -72,7 +72,19 @@ fit with the drafter.
 **Greedy text changes.** With the drafter, greedy replies repeat exactly from run to run, but
 they differ from the target's greedy replies without a drafter in 18 of 18 at 2 drafted tokens
 (9 of 18 at 1). The target still checks every drafted token; the differences likely come from
-rounding in the batched check (inferred, not measured). Answer quality with this drafter was not measured.
+rounding in the batched check (inferred, not measured).
+
+**The answers do not change.** One request at a time at `-c 24576`, the 12B target scores the
+same with and without this drafter, and finishes GSM8K 2.34x faster with it:
+
+| | with this drafter | without a drafter |
+| --- | ---: | ---: |
+| GSM8K (1,319 questions) | 0.9598 | 0.9629 |
+| BFCL simple (400) | 0.9500 | 0.9475 |
+
+Paired by question the differences are −0.0030 (95% range −0.0083 to +0.0023) and +0.0025
+(0 to +0.0075). Method and per-question records:
+[2026-10-16-accuracy-12b-3050oem](https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-16-accuracy-12b-3050oem).
 
 #### What is in it
 

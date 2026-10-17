@@ -240,12 +240,12 @@ The rig's own settings, one request at a time: GSM8K (1,319 grade-school math qu
 
 | one request at a time | 12B, drafter | 12B, no drafter | E4B, drafter | E4B, no drafter |
 | :--- | ---: | ---: | ---: | ---: |
-| GSM8K | **0.960** | in progress | 0.930 | 0.931 |
+| GSM8K | **0.960** | **0.963** | 0.930 | 0.931 |
 | BFCL simple | **0.950** | **0.948** | 0.913 | 0.913 |
 
 **The 12B answers more questions than E4B on both tests.** Paired question by question, it is 3.0 points ahead on GSM8K (95% range 1.8 to 4.3) and 3.8 points ahead on BFCL (1.0 to 6.5), both with the drafter.
 
-**The drafter changes no BFCL score.** The two runs differ on one question of 400, and 396 of 400 tool calls are identical. Without the drafter BFCL took 1.73x as long.
+**The drafter changes no score.** On GSM8K the runs with and without it differ by 0.3 points (95% range −0.8 to +0.2), on BFCL by one question of 400. The greedy text differs, as in Step 8: 332 of 1,319 GSM8K replies match word for word. Without the drafter GSM8K took 2.34x as long, 4 h 16 min against 1 h 49 min.
 
 ---
 
@@ -271,7 +271,7 @@ For answers, the 12B. It scores 3 to 4 points higher than E4B on math and on fun
 
 For long conversations or speed, E4B. It holds the full 131,072-token context on the same card and generates at 100 tok/s with its drafter, against the 12B's 24,576 tokens and 56.4 tok/s.
 
-Either way, serve with the drafter: it doubles the 12B's speed and costs no BFCL answers.
+Either way, serve with the drafter: it doubles the 12B's speed and costs no answers.
 
 ---
 
@@ -288,7 +288,7 @@ The goal of this article was to find out whether Gemma 4 12B, in Google's QAT bu
 - 🟢 The exact Q4_0 rebuild fits with every layer on the card at up to 40,960 tokens of context, against 28,672 for Google's file
 - 🟢 It generates 1.035x faster than Google's file and stays 4.4x closer to bf16 by mean divergence
 - 🟢 Google's 12B drafter, rebuilt as exact Q4_0, doubles generation to 56.4 tok/s, and runs 1.06x faster than the Q8_0 conversion
-- 🟢 The 12B answers more questions than E4B on the same card: GSM8K 0.960 against 0.930, BFCL 0.950 against 0.913, and the drafter changes no BFCL score
+- 🟢 The 12B answers more questions than E4B on the same card: GSM8K 0.960 against 0.930, BFCL 0.950 against 0.913, and the drafter changes neither score
 - ⚠️ With the drafter, the context that fits drops to 24,576 tokens at 16-bit, or 49,152 with an 8-bit cache
 - ⚠️ The 12B generates at 0.47x E4B's speed on the same card
 - ❌ The full 131,072-token context does not fit on 8 GB
