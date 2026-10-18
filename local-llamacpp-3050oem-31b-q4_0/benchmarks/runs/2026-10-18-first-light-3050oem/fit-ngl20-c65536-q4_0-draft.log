@@ -1,0 +1,23 @@
+0.00.056.813 I srv  llama_server: initializing ...
+0.00.056.825 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.057.209 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.059.628 I srv    load_model: loading model '/home/xbill/models/gemma-4-31B-it-qat-q4_0-gguf/gemma-4-31B_q4_0-it.gguf'
+0.01.573.159 E llama_init_from_model: failed to initialize the context: Gemma4Assistant requires ctx_other to be set (this warning is normal during memory fitting)
+0.01.650.428 W operator(): failed to measure the memory of the extra model, fitting without it: failed to create llama_context from model
+0.01.650.450 W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 20, abort
+0.02.229.689 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.02.230.308 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.02.264.749 W load: '</s>' is a normal token here, removing it from EOG list
+0.04.124.474 I cmn          init: llama threadpool init, n_threads = 8
+0.04.642.118 I common_speculative_init_result: loading draft model '/home/xbill/models/gemma-4-31B-it-qat-assistant/gemma-4-31B-it-qat-assistant-q4_0-exact.gguf'
+0.05.223.588 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.05.224.191 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.05.259.179 W load: '</s>' is a normal token here, removing it from EOG list
+0.05.283.016 E ggml_backend_cuda_buffer_type_alloc_buffer: allocating 251.93 MiB on device 0: cudaMalloc failed: out of memory
+0.05.283.021 E ggml_backend_buft_alloc_buffer_n_default: failed to allocate CUDA0 buffer of size 264169984
+0.05.369.580 E llama_model_load: error loading model: unable to allocate CUDA0 buffer
+0.05.369.589 E llama_model_load_from_file_impl: failed to load model
+0.05.369.590 E common_speculative_init_result: failed to load draft model, '/home/xbill/models/gemma-4-31B-it-qat-assistant/gemma-4-31B-it-qat-assistant-q4_0-exact.gguf'
+0.05.369.597 E srv    load_model: failed to load draft model, '/home/xbill/models/gemma-4-31B-it-qat-assistant/gemma-4-31B-it-qat-assistant-q4_0-exact.gguf'
+0.05.369.605 I srv    operator(): operator(): cleaning up before exit...
+0.05.370.096 E srv  llama_server: exiting due to model loading error

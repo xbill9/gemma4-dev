@@ -278,6 +278,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-mixed-3050oem` | 79 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-thinking-3050oem` | 17 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-queue-3050oem` | 4 | 0 | 0 | **no** | **no** |
+| local-llamacpp-3050oem-31b-q4_0 | `2026-10-18-first-light-3050oem` | 50 | 3 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-first-light-3050oem` | 7 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-quality-e2b-vs-e4b-3050oem` | 53 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-spec-mtp-3050oem` | 13 | 0 | 0 | yes | **no** |
@@ -557,6 +558,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-3050oem-12b-q4_0 | 0 | 5 |
 | local-llamacpp-3050oem-26b-q4_0 | 0 | 1 |
 | local-llamacpp-3050oem-2b-q4_0 | 0 | 18 |
+| local-llamacpp-3050oem-31b-q4_0 | 0 | 1 |
 | local-llamacpp-3050oem-4b-q4_0 | 0 | 3 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-cpu-4b-q4_0 | 1 | 1 |
