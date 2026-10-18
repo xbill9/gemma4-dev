@@ -1,0 +1,14 @@
+Can a QAT 12B Fit an 8 GB GPU? Gemma 4 12B on an RTX 3050
+
+Yes. An exact Q4_0 rebuild of Google's Gemma 4 12B QAT GGUF runs with every layer on an 8 GB RTX 3050 at up to 40,960 tokens of context, and Google's 12B drafter, rebuilt the same way, doubles its generation speed to 56 tok/s with llama.cpp. A 4-bit context cache stretches the drafter setting to 81,920 tokens at the same answers.
+
+What is in it:
+
+- 🟢 The exact Q4_0 rebuild fits with every layer on the card at up to 40,960 tokens of context, against 28,672 for Google's file
+- 🟢 It generates 1.035x faster than Google's file and stays 4.4x closer to bf16 by mean divergence
+- 🟢 Google's 12B drafter, rebuilt as exact Q4_0, doubles generation to 56.4 tok/s, and runs 1.06x faster than the Q8_0 conversion
+- 🟢 The 12B answers more questions than E4B on the same card: GSM8K 0.960 against 0.930, BFCL 0.950 against 0.913, and the drafter changes neither score
+
+dev.to (Google Developer Experts): https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267
+Medium: https://xbill999.medium.com/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1917208212ad
+Substack: https://xbill9.substack.com/p/can-a-qat-12b-fit-an-8-gb-gpu-gemma
