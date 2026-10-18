@@ -1,7 +1,7 @@
 ---
 title: "Can a QAT 12B Fit an 8 GB GPU? Gemma 4 12B on an RTX 3050"
 published: false
-description: "Yes. An exact Q4_0 rebuild of Google's Gemma 4 12B QAT GGUF runs with every layer on an 8 GB RTX 3050 at up to 40,960 tokens of context, and Google's 12B drafter, rebuilt the same way, doubles its generation speed to 56 tok/s with llama.cpp."
+description: "Yes. An exact Q4_0 rebuild of Google's Gemma 4 12B QAT GGUF runs with every layer on an 8 GB RTX 3050 at up to 40,960 tokens of context, and Google's 12B drafter, rebuilt the same way, doubles its generation speed to 56 tok/s with llama.cpp. A 4-bit context cache stretches the drafter setting to 81,920 tokens at the same answers."
 tags: gemma, llamacpp, cuda, benchmarking
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050/devto-cover.2bba6341.jpg
 ---
@@ -19,9 +19,10 @@ https://github.com/xbill9/gemma4-dev
 | File size | 6.98 GB | **6.72 GB** |
 | Most context that loads | 28,672 tokens | **40,960 tokens** |
 | Generation | 27.7 tok/s | **28.6 tok/s** |
-| With the 12B drafter | — | **56.4 tok/s** at 24,576 tokens of context |
+| With the 12B drafter | — | **56.4 tok/s** |
+| Most context with the drafter, 4-bit cache | — | **81,920 tokens** |
 
-The rebuild stores every weight on the 4-bit grid QAT trained, including the embedding table that Google's file keeps at 6 bits. That one table frees 247.5 MiB of the card, which buys 12,288 more tokens of context. Google's 12B drafter, rebuilt the same way, doubles generation.
+The rebuild stores every weight on the 4-bit grid QAT trained, including the embedding table that Google's file keeps at 6 bits. That one table frees 247.5 MiB of the card, which buys 12,288 more tokens of context. Google's 12B drafter, rebuilt the same way, doubles generation, and a 4-bit context cache gives it 81,920 tokens of context with no change in answers.
 
 ---
 
@@ -131,15 +132,15 @@ make draft
 
 `fit.sh` starts `llama-server -ngl 99 -fa 1` at rising context sizes and records the largest that loads, with the card otherwise idle:
 
-| RTX 3050, 8,192 MiB | 16-bit cache | 8-bit cache (`-ctk q8_0 -ctv q8_0`) |
-| :--- | ---: | ---: |
-| Google's GGUF | 28,672 tokens, 7,814 MiB | not tested |
-| exact rebuild | **40,960 tokens, 7,772 MiB** | **65,536 tokens, 7,550 MiB** |
-| exact rebuild + drafter | **24,576 tokens, 7,820 MiB** | **49,152 tokens, 7,790 MiB** |
+| RTX 3050, 8,192 MiB | 16-bit cache | 8-bit cache (`q8_0`) | 4-bit cache (`q4_0`) |
+| :--- | ---: | ---: | ---: |
+| Google's GGUF | 28,672 tokens | not tested | not tested |
+| exact rebuild | **40,960 tokens** | **65,536 tokens** | **131,072 tokens** |
+| exact rebuild + drafter | **24,576 tokens** | **49,152 tokens** | **81,920 tokens** |
 
-Google's file fails at 32,768 tokens; the rebuild loads there with 556 MiB to spare and fails at 49,152. The 8-bit cache halves every cache figure, sliding layers included, so it doubles the context at each setting. Its speed cost is unmeasured on the 12B.
+Google's file fails at 32,768 tokens; the rebuild loads there with 556 MiB to spare and fails at 49,152. The 8-bit cache halves every cache figure, sliding layers included, and the 4-bit cache halves it again. Step 10 measures what that costs.
 
-The model's own limit is 131,072 tokens. On this card the 12B reaches a third of that with the 16-bit cache, where E4B fits the full 131,072 in 6,662 MiB.
+The model's own limit is 131,072 tokens. Without the drafter, the 4-bit cache reaches it on this card.
 
 ---
 
@@ -199,10 +200,10 @@ Every block landed on the grid. The rebuild is 253,708,960 bytes against 465,128
 
 #### Step 8 — Measure the Drafter
 
-The rig serves with four extra flags:
+The rig serves with four extra flags for the drafter, and a 4-bit context cache (Step 10):
 
 ```
-llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -c 24576 -fa 1 --reasoning off \
+llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -c 81920 -ctk q4_0 -ctv q4_0 -fa 1 --reasoning off \
   -md gemma-4-12B-it-qat-assistant-q4_0-exact.gguf --spec-type draft-mtp -ngld all --spec-draft-n-max 2
 ```
 
@@ -249,6 +250,34 @@ The rig's own settings, one request at a time: GSM8K (1,319 grade-school math qu
 
 ---
 
+#### Step 10 — Choose the Context Cache
+
+The rig serves one long conversation at a time, so the context it holds and its speed with that context matter most. `kv_sweep.py` loads each cache type at its largest context, with and without the drafter, puts 0 to 98,304 tokens of a long document ahead of three questions, and measures generation (256 greedy tokens, geometric mean of the three):
+
+| tokens already in context | 0 | 16,384 | 32,768 | 65,536 | 98,304 |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| 16-bit cache, drafter (24,576) | 57.5 tok/s | 49.8 | — | — | — |
+| 8-bit cache, drafter (49,152) | 55.1 | 43.3 | 39.3 | — | — |
+| **4-bit cache, drafter (81,920)** | **55.1** | **42.4** | **37.8** | **30.8** | — |
+| 4-bit cache, no drafter (131,072) | 27.5 | 24.1 | 22.2 | 19.2 | 16.8 |
+
+**The drafter keeps paying with a long conversation held**: 2.00x at 0 tokens, 1.70x at 32,768, 1.60x at 65,536. A smaller cache costs the drafter more than it costs plain generation: at 16,384 tokens the 4-bit cache runs at 0.85x the 16-bit one with the drafter and 0.94x without. Prompt reading is level across cache types, about 720 tok/s at 16,384 tokens and 408 at 65,536.
+
+The same GSM8K and BFCL runs as Step 9, at each cache's largest context, paired question by question against the 16-bit cache:
+
+| one request at a time | GSM8K | BFCL simple |
+| :--- | ---: | ---: |
+| 16-bit cache, drafter | 0.960 | 0.950 |
+| 8-bit cache, drafter | 0.960 | 0.948 |
+| **4-bit cache, drafter** | **0.961** | **0.950** |
+| 4-bit cache, no drafter | 0.962 | 0.950 |
+
+**The cache type changes no score**: every paired range includes zero. A recall test plants eight six-digit codes through the document and asks for all of them: the 16-bit, 8-bit and 4-bit caches return the same share, about 85% at 16,384 tokens and 70% at 32,768, and the drafter changes neither.
+
+3 drafted tokens ran level with 2 at every depth and 1 ran well behind, so 2 stays. Larger prompt batches (`-ub 1024`) do not load beside the drafter.
+
+---
+
 #### Compare and Contrast
 
 | RTX 3050 OEM, 8 GB | 🥇 Gemma 4 12B | 🥈 Gemma 4 E4B |
@@ -258,6 +287,7 @@ The rig's own settings, one request at a time: GSM8K (1,319 grade-school math qu
 | Generation, 2-token drafter | 56.4 tok/s | 100.0 tok/s (Part 2) |
 | Drafter gain | 2.01x | 1.72x |
 | Context with the drafter, 16-bit cache | 24,576 tokens | 131,072 tokens |
+| Context with the drafter, 4-bit cache | 81,920 tokens | not measured |
 | GSM8K, with the drafter | 0.960 | 0.930 |
 | BFCL simple, with the drafter | 0.950 | 0.913 |
 
@@ -269,7 +299,9 @@ E4B's numbers are from llama.cpp `77c4540ce` (Part 2) except the no-drafter gene
 
 For answers, the 12B. It scores 3 to 4 points higher than E4B on math and on function calls, and with the drafter it generates at 56.4 tok/s, near E4B's 61.2 without one.
 
-For long conversations or speed, E4B. It holds the full 131,072-token context on the same card and generates at 100 tok/s with its drafter, against the 12B's 24,576 tokens and 56.4 tok/s.
+For one long conversation, the 12B with a 4-bit cache and the drafter: 81,920 tokens at 55 tok/s with nothing held and 31 tok/s at 65,536, with the same answers as the 16-bit cache. Past 81,920 tokens, drop the drafter for the full 131,072 at about half the speed.
+
+For speed, E4B. It generates at 100 tok/s with its drafter and holds the full 131,072-token context with a 16-bit cache.
 
 Either way, serve with the drafter: it doubles the 12B's speed and costs no answers.
 
@@ -277,7 +309,7 @@ Either way, serve with the drafter: it doubles the 12B's speed and costs no answ
 
 #### What Comes Next
 
-Google publishes the same QAT drafters for 26B-A4B and 31B, both too large for this card. The next measurements are the 12B under several requests at once, where a 24,576-token context leaves little room to share, and the 12B on a 16 GB card with its full context.
+Google publishes the same QAT drafters for 26B-A4B and 31B, both too large for this card. The next measurements are the 12B under several requests at once, which share the 81,920 tokens, and the 12B on a 16 GB card with its full context and the drafter.
 
 ---
 
@@ -289,11 +321,12 @@ The goal of this article was to find out whether Gemma 4 12B, in Google's QAT bu
 - 🟢 It generates 1.035x faster than Google's file and stays 4.4x closer to bf16 by mean divergence
 - 🟢 Google's 12B drafter, rebuilt as exact Q4_0, doubles generation to 56.4 tok/s, and runs 1.06x faster than the Q8_0 conversion
 - 🟢 The 12B answers more questions than E4B on the same card: GSM8K 0.960 against 0.930, BFCL 0.950 against 0.913, and the drafter changes neither score
-- ⚠️ With the drafter, the context that fits drops to 24,576 tokens at 16-bit, or 49,152 with an 8-bit cache
+- 🟢 A 4-bit context cache holds 81,920 tokens with the drafter, 3.3x the 16-bit cache, with no change in GSM8K, BFCL or long-document recall
+- ⚠️ With the drafter, the 4-bit cache generates at 0.85x the 16-bit cache once 16,384 tokens are held
 - ⚠️ The 12B generates at 0.47x E4B's speed on the same card
-- ❌ The full 131,072-token context does not fit on 8 GB
+- ⚠️ The full 131,072-token context fits only without the drafter, at about half the speed
 
-Scope: Gemma 4 12B-it QAT only, text only, one RTX 3050 OEM (8 GB) in an i7-5820K desktop, llama.cpp `7182ef71e`, Google's 12B Q4_0 GGUF against the exact Q4_0 rebuild, Google's 12B QAT drafter as exact Q4_0 and Q8_0, six short prompts for speed, divergence on 8,192 tokens of wikitext-2 on the CPU, GSM8K and BFCL simple one request at a time, one request at a time throughout. E4B comparisons from Part 2 used llama.cpp `77c4540ce`.
+Scope: Gemma 4 12B-it QAT only, text only, one RTX 3050 OEM (8 GB) in an i7-5820K desktop, llama.cpp `7182ef71e`, Google's 12B Q4_0 GGUF against the exact Q4_0 rebuild, Google's 12B QAT drafter as exact Q4_0 and Q8_0, six short prompts for speed, divergence on 8,192 tokens of wikitext-2 on the CPU, GSM8K and BFCL simple one request at a time, 16-bit, 8-bit and 4-bit context caches with 0 to 98,304 tokens of one document in context, one request at a time throughout. E4B comparisons from Part 2 used llama.cpp `77c4540ce`.
 
 The strategy for using MCP for local accelerator comparison was validated with an incremental step by step approach.
 
@@ -309,6 +342,7 @@ The strategy for using MCP for local accelerator comparison was validated with a
 - Memory and speed: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-16-first-light-3050oem/REPORT.md
 - The drafter: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-16-drafter-q4exact-12b-3050oem/REPORT.md
 - Answers: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-16-accuracy-12b-3050oem/REPORT.md
+- Context cache: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-17-kvcache-12b-3050oem/REPORT.md
 - 12B GGUF: https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-exact-gguf
 - 12B drafter: https://huggingface.co/xbill9/gemma-4-12B-it-qat-assistant-q4_0-exact-gguf
 - Google's 12B QAT GGUF: https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf
