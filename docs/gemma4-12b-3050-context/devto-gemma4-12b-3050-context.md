@@ -8,7 +8,7 @@ cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma
 
 This article provides a step by step guide to choosing the context cache, context size and drafter settings for Gemma 4 12B, Google's quantization-aware trained (QAT) build, on an 8 GB NVIDIA RTX 3050 with llama.cpp. The target workload is one long agentic session, a coding assistant whose conversation grows turn by turn, so the measure is how much context fits, how fast the model generates with that context held, and whether the answers change. A suite of Python MCP tools is built to simplify management of the llama.cpp hosted deployment.
 
-This is the fourth part of a short series. [Part 1, Gemma 4's MTP Drafter, Explained](https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0), covers how the drafter works. [Part 2, Do Drafters Work on Small Models?](https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g), measures E2B and E4B on this card. Part 3, Can a QAT 12B Fit an 8 GB GPU?, fits the 12B and its drafter on the card with a 16-bit cache. This part makes room for a long conversation.
+This is the fourth part of a short series. [Part 1, Gemma 4's MTP Drafter, Explained](https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0), covers how the drafter works. [Part 2, Do Drafters Work on Small Models?](https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g), measures E2B and E4B on this card. [Part 3, Can a QAT 12B Fit an 8 GB GPU?](https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267), fits the 12B and its drafter on the card with a 16-bit cache. This part makes room for a long conversation.
 
 https://github.com/xbill9/gemma4-dev
 
@@ -206,6 +206,7 @@ The strategy for using MCP for local accelerator comparison was validated with a
 
 - Part 1, Gemma 4's MTP Drafter, Explained: https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0
 - Part 2, Do Drafters Work on Small Models?: https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g
+- Part 3, Can a QAT 12B Fit an 8 GB GPU?: https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267
 - Repository: https://github.com/xbill9/gemma4-dev
 - 12B rig: https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-12b-q4_0
 - The chosen settings, trade-offs and open questions: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/SERVING-CONFIG.md
