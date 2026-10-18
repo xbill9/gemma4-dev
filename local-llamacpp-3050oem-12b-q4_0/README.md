@@ -5,9 +5,11 @@ driven directly, serving the exact Q4_0 GGUF of Gemma 4 **12B**-it
 (`xbill9/gemma-4-12B-it-qat-q4_0-exact-gguf`) off one **NVIDIA RTX 3050 OEM**, with
 the exact Q4_0 build of Google's 12B drafter for speculative decoding. Text only.
 
-**Status 2026-10-16: serving.** About **56 tok/s** generation with the drafter
-(28 without), 987 t/s prompt reading, 24,576-token context, **7,820 MiB of an
-8,192 MiB card**. Without the drafter, 40,960 tokens fit.
+**Status 2026-10-18: serving.** **81,920-token context** with a q4_0 context cache and
+the drafter: about **55 tok/s** generation with nothing in context, 38 at 32k and 31 at 65k
+tokens, **7,853 MiB of an 8,192 MiB card**, answers level with the f16 cache. Without the
+drafter the full 131,072 tokens fit at about half the speed
+(`benchmarks/runs/2026-10-17-kvcache-12b-3050oem`).
 
 | | |
 | --- | --- |

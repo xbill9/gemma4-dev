@@ -1,0 +1,47 @@
+0.00.140.597 I srv  llama_server: initializing ...
+0.00.140.611 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.141.047 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.143.582 I srv    load_model: loading model '/home/xbill/models/gemma-4-12B-it-qat-q4_0-exact/gemma-4-12B-it-q4_0-exact.gguf'
+0.01.661.178 E llama_init_from_model: failed to initialize the context: Gemma4Assistant requires ctx_other to be set (this warning is normal during memory fitting)
+0.01.734.173 W operator(): failed to measure the memory of the extra model, fitting without it: failed to create llama_context from model
+0.01.734.196 W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 99, abort
+0.02.307.095 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.02.307.737 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.02.342.142 W load: '</s>' is a normal token here, removing it from EOG list
+0.03.753.797 I cmn          init: llama threadpool init, n_threads = 6
+0.03.837.563 I common_speculative_init_result: loading draft model '/home/xbill/models/gemma-4-12B-it-qat-assistant/gemma-4-12B-it-qat-assistant-q4_0-exact.gguf'
+0.04.409.531 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.04.410.174 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.04.445.154 W load: '</s>' is a normal token here, removing it from EOG list
+0.04.519.040 W llama_kv_cache: layer   3: sharing with layer 47. k = 0x7f8fd4ac0000, v = 0x7f8fd6260000
+0.04.519.278 W llama_kv_cache: layer   0: sharing with layer 46. k = 0x7f8e37da0000, v = 0x7f8e37f50000
+0.04.519.280 W llama_kv_cache: layer   1: sharing with layer 46. k = 0x7f8e37da0000, v = 0x7f8e37f50000
+0.04.519.281 W llama_kv_cache: layer   2: sharing with layer 46. k = 0x7f8e37da0000, v = 0x7f8e37f50000
+0.04.599.355 I srv    load_model: initializing, n_slots = 1, n_ctx_slot = 86016, kv_unified = 'false'
+0.04.658.343 I srv  llama_server: model loaded
+0.04.658.352 I srv  llama_server: listening on http://127.0.0.1:8099
+0.04.961.974 I slot get_availabl: id  0 | task -1 | selected slot by LRU, n_tokens = 0, t_last = -1
+0.04.962.079 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+/home/xbill/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:109: CUDA error
+0.05.270.849 E CUDA error: out of memory
+0.05.270.855 E   current device: 0, in function ggml_cuda_graph_evaluate_and_capture at /home/xbill/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:4659
+0.05.270.855 E   cudaGraphInstantiate(&graph->instance, graph->graph, __null, __null, 0)
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(+0x15694) [0x7f9060710694]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(+0x15b00) [0x7f9060710b00]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(ggml_abort+0x11d) [0x7f9060710cad]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(+0x2a5593) [0x7f905aaa5593]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(+0x2bf58c) [0x7f905aabf58c]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(ggml_backend_sched_graph_compute_async+0x3d6) [0x7f906072e876]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context13graph_computeEP11ggml_cgraphb+0xdb) [0x7f905ee1136b]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context14process_ubatchERK12llama_ubatch14llm_graph_typeP22llama_memory_context_iR11ggml_status+0xfd) [0x7f905ee14f8d]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context6decodeERK15llama_batch_ext+0x47b) [0x7f905ee1f08b]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_ZNSt17_Function_handlerIFvvEZN19server_context_impl6decodeERiiEUlvE_E9_M_invokeERKSt9_Any_data+0x4e) [0x7f906016bf5e]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_ZN12server_queue14yield_to_queueEOSt8functionIFvvEE+0x95) [0x7f906011a1b5]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_ZN19server_context_impl6decodeERii+0x19c) [0x7f906018081c]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_ZN19server_context_impl12update_slotsEv+0x610) [0x7f9060182210]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_ZN12server_queue10start_loopEl+0x108) [0x7f906011ac58]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_Z12llama_serverR13common_paramsiPPcR12server_child+0x48c3) [0x7f90600cccf3]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_Z12llama_serveriPPc+0x1245) [0x7f90600ce6e5]
+/usr/lib/x86_64-linux-gnu/libc.so.6(+0x29fba) [0x7f905fa33fba]
+/usr/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x87) [0x7f905fa340d7]
+/home/xbill/llama.cpp/build/bin/llama-server(+0x1201) [0x557707b08201]

@@ -33,13 +33,14 @@ the mmap and `OVERRIDE_TENSORS` is empty. The whole model is on the card, and th
 | generation, six prompts, 2-token drafter (geomean) | **56.4** (2.01x) | — |
 | prompt reading (pp512) | 987 t/s | 2,241 |
 | weights on the card | 6,390 MiB | — |
-| VRAM as served (`-c 24576`, drafter) | 7,820 MiB | — |
+| VRAM as served (`-c 81920`, q4_0 cache, drafter) | 7,853 MiB | — |
 
 - **Exact rebuild against Google's GGUF:** 1.035x generation, prefill level, 247.5 MiB less
   VRAM (`token_embd` Q4_0 instead of Q6_K), and the most context that fits rises from 28,672
   to 40,960 tokens at f16.
-- **Context that fits:** f16 KV 40,960 without the drafter, 24,576 with it; q8_0 KV 65,536
-  and 49,152. KV is 16 KiB/token plus a fixed 480 MiB for the sliding layers.
+- **Context that fits** (2026-10-17): without / with the drafter, f16 40,960 / 24,576, q8_0
+  65,536 / 49,152, q4_0 131,072 / 81,920. KV at f16 is 16 KiB/token plus a fixed 480 MiB for
+  the sliding layers.
 - **By conversation length** (no drafter): 28.6 / 26.8 / 26.3 tok/s at 0 / 8k / 16k tokens.
 - **Drafter:** exact Q4_0 at 2 tokens 2.01x, acceptance 0.658; Q8_0 1.90x at the same
   acceptance and 202 MiB more; 1 token 1.62x, 3 tokens 2.02x. **Greedy text with the drafter
@@ -53,7 +54,24 @@ the mmap and `OVERRIDE_TENSORS` is empty. The whole model is on the card, and th
   level on both and GSM8K 2.34x faster with it. **Above E4B on both**, paired by question:
   GSM8K +0.030 (95% +0.018 to +0.043), BFCL +0.0375 (+0.010 to +0.065), with the drafter.
 
-**Not re-measured here:** flash attention, f16 KV over q8_0, thread count, concurrency.
+## Context cache — 2026-10-17
+
+`benchmarks/runs/2026-10-17-kvcache-12b-3050oem/`. **Serves q4_0 cache, drafter at 2 tokens,
+`-c 81920`**, chosen for one long conversation at a time:
+
+- **Answers level with f16** for q8_0 and q4_0, with and without the drafter: GSM8K 0.9613 and
+  BFCL 0.9500 at q4_0 with the drafter, paired ranges against f16 include zero. Recall of eight
+  codes spread through a long document is level across cache types (about 85% at 16k, 70% from
+  32k), and the drafter changes neither.
+- **Generation with the drafter, q4_0:** 55.1 / 42.4 / 37.8 / 30.8 tok/s at 0 / 16k / 32k / 65k
+  tokens held; 0.96x f16 empty, 0.85x at 16k (q8_0 0.87x). Without it the cache type matters
+  little (q4_0 0.94x f16 at 16k). Prompt reading is level across cache types.
+- **Past 81,920 tokens:** empty `SPEC_DRAFT_MODEL`, `CONTEXT_SIZE=131072`: 27.5 / 22.2 / 16.8
+  tok/s at 0 / 32k / 98k.
+- 3 drafted tokens level with 2, 1 well behind. `-ub` 1024 or 2048 with the drafter fails to
+  load even at 65,536.
+
+**Not re-measured here:** flash attention, thread count, concurrency.
 
 ## Inherited and still true here
 
