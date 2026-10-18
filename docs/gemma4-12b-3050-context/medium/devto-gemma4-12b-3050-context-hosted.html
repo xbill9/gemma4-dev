@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>How Much Context Fits Beside a 12B on an 8 GB GPU? Gemma 4 12B's Context Cache on an RTX 3050</title>
+  <meta name="description" content="A 4-bit context cache lets Gemma 4 12B hold 81,920 tokens beside its drafter on an 8 GB RTX 3050, 3.3x the 16-bit cache, with the same GSM8K, BFCL and long-document recall scores, at 55 tok/s empty and 31 tok/s with 65,536 tokens held." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to choosing the context
+cache, context size and drafter settings for Gemma 4 12B, Google's
+quantization-aware trained (QAT) build, on an 8 GB NVIDIA RTX 3050 with
+llama.cpp. The target workload is one long agentic session, a coding
+assistant whose conversation grows turn by turn, so the measure is how
+much context fits, how fast the model generates with that context held,
+and whether the answers change. A suite of Python MCP tools is built to
+simplify management of the llama.cpp hosted deployment.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-cover.abc59f31.jpg" alt="How Much Context Fits Beside a 12B on an 8 GB GPU? Gemma 4 12B&#x27;s Context Cache on an RTX 3050" /></figure>
+<p>This is the fourth part of a short series. <a
+href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">Part
+1, Gemma 4's MTP Drafter, Explained</a>, covers how the drafter works.
+<a
+href="https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g">Part
+2, Do Drafters Work on Small Models?</a>, measures E2B and E4B on this
+card. <a
+href="https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267">Part
+3, Can a QAT 12B Fit an 8 GB GPU?</a>, fits the 12B and its drafter on
+the card with a 16-bit cache. This part makes room for a long
+conversation.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p><strong>How much context fits beside the 12B and its drafter? 81,920
+tokens, with a 4-bit context cache</strong>, and the answers stay the
+same:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-gemma4-12b-3050-context-table-1.png"
+alt="Table: RTX 3050 OEM, 8 GB, 12B + drafter, 16-bit cache, 4-bit cache" /></p>
+<p>The 4-bit cache holds 3.3x the tokens for 4% of the generation speed
+with nothing held and 15% at 16,384 tokens. Without the drafter the same
+cache holds the model's full 131,072 tokens at about half the speed.</p>
+<hr />
+<h4 id="what-is-being-measured">What Is Being Measured?</h4>
+<p>Gemma 4 12B's weights take 6,390 MiB of the card's 8,192 MiB in the
+exact Q4_0 rebuild from Part 3. Everything else shares what is left: the
+context cache (the keys and values of every token already read), the
+drafter (Google's 12B multi-token prediction assistant, 227 MiB of
+weights), and working buffers.</p>
+<p>The context cache is the part that grows with the conversation.
+llama.cpp stores it at 16 bits by default and can store it at 8 bits
+(<code>q8_0</code>) or 4 bits (<code>q4_0</code>), which halves and
+quarters what each token costs. The questions are what a smaller cache
+costs in speed and in answers, and whether the drafter is still worth
+its memory once the context is long.</p>
+<p>Every setting is measured on one llama.cpp build,
+<code>7182ef71e</code>, with the same model and drafter files and one
+request at a time (<code>--parallel 1</code>), because the workload is
+one conversation.</p>
+<hr />
+<h4 id="step-1--serve-the-rig">Step 1 — Serve the Rig</h4>
+<p>The rig is <code>local-llamacpp-3050oem-12b-q4_0</code>. Its
+<code>tpu.env</code> holds every serving setting, and
+<code>make serve</code> starts <code>llama-server</code> from it:</p>
+<pre><code>git clone https://github.com/xbill9/gemma4-dev
+cd gemma4-dev/local-llamacpp-3050oem-12b-q4_0
+make download draft
+make serve</code></pre>
+<p>The setting this article arrives at:</p>
+<pre><code>llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -c 81920 -ctk q4_0 -ctv q4_0 -fa 1 \
+  -t 6 -tb 12 --parallel 1 --reasoning off --metrics \
+  -md gemma-4-12B-it-qat-assistant-q4_0-exact.gguf --spec-type draft-mtp -ngld all --spec-draft-n-max 2</code></pre>
+<hr />
+<h4 id="step-2--find-the-most-context-that-fits">Step 2 — Find the Most
+Context That Fits</h4>
+<p><code>kv_sweep.py</code> starts <code>llama-server</code> with each
+cache type, with and without the drafter, at falling context sizes, and
+keeps the largest that loads:</p>
+<pre><code>python3 kv_sweep.py ../../.. .</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-gemma4-12b-3050-context-table-2.png"
+alt="Table: RTX 3050, 8,192 MiB, with the drafter, without" /></p>
+<p>With the drafter, 86,016 tokens fail to load. 131,072 is the model's
+own limit, so without the drafter the 4-bit cache holds all of it.</p>
+<hr />
+<h4 id="step-3--measure-speed-with-a-long-conversation-held">Step 3 —
+Measure Speed With a Long Conversation Held</h4>
+<p>The same script puts 0 to 98,304 tokens of a long document (the
+NVIDIA driver README) ahead of three questions (a story, a Python
+function, a summary) and measures 256 greedy tokens of generation, with
+the prompt cache on as a conversation would use it:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-gemma4-12b-3050-context-table-3.png"
+alt="Table: tokens already in context, 0, 16,384, 32,768, 65,536, 98,304" /></p>
+<p>Each figure is the geometric mean of the three questions. Reading new
+text is level across cache types: about 840 tok/s for 8,192 tokens, 720
+at 16,384, 600 at 32,768 and 408 at 65,536.</p>
+<p><strong>The drafter keeps paying with a long conversation
+held</strong>: with the 4-bit cache it is 2.00x faster with nothing
+held, 1.70x at 32,768 tokens and 1.60x at 65,536. It keeps 61% to 71% of
+drafted tokens at every depth and cache type.</p>
+<hr />
+<h4 id="mag_right-tip-a-smaller-cache-costs-the-drafter-more">🔎 Tip: A
+Smaller Cache Costs the Drafter More</h4>
+<p>Without the drafter, the 4-bit cache generates at 0.94x the 16-bit
+cache with 16,384 tokens held. With the drafter, 0.85x. The drafter
+checks two drafted tokens in one pass over the whole cache, so a cache
+that is slower to read costs it more. The drafter still wins at every
+depth: the slowest drafter setting at 16,384 tokens (42.4 tok/s) is
+1.65x the fastest setting without one (25.7, arithmetic).</p>
+<hr />
+<h4 id="step-4--check-the-answers">Step 4 — Check the Answers</h4>
+<p><code>gen_eval.py</code> runs GSM8K (1,319 grade-school math
+questions, up to 2,048 tokens per reply) and BFCL simple (400 single
+function calls), one request at a time, with each cache at its largest
+context:</p>
+<pre><code>JEV_GEN_MAX_TOKENS=2048 python3 gen_eval.py run http://127.0.0.1:8080 google/gemma-4-12B-it gsm8k gsm8k-q4x.jsonl --concurrency 1</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-gemma4-12b-3050-context-table-4.png"
+alt="Table: one request at a time, GSM8K, BFCL simple" /></p>
+<p><strong>The cache type changes no score.</strong>
+<code>compare.py</code> pairs each run question by question against the
+16-bit cache with the same drafter setting. For the 4-bit cache with the
+drafter the difference is +0.15 points on GSM8K (95% range −0.45 to
++0.76) and zero on BFCL (−1.0 to +1.0), and every other range also
+includes zero. The time a run takes is set by the drafter: GSM8K took 1
+h 57 min with the drafter and 4 h 20 min without, on the 4-bit
+cache.</p>
+<hr />
+<h4 id="step-5--check-recall-from-a-long-document">Step 5 — Check Recall
+From a Long Document</h4>
+<p>GSM8K and BFCL questions are short. <code>recall.py</code> tests the
+long context itself: it plants eight lines of the form "The access code
+for project Heron is 601531." through the document, asks for every code
+as JSON, and scores the codes returned, ten trials per depth with the
+same codes for every setting:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-gemma4-12b-3050-context-table-5.png"
+alt="Table: codes right, of 80, 16,384, 32,768, 64,000, 98,304, 126,976" /></p>
+<p><strong>The cache type and the drafter leave recall level</strong> at
+every depth they share. Recall falls with depth on every cache, from
+about 85% of codes at 16,384 tokens to about 70% from 32,768 on.</p>
+<hr />
+<h4 id="step-6--tune-the-drafter-and-prompt-batch">Step 6 — Tune the
+Drafter and Prompt Batch</h4>
+<p><code>tune.py</code> tries the remaining settings on the 4-bit cache
+at 81,920 tokens:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-gemma4-12b-3050-context-table-6.png"
+alt="Table: 4-bit cache, drafter, 0 tokens held, 32,768, 65,536, drafted tokens kept" /></p>
+<p>3 drafted tokens ran within 4% of 2, inside this card's spread from
+one server start to the next: two starts of the same setting read a
+32,768-token prompt at 589 and 673 tok/s. 2 stays. A larger prompt batch
+(<code>-ub 1024</code> or <code>2048</code>) does not load beside the
+drafter, even at 65,536 tokens.</p>
+<hr />
+<h4 id="mag_right-tip-keep-the-conversation-in-the-prompt-cache">🔎 Tip:
+Keep the Conversation in the Prompt Cache</h4>
+<p>Reading 65,536 tokens from scratch at about 406 tok/s takes about 160
+seconds (arithmetic). In one conversation llama.cpp's prompt cache keeps
+what it has already read, so each turn reads only the new text. One
+request at a time (<code>--parallel 1</code>) keeps the whole 81,920
+tokens for that one conversation, because llama.cpp splits the context
+across parallel slots.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-12b-3050-context/medium/img/devto-gemma4-12b-3050-context-table-7.png"
+alt="Table: RTX 3050 OEM, 8 GB, Gemma 4 12B, 16-bit cache + drafter, 4-bit cache + drafter, 4-bit cache, no drafter" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For one long conversation, the 4-bit cache with the drafter at 81,920
+tokens. It holds 3.3x the 16-bit cache's context with the same answers,
+and generates at 55 tok/s with nothing held and 31 tok/s at 65,536
+tokens.</p>
+<p>For a conversation that must go past 81,920 tokens, drop the drafter:
+the 4-bit cache then holds the full 131,072 tokens at about half the
+speed.</p>
+<p>For short conversations only, the 16-bit cache with the drafter is
+the fastest setting, up to 24,576 tokens.</p>
+<hr />
+<h4 id="what-comes-next">What Comes Next</h4>
+<p>The answer tests here use short questions, and the recall test is the
+only one with a long context held. The next measurements are function
+calling with 32,768 to 81,920 tokens of conversation ahead of each call,
+a replayed multi-turn coding session that measures each turn's speed and
+how much of the prompt cache it reuses, and repeated server starts to
+resolve the 2-against-3 drafted-token gap.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find the context cache, context size
+and drafter settings that serve Gemma 4 12B best for one long
+conversation on an 8 GB RTX 3050. The key to the solution was measuring
+speed with a long conversation already held and checking answers
+question by question for each cache type. The results were:</p>
+<ul>
+<li>🟢 A 4-bit context cache holds 81,920 tokens beside the 12B and its
+drafter, 3.3x the 16-bit cache's 24,576</li>
+<li>🟢 GSM8K, BFCL and long-document recall are level across the 16-bit,
+8-bit and 4-bit caches, with and without the drafter</li>
+<li>🟢 The drafter is still 1.60x faster with 65,536 tokens held</li>
+<li>⚠️ With the drafter, the 4-bit cache generates at 0.85x the 16-bit
+cache once 16,384 tokens are held</li>
+<li>⚠️ The full 131,072-token context fits only without the drafter, at
+about half the speed</li>
+<li>❌ Recall of eight facts planted in a long document falls from about
+85% at 16,384 tokens to about 70% from 32,768 on, on every cache</li>
+</ul>
+<p>Scope: Gemma 4 12B-it QAT only, exact Q4_0 rebuild and exact Q4_0 12B
+drafter, text only, one RTX 3050 OEM (8 GB) in an i7-5820K desktop,
+llama.cpp <code>7182ef71e</code>, 16-bit, 8-bit and 4-bit context
+caches, 0 to 98,304 tokens of one document held for speed and up to
+126,976 for recall, greedy decoding, thinking off, GSM8K and BFCL simple
+with short prompts, one request at a time throughout.</p>
+<p>The strategy for using MCP for local accelerator comparison was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Part 1, Gemma 4's MTP Drafter, Explained: <a
+href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0</a></li>
+<li>Part 2, Do Drafters Work on Small Models?: <a
+href="https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g">https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g</a></li>
+<li>Part 3, Can a QAT 12B Fit an 8 GB GPU?: <a
+href="https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267">https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267</a></li>
+<li>Repository: <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></li>
+<li>12B rig: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-12b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-12b-q4_0</a></li>
+<li>The chosen settings, trade-offs and open questions: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/SERVING-CONFIG.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/SERVING-CONFIG.md</a></li>
+<li>Context cache run: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-17-kvcache-12b-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-17-kvcache-12b-3050oem/REPORT.md</a></li>
+<li>16-bit cache answers: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-16-accuracy-12b-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-16-accuracy-12b-3050oem/REPORT.md</a></li>
+<li>12B GGUF: <a
+href="https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-exact-gguf</a></li>
+<li>12B drafter: <a
+href="https://huggingface.co/xbill9/gemma-4-12B-it-qat-assistant-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-12B-it-qat-assistant-q4_0-exact-gguf</a></li>
+<li>llama.cpp: <a
+href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+</ul>
+</body>
+</html>
