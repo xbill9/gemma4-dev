@@ -56,6 +56,8 @@ the mmap and `OVERRIDE_TENSORS` is empty. The whole model is on the card, and th
 
 ## Context cache — 2026-10-17
 
+Full write-up, trade-offs and gaps: `SERVING-CONFIG.md`.
+
 `benchmarks/runs/2026-10-17-kvcache-12b-3050oem/`. **Serves q4_0 cache, drafter at 2 tokens,
 `-c 81920`**, chosen for one long conversation at a time:
 

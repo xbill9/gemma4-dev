@@ -9,7 +9,8 @@ the exact Q4_0 build of Google's 12B drafter for speculative decoding. Text only
 the drafter: about **55 tok/s** generation with nothing in context, 38 at 32k and 31 at 65k
 tokens, **7,853 MiB of an 8,192 MiB card**, answers level with the f16 cache. Without the
 drafter the full 131,072 tokens fit at about half the speed
-(`benchmarks/runs/2026-10-17-kvcache-12b-3050oem`).
+(`benchmarks/runs/2026-10-17-kvcache-12b-3050oem`). Why these parameters, the
+trade-offs and what is untested: [`SERVING-CONFIG.md`](SERVING-CONFIG.md).
 
 | | |
 | --- | --- |
