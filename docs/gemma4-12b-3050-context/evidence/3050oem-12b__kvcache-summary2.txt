@@ -1,0 +1,41 @@
+## Tuning: fit
+
+q4-draft-fit     -ub  512 -c  94208 fails  42, 1905 MHz, 17 MiB
+q4-draft-fit     -ub  512 -c  90112 fails  43, 1905 MHz, 17 MiB
+q4-draft-fit     -ub  512 -c  86016 fails  42, 1905 MHz, 17 MiB
+q4-draft-ub1024  -ub 1024 -c  81920 fails  42, 1905 MHz, 17 MiB
+q4-draft-ub1024  -ub 1024 -c  65536 fails  42, 1905 MHz, 17 MiB
+q4-draft-ub2048  -ub 2048 -c  81920 fails  41, 1905 MHz, 17 MiB
+q4-draft-ub2048  -ub 2048 -c  65536 fails  41, 1905 MHz, 17 MiB
+q4-none-ub1024   -ub 1024 -c 131072 fails  41, 1905 MHz, 17 MiB
+q4-none-ub1024   -ub 1024 -c 114688 loads  47, 1890 MHz, 7781 MiB
+q4-draft-n1      -ub  512 -c  81920 loads  48, 1852 MHz, 7853 MiB
+q4-draft-n3      -ub  512 -c  81920 loads  45, 1905 MHz, 7853 MiB
+
+## Tuning: generation tok/s (geomean) / prompt t/s / drafted kept, by depth
+
+| arm | -c | 0 | 32768 | 65536 | 98304 |
+| --- | ---: | --- | --- | --- | --- |
+| q4-draft (sweep) | 81920 | 55.1 / kept 0.71 | 37.8 / pp 589 / kept 0.67 | 30.8 / pp 406 / kept 0.64 | - |
+| q4-none (sweep) | 131072 | 27.5 | 22.2 / pp 599 | 19.2 / pp 410 | 16.8 / pp 333 |
+| q4-none-ub1024 | 114688 | - | 22.0 / pp 705 | - | 16.7 / pp 399 |
+| q4-draft-n1 | 81920 | 42.9 / kept 0.75 | 30.9 / pp 672 / kept 0.72 | 27.3 / pp 441 / kept 0.77 | - |
+| q4-draft-n3 | 81920 | 56.0 / kept 0.59 | 39.3 / pp 673 / kept 0.57 | 32.1 / pp 442 / kept 0.55 | - |
+
+## Recall: codes right (8 per trial, 10 trials) and generation tok/s
+
+| arm | -c | depth | right | of | trials all 8 | tok/s (geomean) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| f16-none | 40960 | 16384 | 69 | 80 | 3 / 10 | 25.6 |
+| f16-none | 40960 | 32768 | 55 | 80 | 0 / 10 | 24.8 |
+| q8-none | 65536 | 16384 | 68 | 80 | 3 / 10 | 24.3 |
+| q8-none | 65536 | 32768 | 58 | 80 | 0 / 10 | 22.5 |
+| q8-none | 65536 | 49152 | 55 | 80 | 0 / 10 | 21.0 |
+| q8-none | 65536 | 64000 | 57 | 80 | 0 / 10 | 19.7 |
+| q4-none | 131072 | 16384 | 67 | 80 | 1 / 10 | 24.1 |
+| q4-none | 131072 | 32768 | 58 | 80 | 0 / 10 | 22.2 |
+| q4-none | 131072 | 64000 | 59 | 80 | 1 / 10 | 19.2 |
+| q4-none | 131072 | 98304 | 48 | 80 | 0 / 10 | 16.8 |
+| q4-none | 131072 | 126976 | 56 | 80 | 0 / 10 | 15.2 |
+| q4-draft | 81920 | 32768 | 58 | 80 | 1 / 10 | 45.6 |
+| q4-draft | 81920 | 64000 | 57 | 80 | 1 / 10 | 38.8 |
