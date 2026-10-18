@@ -33,7 +33,7 @@ or [`google/gemma-4-12B-it-qat-q4_0-gguf`](https://huggingface.co/google/gemma-4
 Google's card says the drafter must match the target's QAT precision.
 
 ```
-llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -fa 1 -c 24576 \
+llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -fa 1 -c 81920 -ctk q4_0 -ctv q4_0 \
   -md gemma-4-12B-it-qat-assistant-q4_0-exact.gguf --spec-type draft-mtp -ngld all --spec-draft-n-max 2
 ```
 
@@ -67,7 +67,9 @@ runs, geometric mean over prompts. No drafter ran first and last, at 28.1 tok/s 
 
 **On an 8 GB card the drafter costs context.** With this file the 12B target loads at up to
 24,576 tokens of f16 context (7,820 MiB); without a drafter, 40,960. With a q8_0 KV cache, 49,152
-fit with the drafter.
+fit with the drafter, and with q4_0, 81,920, with the same GSM8K and BFCL scores as f16. The drafter
+still gives 1.60x with 65,536 tokens in context
+([run](https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-17-kvcache-12b-3050oem/REPORT.md)).
 
 **Greedy text changes.** With the drafter, greedy replies repeat exactly from run to run, but
 they differ from the target's greedy replies without a drafter in 18 of 18 at 2 drafted tokens

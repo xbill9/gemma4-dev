@@ -29,7 +29,7 @@ and follows the unquantized model more closely. Google's model card is kept unch
 **It runs a QAT 12B on an 8 GB card with every layer on the GPU**, at up to 40,960 tokens of
 context, against 28,672 for Google's file. With the 12B drafter,
 [`xbill9/gemma-4-12B-it-qat-assistant-q4_0-exact-gguf`](https://huggingface.co/xbill9/gemma-4-12B-it-qat-assistant-q4_0-exact-gguf),
-it generates at 56 tok/s on an RTX 3050 with 24,576 tokens of context.
+it generates at 56 tok/s on an RTX 3050, with up to 81,920 tokens of context in a q4_0 KV cache.
 
 The E2B and E4B counterparts, built the same way, are
 [`xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf`](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf) and
@@ -67,11 +67,17 @@ GPU as well as being read from the memory-mapped file for input; storing it as Q
 247.5 MiB of VRAM. What is left goes to the context cache, which costs 16 KiB per token for the
 8 full-attention layers plus a fixed 480 MiB for the 40 sliding-window layers (f16).
 
-| `llama-server -ngl 99 -fa 1`, RTX 3050 8 GB | f16 KV cache | q8_0 KV cache |
-|---|---:|---:|
-| this GGUF | 40,960 tokens (7,772 MiB) | 65,536 tokens (7,550 MiB) |
-| this GGUF + exact Q4_0 drafter | 24,576 tokens (7,820 MiB) | 49,152 tokens (7,790 MiB) |
-| Google's GGUF | 28,672 tokens (7,814 MiB) | not tested |
+| `llama-server -ngl 99 -fa 1`, RTX 3050 8 GB | f16 KV cache | q8_0 KV cache | q4_0 KV cache |
+|---|---:|---:|---:|
+| this GGUF | 40,960 tokens | 65,536 tokens | 131,072 tokens |
+| this GGUF + exact Q4_0 drafter | 24,576 tokens | 49,152 tokens | 81,920 tokens (7,853 MiB) |
+| Google's GGUF | 28,672 tokens | not tested | not tested |
+
+GSM8K, BFCL simple and recall of codes spread through a long document are level across the f16,
+q8_0 and q4_0 caches, with and without the drafter (paired ranges include zero). With the drafter,
+the q4_0 cache generates 55.1 / 42.4 / 37.8 / 30.8 tok/s with 0 / 16k / 32k / 65k tokens in
+context, 0.85x f16 at 16k
+([run](https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-17-kvcache-12b-3050oem/REPORT.md)).
 
 Generation without a drafter: 28.6 / 26.8 / 26.3 tok/s with 0 / 8,192 / 16,384 tokens already in
 context. The card has to be otherwise idle: these figures leave 370–640 MiB free.
@@ -129,7 +135,7 @@ GSM8K 2.34x faster. Method and per-question records:
 ```bash
 llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -fa 1 -c 40960 --jinja
 # with the drafter:
-llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -fa 1 -c 24576 --jinja \
+llama-server -m gemma-4-12B-it-q4_0-exact.gguf -ngl 99 -fa 1 -c 81920 -ctk q4_0 -ctv q4_0 --jinja \
   -md gemma-4-12B-it-qat-assistant-q4_0-exact.gguf --spec-type draft-mtp -ngld all --spec-draft-n-max 2
 ```
 
