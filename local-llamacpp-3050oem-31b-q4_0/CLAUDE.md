@@ -36,8 +36,11 @@ card. `N_CPU_MOE` is carried from the 26B sister and stays empty.
 - **Context that fits**, q4_0: with the drafter 32,768 at `-ngl 20`, 65,536 at 16, 131,072 at
   12; without it 262,144 at 10.
 
-**Not measured:** generation with a long conversation held, answer quality of any kind on the
-31B, concurrency.
+**Answer quality** (`benchmarks/runs/2026-10-19-accuracy-31b-3050oem/`, in progress): BFCL
+0.960 / 0.958 with / without the drafter, level with the 26B (0.945) and 12B (0.950). GSM8K running,
+about 59 s per question with the drafter.
+
+**Not measured:** generation with a long conversation held, concurrency.
 
 ## Inherited and still true here
 
