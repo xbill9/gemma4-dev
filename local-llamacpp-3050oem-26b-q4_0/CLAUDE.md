@@ -44,8 +44,13 @@ bus slows the model.
   grows with context held: code 1.44x empty, 1.67x at 98k. Greedy text differs from no
   drafter.
 
-**Not measured:** answer quality of any kind on the 26B (GSM8K, BFCL, the q4_0 cache,
-the drafter), an exact Q4_0 rebuild of the target, concurrency.
+**Answer quality** (`benchmarks/runs/2026-10-18-accuracy-26b-3050oem/`, at the serving setting):
+GSM8K 0.965 / 0.962 and BFCL 0.945 / 0.945 with / without the drafter, level with each other and
+with the 12B sister (paired ranges include zero). GSM8K takes 1.76x the 12B's time; the drafter
+finishes it 1.35x faster.
+
+**Not measured:** the q4_0 cache against f16 for answers, an exact Q4_0 rebuild of the target,
+concurrency.
 
 ## Inherited and still true here
 
