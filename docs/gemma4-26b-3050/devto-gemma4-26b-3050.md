@@ -208,6 +208,7 @@ The strategy for using MCP for local accelerator comparison was validated with a
 - Part 1, Gemma 4's MTP Drafter, Explained: https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0
 - Part 2, Do Drafters Work on Small Models?: https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g
 - Part 3, Can a QAT 12B Fit an 8 GB GPU?: https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267
+- Part 4, How Much Context Fits Beside a 12B on an 8 GB GPU?: https://dev.to/gde/how-much-context-fits-beside-a-12b-on-an-8-gb-gpu-gemma-4-12bs-context-cache-on-an-rtx-3050-20im
 - Repository: https://github.com/xbill9/gemma4-dev
 - 26B rig: https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-26b-q4_0
 - First light run: https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-26b-q4_0/benchmarks/runs/2026-10-18-first-light-3050oem/REPORT.md
