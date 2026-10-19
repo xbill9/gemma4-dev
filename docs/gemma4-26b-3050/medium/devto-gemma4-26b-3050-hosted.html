@@ -197,7 +197,7 @@ The measures are how fast it generates, how much context fits, what the
 drafter adds, and whether the answers match the 12B that fits the card
 whole. A suite of Python MCP tools is built to simplify management of
 the llama.cpp hosted deployment.</p>
-<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-cover.00669e4e.jpg" alt="Can a 26B MoE Run on an 8 GB GPU? Gemma 4 26B A4B on an RTX 3050" /></figure>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-cover.00669e4e.jpg" alt="Can a 26B MoE Run on an 8 GB GPU? Gemma 4 26B A4B on an RTX 3050" /></figure>
 <p>This is the fifth part of a short series. <a
 href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">Part
 1, Gemma 4's MTP Drafter, Explained</a>, covers how the drafter works.
@@ -214,7 +214,7 @@ runs a model twice the card's size.</p>
 href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
 <p><strong>Can a 26B run on an 8 GB card? Yes, with 21 of its 30 expert
 layers in system RAM</strong>, and its answers match the 12B's:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-gemma4-26b-3050-table-1.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-gemma4-26b-3050-table-1.png"
 alt="Table: RTX 3050 OEM, 8 GB, 4-bit cache, drafter, Gemma 4 12B, Gemma 4 26B A4B" /></p>
 <p>The 26B holds 1.6x the 12B's context and scores the same, at 0.61x to
 0.74x the 12B's generation speed.</p>
@@ -257,7 +257,7 @@ Find How Many Expert Layers the Card Can Hold</h4>
 <p><code>llama-bench</code> measures generation (128 tokens) and prompt
 reading (512 tokens) with the experts of 30 down to 16 layers in
 RAM:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-gemma4-26b-3050-table-2.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-gemma4-26b-3050-table-2.png"
 alt="Table: experts in RAM, of 30 layers, 30 (all), 24, 20, 18, 17, 16" /></p>
 <p><strong>Each expert layer moved to the card adds about half a token
 per second.</strong> With every expert in RAM the 26B already generates
@@ -277,7 +277,7 @@ Layers for Context</h4>
 <p>Every expert layer on the card costs about 410 MiB that the context
 cache could use. Each row below is the most context that loads with that
 many layers in RAM, one request at a time:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-gemma4-26b-3050-table-3.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-gemma4-26b-3050-table-3.png"
 alt="Table: experts in RAM, 16-bit cache, 8-bit cache, 4-bit cache, 4-bit cache + drafter" /></p>
 <p>Blank cells were not tried. <strong>The 26B holds more context than
 the 12B on the same card</strong>: 131,072 tokens beside the drafter
@@ -294,7 +294,7 @@ file, and published as
 <code>xbill9/gemma-4-26B-A4B-it-qat-assistant-q4_0-exact-gguf</code>.
 <code>spec_ab.py</code> runs six prompts, greedy three times and sampled
 once, 256 tokens each, with 20 expert layers in RAM:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-gemma4-26b-3050-table-4.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-gemma4-26b-3050-table-4.png"
 alt="Table: drafter setting, greedy tok/s, x no drafter, drafted tokens kept, sampled x no drafter" /></p>
 <p><strong>The drafter gives 1.24x here against 2.01x on the
 12B.</strong> It keeps as many drafted tokens as the 12B's does, so the
@@ -310,7 +310,7 @@ Measure Speed With a Long Conversation Held</h4>
 a long document (the NVIDIA driver README) ahead of three questions (a
 story, a Python function, a summary of the document), 256 greedy tokens
 each, with the prompt cache on:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-gemma4-26b-3050-table-5.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-gemma4-26b-3050-table-5.png"
 alt="Table: tokens already in context, 0, 16,384, 32,768, 65,536, 98,304" /></p>
 <p>Each figure is the geometric mean of the questions (story and code
 only with nothing held). <strong>Without drafters the 26B generates as
@@ -328,7 +328,7 @@ tok/s at 8,192 tokens to 227 at 98,304; the 12B reads 828 tok/s at
 questions, up to 2,048 tokens per reply) and BFCL simple (400 single
 function calls), one request at a time, at the serving setting:</p>
 <pre><code>JEV_GEN_MAX_TOKENS=2048 python3 gen_eval.py run http://127.0.0.1:8080 google/gemma-4-26B-A4B-it gsm8k gsm8k-q4x.jsonl --concurrency 1</code></pre>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-gemma4-26b-3050-table-6.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-gemma4-26b-3050-table-6.png"
 alt="Table: one request at a time, 4-bit cache, GSM8K, BFCL simple" /></p>
 <p><strong>The 26B scores level with the 12B, and the drafter changes
 neither score.</strong> <code>compare.py</code> pairs the runs question
@@ -352,7 +352,7 @@ with every expert in RAM. For a model larger than the card, the active
 parameter count decides the speed.</p>
 <hr />
 <h4 id="compare-and-contrast">Compare and Contrast</h4>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/imgdevto-gemma4-26b-3050-table-7.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-26b-3050/medium/img/devto-gemma4-26b-3050-table-7.png"
 alt="Table: RTX 3050 OEM, 8 GB, 12B, 4-bit cache + drafter, 26B, 4-bit cache + drafter, 26B, 4-bit cache, no drafter" /></p>
 <hr />
 <h4 id="so-which-one">So, Which One?</h4>
