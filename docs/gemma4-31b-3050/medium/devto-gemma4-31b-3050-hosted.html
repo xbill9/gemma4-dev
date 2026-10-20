@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>A Dense 31B on an 8 GB GPU: Gemma 4 31B on an RTX 3050</title>
+  <meta name="description" content="Gemma 4 31B, a dense 17.7 GB model, serves from an 8 GB RTX 3050 with 40 of its 60 layers in system RAM: the highest GSM8K and BFCL scores of the family, at about 4 tok/s and 11x the 12B&#x27;s GSM8K time." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to serving Gemma 4 31B,
+Google's quantization-aware trained (QAT) dense model, on an 8 GB NVIDIA
+RTX 3050 with llama.cpp. The model file is 17.7 GB, so it cannot fit on
+the card. llama.cpp puts as many layers as will fit on the GPU and runs
+the rest on the CPU. The measures are how fast it generates, how much
+context fits, what the drafter adds, and whether the answers beat the
+26B and 12B sisters that came before it. A suite of Python MCP tools is
+built to simplify management of the llama.cpp hosted deployment.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-31b-3050/medium/img/devto-cover.b440d4e2.jpg" alt="A Dense 31B on an 8 GB GPU: Gemma 4 31B on an RTX 3050" /></figure>
+<p>This is the sixth part of a short series. <a
+href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">Part
+1, Gemma 4's MTP Drafter, Explained</a>, covers how the drafter works.
+<a
+href="https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g">Part
+2, Do Drafters Work on Small Models?</a>, measures E2B and E4B on this
+card. <a
+href="https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267">Part
+3, Can a QAT 12B Fit an 8 GB GPU?</a>, fits the 12B and its drafter on
+the card. <a
+href="https://dev.to/gde/how-much-context-fits-beside-a-12b-on-an-8-gb-gpu-gemma-4-12bs-context-cache-on-an-rtx-3050-20im">Part
+4, How Much Context Fits Beside a 12B on an 8 GB GPU?</a>, gives the 12B
+a 4-bit context cache. <a
+href="https://dev.to/gde/can-a-26b-moe-run-on-an-8-gb-gpu-gemma-4-26b-a4b-on-an-rtx-3050-2efn">Part
+5, Can a 26B MoE Run on an 8 GB GPU?</a>, runs the 26B
+mixture-of-experts with its experts in system RAM. This part runs the
+dense 31B, the largest and most accurate of the family.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p><strong>The 31B is the most accurate Gemma 4 that serves on this
+card, and the slowest.</strong> It scores highest on both tests and
+takes 11x the 12B's GSM8K time:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-31b-3050/medium/img/devto-gemma4-31b-3050-table-1.png"
+alt="Table: RTX 3050 OEM, 8 GB, 4-bit cache, drafter, Gemma 4 12B, Gemma 4 26B A4B, Gemma 4 31B" /></p>
+<p>The 31B leads the 12B on GSM8K by 1.2 points and the 26B by 0.8, both
+beyond the run-to-run range, while the 12B generates 13x faster. At
+about 4 tok/s it is a batch model on this card: a 200-token reply takes
+most of a minute, so it earns its place on an offline run of questions
+and the 12B serves a conversation.</p>
+<hr />
+<h4 id="what-is-being-measured">What Is Being Measured?</h4>
+<p>Gemma 4 31B is a dense model: 60 layers of 257 to 287 MiB, 15,716 MiB
+in all, plus a 1,102 MiB token embedding. Every token reads every layer,
+so the layers that run on the CPU set the speed. The 26B of Part 5 is a
+mixture-of-experts model that reads only 8 of its 128 experts per layer,
+so moving its experts to the CPU costs little; the dense 31B has no such
+shortcut.</p>
+<p>llama.cpp's <code>-ngl N</code> puts the first N of the 60 layers on
+the GPU and runs the rest on the CPU. The card holds 20 at the serving
+setting, so 40 run on the CPU, and every token crosses all 40.</p>
+<p>The host is an i7-5820K desktop (6 cores, 12 threads, quad-channel
+DDR4, 46 GiB) with the RTX 3050 OEM (8 GB). Every setting is measured on
+one llama.cpp build, <code>7182ef71e</code>, with Google's
+<code>google/gemma-4-31B-it-qat-q4_0-gguf</code> unmodified, and one
+request at a time (<code>--parallel 1</code>).</p>
+<hr />
+<h4 id="step-1--serve-the-rig">Step 1 — Serve the Rig</h4>
+<p>The rig is <code>local-llamacpp-3050oem-31b-q4_0</code>. Its
+<code>tpu.env</code> holds every serving setting, and
+<code>make serve</code> starts <code>llama-server</code> from it:</p>
+<pre><code>git clone https://github.com/xbill9/gemma4-dev
+cd gemma4-dev/local-llamacpp-3050oem-31b-q4_0
+make download draft
+make serve</code></pre>
+<p>The setting this article arrives at:</p>
+<pre><code>llama-server -m gemma-4-31B_q4_0-it.gguf -ngl 20 -c 32768 -ctk q4_0 -ctv q4_0 -fa 1 \
+  -t 8 -tb 12 --parallel 1 --reasoning off --metrics \
+  -md gemma-4-31B-it-qat-assistant-q4_0-exact.gguf --spec-type draft-mtp -ngld all --spec-draft-n-max 1</code></pre>
+<p><code>-ngl 20</code> puts 20 of the 60 layers on the card; the
+drafter runs at 1 token. The check reply through <code>make serve</code>
+generated at 4.14 tok/s in 7,734 MiB.</p>
+<hr />
+<h4 id="step-2--find-how-many-layers-the-card-can-hold">Step 2 — Find
+How Many Layers the Card Can Hold</h4>
+<p><code>llama-bench</code> measures generation (64 tokens) and prompt
+reading (512 tokens) with 0 to 24 layers on the card,
+<code>-t 6</code>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-31b-3050/medium/img/devto-gemma4-31b-3050-table-2.png"
+alt="Table: layers on the card, of 60, 0, 12, 16, 18, 20, 22, 24" /></p>
+<p><strong>Each layer moved to the card adds about 0.05 tok/s</strong>,
+a tenth of what an expert layer adds on the 26B, because the dense model
+reads every layer for every token. With all 60 on the CPU it generates
+1.68 tok/s, rising to 2.52 at 20 layers and 2.62 at 22; at 24 the
+working buffer no longer fits. The rig serves 20 layers, which leaves
+room for 32,768 tokens of 4-bit cache with the drafter (Step 3). Threads
+at 22 layers: 4 / 6 / 8 / 12 give 2.09 / 2.62 / 2.66 / 2.63 tok/s, so
+the rig serves <code>-t 8</code>.</p>
+<hr />
+<h4 id="mag_right-tip-the-active-parameter-count-sets-the-speed">🔎 Tip:
+The Active Parameter Count Sets the Speed</h4>
+<p>The 26B A4B holds 26.5B parameters against the 31B's 31B, but reads
+only about 4B of them per token, so with its experts in system RAM it
+generates at 24 tok/s against the dense 31B's 1.68 with every layer in
+RAM. Moving work to the CPU is cheap for a sparse model and expensive
+for a dense one. For a model larger than the card, the count that
+decides the speed is how many parameters each token reads, not how many
+the file holds.</p>
+<hr />
+<h4 id="step-3--trade-layers-for-context">Step 3 — Trade Layers for
+Context</h4>
+<p>Every layer on the card costs memory the context cache could use.
+Each row is the largest context that loaded with that many layers on the
+card, one request at a time, 4-bit cache:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-31b-3050/medium/img/devto-gemma4-31b-3050-table-3.png"
+alt="Table: layers on the card, with drafter, no drafter" /></p>
+<p>The dense weights take most of the card, so context and speed trade
+against each other. The rig serves 20 layers at 32,768 tokens for the
+generation speed; dropping to 12 holds 131,072 tokens with the drafter,
+matching the 26B; at 12 layers llama-bench generates 2.13 tok/s without
+the drafter, and generation with it is not measured. Without the
+drafter, 10 layers on the card hold the model's full 262,144 tokens.</p>
+<hr />
+<h4 id="step-4--measure-the-drafter">Step 4 — Measure the Drafter</h4>
+<p>Google ships a QAT drafter for the 31B, a small model that proposes
+the next tokens for the 31B to check. It is stored as exact 4-bit (Q4_0)
+on its trained grid, 280 MB against 515 MB for the converter's 8-bit
+file, and published as
+<code>xbill9/gemma-4-31B-it-qat-assistant-q4_0-exact-gguf</code>.
+<code>spec_ab.py</code> runs six prompts, 128 tokens each, one run per
+setting, with 20 layers on the card:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-31b-3050/medium/img/devto-gemma4-31b-3050-table-4.png"
+alt="Table: drafted tokens, none, 1, 2, 3, 4" /></p>
+<p><strong>1 drafted token gives 1.59x, and longer drafts give
+less.</strong> The 31B keeps three quarters of a single drafted token,
+and 1.47x to 1.71x on every prompt, facts and code most and the summary
+least. Checking several drafted tokens at once reads the 40 CPU-side
+layers for each one, which costs more than it saves, so 2, 3 and 4
+tokens all gain less than 1 token does (1.09x to 1.37x). The rig serves
+1 token.</p>
+<hr />
+<h4 id="step-5--check-the-answers">Step 5 — Check the Answers</h4>
+<p><code>gen_eval.py</code> runs GSM8K (1,319 grade-school math
+questions, up to 2,048 tokens per reply) and BFCL simple (400 single
+function calls), one request at a time, at the serving setting:</p>
+<pre><code>JEV_GEN_MAX_TOKENS=2048 python3 gen_eval.py run http://127.0.0.1:8080 google/gemma-4-31B-it gsm8k gsm8k-q4x.jsonl --concurrency 1</code></pre>
+<p>Each sister's score below is on the same questions the 31B answered,
+so the rows compare like for like:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-31b-3050/medium/img/devto-gemma4-31b-3050-table-5.png"
+alt="Table: as served, 4-bit cache, drafter, GSM8K, BFCL simple" /></p>
+<p><strong>The 31B is the family's most accurate on both tests.</strong>
+<code>compare.py</code> pairs the runs question by question with a 95%
+bootstrap range. On GSM8K the 31B leads the 26B by 0.83 points (range
++0.08 to +1.67) and the 12B by 1.21 (+0.45 to +2.05), both ranges above
+zero. On BFCL simple it leads the 26B by 1.50 points (−0.50 to +3.50)
+and the 12B by 1.00 (−0.75 to +2.75), both ranges spanning zero, so the
+function-calling lead is within the run-to-run range.</p>
+<p>The drafter changes one answer in 663, for the better. On GSM8K the
+drafter and no-drafter arms agree on every one of 263 paired questions,
+with 96 of them word for word the same and the rest reworded to the same
+answer. On BFCL the two arms differ in answer on 1 of 400 replies, a
+wrong answer the drafter gets right, with 397 word for word the
+same.</p>
+<p>The time is where the dense model pays. GSM8K took the 31B 79,000 s
+with the drafter, against 12,346 s for the 26B and 7,032 s for the 12B,
+both with their own drafters.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-31b-3050/medium/img/devto-gemma4-31b-3050-table-6.png"
+alt="Table: RTX 3050 OEM, 8 GB, 4-bit cache, drafter, 31B accuracy, 26B context, 12B speed" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For the best answers this card can give, run as an offline batch, the
+31B, at 32,768 tokens and about 4 tok/s with the drafter. It wins GSM8K
+by a margin beyond the run-to-run range and leads function calling
+within it, at a speed that suits a queue of questions left to run
+overnight.</p>
+<p>For a long conversation at a usable speed, the 12B with its drafter,
+at 55.1 tok/s and 81,920 tokens. It answers 1.2 points behind the 31B on
+GSM8K and 1.0 on BFCL, and generates 13x faster.</p>
+<p>For context between the 12B's 81,920 tokens and the full 262,144, the
+26B with its experts in RAM, which holds 131,072 tokens with its drafter
+and generates at 33.7 tok/s.</p>
+<hr />
+<h4 id="what-comes-next">What Comes Next</h4>
+<p>The answer tests here use short questions and one request at a time.
+The next measurements are function calling with a long conversation held
+across the three models, and the 26B's 4-bit cache against the 16-bit
+cache for answers.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find whether Gemma 4 31B, a dense
+model more than twice the card's size, can serve from an 8 GB RTX 3050,
+and how its answers compare with the 26B and 12B sisters. The key to the
+solution was putting 20 layers on the card and running the other 40 on
+the CPU. The results were:</p>
+<ul>
+<li>🟢 The 17.7 GB dense 31B serves from an 8 GB card with 40 of its 60
+layers in system RAM</li>
+<li>🟢 GSM8K 0.974, the highest of the family, ahead of the 26B by 0.83
+points and the 12B by 1.21, both beyond the run-to-run range</li>
+<li>🟢 BFCL simple 0.960, the highest of the family, with a lead within
+the run-to-run range</li>
+<li>🟢 The drafter changes one answer in 663, a wrong BFCL reply it gets
+right; all 263 paired GSM8K questions agree</li>
+<li>🟢 It holds 131,072 tokens with the drafter at 12 layers on the
+card, and the full 262,144 without it at 10</li>
+<li>⚠️ 1 drafted token gives 1.59x; longer drafts read the CPU-side
+layers too many times and give less</li>
+<li>❌ At about 4 tok/s the 12B generates 13x faster, and a GSM8K run
+takes 11x the 12B's time</li>
+</ul>
+<p>Scope: Gemma 4 31B-it QAT only, Google's Q4_0 GGUF unmodified with
+the exact Q4_0 31B drafter, text only, one RTX 3050 OEM (8 GB) in an
+i7-5820K desktop, llama.cpp <code>7182ef71e</code>, 4-bit context cache,
+greedy decoding, thinking off, GSM8K and BFCL simple with short prompts,
+one request at a time throughout. The sister figures are from Parts 4
+and 5 on the same card and build; the GSM8K-without-drafter arm is a
+263-question check.</p>
+<p>The strategy for using MCP for local accelerator comparison was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Part 1, Gemma 4's MTP Drafter, Explained: <a
+href="https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0">https://dev.to/gde/gemma-4s-mtp-drafter-explained-speculative-decoding-and-a-4-bit-drafter-at-60-of-the-size-1oc0</a></li>
+<li>Part 2, Do Drafters Work on Small Models?: <a
+href="https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g">https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g</a></li>
+<li>Part 3, Can a QAT 12B Fit an 8 GB GPU?: <a
+href="https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267">https://dev.to/gde/can-a-qat-12b-fit-an-8-gb-gpu-gemma-4-12b-on-an-rtx-3050-1267</a></li>
+<li>Part 4, How Much Context Fits Beside a 12B on an 8 GB GPU?: <a
+href="https://dev.to/gde/how-much-context-fits-beside-a-12b-on-an-8-gb-gpu-gemma-4-12bs-context-cache-on-an-rtx-3050-20im">https://dev.to/gde/how-much-context-fits-beside-a-12b-on-an-8-gb-gpu-gemma-4-12bs-context-cache-on-an-rtx-3050-20im</a></li>
+<li>Part 5, Can a 26B MoE Run on an 8 GB GPU?: <a
+href="https://dev.to/gde/can-a-26b-moe-run-on-an-8-gb-gpu-gemma-4-26b-a4b-on-an-rtx-3050-2efn">https://dev.to/gde/can-a-26b-moe-run-on-an-8-gb-gpu-gemma-4-26b-a4b-on-an-rtx-3050-2efn</a></li>
+<li>Repository: <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></li>
+<li>31B rig: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-31b-q4_0">https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-31b-q4_0</a></li>
+<li>First light run: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-31b-q4_0/benchmarks/runs/2026-10-18-first-light-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-31b-q4_0/benchmarks/runs/2026-10-18-first-light-3050oem/REPORT.md</a></li>
+<li>Answers run: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-31b-q4_0/benchmarks/runs/2026-10-19-accuracy-31b-3050oem/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-llamacpp-3050oem-31b-q4_0/benchmarks/runs/2026-10-19-accuracy-31b-3050oem/REPORT.md</a></li>
+<li>31B GGUF: <a
+href="https://huggingface.co/google/gemma-4-31B-it-qat-q4_0-gguf">https://huggingface.co/google/gemma-4-31B-it-qat-q4_0-gguf</a></li>
+<li>31B drafter: <a
+href="https://huggingface.co/xbill9/gemma-4-31B-it-qat-assistant-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-31B-it-qat-assistant-q4_0-exact-gguf</a></li>
+<li>llama.cpp: <a
+href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+</ul>
+</body>
+</html>
