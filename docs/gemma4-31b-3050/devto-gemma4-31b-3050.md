@@ -18,11 +18,11 @@ https://github.com/xbill9/gemma4-dev
 | :--- | ---: | ---: | ---: |
 | Model file | 6.7 GB, all on the card | 14.4 GB, experts mostly in RAM | 17.7 GB, 40 of 60 layers in RAM |
 | Context as served | 81,920 tokens | 131,072 tokens | 32,768 tokens |
-| Generation, nothing held | 55.1 tok/s | 33.7 tok/s | **4.0 tok/s** |
+| Generation, nothing held | 55.1 tok/s | 33.7 tok/s | **4.14 tok/s** |
 | GSM8K / BFCL simple | 0.961 / 0.950 | 0.965 / 0.945 | **0.974 / 0.960** |
 | GSM8K run, 1,319 questions | 1 h 57 min | 3 h 26 min | **21 h 57 min** |
 
-The 31B leads the 12B on GSM8K by 1.2 points and the 26B by 0.8, both beyond the run-to-run range, at a tenth of the 12B's generation speed. At about 4 tok/s it is a batch model on this card: a 200-token reply takes most of a minute, so it earns its place on an offline run of questions and the 12B serves a conversation.
+The 31B leads the 12B on GSM8K by 1.2 points and the 26B by 0.8, both beyond the run-to-run range, while the 12B generates 13x faster. At about 4 tok/s it is a batch model on this card: a 200-token reply takes most of a minute, so it earns its place on an offline run of questions and the 12B serves a conversation.
 
 ---
 
@@ -68,13 +68,13 @@ llama-server -m gemma-4-31B_q4_0-it.gguf -ngl 20 -c 32768 -ctk q4_0 -ctv q4_0 -f
 | Generation, tok/s | 1.68 | 2.13 | 2.30 | 2.39 | 2.52 | 2.62 | does not load |
 | Prompt reading, tok/s | 116 | 133 | 141 | 145 | 149 | 154 | |
 
-**Each layer moved to the card adds about 0.05 tok/s**, a tenth of what an expert layer adds on the 26B, because the dense model reads every layer for every token. With all 60 on the CPU it generates 1.68 tok/s, rising to 2.52 at 20 layers and 2.62 at 22; at 24 the working buffer no longer fits. The rig serves 20 layers, the most that leaves room for 32,768 tokens of 4-bit cache with the drafter (Step 3). Threads at 22 layers: 4 / 6 / 8 / 12 give 2.09 / 2.62 / 2.66 / 2.63 tok/s, so the rig serves `-t 8`.
+**Each layer moved to the card adds about 0.05 tok/s**, a tenth of what an expert layer adds on the 26B, because the dense model reads every layer for every token. With all 60 on the CPU it generates 1.68 tok/s, rising to 2.52 at 20 layers and 2.62 at 22; at 24 the working buffer no longer fits. The rig serves 20 layers, which leaves room for 32,768 tokens of 4-bit cache with the drafter (Step 3). Threads at 22 layers: 4 / 6 / 8 / 12 give 2.09 / 2.62 / 2.66 / 2.63 tok/s, so the rig serves `-t 8`.
 
 ---
 
 #### 🔎 Tip: The Active Parameter Count Sets the Speed
 
-The 26B A4B holds more total parameters than the 31B but activates a fraction of them per token, so with its experts in system RAM it generates at 24 tok/s against the dense 31B's 1.68 with every layer in RAM. Moving work to the CPU is cheap for a sparse model and expensive for a dense one. For a model larger than the card, the count that decides the speed is how many parameters each token reads, not how many the file holds.
+The 26B A4B holds 26.5B parameters against the 31B's 31B, but reads only about 4B of them per token, so with its experts in system RAM it generates at 24 tok/s against the dense 31B's 1.68 with every layer in RAM. Moving work to the CPU is cheap for a sparse model and expensive for a dense one. For a model larger than the card, the count that decides the speed is how many parameters each token reads, not how many the file holds.
 
 ---
 
@@ -89,7 +89,7 @@ Every layer on the card costs memory the context cache could use. Each row is th
 | 12 | 131,072 (7,810 MiB) | |
 | 10 | | 262,144 (7,802 MiB) |
 
-The dense weights take most of the card, so context and speed trade against each other. The rig serves 20 layers at 32,768 tokens for the generation speed; dropping to 12 holds 131,072 tokens with the drafter, matching the 26B, at 2.13 tok/s. Without the drafter, 10 layers on the card hold the model's full 262,144 tokens.
+The dense weights take most of the card, so context and speed trade against each other. The rig serves 20 layers at 32,768 tokens for the generation speed; dropping to 12 holds 131,072 tokens with the drafter, matching the 26B; at 12 layers llama-bench generates 2.13 tok/s without the drafter, and generation with it is not measured. Without the drafter, 10 layers on the card hold the model's full 262,144 tokens.
 
 ---
 
@@ -103,7 +103,7 @@ Google ships a QAT drafter for the 31B, a small model that proposes the next tok
 | x none | 1.00x | **1.59x** | 1.21x | 1.37x | 1.09x |
 | drafted tokens kept | — | 0.76 | 0.66 | 0.56 | 0.49 |
 
-**1 drafted token gives 1.59x, and longer drafts give less.** The 31B keeps three quarters of a single drafted token, and 1.47x to 1.71x on every prompt, facts and code most and the summary least. Checking several drafted tokens at once reads the 40 CPU-side layers for each one, which costs more than it saves, so 2, 3 and 4 tokens all fall below 1. The rig serves 1 token.
+**1 drafted token gives 1.59x, and longer drafts give less.** The 31B keeps three quarters of a single drafted token, and 1.47x to 1.71x on every prompt, facts and code most and the summary least. Checking several drafted tokens at once reads the 40 CPU-side layers for each one, which costs more than it saves, so 2, 3 and 4 tokens all gain less than 1 token does (1.09x to 1.37x). The rig serves 1 token.
 
 ---
 
@@ -125,7 +125,7 @@ Each sister's score below is on the same questions the 31B answered, so the rows
 
 **The 31B is the family's most accurate on both tests.** `compare.py` pairs the runs question by question with a 95% bootstrap range. On GSM8K the 31B leads the 26B by 0.83 points (range +0.08 to +1.67) and the 12B by 1.21 (+0.45 to +2.05), both ranges above zero. On BFCL simple it leads the 26B by 1.50 points (−0.50 to +3.50) and the 12B by 1.00 (−0.75 to +2.75), both ranges spanning zero, so the function-calling lead is within the run-to-run range.
 
-The drafter changes no answer. On GSM8K the drafter and no-drafter arms agree on every one of 263 paired questions, with 96 of them word for word the same and the rest reworded to the same answer. On BFCL the two arms differ on 1 of 400 replies, a wrong answer the drafter gets right, with 397 word for word the same.
+The drafter changes one answer in 663, for the better. On GSM8K the drafter and no-drafter arms agree on every one of 263 paired questions, with 96 of them word for word the same and the rest reworded to the same answer. On BFCL the two arms differ in answer on 1 of 400 replies, a wrong answer the drafter gets right, with 397 word for word the same.
 
 The time is where the dense model pays. GSM8K took the 31B 79,000 s with the drafter, against 12,346 s for the 26B and 7,032 s for the 12B, both with their own drafters.
 
@@ -137,7 +137,7 @@ The time is where the dense model pays. GSM8K took the 31B 79,000 s with the dra
 | :--- | ---: | ---: | ---: |
 | Layers / experts on the CPU | 40 of 60 layers | 21 of 30 expert layers | — |
 | Context as served | 32,768 tokens | 131,072 tokens | 81,920 tokens |
-| Generation, nothing held | 4.0 tok/s | 33.7 tok/s | 55.1 tok/s |
+| Generation, nothing held | 4.14 tok/s | 33.7 tok/s | 55.1 tok/s |
 | GSM8K | 0.974 | 0.965 | 0.961 |
 | BFCL simple | 0.960 | 0.945 | 0.950 |
 | GSM8K run | 21 h 57 min | 3 h 26 min | 1 h 57 min |
@@ -148,7 +148,7 @@ The time is where the dense model pays. GSM8K took the 31B 79,000 s with the dra
 
 For the best answers this card can give, run as an offline batch, the 31B, at 32,768 tokens and about 4 tok/s with the drafter. It wins GSM8K by a margin beyond the run-to-run range and leads function calling within it, at a speed that suits a queue of questions left to run overnight.
 
-For a long conversation at a usable speed, the 12B with its drafter, at 55.1 tok/s and 81,920 tokens. It answers within a point of the 31B and generates ten times faster.
+For a long conversation at a usable speed, the 12B with its drafter, at 55.1 tok/s and 81,920 tokens. It answers 1.2 points behind the 31B on GSM8K and 1.0 on BFCL, and generates 13x faster.
 
 For context between the 12B's 81,920 tokens and the full 262,144, the 26B with its experts in RAM, which holds 131,072 tokens with its drafter and generates at 33.7 tok/s.
 
@@ -167,10 +167,10 @@ The goal of this article was to find whether Gemma 4 31B, a dense model more tha
 - 🟢 The 17.7 GB dense 31B serves from an 8 GB card with 40 of its 60 layers in system RAM
 - 🟢 GSM8K 0.974, the highest of the family, ahead of the 26B by 0.83 points and the 12B by 1.21, both beyond the run-to-run range
 - 🟢 BFCL simple 0.960, the highest of the family, with a lead within the run-to-run range
-- 🟢 The drafter changes no answer: every one of 263 paired GSM8K questions agrees, and all but one of the 400 BFCL replies
+- 🟢 The drafter changes one answer in 663, a wrong BFCL reply it gets right; all 263 paired GSM8K questions agree
 - 🟢 It holds 131,072 tokens with the drafter at 12 layers on the card, and the full 262,144 without it at 10
 - ⚠️ 1 drafted token gives 1.59x; longer drafts read the CPU-side layers too many times and give less
-- ❌ At about 4 tok/s it generates at a tenth of the 12B, and a GSM8K run takes 11x the 12B's time
+- ❌ At about 4 tok/s the 12B generates 13x faster, and a GSM8K run takes 11x the 12B's time
 
 Scope: Gemma 4 31B-it QAT only, Google's Q4_0 GGUF unmodified with the exact Q4_0 31B drafter, text only, one RTX 3050 OEM (8 GB) in an i7-5820K desktop, llama.cpp `7182ef71e`, 4-bit context cache, greedy decoding, thinking off, GSM8K and BFCL simple with short prompts, one request at a time throughout. The sister figures are from Parts 4 and 5 on the same card and build; the GSM8K-without-drafter arm is a 263-question check.
 
