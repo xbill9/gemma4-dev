@@ -22,7 +22,7 @@ https://github.com/xbill9/gemma4-dev
 | GSM8K / BFCL simple | 0.961 / 0.950 | 0.965 / 0.945 | **0.974 / 0.960** |
 | GSM8K run, 1,319 questions | 1 h 57 min | 3 h 26 min | **21 h 57 min** |
 
-The 31B leads the 12B on GSM8K by 1.2 points and the 26B by 0.8, both beyond the run-to-run range, at a tenth of the 12B's generation speed.
+The 31B leads the 12B on GSM8K by 1.2 points and the 26B by 0.8, both beyond the run-to-run range, at a tenth of the 12B's generation speed. At about 4 tok/s it is a batch model on this card: a 200-token reply takes most of a minute, so it earns its place on an offline run of questions and the 12B serves a conversation.
 
 ---
 
@@ -146,7 +146,7 @@ The time is where the dense model pays. GSM8K took the 31B 79,000 s with the dra
 
 #### So, Which One?
 
-For the best answers this card can give, the 31B, at 32,768 tokens and about 4 tok/s with the drafter. It wins GSM8K by a margin beyond the run-to-run range and leads function calling within it.
+For the best answers this card can give, run as an offline batch, the 31B, at 32,768 tokens and about 4 tok/s with the drafter. It wins GSM8K by a margin beyond the run-to-run range and leads function calling within it, at a speed that suits a queue of questions left to run overnight.
 
 For a long conversation at a usable speed, the 12B with its drafter, at 55.1 tok/s and 81,920 tokens. It answers within a point of the 31B and generates ten times faster.
 
