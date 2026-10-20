@@ -36,9 +36,11 @@ card. `N_CPU_MOE` is carried from the 26B sister and stays empty.
 - **Context that fits**, q4_0: with the drafter 32,768 at `-ngl 20`, 65,536 at 16, 131,072 at
   12; without it 262,144 at 10.
 
-**Answer quality** (`benchmarks/runs/2026-10-19-accuracy-31b-3050oem/`, in progress): BFCL
-0.960 / 0.958 with / without the drafter, level with the 26B (0.945) and 12B (0.950). GSM8K running,
-about 59 s per question with the drafter.
+**Answer quality** (`benchmarks/runs/2026-10-19-accuracy-31b-3050oem/`): BFCL
+0.960 / 0.958 with / without the drafter, level with the 26B (0.945) and 12B (0.950). GSM8K 0.9735
+with the drafter (1,319), ahead of the 26B (+0.0083, interval clear of zero) and 12B (+0.0121). The
+drafter changes no answer: 0 disagreements on the 263 paired GSM8K questions (167 reworded), 1 on
+BFCL (wrong → right). GSM8K without the drafter is a 263-question check, not carried to the end.
 
 **Not measured:** generation with a long conversation held, concurrency.
 
