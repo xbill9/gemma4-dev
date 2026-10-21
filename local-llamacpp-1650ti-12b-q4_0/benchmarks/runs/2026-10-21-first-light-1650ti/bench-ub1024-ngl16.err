@@ -1,0 +1,25 @@
+ggml_cuda_init: found 1 CUDA devices (Total VRAM: 3732 MiB):
+  Device 0: NVIDIA GeForce GTX 1650 Ti with Max-Q Design, compute capability 7.5, VMM: yes, VRAM: 3732 MiB
+The following devices will have suboptimal performance due to a lack of tensor cores:
+  Device 0: NVIDIA GeForce GTX 1650 Ti with Max-Q Design
+Consider compiling with CMAKE_CUDA_ARCHITECTURES=61-virtual;80-virtual and DGGML_CUDA_FORCE_MMQ to force the use of the Pascal code for Turing.
+CUDA error: out of memory
+  current device: 0, in function alloc at /home/xbill/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:627
+  cuMemCreate(&handle, reserve_size, &prop, 0)
+/home/xbill/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:109: CUDA error
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(+0x15694) [0x7fc642b4b694]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(+0x15b00) [0x7fc642b4bb00]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(ggml_abort+0x11d) [0x7fc642b4bcad]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(+0x2a37d3) [0x7fc63dca37d3]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(_ZN18ggml_cuda_pool_vmm5allocEmPm+0x568) [0x7fc63dcc03d8]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(_Z19ggml_cuda_mul_mat_qR25ggml_backend_cuda_contextPK11ggml_tensorS3_S3_PS1_+0x15a5) [0x7fc63dd08565]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(+0x2bd376) [0x7fc63dcbd376]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(ggml_backend_sched_graph_compute_async+0x3d6) [0x7fc642b69876]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context13graph_computeEP11ggml_cgraphb+0xdb) [0x7fc64221136b]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context14process_ubatchERK12llama_ubatch14llm_graph_typeP22llama_memory_context_iR11ggml_status+0xfd) [0x7fc642214f8d]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context6decodeERK15llama_batch_ext+0x47b) [0x7fc64221f08b]
+/home/xbill/llama.cpp/build/bin/libllama-bench-impl.so(+0x1a18a) [0x7fc64315f18a]
+/home/xbill/llama.cpp/build/bin/libllama-bench-impl.so(_Z11llama_benchiPPc+0xc6c) [0x7fc64317207c]
+/usr/lib/x86_64-linux-gnu/libc.so.6(+0x29fba) [0x7fc642c33fba]
+/usr/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x87) [0x7fc642c340d7]
+/home/xbill/llama.cpp/build/bin/llama-bench(+0x1201) [0x559d81210201]

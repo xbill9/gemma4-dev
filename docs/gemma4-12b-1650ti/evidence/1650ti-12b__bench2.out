@@ -1,0 +1,35 @@
+== threads 12:02:05
+| gemma4 ?B Q4_0                 |   6.24 GiB |    11.91 B | CUDA       |  21 |       4 |   1 |            tg64 |          4.71 ± 0.03 |
+| gemma4 ?B Q4_0                 |   6.24 GiB |    11.91 B | CUDA       |  21 |       6 |   1 |            tg64 |          4.90 ± 0.05 |
+| gemma4 ?B Q4_0                 |   6.24 GiB |    11.91 B | CUDA       |  21 |       8 |   1 |            tg64 |          4.63 ± 0.10 |
+| gemma4 ?B Q4_0                 |   6.24 GiB |    11.91 B | CUDA       |  21 |      12 |   1 |            tg64 |          3.61 ± 0.12 |
+== ub=512 ngl=21 12:04:20
+FAIL
+== ub=512 ngl=18 12:04:28
+| gemma4 ?B Q4_0                 |   6.24 GiB |    11.91 B | CUDA       |  18 |   1 |          pp2048 |         56.60 ± 0.00 |
+== ub=1024 ngl=21 12:06:24
+FAIL
+== ub=1024 ngl=18 12:06:31
+FAIL
+== ub=1024 ngl=16 12:06:33
+./bench2.sh: line 10: 1664495 Aborted                    (core dumped) $B -m $X -ngl $n -b 2048 -ub $ub -fa 1 -p 2048 -n 0 -r 2 -t 6 -o md 2> bench-ub$ub-ngl$n.err > bench-ub$ub-ngl$n.md
+FAIL
+== ub=1024 ngl=14 12:06:38
+| gemma4 ?B Q4_0                 |   6.24 GiB |    11.91 B | CUDA       |  14 |     1024 |   1 |          pp2048 |         59.35 ± 0.06 |
+== ub=2048 ngl=21 12:08:39
+FAIL
+== ub=2048 ngl=18 12:08:46
+FAIL
+== ub=2048 ngl=16 12:08:53
+FAIL
+== ub=2048 ngl=14 12:08:55
+FAIL
+== ub=2048 ngl=12 12:09:02
+FAIL
+== ub=2048 ngl=10 12:09:03
+FAIL
+== ub=2048 ngl=8 12:09:10
+./bench2.sh: line 10: 1665137 Aborted                    (core dumped) $B -m $X -ngl $n -b 2048 -ub $ub -fa 1 -p 2048 -n 0 -r 2 -t 6 -o md 2> bench-ub$ub-ngl$n.err > bench-ub$ub-ngl$n.md
+FAIL
+== ub=2048 ngl=6 12:09:15
+| gemma4 ?B Q4_0                 |   6.24 GiB |    11.91 B | CUDA       |   6 |     2048 |   1 |          pp2048 |         60.46 ± 0.03 |

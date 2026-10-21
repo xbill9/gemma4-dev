@@ -1,0 +1,31 @@
+0.00.032.744 I srv  llama_server: initializing ...
+0.00.032.753 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.033.053 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.035.053 I srv    load_model: loading model '/home/xbill/models/gemma-4-12B-it-qat-q4_0-exact/gemma-4-12B-it-q4_0-exact.gguf'
+0.00.864.481 W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 24, abort
+0.01.435.070 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.435.697 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.01.472.122 W load: '</s>' is a normal token here, removing it from EOG list
+0.02.220.070 I cmn          init: llama threadpool init, n_threads = 6
+/home/xbill/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:109: CUDA error
+0.02.474.169 E CUDA error: out of memory
+0.02.474.177 E   current device: 0, in function alloc at /home/xbill/llama.cpp/ggml/src/ggml-cuda/ggml-cuda.cu:627
+0.02.474.177 E   cuMemCreate(&handle, reserve_size, &prop, 0)
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(+0x15694) [0x7f9a4d141694]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(+0x15b00) [0x7f9a4d141b00]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(ggml_abort+0x11d) [0x7f9a4d141cad]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(+0x2a37d3) [0x7f9a47aa37d3]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(_ZN18ggml_cuda_pool_vmm5allocEmPm+0x568) [0x7f9a47ac03d8]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(_Z23ggml_cuda_mul_mat_vec_qR25ggml_backend_cuda_contextPK11ggml_tensorS3_S3_PS1_PK29ggml_cuda_mm_fusion_args_host+0x62d) [0x7f9a47c45e3d]
+/home/xbill/llama.cpp/build/bin/libggml-cuda.so.0(+0x2bd376) [0x7f9a47abd376]
+/home/xbill/llama.cpp/build/bin/libggml-base.so.0(ggml_backend_sched_graph_compute_async+0x3d6) [0x7f9a4d15f876]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context13graph_computeEP11ggml_cgraphb+0xdb) [0x7f9a4c01136b]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context14process_ubatchERK12llama_ubatch14llm_graph_typeP22llama_memory_context_iR11ggml_status+0xfd) [0x7f9a4c014f8d]
+/home/xbill/llama.cpp/build/bin/libllama.so.0(_ZN13llama_context6decodeERK15llama_batch_ext+0x47b) [0x7f9a4c01f08b]
+/home/xbill/llama.cpp/build/bin/libllama-common.so.0(_Z23common_init_from_paramsR13common_paramsb+0x375) [0x7f9a4c8739e5]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_ZN19server_context_impl10load_modelER13common_params+0x651) [0x7f9a4d38a4d1]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_Z12llama_serverR13common_paramsiPPcR12server_child+0x42ba) [0x7f9a4d2cc6ea]
+/home/xbill/llama.cpp/build/bin/libllama-server-impl.so(_Z12llama_serveriPPc+0x1245) [0x7f9a4d2ce6e5]
+/usr/lib/x86_64-linux-gnu/libc.so.6(+0x29fba) [0x7f9a4cc33fba]
+/usr/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x87) [0x7f9a4cc340d7]
+/home/xbill/llama.cpp/build/bin/llama-server(+0x1201) [0x558cc5476201]

@@ -1,0 +1,27 @@
+0.00.042.736 I srv  llama_server: initializing ...
+0.00.042.751 I cmn  common_param: common_params_print_info: verbosity = 3 (adjust with the `-lv N` CLI arg)
+0.00.043.084 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.045.221 I srv    load_model: loading model '/home/xbill/models/gemma-4-12B-it-qat-q4_0-exact/gemma-4-12B-it-q4_0-exact.gguf'
+0.01.528.747 E llama_init_from_model: failed to initialize the context: Gemma4Assistant requires ctx_other to be set (this warning is normal during memory fitting)
+0.01.606.070 W operator(): failed to measure the memory of the extra model, fitting without it: failed to create llama_context from model
+0.01.606.088 W common_fit_params: failed to fit params to free device memory: n_gpu_layers already set by user to 21, abort
+0.02.176.178 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.02.176.708 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.02.209.007 W load: '</s>' is a normal token here, removing it from EOG list
+0.02.887.678 I cmn          init: llama threadpool init, n_threads = 6
+0.03.236.915 I common_speculative_init_result: loading draft model '/home/xbill/models/gemma-4-12B-it-qat-assistant/gemma-4-12B-it-qat-assistant-q4_0-exact.gguf'
+0.03.805.620 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.03.806.171 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.03.840.210 W load: '</s>' is a normal token here, removing it from EOG list
+0.03.900.396 W llama_kv_cache: layer   3: sharing with layer 47. k = 0x7f523e000000, v = 0x7f523e900000
+0.03.900.554 W llama_kv_cache: layer   0: sharing with layer 46. k = 0x1000aca0000, v = 0x1000ae50000
+0.03.900.556 W llama_kv_cache: layer   1: sharing with layer 46. k = 0x1000aca0000, v = 0x1000ae50000
+0.03.900.557 W llama_kv_cache: layer   2: sharing with layer 46. k = 0x1000aca0000, v = 0x1000ae50000
+0.03.902.096 E ggml_backend_cuda_buffer_type_alloc_buffer: allocating 145.78 MiB on device 0: cudaMalloc failed: out of memory
+0.03.902.100 E ggml_gallocr_reserve_n_impl: failed to allocate CUDA0 buffer of size 152864896
+0.03.902.101 E graph_reserve: failed to allocate compute buffers
+0.03.902.301 E llama_init_from_model: failed to initialize the context: failed to allocate compute pp buffers
+0.03.902.304 E common_speculative_init_result: failed to create MTP context
+0.03.902.318 E srv    load_model: failed to create MTP context
+0.03.902.339 I srv    operator(): operator(): cleaning up before exit...
+0.03.902.910 E srv  llama_server: exiting due to model loading error
