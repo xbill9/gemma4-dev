@@ -572,6 +572,8 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-pytorch-v5e1-2b` | TPU | PyTorch / `torch_xla` | v5e-1 | 2B | — |
 | `~/gemma4-dev/tpu-pytorch-v5e1-12b` | TPU | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | **`w4a16` — name stale, see below** |
 | `~/torchtpu-dev/tpu-pytorch-v5e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-pytorch-v5e1` repo, moved into `torchtpu-dev` and renamed 2026-10-21 |
+| `~/torchtpu-dev/tpu-pytorch-v5e1-2b` | TPU | PyTorch / TorchTPU | v5e-1 | `gemma-4-E2B-it` | — — forked from `tpu-pytorch-v5e1-12b-w4a16` 2026-10-21; not provisioned. Unlike `~/gemma4-dev/tpu-pytorch-v5e1-2b`, which has no `tpu.env` and whose `server.py` defaults to `gemma-4-31B-it` on `v6e-8`, its `tpu.env` pins E2B on `v5e-1` |
+| `~/torchtpu-dev/tpu-pytorch-v5e1-2b-w4a16` | TPU | PyTorch / TorchTPU | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — forked from `tpu-pytorch-v5e1-12b-w4a16` 2026-10-21; not provisioned |
 | `~/torchtpu-dev/tpu-pytorch-v6e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned |
 | `~/torchtpu-dev/tpu-pytorch-v5e4-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned. `TENSOR_PARALLEL_SIZE=1`: the static-shape server has no sharding path, so it serves from one of the four chips |
 | `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |
