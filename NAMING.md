@@ -1,8 +1,10 @@
 # Rig naming scheme
 
-Canonical reference for how accelerator rig repos are named. Rigs currently live in three trees — `~/tpu-*`,
-`~/gemma4-dev/*`, and `~/gemma4-queens/*` — and the scheme is the same regardless of which tree a rig sits in.
-Location is not part of the name.
+Canonical reference for how accelerator rig repos are named. Rigs currently live in four trees — `~/tpu-*`,
+`~/gemma4-dev/*`, `~/gemma4-queens/*`, and `~/torchtpu-dev/*` — and the scheme is the same regardless of which
+tree a rig sits in. Location is not part of the name. `~/torchtpu-dev` is the `xbill9/torchtpu-dev` monorepo,
+laid out like this one (one plugin per rig directory, root `marketplace.json`); its `colab/` directory holds
+serving code for a Colab runtime and is outside the scheme, because nothing there is provisioned.
 
 ## The slots
 
@@ -569,6 +571,9 @@ Three things that trip people up:
 | `~/gemma4-dev/tpu-vllm-v5e1-4b-w8a8rtn` | TPU Queued Resource | vLLM | v5e-1 | `glenic/gemma-4-E4B-it-W8A8-INT8` | `w8a8rtn` — **artifact rig**, a repack-sweep cell from `jev-tpu-v5e1`, see below. Served with its stored `lm_head`, byte-identical to the tied `embed_tokens`, removed (`jev-tpu-v5e1/strip_tied_head.py`); no served value changes |
 | `~/gemma4-dev/tpu-pytorch-v5e1-2b` | TPU | PyTorch / `torch_xla` | v5e-1 | 2B | — |
 | `~/gemma4-dev/tpu-pytorch-v5e1-12b` | TPU | PyTorch / `torch_xla` | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | **`w4a16` — name stale, see below** |
+| `~/torchtpu-dev/tpu-pytorch-v5e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-pytorch-v5e1` repo, moved into `torchtpu-dev` and renamed 2026-10-21 |
+| `~/torchtpu-dev/tpu-pytorch-v6e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned |
+| `~/torchtpu-dev/tpu-pytorch-v5e4-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned. `TENSOR_PARALLEL_SIZE=1`: the static-shape server has no sharding path, so it serves from one of the four chips |
 | `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |
 | `~/tpu-pytorch-v6e1-2b` | TPU | PyTorch | v6e-1 | 2B | — |
 | `~/tpu-pytorch-inf2-2b` | Inferentia (slot `tpu`) | PyTorch | inf2 | 2B | — |
