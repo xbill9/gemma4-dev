@@ -4,10 +4,10 @@ Gemma 4 E2B, Google's QAT weights as the W4A16 repack `xbill9/gemma-4-E2B-it-qat
 PyTorch + transformers on the laptop's GTX 1650 Ti (TU117, sm_75, 4096 MiB). Local: nothing to provision.
 
 **State as of 2026-10-23: an experiment, not a server.** No `server.py`, MCP server, skill or plugin yet. The current
-code is `benchmarks/runs/2026-10-23-lmhead-kernel-1650ti/e2b_w4.py` with `w4gemv_v2.py`; each run's `REPORT.md` holds its
-numbers. Headline: **57.3–57.6 tok/s decode, 2,769 MiB peak**, every weight and vocabulary table int4 on the GPU,
-greedy replies token-identical to the fp16-table build on 8 of 8 prompts (`STEP_COMPILE=1 DECODE_SDPA=math`).
-First light the same day was 18.1 tok/s.
+code is `benchmarks/runs/2026-10-23-close-gap-1650ti/` (`e2b_w4.py`, `w4gemv_v3.py`, `w4attn.py`); each run's
+`REPORT.md` holds its numbers. Headline: **79.3–80.3 tok/s decode, 2,793 MiB peak, 0.97x llama.cpp on the same card
+the same day (82.0–82.3)**, every weight and vocabulary table int4 on the GPU, greedy replies token-identical to the
+fp16-table build on 8 of 8 prompts (`KERNEL=v3 MERGE=1 ATTN=w4decode STEP_COMPILE=1`). First light was 18.1 tok/s.
 
 Read before changing anything:
 
@@ -22,8 +22,9 @@ Read before changing anything:
 - **`StaticSlidingWindowLayer` is given `StaticLayer`'s `update`, `get_seq_length` and `get_mask_sizes`**: its
   Python-int length goes stale inside a CUDA graph and makes torch.compile recompile every step. Valid only while
   `MAX_CACHE` (384) is no longer than the 512-token sliding window; the script asserts it.
-- **Decode attention runs on `SDPBackend.MATH`**: PyTorch's default memory-efficient kernel took 13 ms per token for
-  35 single-query calls on sm_75.
+- **Decode attention is `w4attn.py`'s Triton kernel**, registered as attention implementation `w4decode` (prompt
+  reads fall back to SDPA). PyTorch's default memory-efficient kernel took 13 ms per token on sm_75 and the math
+  backend about 5.6 ms; this one 0.85 ms.
 - **Remove accelerate's hooks before compiling, then reapply the int4 forwards** (removing hooks restores the
   compressed-tensors forwards).
 - The card is shared with `local-llamacpp-1650ti-*` and `local-ollama-1650ti-2b-q4_0`; stop their servers first.
