@@ -44,7 +44,6 @@ def _dec_split(
     MODE: tl.constexpr,
 ):
     sid = tl.program_id(0)
-    scale = scale.to(tl.float32)
     pos = tl.load(pos_ptr).to(tl.int32)
     if SLIDING:
         hi = L  # every ring slot; the stored positions decide what counts
