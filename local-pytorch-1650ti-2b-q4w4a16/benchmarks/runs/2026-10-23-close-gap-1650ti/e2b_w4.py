@@ -23,8 +23,8 @@ from huggingface_hub import snapshot_download
 from safetensors import safe_open
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, StaticCache
 
-# KERNEL picks the int4 GEMV: v2 (lmhead-kernel run) or v3 (2^23 bit-trick conversion).
-KERNEL = os.environ.get("KERNEL", "v3")
+# KERNEL picks the int4 GEMV: v2 (lmhead-kernel run), v3 (2^23 bit-trick conversion), v4 (wide autotune), v5 (v4 pinned).
+KERNEL = os.environ.get("KERNEL", "v5")
 w4_gemv = __import__(f"w4gemv_{KERNEL}").w4_gemv
 import w4attn
 
