@@ -3,11 +3,17 @@
 Gemma 4 E2B, Google's QAT weights as the W4A16 repack `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text`, run in plain
 PyTorch + transformers on the laptop's GTX 1650 Ti (TU117, sm_75, 4096 MiB). Local: nothing to provision.
 
-**State as of 2026-10-23: an experiment, not a server.** No `server.py`, MCP server, skill or plugin yet. The current
-code is `benchmarks/runs/2026-10-23-close-gap-1650ti/` (`e2b_w4.py`, `w4gemv_v5.py`, `w4attn.py`); each run's
-`REPORT.md` holds its numbers. Headline: **89.8–90.6 tok/s decode, 2,793 MiB peak, 1.10x llama.cpp on the same card
-the same day (82.0–82.3)**, every weight and vocabulary table int4 on the GPU, greedy replies token-identical to the
-fp16-table build on 8 of 8 prompts in two runs (`MERGE=1 ATTN=w4decode STEP_COMPILE=1`, kernel v5 by default). First light was 18.1 tok/s.
+**State as of 2026-10-23: an engine and an OpenAI-compatible server, no MCP server or skill yet.**
+
+- `e2b_engine.py` — the engine (`Engine(max_ctx=...)`: load, `render`, `generate`), with `w4gemv.py` (int4 GEMV,
+  configs pinned per shape for this card) and `w4attn.py` (split decode attention, chunked prompt attention).
+- `openai_server.py` — `/v1/chat/completions`, one request at a time, greedy, tool calls via `gemma4_tools.py`.
+- `colab/` — the T4 notebook (jupytext source in `src/`, built into `notebooks/` by `tools/build_notebooks.py`).
+- `benchmarks/runs/2026-10-23-*` — every measurement; the engine was promoted from `2026-10-23-long-context-1650ti/`.
+
+Headline (each run's `REPORT.md` has the rest): **87.8 tok/s decode at short context, 1.07x llama.cpp on the same card
+the same day; the full 131,072-token context fits in 3,471 MiB peak with every table on the GPU**, decode 51.0 tok/s at
+32k (0.90x) and 21.8 at 131k (0.72x); greedy replies token-identical to the fp16-table build.
 
 Read before changing anything:
 
@@ -17,16 +23,20 @@ Read before changing anything:
   steps recovered from the QAT grid). In fp16 the per-layer table is 4.38 GiB and must sit in CPU RAM (`e2b_w4.py text`);
   never hand it to accelerate's offload, which copies the whole table to the GPU every forward.
 - **fp16, not bf16, on the fast paths**: Inductor skips bf16 on sm_75. bf16 runs only as the accuracy reference.
-- **`w4gemv_v5.py` pins one tiling per (rows, packed cols) shape**, tuned on this card; re-tune (`kbench.py` with v4)
-  on other hardware.
-- **`w4gemv_v*.py` assume the compressed-tensors pack-quantized layout**: symmetric int4, 8 nibbles per int32 low
+- **`w4gemv.py` (v5) pins one tiling per (rows, packed cols) shape**, tuned on this card; re-tune (`kbench.py` with
+  v4 in `2026-10-23-close-gap-1650ti`) on other hardware.
+- **`w4gemv*.py` assume the compressed-tensors pack-quantized layout**: symmetric int4, 8 nibbles per int32 low
   first, offset 8, group 32. It handles one row (decode); prefill goes through unpack + matmul.
-- **`StaticSlidingWindowLayer` is given `StaticLayer`'s `update`, `get_seq_length` and `get_mask_sizes`**: its
-  Python-int length goes stale inside a CUDA graph and makes torch.compile recompile every step. Valid only while
-  `MAX_CACHE` (384) is no longer than the 512-token sliding window; the script asserts it.
-- **Decode attention is `w4attn.py`'s Triton kernel**, registered as attention implementation `w4decode` (prompt
-  reads fall back to SDPA). PyTorch's default memory-efficient kernel took 13 ms per token on sm_75 and the math
-  backend about 5.6 ms; this one 0.85 ms.
+- **The engine owns the K/V cache, not transformers.** Its `StaticSlidingWindowLayer` keeps a Python-int length that
+  a CUDA graph freezes and that makes torch.compile recompile every step. Full layers get `max_ctx` slots; sliding
+  layers a 512-slot ring that stores each slot's position; Gemma 4's attention forward is replaced (`_attn_forward`).
+  During a chunked prompt read a sliding layer's new K/V is held back until the forward pass ends: the KV-shared
+  layers later in the same pass still need the ring's older positions.
+- **Decode attention is `w4attn.py`'s split Triton kernel**: all eight query heads per K/V read, no `tl.dot` (this
+  card has no tensor cores; fp16 `tl.dot` ran at 24 GB/s). Prompt chunks use memory-efficient SDPA with K/V expanded
+  as views.
+- **Prompt reads multiply in fp32 on this card**: cuBLAS fp16 GEMMs run at ~0.4 TFLOP/s on TU117, fp32 at 1.6-1.9.
+  On a GPU with tensor cores (a T4) fp16 may win; the Colab notebook times both and picks.
 - **Remove accelerate's hooks before compiling, then reapply the int4 forwards** (removing hooks restores the
   compressed-tensors forwards).
 - The card is shared with `local-llamacpp-1650ti-*` and `local-ollama-1650ti-2b-q4_0`; stop their servers first.
