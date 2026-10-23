@@ -34,7 +34,7 @@ prompts start from 15–40 and generate up to 128.
 #### Decode attention kernel (`w4attn.py`)
 
 Plain-math SDPA converted the whole 384-slot K/V cache to fp32 and copied it out for all eight query heads in every layer,
-then multiplied in fp32: about 5.6 ms per token. `w4attn.py` registers a transformers attention function (`w4decode`):
+then multiplied in fp32: 5.40 ms per token (the sum of those kernels in `../2026-10-23-lmhead-kernel-1650ti/emb4-v2c-math.jsonl`). `w4attn.py` registers a transformers attention function (`w4decode`):
 one Triton program per query head streams the fp16 cache once, applies the boolean mask transformers builds and keeps
 an online softmax in fp32; prompt reads go to SDPA. Against fp32 SDPA (`attn_check.jsonl`): relative error 2.6–3.2e-4,
 22–47 µs per call at head size 256 and 512. In the model: 0.85–0.88 ms per token for 35 calls.
