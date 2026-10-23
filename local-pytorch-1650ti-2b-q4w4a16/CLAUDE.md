@@ -33,8 +33,11 @@ Read before changing anything:
   During a chunked prompt read a sliding layer's new K/V is held back until the forward pass ends: the KV-shared
   layers later in the same pass still need the ring's older positions.
 - **Decode attention is `w4attn.py`'s split Triton kernel**: all eight query heads per K/V read, no `tl.dot` (this
-  card has no tensor cores; fp16 `tl.dot` ran at 24 GB/s). Prompt chunks use memory-efficient SDPA with K/V expanded
-  as views.
+  card has no tensor cores; fp16 `tl.dot` ran at 24 GB/s). Prompt chunks use memory-efficient SDPA: full layers
+  with K/V expanded across heads as views and the built-in bottom-right causal mask; sliding layers with an explicit
+  window mask and **K/V copied, never expanded**. With an explicit mask and stride-0 K/V, memory-efficient SDPA (torch
+  2.13 on this card) gets the last query row wrong whenever a chunk holds 32k+1 tokens, which gave a wrong first reply
+  token on about 1 prompt in 32 (GSM8K: 12 of those 38 right, llama.cpp 36; `benchmarks/runs/2026-10-23-accuracy-1650ti/sdpa_repro.txt`).
 - **Prompt reads multiply in fp32 on this card**: cuBLAS fp16 GEMMs run at ~0.4 TFLOP/s on TU117, fp32 at 1.6-1.9.
   On a GPU with tensor cores (a T4) fp16 may win; the Colab notebook times both and picks.
 - **Remove accelerate's hooks before compiling, then reapply the int4 forwards** (removing hooks restores the

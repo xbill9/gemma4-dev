@@ -44,6 +44,7 @@ def _dec_split(
     MODE: tl.constexpr,
 ):
     sid = tl.program_id(0)
+    scale = scale.to(tl.float32)
     pos = tl.load(pos_ptr).to(tl.int32)
     if SLIDING:
         hi = L  # every ring slot; the stored positions decide what counts
@@ -126,7 +127,9 @@ def _dec_combine(pm_ptr, pl_ptr, pacc_ptr, o_ptr, H: tl.constexpr, D: tl.constex
 _scratch = {}
 
 
-def decode_attention(q, k_buf, v_buf, kpos, pos, sliding, window, scale, splits=None, bn=None, warps=None, mode=None, hp=None):
+def decode_attention(
+    q, k_buf, v_buf, kpos, pos, sliding, window, scale, splits=None, bn=None, warps=None, mode=None, hp=None
+):
     """q [1, 1, H, D]; k_buf/v_buf [L, D]; kpos [L] int32 (ring slots) or None; pos [1] int64 on device."""
     H, D = q.shape[2], q.shape[3]
     L = k_buf.shape[0]
@@ -177,6 +180,9 @@ def prefill_attention(q, keys, values, kpos, qpos0, sliding, window, scale):
     k = keys.view(1, 1, Lk, D).expand(1, H, Lk, D)
     v = values.view(1, 1, Lk, D).expand(1, H, Lk, D)
     if sliding:
+        # Real copies, not head-broadcast views: memory-efficient SDPA with an explicit mask and stride-0 K/V gets the
+        # last query row wrong when n % 32 == 1 (torch 2.13, sm_75; benchmarks/runs/2026-10-23-accuracy-1650ti/sdpa_repro.txt). At most 768 keys here.
+        k, v = k.contiguous(), v.contiguous()
         qpos = qpos0 + torch.arange(n, device=q.device)
         kp = kpos.to(q.device)
         mask = (kp[None, :] <= qpos[:, None]) & (kp[None, :] > qpos[:, None] - window) & (kp[None, :] >= 0)

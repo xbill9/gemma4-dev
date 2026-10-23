@@ -224,7 +224,12 @@ print({str(k): round(v, 2) for k, v in rates.items()}, "->", PREFILL_DTYPE)
 
 # %%
 # Cell 3.2: load the engine (about two minutes: downloads are cached, the decode step compiles)
+import logging
+
 from e2b_engine import Engine
+
+# Older torch builds print a long, harmless warning while tracing the attention kernel; keep the output readable.
+logging.getLogger("torch._higher_order_ops.triton_kernel_wrap").setLevel(logging.ERROR)
 
 t0 = time.perf_counter()
 eng = Engine(max_ctx=32768, prefill_dtype=PREFILL_DTYPE)
