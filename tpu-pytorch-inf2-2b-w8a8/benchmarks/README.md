@@ -70,7 +70,7 @@ optionally `error`.
    `per_stream_tok_per_s` is derived: ≈ 1000 / median TPOT.
 
    Shortcut where available: the `run_vllm_benchmark` MCP tool with `save_result=True` returns a
-   ready-made `throughput.sweep[]` entry. **It is not in every rig** — `tpu-pytorch-inf2-2b-w8a8` has
+   ready-made `throughput.sweep[]` entry. **It is not in every rig** — `tpu-pytorch-inf2-2b` has
    no such tool at all. Check `grep -n "save_result" server.py` before relying on it.
 3. Record every cell you decided not to run as `status: "infeasible"` with an `error` line, and
    every cell that failed as `status: "failed"`. Coverage claims in a REPORT.md should quote
@@ -85,7 +85,7 @@ optionally `error`.
 
 The strongest example in this repo is `runs/2026-07-25-vllm-sweep-v6e1/` (complete in
 `tpu-pytorch-v5e1-2b`, `-12b`, and `tpu-pytorch-v6e1-2b`; the copies in `tpu-jax-v5e1-2b`,
-`tpu-jax-v6e1-2b` and `tpu-pytorch-inf2-2b-w8a8` are partial stubs). Its shape is the one to copy:
+`tpu-jax-v6e1-2b` and `tpu-pytorch-inf2-2b` are partial stubs). Its shape is the one to copy:
 
 ```
 runs/<date>-<what>-<hw-short>/

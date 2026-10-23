@@ -234,6 +234,9 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-t4-embed2 | `2026-10-08-embed-sweep-t4` | 6 | 0 | 0 | **no** | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-08-jev-tasks-t4` | 6 | 0 | 0 | **no** | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
+| local-litertlm-i71360p-2b-q4wi4b32 | `2026-10-15-qat-grid-bf16-scales-i71360p` | 5 | 2 | 0 | **no** | **no** |
+| local-llamacpp-1650ti-12b-q4_0 | `2026-10-21-accuracy-12b-1650ti` | 9 | 0 | 0 | **no** | **no** |
+| local-llamacpp-1650ti-12b-q4_0 | `2026-10-21-first-light-1650ti` | 157 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-first-light-1650ti` | 1 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-03-full-sweep-1650ti` | 6 | 3 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-09-08-conc-shortprompt-1650ti` | 6 | 2 | 0 | yes | **no** |
@@ -250,15 +253,16 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-10-14-drafter-gaps-1650ti` | 46 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-10-15-drafter-load-1650ti` | 124 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-concurrency-1650ti` | 38 | 0 | 0 | yes | **no** |
-| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 19 | 1 | 0 | yes | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes | **no** |
-| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 8 | 0 | 0 | **no** | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 10 | 0 | 0 | **no** | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-10-14-repeatability-1650ti` | 18 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-accuracy-12b-3050oem` | 18 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-drafter-q4exact-12b-3050oem` | 24 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-exact-gguf-12b-3050oem` | 27 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-first-light-3050oem` | 22 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-17-kvcache-12b-3050oem` | 74 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-26b-q4_0 | `2026-10-18-accuracy-26b-3050oem` | 18 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-26b-q4_0 | `2026-10-18-first-light-3050oem` | 96 | 2 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-concurrency-3050oem` | 15 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-first-light-3050oem` | 19 | 12 | 0 | yes | **no** |
@@ -274,13 +278,14 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-14-overnight-3050oem` | 3 | 0 | 0 | **no** | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-draft1-3050oem` | 15 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-drafter-kvu-3050oem` | 57 | 0 | 0 | yes | **no** |
-| local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-longmixed-3050oem` | 62 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-longmixed-3050oem` | 61 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-mixed-3050oem` | 79 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-thinking-3050oem` | 17 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-queue-3050oem` | 4 | 0 | 0 | **no** | **no** |
 | local-llamacpp-3050oem-31b-q4_0 | `2026-10-18-first-light-3050oem` | 50 | 3 | 0 | yes | **no** |
+| local-llamacpp-3050oem-31b-q4_0 | `2026-10-19-accuracy-31b-3050oem` | 24 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-first-light-3050oem` | 7 | 0 | 0 | yes | **no** |
-| local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-quality-e2b-vs-e4b-3050oem` | 53 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-quality-e2b-vs-e4b-3050oem` | 52 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-spec-mtp-3050oem` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes | **no** |
@@ -294,6 +299,9 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-sdm850-2b-q4_0 | `2026-10-11-first-light-sdm850` | 15 | 13 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
+| local-pytorch-1650ti-2b-q4w4a16 | `2026-10-23-close-gap-1650ti` | 36 | 1 | 0 | yes | **no** |
+| local-pytorch-1650ti-2b-q4w4a16 | `2026-10-23-first-light-1650ti` | 21 | 0 | 0 | yes | **no** |
+| local-pytorch-1650ti-2b-q4w4a16 | `2026-10-23-lmhead-kernel-1650ti` | 26 | 0 | 0 | yes | **no** |
 | local-pytorch-cpu-2b | `2026-09-04-first-light-pytorch-cpu` | 2 | 1 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 13 | 1 | 0 | yes | yes |
 | tpu-jax-v5e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 5 | 0 | yes | **no** |
@@ -553,12 +561,14 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-t4-4b-q4w4a16emb4 | 1 | 1 |
 | gpu-vllm-t4-embed2 | 1 | 4 |
 | local-jax-cpu-2b | 0 | 1 |
+| local-litertlm-i71360p-2b-q4wi4b32 | 0 | 1 |
+| local-llamacpp-1650ti-12b-q4_0 | 0 | 2 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 15 |
 | local-llamacpp-1650ti-4b-q4_0 | 2 | 5 |
 | local-llamacpp-3050oem-12b-q4_0 | 0 | 5 |
-| local-llamacpp-3050oem-26b-q4_0 | 0 | 1 |
+| local-llamacpp-3050oem-26b-q4_0 | 0 | 2 |
 | local-llamacpp-3050oem-2b-q4_0 | 0 | 18 |
-| local-llamacpp-3050oem-31b-q4_0 | 0 | 1 |
+| local-llamacpp-3050oem-31b-q4_0 | 0 | 2 |
 | local-llamacpp-3050oem-4b-q4_0 | 0 | 3 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-cpu-4b-q4_0 | 1 | 1 |
@@ -567,6 +577,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-sc7180p-2b-q4_0 | 0 | 1 |
 | local-llamacpp-sdm850-2b-q4_0 | 0 | 1 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
+| local-pytorch-1650ti-2b-q4w4a16 | 0 | 3 |
 | local-pytorch-cpu-2b | 0 | 1 |
 | local-vllm-cpu-2b | 0 | 0 |
 | tpu-jax-inf2-2b | 0 | 0 |

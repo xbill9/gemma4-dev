@@ -15,4 +15,6 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 
 | Run | Files | Result files | Infeasible cells | REPORT.md |
 |---|---:|---:|---:|---|
+| `2026-10-23-close-gap-1650ti` | 36 | 1 | 0 | yes |
 | `2026-10-23-first-light-1650ti` | 21 | 0 | 0 | yes |
+| `2026-10-23-lmhead-kernel-1650ti` | 26 | 0 | 0 | yes |
