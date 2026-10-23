@@ -15,10 +15,11 @@ import triton.language as tl
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.nn.attention.bias import causal_lower_right
 
-# Defaults from dec_sweep2.jsonl (GTX 1650 Ti, D=512): broadcast multiply-sum over the 8 real heads, no tl.dot
-# (this card has no tensor cores and fp16 tl.dot ran at 24 GB/s), 128 slices of 8-key blocks, 4 warps.
-SPLITS = 128
-BN, WARPS, MODE, HP = 8, 4, 2, 8
+# Defaults from dec_sweep3.jsonl (GTX 1650 Ti, D=512): one head at a time over 2-D [keys, D] tiles (mode 3), 64 slices
+# of 8-key blocks, 2 warps: 4.11 ms at 131,072 tokens held (65 GB/s). fp16 tl.dot ran at 24 GB/s on this card, which
+# has no tensor cores (dec_sweep.jsonl).
+SPLITS = 64
+BN, WARPS, MODE, HP = 8, 2, 3, 8
 
 
 @triton.jit
@@ -72,8 +73,18 @@ def _dec_split(
             s = tl.dot(q, tl.trans(k)) * scale
         elif MODE == 1:
             s = tl.dot(q.to(tl.float32), tl.trans(k.to(tl.float32)), input_precision="ieee") * scale
-        else:
+        elif MODE == 2:
             s = tl.sum(q.to(tl.float32)[:, None, :] * k.to(tl.float32)[None, :, :], axis=2) * scale
+        else:
+            # One head at a time over a 2-D [keys, D] tile, so the reduction runs along D inside a warp; the eight
+            # rows of s are assembled with selects. q rows are re-read from L1 each block.
+            kf = k.to(tl.float32)
+            s = tl.zeros((HP, BN), tl.float32)
+            for h in tl.static_range(H):
+                qh = tl.load(q_ptr + h * D + d).to(tl.float32)
+                sh = tl.sum(kf * qh[None, :], axis=1)
+                s = tl.where(hh[:, None] == h, sh[None, :], s)
+            s = s * scale
         s = tl.where(keep[None, :], s, -1e30)
         m_new = tl.maximum(m_i, tl.max(s, axis=1))
         alpha = tl.exp(m_i - m_new)
@@ -84,8 +95,15 @@ def _dec_split(
             pv = tl.dot(p.to(tl.float16), v)
         elif MODE == 1:
             pv = tl.dot(p, v.to(tl.float32), input_precision="ieee")
-        else:
+        elif MODE == 2:
             pv = tl.sum(p[:, :, None] * v.to(tl.float32)[None, :, :], axis=1)
+        else:
+            vf = v.to(tl.float32)
+            pv = tl.zeros((HP, D), tl.float32)
+            for h in tl.static_range(H):
+                ph = tl.sum(tl.where(hh[:, None] == h, p, 0.0), axis=0)
+                pvh = tl.sum(ph[:, None] * vf, axis=0)
+                pv = tl.where(hh[:, None] == h, pvh[None, :], pv)
         acc = acc * alpha[:, None] + pv
         m_i = m_new
     tl.store(pm_ptr + sid * H + hh, m_i, mask=hm)

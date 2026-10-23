@@ -36,7 +36,7 @@ OUT = pathlib.Path(sys.argv[1])
 DEPTHS = [int(x) for x in (sys.argv[2] if len(sys.argv) > 2 else "0,4096,16384,32768,65536,131000").split(",")]
 DTYPE = torch.float16
 MAX_CTX = int(os.environ.get("MAX_CTX", "131072"))
-CHUNK = int(os.environ.get("CHUNK", "512"))
+CHUNK = int(os.environ.get("CHUNK", "256"))
 DECODE_TOKENS = int(os.environ.get("DECODE_TOKENS", "64"))
 SHIFTS = torch.arange(0, 32, 4, device="cuda", dtype=torch.int32)
 
@@ -58,10 +58,15 @@ def tensor(repo, key, patterns):
 
 
 # --- int4 linears and tables -----------------------------------------------------------------------------------------
+# Prompt reads multiply in PREFILL_DTYPE. This card (TU117) has no tensor cores: cuBLAS fp16 GEMMs run at about
+# 0.4 TFLOP/s and fp32 at 1.6-1.9 (gemm_check.jsonl), so fp32 is the default; the activations go back to fp16 after.
+PREFILL_DTYPE = {"fp32": torch.float32, "fp16": torch.float16}[os.environ.get("PREFILL_DTYPE", "fp32")]
+
+
 def _dequant(packed, scale):
     o, g = scale.shape
-    q = ((packed.unsqueeze(-1) >> SHIFTS) & 15).view(o, g, 32).to(DTYPE) - 8
-    return (q * scale.unsqueeze(-1).to(DTYPE)).view(o, g * 32)
+    q = ((packed.unsqueeze(-1) >> SHIFTS) & 15).view(o, g, 32).to(PREFILL_DTYPE) - 8
+    return (q * scale.unsqueeze(-1).to(PREFILL_DTYPE)).view(o, g * 32)
 
 
 torch._dynamo.config.cache_size_limit = 64
@@ -71,7 +76,7 @@ _dequant = torch.compile(_dequant, dynamic=False)
 def w4a16(x, packed, scale):
     if x.numel() == x.shape[-1]:
         return w4_gemv(x, packed, scale)
-    return torch.nn.functional.linear(x, _dequant(packed, scale))
+    return torch.nn.functional.linear(x.to(PREFILL_DTYPE), _dequant(packed, scale)).to(x.dtype)
 
 
 class PackedLinear(torch.nn.Module):
@@ -123,8 +128,11 @@ def packed(name):
 ple_scale, emb_scale = tm.embed_tokens_per_layer.scalar_embed_scale, tm.embed_tokens.scalar_embed_scale
 tm.embed_tokens.weight.data = torch.empty(0, dtype=DTYPE, device=0)  # fp16 table (tied lm_head): free its storage
 tm.embed_tokens_per_layer = PackedEmbedding(*packed(pre + "embed_tokens_per_layer"), ple_scale)
-tm.embed_tokens = PackedEmbedding(*packed(pre + "embed_tokens"), emb_scale)
-model.lm_head = PackedLinear(*packed("lm_head"))
+# -text-emb4 stores embed_tokens and the untied lm_head as the same levels and scales twice (embed_lmhead_identical.txt);
+# the model was trained tied, so one copy serves both and saves 216 MiB.
+vocab_packed, vocab_scale = packed("lm_head")
+tm.embed_tokens = PackedEmbedding(vocab_packed, vocab_scale, emb_scale)
+model.lm_head = PackedLinear(vocab_packed, vocab_scale)
 model.config.tie_word_embeddings = False
 remove_hook_from_module(model, recurse=True)  # everything is on the GPU; the hooks would only break torch.compile
 model.to(DTYPE)
@@ -264,6 +272,7 @@ for mod in model.modules():
 kv_mib = sum(t.numel() * t.element_size() for kv in kvs for t in (kv.k, kv.v)) // 2**20
 out(
     step="load",
+    prefill_dtype=str(PREFILL_DTYPE),
     weights_mib=weights_mib,
     kv_mib=kv_mib,
     max_ctx=MAX_CTX,
@@ -404,3 +413,31 @@ with torch.inference_mode():
             answer=answer[:80],
             recalled=str(code) in answer,
         )
+
+# --- optional: where a prompt read's GPU time goes -------------------------------------------------------------------
+if os.environ.get("PROFILE_PREFILL"):
+    from torch.profiler import ProfilerActivity, profile
+
+    n_tok = int(os.environ["PROFILE_PREFILL"])
+    with torch.inference_mode():
+        ids, _ = build(n_tok)
+        read_prompt(ids)  # warm
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        with profile(activities=[ProfilerActivity.CUDA]) as prof:
+            read_prompt(ids)
+            torch.cuda.synchronize()
+        wall = time.perf_counter() - t0
+    kern = [e for e in prof.key_averages() if e.device_type == torch.autograd.DeviceType.CUDA]
+    total = sum(e.self_device_time_total for e in kern) / 1e3
+    out(
+        step="profile_prefill",
+        prompt_tokens=ids.shape[1],
+        chunk=CHUNK,
+        wall_ms=round(wall * 1e3, 1),
+        gpu_kernel_ms=round(total, 1),
+        top=[
+            (e.key[:70], round(e.self_device_time_total / 1e3, 1), e.count)
+            for e in sorted(kern, key=lambda e: -e.self_device_time_total)[:14]
+        ],
+    )
