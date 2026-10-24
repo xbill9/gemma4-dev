@@ -40,7 +40,7 @@ right to 36 (llama.cpp 36). `affected_prompts.txt` counts them against the first
 
 #### The server
 
-`curl_examples.sh` / `curl_examples.out`: a plain chat (34 tokens, 84.87 tok/s decode) and a tool call returned as
+`curl_examples.sh` / `curl_examples.out` (fixed engine, server log `server-curl.log`): a plain chat (34 tokens, 85.23 tok/s decode) and a tool call returned as
 OpenAI `tool_calls` (`get_weather`, `{"city": "Paris"}`). The 6 BFCL replies with no tool call on the fixed engine are
 the model asking a question back; `replay_bfcl.jsonl` replays the first pass's 8, the other 2 being the attention bug.
 

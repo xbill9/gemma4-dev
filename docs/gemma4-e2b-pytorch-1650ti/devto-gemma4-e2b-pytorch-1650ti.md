@@ -181,13 +181,52 @@ At 32,761 tokens a second prompt with different codes was answered correctly, an
 
 #### Step 9 — Check the Answers: GSM8K and BFCL
 
-TODO-accuracy: GSM8K (1,319, 2,048-token limit) and BFCL simple (400) through the same harness as the llama.cpp reference, one request at a time, paired per question.
+GSM8K (1,319 grade-school math problems, 2,048-token limit) and BFCL simple (400 single tool calls) run through the same scoring code, question sets and chat template as the llama.cpp results on this card, greedy, and are paired question by question:
+
+| GTX 1650 Ti, Gemma 4 E2B QAT | llama.cpp | PyTorch | Difference (95% range) |
+| :--- | ---: | ---: | ---: |
+| GSM8K | 0.8992 | 0.8992 | +0.000 (−0.011 to +0.011) |
+| BFCL simple | 0.9225 | 0.9200 | −0.003 (−0.007 to +0.000) |
+
+Both engines answer 1,186 GSM8K problems correctly; 26 go each way. On BFCL one question separates them. The 4-bit arithmetic, 16-bit decode and 32-bit prompt reads leave the answers where llama.cpp has them.
+
+---
+
+#### 🔎 Tip: Copy Keys and Values Before Masked Memory-Efficient Attention
+
+For the sliding-window layers a prompt chunk goes to PyTorch's memory-efficient attention with an explicit mask, and the single key/value head is shared by the eight query heads. Broadcast as a view (`expand`, stride 0), those keys and values make torch 2.13's kernel return a wrong last row whenever the chunk holds 33, 65, 97 … queries, on this card:
+
+```plaintext
+n=33 Lk=545: bool+expand 1.127  bool contiguous 0.000  float mask 1.205  D=128 1.452  H=1 0.000
+```
+
+The last row of a prompt read is the token that picks the first reply token, so this shows up as about one prompt in 32 starting its reply wrong. Copying the keys and values first (`.contiguous()`, at most 768 keys on these layers) gives the right row at every chunk length. Calls with the built-in causal mask and no explicit mask, as on the full-attention layers, return the right rows with the broadcast view.
 
 ---
 
 #### Step 10 — Serve It
 
-TODO-server: `python3 openai_server.py --port 8100` and a curl, with output.
+`openai_server.py` puts the engine behind `/v1/chat/completions`, one request at a time, greedy. Tool definitions go through Gemma 4's chat template and tool calls come back in OpenAI's `tool_calls` field:
+
+```bash
+python3 openai_server.py --port 8100 --max-ctx 8192
+curl -s localhost:8100/v1/chat/completions -H 'Content-Type: application/json' -d '{
+  "messages": [{"role": "user", "content": "What is the weather in Paris right now?"}],
+  "tools": [{"type": "function", "function": {
+    "name": "get_weather",
+    "description": "Current weather for a city",
+    "parameters": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]}
+  }}]
+}'
+```
+
+The reply, with its message, finish reason and timings:
+
+```json
+{"message": {"role": "assistant", "content": null, "tool_calls": [{"id": "call_5f097a4f09c24b0e8581e124", "type": "function", "function": {"name": "get_weather", "arguments": "{\"city\": \"Paris\"}"}}]}, "finish_reason": "tool_calls", "usage": {"prompt_tokens": 65, "completion_tokens": 15, "total_tokens": 80}, "timings": {"prompt_ms": 366.8, "decode_ms": 160.3, "decode_tok_per_s": 81.08}}
+```
+
+A plain chat question, "In one sentence, what is a GPU?", came back in 34 tokens at 85.23 tok/s. The BFCL and GSM8K scores above were measured through this server. `--max-ctx` defaults to 131,072.
 
 ---
 
@@ -227,9 +266,9 @@ The goal of this article was to run Gemma 4 E2B in plain PyTorch on a 4 GB GTX 1
 - ❌ 16-bit weights and Transformers' own 4-bit path both run out of memory on this card
 - ⚠️ At 32k and 131k tokens held, llama.cpp decodes 1.11x and 1.39x faster
 - ⚠️ Prompts read at 226.5 tok/s for 4k tokens; llama.cpp reads faster
-- TODO-accuracy-bullet
+- 🟢 GSM8K 0.8992 and BFCL 0.920, level with llama.cpp question for question
 
-Scope: Gemma 4 E2B-it QAT only, text only, one GTX 1650 Ti Max-Q (4 GB) in a laptop, torch 2.13.0+cu130, Triton 3.7.1, transformers 5.16.1, greedy decoding, one request at a time throughout. Decode speeds are 63 to 128 generated tokens after the prompt; llama.cpp `7182ef7` was measured the same day on the same card with `llama-bench`, 64 to 128 generated tokens at a stated depth, so the prompt-read columns are different measurements. Recall used four prompts, too few for a rate.
+Scope: Gemma 4 E2B-it QAT only, text only, one GTX 1650 Ti Max-Q (4 GB) in a laptop, torch 2.13.0+cu130, Triton 3.7.1, transformers 5.16.1, greedy decoding, one request at a time throughout. Decode speeds are 63 to 128 generated tokens after the prompt; llama.cpp `7182ef7` was measured the same day on the same card with `llama-bench`, 64 to 128 generated tokens at a stated depth, so the prompt-read columns are different measurements. The GSM8K and BFCL reference is llama.cpp `77c4540ce` on the same card on 2026-10-14, 8 requests at a time. Recall used four prompts, too few for a rate.
 
 The strategy for running Gemma 4 on a 4 GB GPU in plain PyTorch was validated with an incremental step by step approach.
 
@@ -243,6 +282,7 @@ The strategy for running Gemma 4 on a 4 GB GPU in plain PyTorch was validated wi
 - 4-bit tables and the 4-bit kernel: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-lmhead-kernel-1650ti/REPORT.md
 - Decode attention and kernel tuning: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-close-gap-1650ti/REPORT.md
 - Long context: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-long-context-1650ti/REPORT.md
+- Answer quality and the attention fix: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-accuracy-1650ti/REPORT.md
 - Decoder checkpoint: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text
 - 4-bit tables checkpoint: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4
 - Google's QAT E2B: https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized
