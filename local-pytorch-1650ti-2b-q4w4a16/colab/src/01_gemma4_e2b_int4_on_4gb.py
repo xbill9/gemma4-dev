@@ -88,7 +88,7 @@ for package in ("torch", "triton", "transformers", "compressed-tensors", "accele
 import pathlib
 import urllib.request
 
-ENGINE_REF = "c44bbf379fdad29e872209232c13efc3525bc5e0"
+ENGINE_REF = "a836a6aa13d6102edd75025cb1c148be058c58d6"
 RIG = f"https://raw.githubusercontent.com/xbill9/gemma4-dev/{ENGINE_REF}/local-pytorch-1650ti-2b-q4w4a16"
 for name in ("e2b_engine.py", "w4gemv.py", "w4attn.py", "gemma4_tools.py"):
     pathlib.Path(name).write_bytes(urllib.request.urlopen(f"{RIG}/{name}").read())
