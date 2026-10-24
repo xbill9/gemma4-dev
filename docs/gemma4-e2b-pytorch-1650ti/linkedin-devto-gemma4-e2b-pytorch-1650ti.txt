@@ -1,0 +1,14 @@
+Gemma 4 on a 4 GB GPU in Plain PyTorch: From Out of Memory to Faster Than llama.cpp
+
+On a 4 GB GTX 1650 Ti, Gemma 4 E2B does not fit in 16-bit, and Transformers' own 4-bit path runs out of memory on its first forward pass. Kept in Google's QAT 4-bit end to end, with a few Triton kernels and a CUDA graph, plain PyTorch decodes at 88 tok/s, 1.07x llama.cpp on the same card, and holds the full 131,072-token context.
+
+What is in it:
+
+- 🟢 Every 4-bit code matches Google's QAT release; the whole model is 2,483 MiB on the GPU
+- 🟢 Decode at 87.8 tok/s at short context, 1.07x llama.cpp on the same card the same day
+- 🟢 The full 131,072-token context fits, 3,471 MiB peak of 3,732
+- 🟢 Long-context recall matches llama.cpp answer for answer on the prompts both ran
+
+dev.to (Google Developer Experts): https://dev.to/gde/gemma-4-on-a-4-gb-gpu-in-plain-pytorch-from-out-of-memory-to-faster-than-llamacpp-31jb
+Medium: https://xbill999.medium.com/gemma-4-on-a-4-gb-gpu-in-plain-pytorch-from-out-of-memory-to-faster-than-llama-cpp-c1d7383fe594
+Substack: https://xbill9.substack.com/p/gemma-4-on-a-4-gb-gpu-in-plain-pytorch
