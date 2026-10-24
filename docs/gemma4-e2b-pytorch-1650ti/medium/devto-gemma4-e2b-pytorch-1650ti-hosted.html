@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 on a 4 GB GPU in Plain PyTorch: From Out of Memory to Faster Than llama.cpp</title>
+  <meta name="description" content="On a 4 GB GTX 1650 Ti, Gemma 4 E2B does not fit in 16-bit, and Transformers&#x27; own 4-bit path runs out of memory on its first forward pass. Kept in Google&#x27;s QAT 4-bit end to end, with a few Triton kernels and a CUDA graph, plain PyTorch decodes at 88 tok/s, 1.07x llama.cpp on the same card, and holds the full 131,072-token context." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to running Gemma 4 E2B,
+Google's quantization-aware trained (QAT) build, on a 4 GB NVIDIA GTX
+1650 Ti laptop GPU with plain PyTorch and Hugging Face Transformers. A
+small OpenAI-compatible server is built to run the result like any other
+local model server.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-cover.fa8eaefc.jpg" alt="Gemma 4 on a 4 GB GPU in Plain PyTorch: From Out of Memory to Faster Than llama.cpp" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p><strong>Can plain PyTorch run Gemma 4 on a 4 GB GPU? Yes, and faster
+than llama.cpp at chat-length context</strong>, once the model stays
+4-bit from disk to arithmetic:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-1.png"
+alt="Table: GTX 1650 Ti, 4 GB, Gemma 4 E2B, Decode, Fits the card" /></p>
+<p>Every weight stays on the 4-bit grid Google trained, and the speed
+comes from doing the 4-bit arithmetic in kernels that read the packed
+weights directly.</p>
+<hr />
+<h4 id="what-is-being-measured">What Is Being Measured?</h4>
+<p>Gemma 4 E2B stores about 4.7 billion parameters (8.73 GiB in 16-bit),
+most of them in two vocabulary tables, and a 4 GB laptop GPU shows
+PyTorch 3,732 MiB. Google publishes E2B already trained for 4-bit
+weights. The questions are whether plain PyTorch can run it inside that
+memory, how fast it decodes, how much context fits beside it, and
+whether the answers survive, measured against llama.cpp on the same
+card.</p>
+<p>The card is a GTX 1650 Ti with Max-Q design (Turing TU117, no tensor
+cores) in a laptop. The same card's llama.cpp results are in <a
+href="https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g">Do
+Drafters Work on Small Models?</a>.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA GPU with 4 GB and a CUDA driver — here a GTX 1650 Ti
+Max-Q, driver 615.71.10</li>
+<li>PyTorch with CUDA and Triton — every number here is from torch
+2.13.0+cu130 and Triton 3.7.1</li>
+<li><code>transformers==5.16.1</code>,
+<code>compressed-tensors==0.17.0</code>,
+<code>accelerate==1.14.0</code>, in the system <code>python3</code>, no
+virtualenv</li>
+<li>About 9 GB of free disk for the two checkpoints</li>
+<li>The repository cloned, with the rig
+<code>local-pytorch-1650ti-2b-q4w4a16/</code></li>
+</ul>
+<hr />
+<h4 id="why-doesnt-16-bit-fit">Why Doesn't 16-bit Fit?</h4>
+<p>Unpacked to 16-bit on the CPU, the model's parts weigh:</p>
+<pre class="plaintext"><code>{&quot;embed_tokens&quot;: 0.75, &quot;layers&quot;: 3.579, &quot;embed_tokens_per_layer&quot;: 4.375, &quot;total&quot;: 8.731}   # GiB</code></pre>
+<p>The 35 decoder layers alone are 3.58 GiB against 3.65 GiB the card
+gives PyTorch, before any working memory. The per-layer embedding table,
+4.38 GiB, is Gemma 4's per-layer input table for the E sizes: a row of
+35 × 256 values for every token in the 262,144-token vocabulary.</p>
+<hr />
+<h4 id="step-1--load-googles-qat-weights-without-unpacking-them">Step 1
+— Load Google's QAT Weights Without Unpacking Them</h4>
+<p>The checkpoint is
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text</code>: Google's QAT
+E2B repacked into the compressed-tensors W4A16 format (4-bit weights in
+groups of 32, 16-bit activations), text only. Every 4-bit code in it
+equals Google's QAT release:</p>
+<pre class="plaintext"><code>{&quot;elements&quot;: 1876819968, &quot;elements_differing&quot;: 187046012, &quot;int4_codes_disagreeing&quot;: 0, &quot;worst_diff_in_units_of_group_step&quot;: 0.062}</code></pre>
+<p>All 1,876,819,968 codes agree with
+<code>google/gemma-4-E2B-it-qat-q4_0-unquantized</code>. The 10% of
+values that differ do so by at most 6.2% of one grid step, from storing
+each group's step in bf16.</p>
+<p>Loaded through Transformers with the per-layer table left in CPU
+memory, the packed layers take 1.73 GiB on the GPU. The first forward
+pass then fails. Transformers 5.16 applies compressed-tensors with
+<code>run_compressed=False</code>
+(<code>quantizer_compressed_tensors.py:114</code>), so
+compressed-tensors unpacks every layer to 16-bit on the first call,
+which needs the 3.58 GiB above. Transformers 5.20.2 does the same, and
+its <code>use_optimized_inference</code> covers W8A8 FP8 on SM89 and
+newer only.</p>
+<p>Removing that unpack hook and unpacking each layer inside its own
+forward pass runs, at 0.58 tok/s:</p>
+<pre class="plaintext"><code>{&quot;step&quot;: &quot;generate_warm&quot;, &quot;prompt_tokens&quot;: 19, &quot;new_tokens&quot;: 57, &quot;seconds&quot;: 97.69, &quot;tok_per_s&quot;: 0.58, &quot;peak_cuda_mib&quot;: 1948}</code></pre>
+<hr />
+<h4 id="step-2--keep-the-vocabulary-tables-in-4-bit">Step 2 — Keep the
+Vocabulary Tables in 4-Bit</h4>
+<p><code>embed_tokens</code> (which doubles as the output layer,
+<code>lm_head</code>) and the per-layer table are 16-bit in the
+<code>-text</code> checkpoint. Google's QAT trained them onto a 4-bit
+grid as well: every sampled group of 32 holds at most 16 distinct
+values. <code>xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</code>
+stores them as 4-bit codes with each group's step recovered from the
+grid, in 16-bit:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-2.png"
+alt="Table: Table, Values equal to the 16-bit QAT table, Worst difference" /></p>
+<p>The emb4 checkpoint writes <code>embed_tokens</code> and the untied
+<code>lm_head</code> as identical levels and scales, so one copy on the
+GPU serves both, as the model was trained. With every table in 4-bit,
+the whole model is <strong>2,483 MiB on the GPU</strong>, and the
+per-layer lookup happens on the card instead of in CPU memory.</p>
+<hr />
+<h4 id="step-3--multiply-straight-from-the-packed-weights">Step 3 —
+Multiply Straight From the Packed Weights</h4>
+<p>Decoding one token multiplies one vector by every weight matrix, so
+the speed limit is how fast the card reads the weights. A Triton kernel
+(<code>w4gemv.py</code>) reads the packed 4-bit words, unpacks them in
+registers and multiplies, never writing a 16-bit copy.</p>
+<p>Two details carry most of its speed on this card. Each 4-bit value
+becomes a float by OR-ing it into the bits of 2²³ and subtracting 2²³ +
+8, which is exact and skips Turing's slow integer-to-float conversion.
+And each weight shape gets its own fixed tiling, chosen by searching
+tile sizes, warps and pipeline stages on this card:</p>
+<pre class="plaintext"><code>{&quot;summary&quot;: {&quot;v4&quot;: {&quot;ms_per_token&quot;: 9.3, &quot;GBps_effective&quot;: 137.8}, &quot;v5&quot;: {&quot;ms_per_token&quot;: 9.12, &quot;GBps_effective&quot;: 140.6}}, &quot;bytes_per_token_MiB&quot;: 1222.8}</code></pre>
+<p>9.1 ms per token for 1,222.8 MiB of packed weights is 140.6 GB/s. The
+card reads 155.9 GB/s in a plain sum over memory, so the kernel runs at
+90% of what the card can read.</p>
+<hr />
+<h4 id="step-4--replay-each-decode-step-as-one-cuda-graph">Step 4 —
+Replay Each Decode Step as One CUDA Graph</h4>
+<p>A decode step is hundreds of small kernels, and launching them one at
+a time from Python costs more than running them. The step is compiled
+with <code>torch.compile</code> and captured once as a CUDA graph, then
+replayed for every token.</p>
+<p>Transformers' static cache stands in the way. Its sliding-window
+layer keeps the cache length as a Python integer: a CUDA graph captures
+that integer as a constant, so the sliding-window mask points at the
+wrong position from the fifth token on, and <code>torch.compile</code>
+guards on it, so it recompiles at every token. The engine keeps its own
+cache instead (Step 7), with every position on the GPU.</p>
+<hr />
+<h4 id="step-5--attention-for-one-token-at-a-time">Step 5 — Attention
+for One Token at a Time</h4>
+<p>PyTorch's default attention on this card is a memory-efficient kernel
+built for many query tokens. For one query token it took 13 ms per
+decode step. Gemma 4 E2B has one key/value head shared by eight query
+heads, so a Triton kernel (<code>w4attn.py</code>) reads each cached key
+and value once for all eight heads, split across the cache in slices,
+and combines the slices with an online softmax:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-3.png"
+alt="Table: Attention, per decode step, ms" /></p>
+<p>The kernel avoids <code>tl.dot</code>: on a card without tensor
+cores, Triton's 16-bit dot product ran at 24 GB/s, against 65 GB/s for a
+multiply-and-sum over the eight heads.</p>
+<hr />
+<h4 id="mag_right-tip-merge-the-small-projections">🔎 Tip: Merge the
+Small Projections</h4>
+<p>The gate and up projections of each MLP, and the query, key and value
+projections of each attention layer that computes its own keys and
+values, read the same input. Concatenated into one matrix each, they
+become one kernel launch instead of two or three, 65 fewer per token. On
+this card that was worth about 1 tok/s.</p>
+<hr />
+<h4
+id="step-6--read-prompts-in-32-bit-on-a-card-without-tensor-cores">Step
+6 — Read Prompts in 32-Bit on a Card Without Tensor Cores</h4>
+<p>A prompt is read in 256-token chunks, with the weights unpacked to a
+full matrix for each multiply. For 16-bit matrix multiplies cuBLAS picks
+its tensor-core kernels (<code>s884gemm</code>), and the TU117 has no
+tensor cores:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-4.png"
+alt="Table: 256, 1536 x 1536, 24576, TFLOP/s" /></p>
+<p>Unpacking to 32-bit for prompt reads doubles their speed: a
+4,081-token prompt reads at 226.5 tok/s against 97.7 in 16-bit. Decode
+stays 16-bit.</p>
+<hr />
+<h4 id="step-7--fit-the-full-131072-token-context">Step 7 — Fit the Full
+131,072-Token Context</h4>
+<p>Gemma 4 E2B keeps a full-length key/value cache in only 3 of its 35
+layers, one head of width 512 each: 2 KiB per token per layer. Twelve
+more layers attend over a 512-token window, and the last 20 reuse
+earlier layers' keys and values. So the whole 131,072-token context
+costs 774 MiB:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-5.png"
+alt="Table: MiB" /></p>
+<p>The engine owns that cache: full layers get one slot per position,
+sliding layers a 512-slot ring that records each slot's position. Decode
+speed with the context held, against llama.cpp on the same card:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-6.png"
+alt="Table: Context held, PyTorch, llama.cpp" /></p>
+<p>Seven layers attend over the full-length cache every token, at 3.74
+ms each at 131,072 tokens in this kernel, which is where llama.cpp pulls
+ahead at depth. llama.cpp also fits the full context on this card, with
+its per-layer table in CPU memory.</p>
+<hr />
+<h4 id="step-8--check-long-context-recall-against-llamacpp">Step 8 —
+Check Long-Context Recall Against llama.cpp</h4>
+<p>A recall test fills the context with numbered records, each with a
+random six-digit code, and asks for the code of the record a quarter of
+the way in. The same prompts, sent to llama-server with thinking off,
+give the same token counts and the same answers:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-7.png"
+alt="Table: Prompt, Records, PyTorch, llama.cpp" /></p>
+<p>At 32,761 tokens a second prompt with different codes was answered
+correctly, and at 130,981 tokens the answer came from the wrong record.
+Finding one of thousands of near-identical records is at the edge of
+what E2B does at this depth, in either engine.</p>
+<hr />
+<h4 id="step-9--check-the-answers-gsm8k-and-bfcl">Step 9 — Check the
+Answers: GSM8K and BFCL</h4>
+<p>GSM8K (1,319 grade-school math problems, 2,048-token limit) and BFCL
+simple (400 single tool calls) run through the same scoring code,
+question sets and chat template as the llama.cpp results on this card,
+greedy, and are paired question by question:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-8.png"
+alt="Table: GTX 1650 Ti, Gemma 4 E2B QAT, llama.cpp, PyTorch, Difference (95% range)" /></p>
+<p>Both engines answer 1,186 GSM8K problems correctly; 26 go each way.
+On BFCL one question separates them. The 4-bit arithmetic, 16-bit decode
+and 32-bit prompt reads leave the answers where llama.cpp has them.</p>
+<hr />
+<h4
+id="mag_right-tip-copy-keys-and-values-before-masked-memory-efficient-attention">🔎
+Tip: Copy Keys and Values Before Masked Memory-Efficient Attention</h4>
+<p>For the sliding-window layers a prompt chunk goes to PyTorch's
+memory-efficient attention with an explicit mask, and the single
+key/value head is shared by the eight query heads. Broadcast as a view
+(<code>expand</code>, stride 0), those keys and values make torch 2.13's
+kernel return a wrong last row whenever the chunk holds 33, 65, 97 …
+queries, on this card:</p>
+<pre class="plaintext"><code>n=33 Lk=545: bool+expand 1.127  bool contiguous 0.000  float mask 1.205  D=128 1.452  H=1 0.000</code></pre>
+<p>The last row of a prompt read is the token that picks the first reply
+token, so this shows up as about one prompt in 32 starting its reply
+wrong. Copying the keys and values first (<code>.contiguous()</code>, at
+most 768 keys on these layers) gives the right row at every chunk
+length. Calls with the built-in causal mask and no explicit mask, as on
+the full-attention layers, return the right rows with the broadcast
+view.</p>
+<hr />
+<h4 id="step-10--serve-it">Step 10 — Serve It</h4>
+<p><code>openai_server.py</code> puts the engine behind
+<code>/v1/chat/completions</code>, one request at a time, greedy. Tool
+definitions go through Gemma 4's chat template and tool calls come back
+in OpenAI's <code>tool_calls</code> field:</p>
+<pre class="bash"><code>python3 openai_server.py --port 8100 --max-ctx 8192
+curl -s localhost:8100/v1/chat/completions -H &#39;Content-Type: application/json&#39; -d &#39;{
+  &quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;What is the weather in Paris right now?&quot;}],
+  &quot;tools&quot;: [{&quot;type&quot;: &quot;function&quot;, &quot;function&quot;: {
+    &quot;name&quot;: &quot;get_weather&quot;,
+    &quot;description&quot;: &quot;Current weather for a city&quot;,
+    &quot;parameters&quot;: {&quot;type&quot;: &quot;object&quot;, &quot;properties&quot;: {&quot;city&quot;: {&quot;type&quot;: &quot;string&quot;}}, &quot;required&quot;: [&quot;city&quot;]}
+  }}]
+}&#39;</code></pre>
+<p>The reply, with its message, finish reason and timings:</p>
+<pre class="json"><code>{&quot;message&quot;: {&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: null, &quot;tool_calls&quot;: [{&quot;id&quot;: &quot;call_5f097a4f09c24b0e8581e124&quot;, &quot;type&quot;: &quot;function&quot;, &quot;function&quot;: {&quot;name&quot;: &quot;get_weather&quot;, &quot;arguments&quot;: &quot;{\&quot;city\&quot;: \&quot;Paris\&quot;}&quot;}}]}, &quot;finish_reason&quot;: &quot;tool_calls&quot;, &quot;usage&quot;: {&quot;prompt_tokens&quot;: 65, &quot;completion_tokens&quot;: 15, &quot;total_tokens&quot;: 80}, &quot;timings&quot;: {&quot;prompt_ms&quot;: 366.8, &quot;decode_ms&quot;: 160.3, &quot;decode_tok_per_s&quot;: 81.08}}</code></pre>
+<p>A plain chat question, "In one sentence, what is a GPU?", came back
+in 34 tokens at 85.23 tok/s. The BFCL and GSM8K scores above were
+measured through this server. <code>--max-ctx</code> defaults to
+131,072.</p>
+<hr />
+<h4 id="run-it-on-colab">Run It on Colab</h4>
+<p>The notebook
+<code>local-pytorch-1650ti-2b-q4w4a16/colab/notebooks/01_gemma4_e2b_int4_on_4gb.ipynb</code>
+runs the same steps on a Colab T4. It caps PyTorch at the 3,732 MiB a
+GTX 1650 Ti shows
+(<code>torch.cuda.set_per_process_memory_fraction</code>), so a 16 GB T4
+behaves like the 4 GB card for memory, then times 16-bit against 32-bit
+multiplies and reads prompts with the faster one. The same notebook, run
+on both cards:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-9.png"
+alt="Table: Same notebook, 3,732 MiB cap, Colab T4, GTX 1650 Ti" /></p>
+<p>The T4's tensor cores make 16-bit prompt reads ten times faster than
+the laptop's 32-bit ones; decode, limited by how fast the card reads the
+weights, gains 1.2–1.4x. No Hugging Face token is needed, and every
+checkpoint is public.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-pytorch-1650ti/medium/img/devto-gemma4-e2b-pytorch-1650ti-table-10.png"
+alt="Table: GTX 1650 Ti, Gemma 4 E2B QAT, PyTorch, this article, llama.cpp 7182ef7" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For serving E2B on this card, llama.cpp is ready today, holds long
+context better and reads prompts faster. Plain PyTorch matches it at
+chat length once the model stays 4-bit end to end, and every piece is
+Python and Triton you can read and change. The steps carry to any small
+GPU: keep QAT weights packed, multiply from the packed words, own the
+cache, and replay decode as a graph.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to run Gemma 4 E2B in plain PyTorch on a
+4 GB GTX 1650 Ti. The key to the solution was keeping Google's QAT 4-bit
+weights packed from disk to arithmetic, with Triton kernels that read
+them directly and the decode step replayed as one CUDA graph. The
+results were:</p>
+<ul>
+<li>🟢 Every 4-bit code matches Google's QAT release; the whole model is
+2,483 MiB on the GPU</li>
+<li>🟢 Decode at 87.8 tok/s at short context, 1.07x llama.cpp on the
+same card the same day</li>
+<li>🟢 The full 131,072-token context fits, 3,471 MiB peak of 3,732</li>
+<li>🟢 Long-context recall matches llama.cpp answer for answer on the
+prompts both ran</li>
+<li>❌ 16-bit weights and Transformers' own 4-bit path both run out of
+memory on this card</li>
+<li>⚠️ At 32k and 131k tokens held, llama.cpp decodes 1.11x and 1.39x
+faster</li>
+<li>⚠️ Prompts read at 226.5 tok/s for 4k tokens; llama.cpp reads
+faster</li>
+<li>🟢 GSM8K 0.8992 and BFCL 0.920, level with llama.cpp question for
+question</li>
+</ul>
+<p>Scope: Gemma 4 E2B-it QAT only, text only, one GTX 1650 Ti Max-Q (4
+GB) in a laptop, torch 2.13.0+cu130, Triton 3.7.1, transformers 5.16.1,
+greedy decoding, one request at a time throughout. Decode speeds are 63
+to 128 generated tokens after the prompt; llama.cpp <code>7182ef7</code>
+was measured the same day on the same card with
+<code>llama-bench</code>, 64 to 128 generated tokens at a stated depth,
+so the prompt-read columns are different measurements. The GSM8K and
+BFCL reference is llama.cpp <code>77c4540ce</code> on the same card on
+2026-10-14, 8 requests at a time. Recall used four prompts, too few for
+a rate.</p>
+<p>The strategy for running Gemma 4 on a 4 GB GPU in plain PyTorch was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Repository: <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></li>
+<li>PyTorch rig: <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-pytorch-1650ti-2b-q4w4a16">https://github.com/xbill9/gemma4-dev/tree/main/local-pytorch-1650ti-2b-q4w4a16</a></li>
+<li>First light, the default path and the QAT check: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-first-light-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-first-light-1650ti/REPORT.md</a></li>
+<li>4-bit tables and the 4-bit kernel: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-lmhead-kernel-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-lmhead-kernel-1650ti/REPORT.md</a></li>
+<li>Decode attention and kernel tuning: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-close-gap-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-close-gap-1650ti/REPORT.md</a></li>
+<li>Long context: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-long-context-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-long-context-1650ti/REPORT.md</a></li>
+<li>Colab notebook: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/colab/notebooks/01_gemma4_e2b_int4_on_4gb.ipynb">https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/colab/notebooks/01_gemma4_e2b_int4_on_4gb.ipynb</a></li>
+<li>Answer quality and the attention fix: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-accuracy-1650ti/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-accuracy-1650ti/REPORT.md</a></li>
+<li>Decoder checkpoint: <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text">https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text</a></li>
+<li>4-bit tables checkpoint: <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4">https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</a></li>
+<li>Google's QAT E2B: <a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized">https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-unquantized</a></li>
+<li>Do Drafters Work on Small Models? (the llama.cpp side of this card):
+<a
+href="https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g">https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g</a></li>
+<li>llama.cpp: <a
+href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+</ul>
+</body>
+</html>

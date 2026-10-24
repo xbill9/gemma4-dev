@@ -14,11 +14,11 @@ https://github.com/xbill9/gemma4-dev
 
 | GTX 1650 Ti, 4 GB, Gemma 4 E2B | Decode | Fits the card |
 | :--- | ---: | :--- |
-| 16-bit weights | — | ❌ 3.58 GiB of layers alone |
-| Transformers' own 4-bit path | — | ❌ out of memory on the first forward pass |
-| 4-bit layers, unpacked by PyTorch one layer at a time | 0.58 tok/s | ✅ |
-| **4-bit end to end, this article** | **87.8 tok/s** | ✅ **with the full 131,072-token context** |
-| llama.cpp, same card, same day | 82.1 tok/s | ✅ |
+| 16-bit weights | — | ❌ no, 3.58 GiB of layers alone |
+| Transformers' own 4-bit path | — | ❌ no, out of memory on the first forward pass |
+| 4-bit layers, unpacked by PyTorch one layer at a time | 0.58 tok/s | ✅ yes |
+| **4-bit end to end, this article** | **87.8 tok/s** | ✅ **yes, with the full 131,072-token context** |
+| llama.cpp, same card, same day | 82.1 tok/s | ✅ yes |
 
 Every weight stays on the 4-bit grid Google trained, and the speed comes from doing the 4-bit arithmetic in kernels that read the packed weights directly.
 
@@ -172,7 +172,7 @@ A recall test fills the context with numbered records, each with a random six-di
 
 | Prompt | Records | PyTorch | llama.cpp |
 | ---: | ---: | :--- | :--- |
-| 4,081 tokens | 135 | ✅ | ✅ |
+| 4,081 tokens | 135 | ✅ right code | ✅ right code |
 | 32,761 tokens | 1,091 | ❌ code of record 723 | ❌ the same code |
 
 At 32,761 tokens a second prompt with different codes was answered correctly, and at 130,981 tokens the answer came from the wrong record. Finding one of thousands of near-identical records is at the edge of what E2B does at this depth, in either engine.
@@ -244,7 +244,7 @@ The notebook `local-pytorch-1650ti-2b-q4w4a16/colab/notebooks/01_gemma4_e2b_int4
 | Prompt read, 32,491 tokens | 1,508.2 tok/s (16-bit) | 147.2 tok/s (32-bit) |
 | Decode, 32k held | 69.2 tok/s | 50.8 tok/s |
 | Peak memory, 32k | 2,836 MiB | 2,908 MiB |
-| Recall, 32k | ✅ | ✅ |
+| Recall, 32k | ✅ right code | ✅ right code |
 
 The T4's tensor cores make 16-bit prompt reads ten times faster than the laptop's 32-bit ones; decode, limited by how fast the card reads the weights, gains 1.2–1.4x. No Hugging Face token is needed, and every checkpoint is public.
 
