@@ -100,6 +100,14 @@ Decode attention is the difference at depth: seven layers read the full-length c
 four share it), at 3.74 ms per layer at 131,072 tokens in this kernel. llama.cpp keeps the 1.32 GB per-layer table in
 CPU memory and fits 131,072 tokens too; this engine keeps every table on the GPU.
 
+#### After the sliding-layer attention fix
+
+`w4attn.py` now copies sliding-layer K/V for prompt chunks (`../2026-10-23-accuracy-1650ti/REPORT.md`). None of this
+run's prompts ends on a 32k+1-token chunk (61, 241, 249 and 165 tokens), so the bug did not reach them. The rig
+engine with the fix, same prompts and cache size, two repeats (`prefill_after_fix.jsonl`): prompt read 162.6–176.0,
+234.5–235.0 and 146.6–146.8 tok/s at 61, 4,081 and 32,761 tokens; decode 87.68–87.80, 80.13–80.33 and 51.34–51.56;
+recall unchanged (found, found, the 32k miss).
+
 #### Not measured
 
 16k and 64k with fp32 prompt reads; recall over enough prompts to give a rate.

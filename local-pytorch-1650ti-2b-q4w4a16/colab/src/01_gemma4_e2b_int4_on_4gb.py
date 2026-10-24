@@ -314,26 +314,31 @@ print(json.dumps(long_ctx))
 
 # %% [markdown]
 # **What you should see.** The prompt fits and decodes inside the budget. Whether the answer matches is the model's
-# own long-context recall. On the GTX 1650 Ti this exact prompt (seed 1234, 32,761 tokens) got the wrong code from
-# both this engine and llama.cpp, the same wrong code in both; at 4,081 tokens both found it.
+# own long-context recall. On the GTX 1650 Ti this exact prompt (seed 1234, 32,491 tokens, 1,082 records) found the
+# code. Of two other 32k prompts in the rig's long-context run, both engines missed one and this engine found the
+# other: finding one of a thousand near-identical records is at the edge of what E2B does.
 
 # %% [markdown]
 # ## 5. Scorecard
+
+# The GTX 1650 Ti column is this notebook run on that card (driver 615.71.10, torch 2.13.0, triton 3.7.1,
+# transformers 5.16.1).
 
 # %%
 # Cell 5.1: your numbers beside the GTX 1650 Ti's
 rows = [
     ("16-bit weights in a 3,732 MiB budget", default_path["fp16"]["result"], "out of memory"),
     ("Transformers' own 4-bit path, first forward", default_path["int4_transformers"]["result"], "out of memory"),
-    ("int4 engine, weights + 32k cache (MiB)", f"{eng.weights_mib} + {eng.kv_mib}", "2483 + 194"),
+    ("int4 engine, weights + 32k cache (MiB)", f"{eng.weights_mib} + {eng.kv_mib}", "2499 + 198"),
     (
         "decode, short chat (tok/s)",
         f"{min(c['decode_tok_per_s'] for c in chat)}-{max(c['decode_tok_per_s'] for c in chat)}",
-        "87.8-87.9",
+        "86.1-87.5",
     ),
-    ("prompt read, 32k tokens (tok/s)", long_ctx["prompt_read_tok_per_s"], "not measured with fp32 reads"),
-    ("decode with 32k held (tok/s)", long_ctx["decode_tok_per_s"], "51.5"),
-    ("peak memory, 32k (MiB)", long_ctx["peak_mib"], "3385 (131k cache)"),
+    ("prompt read, 32k tokens (tok/s)", long_ctx["prompt_read_tok_per_s"], "147.2 (32-bit multiplies)"),
+    ("decode with 32k held (tok/s)", long_ctx["decode_tok_per_s"], "50.8"),
+    ("peak memory, 32k (MiB)", long_ctx["peak_mib"], "2908"),
+    ("recall, 32k", "found" if long_ctx["answer"] == str(long_ctx["expected"]) else "missed", "found"),
 ]
 print(f"{'':48s} {'here':>22s} {'GTX 1650 Ti':>28s}")
 for name, here, ref in rows:
