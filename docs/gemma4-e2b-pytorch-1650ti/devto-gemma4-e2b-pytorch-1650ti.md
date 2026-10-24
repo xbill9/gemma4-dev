@@ -256,7 +256,7 @@ The T4's tensor cores make 16-bit prompt reads ten times faster than the laptop'
 | :--- | :--- | :--- |
 | Decode, short chat | 🥇 87.8 tok/s | 82.1 tok/s |
 | Decode, 131k context held | 21.8 tok/s | 🥇 30.2 tok/s |
-| Prompt read, 4k tokens | 226.5 tok/s, whole prompt | 🥇 279.8 tok/s, 512 tokens at 4k |
+| Prompt read, 4k tokens | 226.5 tok/s, whole prompt | 🥇 279.75 tok/s, 512 tokens at 4k |
 | Full 131,072-token context | ✅ every table on the GPU | ✅ per-layer table in CPU memory |
 | Weights | Google's QAT grid, 4-bit end to end | Google's QAT grid, exact Q4_0 GGUF |
 | Code you change | Python and Triton | C++ and CUDA |
