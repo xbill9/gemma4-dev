@@ -1,0 +1,95 @@
+Tesla T4, 15360 MiB, 580.82.07
+
+torch                2.11.0+cu130
+triton               3.6.0
+transformers         5.16.1
+compressed-tensors   0.17.0
+accelerate           1.14.0
+fetched e2b_engine.py
+fetched w4gemv.py
+fetched w4attn.py
+fetched gemma4_tools.py
+/usr/local/lib/python3.13/dist-packages/huggingface_hub/utils/_auth.py:138: UserWarning: 
+Error while fetching `HF_TOKEN` secret value from your vault: 'Requesting secret HF_TOKEN timed out. Secrets can only be fetched when running from the Colab UI.'.
+  warnings.warn(f"\nError while fetching `HF_TOKEN` secret value from your vault: '{str(e)}'.")
+Downloading bytes:           |  0.00B            
+Reconstructing (incomplete total...): |          |  0.00B /  0.00B            
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING:huggingface_hub.utils._http:Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text: 6.11 GiB
+Downloading bytes:           |  0.00B            
+Reconstructing (incomplete total...): |          |  0.00B /  0.00B            
+xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4: 1.65 GiB
+Tesla T4: 14912 MiB; PyTorch capped at 3732 MiB (0.250)
+wrote default_path.py
+{"task": "fp16", "result": "out of memory", "detail": "CUDA out of memory", "peak_mib": 0}
+{"task": "int4_transformers", "loaded_mib": 1775, "result": "out of memory", "detail": "CUDA out of memory", "peak_mib": 3454}
+{'torch.float16': 36.58, 'torch.float32': 6.68} -> torch.float16
+[transformers] `run_compressed` is deprecated and will be removed in a future version. Use `dequantize=True` instead of `run_compressed=False`.
+/usr/local/lib/python3.13/dist-packages/transformers/quantizers/auto.py:275: UserWarning: You passed `quantization_config` or equivalent parameters to `from_pretrained` but the model you're loading already has a `quantization_config` attribute. The `quantization_config` from the model will be used.However, loading attributes (e.g. ['dequantize', 'use_optimized_inference']) will be overwritten with the one you passed to `from_pretrained`. The rest will be ignored.
+  warnings.warn(warning_msg)
+WARNING:accelerate.big_modeling:Some parameters are on the meta device because they were offloaded to the cpu.
+Downloading bytes:           |  0.00B            
+Reconstructing (incomplete total...): |          |  0.00B /  0.00B            
+Downloading bytes:           |  0.00B            
+Reconstructing (incomplete total...): |          |  0.00B /  0.00B            
+Downloading bytes:           |  0.00B            
+Reconstructing (incomplete total...): |          |  0.00B /  0.00B            
+Downloading bytes:           |  0.00B            
+Reconstructing (incomplete total...): |          |  0.00B /  0.00B            
+W1024 01:15:09.076000 2074 usr/local/lib/python3.13/dist-packages/torch/_inductor/utils.py:1731] [1/0] Not enough SMs to use max_autotune_gemm mode
+loaded in 280 s; weights 2498 MiB, K/V cache 198 MiB, allocated 2714 MiB of 3732
+--- Explain in two sentences why the sky is blue.
+The sky appears blue because of a phenomenon called Rayleigh scattering, where the Earth's atmosphere scatters shorter, blue wavelengths of sunlight more effectively than longer, red wavelengths. This scattered blue light is what reaches our eyes from all directions, making the sky look blue during the day.
+[56 tokens, 101.6 tok/s]
+
+--- Write a Python function that reverses a singly linked list.
+Here is a complete Python solution for reversing a singly linked list.
+
+We will first define a `ListNode` class to represent the nodes in the linked list, and then the function to reverse it.
+
+### Python Implementation
+
+```python
+class ListNode:
+    """
+    Definition for a singly-linked list node.
+    """
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+def reverse_linked_list(head: ListNode) -> ListNode:
+    """
+    Reverses a singly linked list iteratively.
+
+    
+[128 tokens, 117.5 tok/s]
+
+--- A train leaves at 9:40 and arrives at 13:15. How long is the trip in minutes? Show the steps.
+Here is how to calculate the duration of the trip:
+
+**1. Calculate the time from the departure time to the next full hour:**
+
+* The train leaves at 9:40.
+* The next full hour is 10:00.
+* Time elapsed: $10:00 - 9:40 = 20$ minutes.
+
+**2. Calculate the time from that hour to the arrival time:**
+
+* The train arrives at 13:15.
+* We start counting from 10:00.
+* Time from 10:0
+[128 tokens, 117.3 tok/s]
+
+peak 2793 MiB of 3732
+{"prompt_tokens": 32491, "records": 1082, "prompt_read_tok_per_s": 1508.2, "decode_tok_per_s": 69.2, "expected": 999494, "answer": "999494", "peak_mib": 2836}
+                                                                   here                  GTX 1650 Ti
+16-bit weights in a 3,732 MiB budget                      out of memory                out of memory
+Transformers' own 4-bit path, first forward               out of memory                out of memory
+int4 engine, weights + 32k cache (MiB)                       2498 + 198                   2499 + 198
+decode, short chat (tok/s)                                  101.6-117.5                    86.1-87.5
+prompt read, 32k tokens (tok/s)                                  1508.2    147.2 (32-bit multiplies)
+decode with 32k held (tok/s)                                       69.2                         50.8
+peak memory, 32k (MiB)                                             2836                         2908
+recall, 32k                                                       found                        found

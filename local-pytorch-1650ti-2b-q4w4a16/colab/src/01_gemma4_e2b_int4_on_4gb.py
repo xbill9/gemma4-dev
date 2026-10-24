@@ -229,7 +229,9 @@ import logging
 from e2b_engine import Engine
 
 # Older torch builds print a long, harmless warning while tracing the attention kernel; keep the output readable.
-logging.getLogger("torch._higher_order_ops.triton_kernel_wrap").setLevel(logging.ERROR)
+logging.getLogger("torch._dynamo").addFilter(
+    lambda record: not record.getMessage().startswith("Encountered an exception in identify_")
+)
 
 t0 = time.perf_counter()
 eng = Engine(max_ctx=32768, prefill_dtype=PREFILL_DTYPE)

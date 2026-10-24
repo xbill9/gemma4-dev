@@ -232,7 +232,21 @@ A plain chat question, "In one sentence, what is a GPU?", came back in 34 tokens
 
 #### Run It on Colab
 
-TODO-colab: the T4 notebook, capped at 3,732 MiB.
+The notebook `local-pytorch-1650ti-2b-q4w4a16/colab/notebooks/01_gemma4_e2b_int4_on_4gb.ipynb` runs the same steps on a Colab T4. It caps PyTorch at the 3,732 MiB a GTX 1650 Ti shows (`torch.cuda.set_per_process_memory_fraction`), so a 16 GB T4 behaves like the 4 GB card for memory, then times 16-bit against 32-bit multiplies and reads prompts with the faster one. The same notebook, run on both cards:
+
+| Same notebook, 3,732 MiB cap | Colab T4 | GTX 1650 Ti |
+| :--- | ---: | ---: |
+| 16-bit weights | ❌ out of memory | ❌ out of memory |
+| Transformers' own 4-bit path | ❌ out of memory | ❌ out of memory |
+| Engine, weights + 32k cache | 2,498 + 198 MiB | 2,499 + 198 MiB |
+| Matrix multiply, 16-bit / 32-bit | 36.58 / 6.68 TFLOP/s | 0.42 / 1.58 TFLOP/s |
+| Decode, short chat | 101.6–117.5 tok/s | 86.1–87.5 tok/s |
+| Prompt read, 32,491 tokens | 1,508.2 tok/s (16-bit) | 147.2 tok/s (32-bit) |
+| Decode, 32k held | 69.2 tok/s | 50.8 tok/s |
+| Peak memory, 32k | 2,836 MiB | 2,908 MiB |
+| Recall, 32k | ✅ | ✅ |
+
+The T4's tensor cores make 16-bit prompt reads ten times faster than the laptop's 32-bit ones; decode, limited by how fast the card reads the weights, gains 1.2–1.4x. No Hugging Face token is needed, and every checkpoint is public.
 
 ---
 
@@ -282,6 +296,7 @@ The strategy for running Gemma 4 on a 4 GB GPU in plain PyTorch was validated wi
 - 4-bit tables and the 4-bit kernel: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-lmhead-kernel-1650ti/REPORT.md
 - Decode attention and kernel tuning: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-close-gap-1650ti/REPORT.md
 - Long context: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-long-context-1650ti/REPORT.md
+- Colab notebook: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/colab/notebooks/01_gemma4_e2b_int4_on_4gb.ipynb
 - Answer quality and the attention fix: https://github.com/xbill9/gemma4-dev/blob/main/local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-accuracy-1650ti/REPORT.md
 - Decoder checkpoint: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text
 - 4-bit tables checkpoint: https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4
