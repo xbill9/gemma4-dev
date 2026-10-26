@@ -57,6 +57,11 @@
       "description": "EC2 G6 DevOps for the stock-PyTorch Gemma 4 E2B rig: instance lifecycle, G-family quotas, x86_64 PyTorch DLAMI resolution, torch-on-Ada verification, and SRE diagnostics via the gpu-pytorch-g6-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA L4 (Ada, SM 8.9, 23034 MiB) through HF transformers -- no custom port, no XLA, no build. Retargeted from gpu-pytorch-g5g-2b 2026-08-29 and measured the same day at 20.93 tok/s, a clean 1.92x over the T4G at byte-identical weights. Sits at 71% of the bandwidth roofline where the JAX rig on the same chip reaches 99%: the gap is eager-mode kernel-launch overhead, and batching is untried."
     },
     {
+      "name": "gpu-pytorch-g6-2b-q4w4a16",
+      "source": "./gpu-pytorch-g6-2b-q4w4a16",
+      "description": "EC2 G6 DevOps for Gemma 4 E2B with Google's QAT 4-bit weights (xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text) on an NVIDIA L4, served by the hand-built PyTorch int4 engine of local-pytorch-1650ti-2b-q4w4a16 (Triton int4 GEMV, CUDA-graph decode). Instance lifecycle, PyTorch DLAMI resolution, pinned runtime install, payload deploy over SSM and SRE diagnostics via the gpu-pytorch-g6-2b-q4w4a16 MCP server; provisioning forked from gpu-pytorch-g6-2b. Created 2026-10-26; not yet measured."
+    },
+    {
       "name": "gpu-vllm-g5g-2b",
       "source": "./gpu-vllm-g5g-2b",
       "description": "EC2 G5g DevOps for the vLLM Gemma 4 E2B rig: instance lifecycle, G-family quotas, arm64 AMI resolution, SM 7.5 build orchestration, and SRE diagnostics via the gpu-vllm-g5g-2b MCP server. Serves google/gemma-4-E2B-it on an NVIDIA T4G (Turing) behind an AWS Graviton2 host — the one rig here whose GPU has no prebuilt aarch64 CUDA kernels."

@@ -1,0 +1,20 @@
+# Serving dependencies, installed ON the G6 instance by cloud-init.
+#
+# Not installed locally. server.py's TORCH_PIP_SPEC, _SERVING_REQUIREMENTS and
+# _PROFILING_REQUIREMENTS are the source of truth; this file mirrors them and
+# tests/test_server.py asserts they match.
+#
+# torch and triton are NOT listed: they come from the PyTorch DLAMI.
+# transformers/compressed-tensors/accelerate are pinned because e2b_engine.py
+# patches their internals (the Gemma 4 attention forward, the decompress hook).
+transformers==5.16.1 compressed-tensors==0.17.0 accelerate==1.14.0
+safetensors
+huggingface_hub
+numpy
+# Chat-template rendering for transformers. A missing jinja2 fails every
+# generation while /health stays green (measured on the JAX sibling 2026-08-19).
+jinja2
+
+# Profiling; non-fatal in install.sh.
+xprof
+tensorboard
