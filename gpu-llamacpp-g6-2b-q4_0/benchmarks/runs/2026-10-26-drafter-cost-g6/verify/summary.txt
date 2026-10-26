@@ -1,0 +1,28 @@
+E2B: one target pass over k tokens, ms (x vs k = 1)
+depth                 k=1               k=2               k=3               k=4               k=5               k=6
+     0    7.70±2.10 (1.00x)   7.60±1.32 (0.99x)   7.60±1.05 (0.99x)   7.71±0.88 (1.00x)   8.28±1.13 (1.08x)   8.23±0.86 (1.07x)
+  8192    8.45±1.36 (1.00x)   8.30±1.30 (0.98x)   8.45±1.37 (1.00x)   8.50±1.32 (1.01x)   9.00±1.30 (1.07x)   9.03±1.31 (1.07x)
+ 32768    9.86±1.32 (1.00x)   9.75±1.30 (0.99x)   9.91±1.28 (1.01x)  10.02±1.34 (1.02x)  10.52±1.28 (1.07x)  10.56±1.31 (1.07x)
+
+E2B on the L4, a drafted step at 0 depth: target pass over 1 + n tokens + the rest
+arm      step ms  target pass ms  rest ms  rest per drafted token ms  rest / plain step
+q4x-n1     8.62            7.60     1.02                       1.02              0.137
+q4x-n2     9.41            7.60     1.81                       0.91              0.242
+q4x-n3    10.17            7.71     2.46                       0.82              0.328
+q4x-n4    11.30            8.28     3.02                       0.75              0.403
+plain step 7.50 ms (speed.py), llama-bench k=1 7.70 ms
+
+E4B: one target pass over k tokens, ms (x vs k = 1)
+depth                 k=1               k=2               k=3               k=4               k=5               k=6
+     0   13.66±2.40 (1.00x)  13.90±1.90 (1.02x)  14.11±1.65 (1.03x)  14.24±1.26 (1.04x)  14.97±1.57 (1.10x)  15.71±1.21 (1.15x)
+  8192   14.64±1.69 (1.00x)  14.89±1.66 (1.02x)  15.01±1.65 (1.03x)  15.10±1.58 (1.03x)  15.83±1.64 (1.08x)  16.02±1.64 (1.09x)
+ 32768   17.59±1.81 (1.00x)  17.81±1.71 (1.01x)  17.96±1.72 (1.02x)  18.06±1.74 (1.03x)  18.78±1.74 (1.07x)  18.96±1.74 (1.08x)
+
+E4B on the L4, a drafted step at 0 depth: target pass over 1 + n tokens + the rest
+arm      step ms  target pass ms  rest ms  rest per drafted token ms  rest / plain step
+q4x-n1    15.08           13.90     1.18                       1.18              0.087
+q4x-n2    16.02           14.11     1.90                       0.95              0.141
+q4x-n3    16.87           14.24     2.63                       0.88              0.195
+q4x-n4    18.37           14.97     3.40                       0.85              0.252
+plain step 13.51 ms (speed.py), llama-bench k=1 13.66 ms
+

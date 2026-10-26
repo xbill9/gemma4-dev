@@ -24,3 +24,11 @@ here on greedy and 6.0% on sampled.
 
 The CUDA 13.1 toolkit, `-t 4 -tb 8`, the full-hash `hf_hub_download` rule and the 24,000-character SSM limit are as in
 `gpu-llamacpp-g6-2b-q4_0/CLAUDE.md`.
+
+**Why the card sets the draft length** (`gpu-llamacpp-g6-2b-q4_0/benchmarks/runs/2026-10-26-drafter-cost-g6`): on the 1650 Ti, 3050 and L4 a
+step yields the same tokens per draft length (about 1.60 / 1.94 / 2.15 at 1 / 2 / 3); the cost of a step relative to a
+plain one is what differs (E2B at 3 tokens: 2.119x on the 1650 Ti, 1.356x here). On the L4 the target checks up to 4
+tokens in one pass for at most 1.04x the time of one, so the added time is the drafter's, 0.75–1.18 ms per drafted
+token: 33% of an E2B step at 3 tokens and 19% of an E4B step, which is why E4B gains more. With several requests at
+once (`mixed.py`, `-kvu`) 2 drafted tokens pay up to 16 requests (E2B 1.06–1.19x, E4B 1.15–1.34x) and lose at 64
+(0.87x); 3 tokens lead only for one request.
