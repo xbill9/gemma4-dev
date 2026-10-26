@@ -1,0 +1,56 @@
++ cd /opt/bench-e4b
++ . ./envsh
+++ set -a
+++ . ./tpu.env
++++ MODEL_NAME=xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf
++++ MODEL_REVISION=8b7c081e6a50e5a3d3060ce723d7917f20153a0e
++++ MODEL_PATH=/opt/models/e4b/gemma-4-E4B-it-q4_0-exact.gguf
++++ MODEL_SHA256=5462cc102b7d22c4748f9b8e82091f2ae064e10a45525151af6f9a7d0da7caf9
++++ QUANTIZATION=q4_0
++++ INSTANCE_TYPE=g6.2xlarge
++++ AWS_REGION=us-east-1
++++ ACCELERATOR_TYPE='NVIDIA L4'
++++ COMPUTE_CAPABILITY=8.9
++++ VRAM_TOTAL_MIB=23034
++++ CUDA_VISIBLE_DEVICES=0
++++ TENSOR_PARALLEL_SIZE=1
++++ LLAMA_CPP_DIR=/opt/llamacpp/llama.cpp
++++ LLAMA_CPP_COMMIT=77c4540ce
++++ LLAMA_SERVER_BIN=/opt/llamacpp/llama.cpp/build/bin/llama-server
++++ CUDA_HOME=/usr/local/cuda-13.1
++++ CUDA_ARCH=89
++++ HOST=0.0.0.0
++++ PORT=8080
++++ N_GPU_LAYERS=99
++++ CONTEXT_SIZE=131072
++++ KV_CACHE_TYPE=f16
++++ FLASH_ATTENTION=1
++++ METRICS=1
++++ THREADS=4
++++ THREADS_BATCH=8
++++ PARALLEL_SLOTS=1
++++ REASONING=off
++++ OVERRIDE_TENSORS=per_layer_token_embd.weight=CUDA0
++++ SPEC_DRAFT_MODEL=/opt/models/e4b-draft/gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf
++++ SPEC_DRAFT_SHA256=dc965cb963e56b86fbc04db8efec83163886085e88514574650a57fa55a2ee24
++++ SPEC_DRAFT_HF=xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf
++++ SPEC_DRAFT_HF_REVISION=a9468097e5feb9df13d25bd624f47edabfda0992
++++ SPEC_DRAFT_N_MAX=2
+++ set +a
++++ cat /opt/torch-g6-q4/PYTHON_BIN
+++ PY=/opt/pytorch/bin/python
+++ basename /opt/models/e4b/gemma-4-E4B-it-q4_0-exact.gguf
+++ dirname /opt/models/e4b/gemma-4-E4B-it-q4_0-exact.gguf
++ /opt/pytorch/bin/python -c 'from huggingface_hub import hf_hub_download as d; d('\''xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf'\'','\''gemma-4-E4B-it-q4_0-exact.gguf'\'',revision='\''8b7c081e6a50e5a3d3060ce723d7917f20153a0e'\'',local_dir='\''/opt/models/e4b'\'')'
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+++ basename /opt/models/e4b-draft/gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf
+++ dirname /opt/models/e4b-draft/gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf
++ /opt/pytorch/bin/python -c 'from huggingface_hub import hf_hub_download as d; d('\''xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf'\'','\''gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf'\'',revision='\''a9468097e5feb9df13d25bd624f47edabfda0992'\'',local_dir='\''/opt/models/e4b-draft'\'')'
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
++ echo '5462cc102b7d22c4748f9b8e82091f2ae064e10a45525151af6f9a7d0da7caf9  /opt/models/e4b/gemma-4-E4B-it-q4_0-exact.gguf'
++ sha256sum -c -
+/opt/models/e4b/gemma-4-E4B-it-q4_0-exact.gguf: OK
++ echo 'dc965cb963e56b86fbc04db8efec83163886085e88514574650a57fa55a2ee24  /opt/models/e4b-draft/gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf'
++ sha256sum -c -
+/opt/models/e4b-draft/gemma-4-E4B-it-qat-assistant-q4_0-exact.gguf: OK
++ ./run.sh

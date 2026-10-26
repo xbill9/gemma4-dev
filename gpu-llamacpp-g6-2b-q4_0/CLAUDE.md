@@ -28,3 +28,7 @@ Things that differ from the 3050 rig:
 
 The PyTorch engine on the same card decodes the same QAT int4 weights at 141.35 tok/s, at the card's memory limit for
 one request (`gpu-pytorch-g6-2b-q4w4a16/benchmarks/runs/2026-10-26-first-light-g6`).
+
+The E4B sister `gpu-llamacpp-g6-4b-q4_0` ran next on the same instance: 74.0 tok/s without the drafter, 1.754x at 3
+tokens (129.7), 0.972x this rig without the drafter; GSM8K +0.030 over E2B, BFCL level
+(`gpu-llamacpp-g6-4b-q4_0/benchmarks/runs/2026-10-26-drafter-g6`).
