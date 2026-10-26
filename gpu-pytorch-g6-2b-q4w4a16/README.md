@@ -6,7 +6,7 @@ Gemma 4 E2B with Google's QAT 4-bit weights, in plain PyTorch on an NVIDIA L4 (A
 - Engine: the one from [`local-pytorch-1650ti-2b-q4w4a16`](../local-pytorch-1650ti-2b-q4w4a16/) — int4 weights packed on the GPU, a Triton int4 GEMV, split decode attention, and the decode step compiled with Inductor and replayed as a CUDA graph.
 - Provisioning: an MCP server (`server.py`) that launches a G6 spot instance on the PyTorch DLAMI, installs the pinned runtime, ships the engine over SSM and runs it under systemd. Forked from [`gpu-pytorch-g6-2b`](../gpu-pytorch-g6-2b/).
 
-Not yet provisioned or measured.
+First light 2026-10-26: 141.35 tok/s decode at short context and 51.41 at 131k on the L4, at the card's memory limit for one request ([`REPORT.md`](benchmarks/runs/2026-10-26-first-light-g6/REPORT.md)).
 
 #### Run it
 

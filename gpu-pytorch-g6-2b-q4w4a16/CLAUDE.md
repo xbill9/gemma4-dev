@@ -15,21 +15,25 @@ A full rig: `server.py` (MCP server), skill, plugin manifest, `tpu.env`. Created
   (dense bf16, stock transformers, same instance family). Comments in `server.py` that describe that machinery are
   its, kept where they still hold; its measurements did not come along.
 
-**Nothing has been provisioned or measured here yet.** No number from either parent is this rig's. In particular:
+**First light 2026-10-26** (`benchmarks/runs/2026-10-26-first-light-g6/REPORT.md`): decode **141.35 / 133.08 / 96.14 /
+51.41 tok/s** at 61 / 4k / 32k / 131k tokens held, 1.61–2.36x the 1650 Ti on the same prompts, prompt reads 2,000–2,700
+tok/s in fp16, recall identical to the 1650 Ti prompt for prompt, 3,395 MiB peak. **Single-request decode is at the
+card's memory limit**: a 1 GiB copy runs at 241.2 GB/s, the int4 GEMV is 6.0 of 7.3 ms per step and moves its 1.28 GB
+at 0.886 of that rate, so the ceiling for this engine is about 151 tok/s. The 1650 Ti tilings stay (autotuning found
+nothing faster). Against v5e-1 vLLM on the same QAT int4 model (128.2 / 446.0 / 1,171.0 tok/s at 1 / 4 / 16 requests)
+one request is level; the gap is batching, which this engine does not do.
 
-- **87.8 / 21.8 tok/s** are the engine on a **GTX 1650 Ti** (`local-pytorch-1650ti-2b-q4w4a16`).
-- **101.6–117.5 tok/s** are the engine on a **Colab T4** under a 3,732 MiB cap
-  (`local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-colab-notebook-t4`).
-- **20.93 tok/s** is `gpu-pytorch-g6-2b`: the same L4, but dense bf16 through stock transformers.
+Numbers that belong to other rigs: **87.8 / 21.8 tok/s** (the engine on a GTX 1650 Ti), **101.6–117.5 tok/s** (a Colab
+T4 under a 3,732 MiB cap), **20.93 tok/s** (`gpu-pytorch-g6-2b`: this L4, dense bf16, stock transformers).
 
 ## What carries from the 1650 Ti, and what may not
 
 - **Compute is float16 on every GPU** (`e2b_engine.DTYPE`), although the L4 has native bf16. Both probes in
   `server.py` (the bootstrap's `verify_gpu` and `verify_gpu_arch`) run an fp16 matmul for that reason, and the
   bootstrap also imports Triton: the GEMV, decode attention and Inductor's compiled step all need it.
-- **`w4gemv.py` pins one tiling per shape, tuned on the 1650 Ti.** It runs on the L4 untuned. Re-tune with the
-  `kbench.py` in `local-pytorch-1650ti-2b-q4w4a16/benchmarks/runs/2026-10-23-close-gap-1650ti` before treating a
-  decode number as this engine's best on this card.
+- **`w4gemv.py` pins one tiling per shape, tuned on the 1650 Ti, and they hold on the L4**: v4's autotuner found nothing
+  faster (`benchmarks/runs/2026-10-26-first-light-g6/tune.jsonl`). Benchmark the GEMV with weights rotated past the
+  48 MiB L2 (`cold_gemv.py`); with one copy replayed, the L4 reports L2 speeds above its 241 GB/s memory.
 - **Prompt-read dtype is chosen on the device.** fp32 won on the 1650 Ti (no tensor cores; fp16 GEMMs at a quarter
   of fp32), fp16 won on the T4 (36.58 vs 6.68 TFLOP/s). `--prefill-dtype auto` times both at start-up and logs the
   rates in the server's first JSON line; `PREFILL_DTYPE` in `tpu.env` forces one.

@@ -1,0 +1,16 @@
+/opt/pytorch/lib/python3.13/site-packages/torch/cuda/__init__.py:64: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[transformers] `run_compressed` is deprecated and will be removed in a future version. Use `dequantize=True` instead of `run_compressed=False`.
+/opt/pytorch/lib/python3.13/site-packages/transformers/quantizers/auto.py:275: UserWarning: You passed `quantization_config` or equivalent parameters to `from_pretrained` but the model you're loading already has a `quantization_config` attribute. The `quantization_config` from the model will be used.However, loading attributes (e.g. ['dequantize', 'use_optimized_inference']) will be overwritten with the one you passed to `from_pretrained`. The rest will be ignored.
+  warnings.warn(warning_msg)
+Compressing model:   0%|          | 0/276 [00:00<?, ?it/s]Compressing model:  19%|█▉        | 52/276 [00:00<00:00, 515.65it/s]Compressing model:  38%|███▊      | 106/276 [00:00<00:00, 525.25it/s]Compressing model:  58%|█████▊    | 160/276 [00:00<00:00, 528.25it/s]Compressing model:  78%|███████▊  | 214/276 [00:00<00:00, 529.90it/s]Compressing model:  97%|█████████▋| 268/276 [00:00<00:00, 530.19it/s]Compressing model: 100%|██████████| 276/276 [00:00<00:00, 528.27it/s]
+Loading weights:   0%|          | 0/1092 [00:00<?, ?it/s]Loading weights:  47%|████▋     | 512/1092 [00:00<00:00, 5099.46it/s]Loading weights:  94%|█████████▎| 1022/1092 [00:00<00:00, 4588.07it/s]Loading weights: 100%|██████████| 1092/1092 [00:00<00:00, 4633.24it/s]
+Some parameters are on the meta device because they were offloaded to the cpu.
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 1612.26it/s]
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 1657.83it/s]
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 1917.40it/s]
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 1915.64it/s]
+{"step": "load", "device": "NVIDIA L4", "prefill_dtype": "torch.float32", "weights_mib": 2489, "kv_mib": 774, "load_s": 37.8, "cuda_alloc_mib": 3272, "torch": "2.13.0+cu130", "transformers": "5.16.1"}
+{"step": "depth", "depth": 0, "prompt_tokens": 61, "prompt_s": 0.38, "prompt_tok_per_s": 158.5, "decode_tokens": 63, "decode_tok_per_s": 139.16, "peak_cuda_mib": 3431, "recall_code": 915965, "answer": "915965", "recalled": true}
+{"step": "depth", "depth": 4096, "prompt_tokens": 4081, "prompt_s": 3.47, "prompt_tok_per_s": 1174.6, "decode_tokens": 63, "decode_tok_per_s": 130.68, "peak_cuda_mib": 3480, "recall_code": 610395, "answer": "610395", "recalled": true}
+{"step": "depth", "depth": 32768, "prompt_tokens": 32761, "prompt_s": 25.6, "prompt_tok_per_s": 1279.9, "decode_tokens": 63, "decode_tok_per_s": 96.39, "peak_cuda_mib": 3480, "recall_code": 713468, "answer": "319550", "recalled": false}

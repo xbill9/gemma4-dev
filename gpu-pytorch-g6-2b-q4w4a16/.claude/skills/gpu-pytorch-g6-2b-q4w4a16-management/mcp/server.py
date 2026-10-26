@@ -165,7 +165,10 @@ _SERVING_REQUIREMENTS = (
     # transformers/accelerate ride in TORCH_PIP_SPEC, not here, so the two
     # lists stay disjoint and the mirror file has one entry per install arg.
     # openai_server.py is stdlib http.server: no fastapi/uvicorn/pydantic.
-    "safetensors", "huggingface_hub", "numpy",
+    # huggingface_hub is pinned: the install runs `pip install --upgrade`, which
+    # took it to 2.3.0 on 2026-10-26, and transformers 5.16.1 refuses to import
+    # with anything outside >=1.5,<2. 1.31.0 is what the 1650 Ti rig runs.
+    "safetensors", "huggingface_hub==1.31.0", "numpy",
     # jinja2 is NOT optional here despite not being imported anywhere in this
     # rig: transformers renders the chat template through it, and every serving
     # path goes through apply_chat_template. Without it /health returns 200 and

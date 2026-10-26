@@ -1,0 +1,60 @@
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:     ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/utils/versions.py", line 116, in require_version_core
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:     return require_version(requirement, hint)
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/utils/versions.py", line 110, in require_version
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:     _compare_versions(op, got_ver, want_ver, requirement, pkg, hint)
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/utils/versions.py", line 43, in _compare_versions
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:     raise ImportError(
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:         f"{requirement} is required for a normal functioning of this module, but found {pkg}=={got_ver}.{hint}"
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]:     )
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]: ImportError: huggingface-hub>=1.5.0,<2.0 is required for a normal functioning of this module, but found huggingface-hub==2.3.0.
+2026-10-26T18:10:52+00:00 ip-172-31-34-18 python[2934]: Try: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main
+2026-10-26T18:10:53+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Main process exited, code=exited, status=1/FAILURE
+2026-10-26T18:10:53+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Failed with result 'exit-code'.
+2026-10-26T18:10:53+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Consumed 2.807s CPU time over 12.138s wall clock time, 304.5M memory peak.
+2026-10-26T18:11:03+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Scheduled restart job, restart counter is at 2.
+2026-10-26T18:11:03+00:00 ip-172-31-34-18 systemd[1]: Started torch-g6-q4.service - Gemma 4 E2B QAT int4 (q4w4a16) on NVIDIA L4 via PyTorch.
+2026-10-26T18:11:03+00:00 ip-172-31-34-18 python[2945]: /opt/pytorch/lib/python3.13/site-packages/torch/cuda/__init__.py:64: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+2026-10-26T18:11:03+00:00 ip-172-31-34-18 python[2945]:   import pynvml  # type: ignore[import]
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]: Traceback (most recent call last):
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:   File "/opt/torch-g6-q4/app/openai_server.py", line 28, in <module>
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     from e2b_engine import TEXT, Engine
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:   File "/opt/torch-g6-q4/app/e2b_engine.py", line 28, in <module>
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     import transformers
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/__init__.py", line 30, in <module>
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     from . import dependency_versions_check
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/dependency_versions_check.py", line 56, in <module>
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     require_version_core(deps[pkg])
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/utils/versions.py", line 116, in require_version_core
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     return require_version(requirement, hint)
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/utils/versions.py", line 110, in require_version
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     _compare_versions(op, got_ver, want_ver, requirement, pkg, hint)
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:   File "/opt/pytorch/lib/python3.13/site-packages/transformers/utils/versions.py", line 43, in _compare_versions
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     raise ImportError(
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:         f"{requirement} is required for a normal functioning of this module, but found {pkg}=={got_ver}.{hint}"
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]:     )
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]: ImportError: huggingface-hub>=1.5.0,<2.0 is required for a normal functioning of this module, but found huggingface-hub==2.3.0.
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 python[2945]: Try: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Main process exited, code=exited, status=1/FAILURE
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Failed with result 'exit-code'.
+2026-10-26T18:11:05+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Consumed 2.785s CPU time over 12.227s wall clock time, 304.8M memory peak.
+2026-10-26T18:11:08+00:00 ip-172-31-34-18 systemd[1]: Stopped torch-g6-q4.service - Gemma 4 E2B QAT int4 (q4w4a16) on NVIDIA L4 via PyTorch.
+2026-10-26T18:11:08+00:00 ip-172-31-34-18 systemd[1]: torch-g6-q4.service: Consumed 2.785s CPU time over 2.787s wall clock time, 304.8M memory peak.
+2026-10-26T18:11:08+00:00 ip-172-31-34-18 systemd[1]: Started torch-g6-q4.service - Gemma 4 E2B QAT int4 (q4w4a16) on NVIDIA L4 via PyTorch.
+2026-10-26T18:11:08+00:00 ip-172-31-34-18 python[2992]: /opt/pytorch/lib/python3.13/site-packages/torch/cuda/__init__.py:64: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+2026-10-26T18:11:08+00:00 ip-172-31-34-18 python[2992]:   import pynvml  # type: ignore[import]
+2026-10-26T18:11:35+00:00 ip-172-31-34-18 python[2992]: [transformers] `run_compressed` is deprecated and will be removed in a future version. Use `dequantize=True` instead of `run_compressed=False`.
+2026-10-26T18:11:35+00:00 ip-172-31-34-18 python[2992]: /opt/pytorch/lib/python3.13/site-packages/transformers/quantizers/auto.py:275: UserWarning: You passed `quantization_config` or equivalent parameters to `from_pretrained` but the model you're loading already has a `quantization_config` attribute. The `quantization_config` from the model will be used.However, loading attributes (e.g. ['dequantize', 'use_optimized_inference']) will be overwritten with the one you passed to `from_pretrained`. The rest will be ignored.
+2026-10-26T18:11:35+00:00 ip-172-31-34-18 python[2992]:   warnings.warn(warning_msg)
+2026-10-26T18:12:29+00:00 ip-172-31-34-18 python[2992]: [2.3K blob data]
+2026-10-26T18:12:29+00:00 ip-172-31-34-18 python[2992]: [557B blob data]
+2026-10-26T18:12:30+00:00 ip-172-31-34-18 python[2992]: [320B blob data]
+2026-10-26T18:12:31+00:00 ip-172-31-34-18 python[2992]: Some parameters are on the meta device because they were offloaded to the cpu.
+2026-10-26T18:12:56+00:00 ip-172-31-34-18 python[2992]: [298B blob data]
+2026-10-26T18:12:57+00:00 ip-172-31-34-18 python[2992]: [142B blob data]
+2026-10-26T18:12:57+00:00 ip-172-31-34-18 python[2992]: [142B blob data]
+2026-10-26T18:12:57+00:00 ip-172-31-34-18 python[2992]: [142B blob data]
+2026-10-26T18:16:19+00:00 ip-172-31-34-18 python[2992]: {"serving": "http://0.0.0.0:8000", "model": "xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text", "build_id": "555f8e0c550f", "device": "NVIDIA L4", "max_ctx": 131072, "prefill_dtype": "float16", "gemm_tflops": {"float16": 47.22, "float32": 11.12}, "weights_mib": 2498, "kv_mib": 774, "load_s": 293.2}
