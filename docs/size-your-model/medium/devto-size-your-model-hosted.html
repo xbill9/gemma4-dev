@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Size Your Model to Where You Run It: Gemma 4 E2B and E4B on an AWS L4 and Two Small GPUs</title>
+  <meta name="description" content="A 24 GB NVIDIA L4 serves Gemma 4 E2B and E4B at only 1.2-1.3x an 8 GB desktop RTX 3050 for one user, with the same answers, because a 4-bit small model uses 13-29% of the card. Pick the model for the hardware, and the hardware for the model." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to serving Gemma 4 E2B and
+E4B, Google's quantization-aware trained (QAT) small models, on an
+NVIDIA L4 in an AWS EC2 G6 instance with llama.cpp, and compares the
+result with the same models on two small local GPUs: an 8 GB RTX 3050
+desktop card and a 4 GB GTX 1650 Ti laptop card. Every card runs the
+same llama.cpp build, the same model files, the same drafter and the
+same tests. The measures are generation speed for one user and for many,
+what the drafter adds on each card and why, answer quality, and
+cost.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-cover.3f5286be.jpg" alt="Size Your Model to Where You Run It: Gemma 4 E2B and E4B on an AWS L4 and Two Small GPUs" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p><strong>For one user, the 24 GB L4 is 1.2-1.3x an 8 GB desktop card,
+with the same answers.</strong> The 4-bit small models use 13-29% of the
+L4's memory, and the rest of the card sits idle:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-1.png"
+alt="Table: Gemma 4, 4-bit QAT, one user, GTX 1650 Ti, 4 GB laptop, RTX 3050 OEM, 8 GB desktop, NVIDIA L4, 24 GB, AWS" /></p>
+<p>The desktop card delivers 79-81% of the L4 without the drafter and
+69-77% with it. The L4 earns its memory with many users at once (1.6x
+the 3050 at 64) and with models too large for 8 GB. The rule this
+article arrives at: size the model to where it runs.</p>
+<hr />
+<h4 id="what-is-being-measured">What Is Being Measured?</h4>
+<p>Gemma 4 E2B and E4B are the two small models of the family, served
+here as exact 4-bit (Q4_0) GGUF files whose every block sits on Google's
+QAT grid: <code>xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</code> and
+<code>xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf</code>. Google also
+ships a QAT drafter for each, a small model that proposes the next few
+tokens for the main model to check in one pass; it is stored the same
+way, as
+<code>xbill9/gemma-4-E{2,4}B-it-qat-assistant-q4_0-exact-gguf</code>.</p>
+<p>When one user is generating, every token reads every weight of the
+model once. The speed limit is then how fast the card reads its memory,
+and the size of the memory plays no part as long as the model fits. That
+is why a card with three times the memory can be only a little
+faster.</p>
+<p>The three cards:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-2.png"
+alt="Table: GTX 1650 Ti Max-Q, RTX 3050 OEM, NVIDIA L4" /></p>
+<p>All three run llama.cpp <code>77c4540ce</code> with flash attention,
+a 16-bit context cache and the per-layer embedding table on the card.
+The L4 build uses CUDA 13.1 for sm_89.</p>
+<hr />
+<h4 id="step-1--serve-the-rigs">Step 1 — Serve the Rigs</h4>
+<p>Each model has a rig directory with a <code>tpu.env</code> holding
+every setting and a <code>Makefile</code> to run on the instance:</p>
+<pre><code>git clone https://github.com/xbill9/gemma4-dev
+cd gemma4-dev/gpu-llamacpp-g6-2b-q4_0      # or gpu-llamacpp-g6-4b-q4_0
+make toolkit build download draft serve</code></pre>
+<p>The G6 instance comes from <code>gpu-pytorch-g6-2b-q4w4a16</code>'s
+MCP tool <code>create_g6_instance</code>, on the PyTorch Deep Learning
+AMI. The AMI has an NVIDIA driver (595.112.07, CUDA 13.2) and no CUDA
+compiler, so <code>make toolkit</code> installs CUDA 13.1 from NVIDIA's
+apt repository, one minor version below what the driver supports.
+<code>make build</code> compiles llama.cpp for sm_89 in 633 s.</p>
+<p>The serving line, E2B:</p>
+<pre><code>llama-server -m gemma-4-E2B-it-q4_0-exact.gguf -ngl 99 -c 131072 -ctk f16 -ctv f16 -fa 1 \
+  -t 4 -tb 8 --parallel 1 --reasoning off --metrics -ot &#39;per_layer_token_embd\.weight=CUDA0&#39; \
+  -md gemma-4-E2B-it-qat-assistant-q4_0-exact.gguf --spec-type draft-mtp -ngld all --spec-draft-n-max 2</code></pre>
+<p>At the full 131,072-token context with the drafter, E2B peaks at
+3,952 MiB and E4B at 6,774 MiB of the L4's 23,034.</p>
+<hr />
+<h4 id="step-2--measure-one-user">Step 2 — Measure One User</h4>
+<p><code>speed.py</code> sends six prompts (code, chat, story,
+explanation, facts, summary), 256 tokens each, three greedy repeats per
+prompt with the prompt cache off, and reports the geometric mean over
+prompts. Each arm gets its own server, started on a cooled card. On the
+L4:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-3.png"
+alt="Table: drafted tokens, E2B tok/s, x none, E4B tok/s, x none, tokens kept" /></p>
+<p>A no-drafter arm run last lands 0.7% (E2B) and 1.2% (E4B) under the
+first. Code gains most from the drafter (2.39x E2B, 2.55x E4B at 3
+tokens) and stories least (1.31x, 1.38x).</p>
+<p><strong>With the drafter, E4B runs at 0.972x E2B without it</strong>:
+129.7 against 133.4 tok/s.</p>
+<p>The same prompts on the two local cards, best setting per card:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-4.png"
+alt="Table: 1650 Ti, 3050, L4" /></p>
+<hr />
+<h4 id="mag_right-tip-the-card-sets-the-draft-length">🔎 Tip: The Card
+Sets the Draft Length</h4>
+<p>The drafter's guesses are kept at the same rate on every card. What
+changes is what each guess costs. Splitting each reply into steps (one
+pass of the main model over the last token plus the drafted ones) shows
+it, here for E2B:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-5.png"
+alt="Table: drafted tokens, tokens per step, all three cards, step time vs a plain step: 1650 Ti, 3050, L4" /></p>
+<p>The speed-up is tokens per step divided by step time. On the L4
+<code>llama-bench</code> times the main model over 1 to 6 tokens in one
+pass: 4 tokens take at most 1.04x the time of 1, at 0, 8,192 and 32,768
+tokens of context. So checking 3 guesses is close to free there, and the
+added time is the drafter's own, 0.75-1.18 ms per guess. That is 33% of
+an E2B step at 3 guesses and 19% of E4B's longer step, which is why E4B
+gains more from its drafter. A slower card pays more per guess and peaks
+at fewer.</p>
+<hr />
+<h4 id="step-3--hold-a-long-conversation">Step 3 — Hold a Long
+Conversation</h4>
+<p><code>longctx.py</code> puts the first D tokens of a long document
+ahead of a story, a code and a summary request, at
+<code>-c 131072</code>. Mean speed-up over the requests at 2 drafted
+tokens:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-6.png"
+alt="Table: tokens ahead, E2B, L4, E2B, 3050, E4B, L4, E4B, 3050" /></p>
+<p>Generation without the drafter slows with context (E2B story 134.1
+tok/s empty, 66.7 at 120,000 ahead on the L4), and the drafter keeps
+paying at every depth on both cards.</p>
+<hr />
+<h4 id="step-4--serve-many-users-at-once">Step 4 — Serve Many Users at
+Once</h4>
+<p><code>mixed.py</code> sends c requests at once, each one of the six
+chat prompts, 256 tokens, five repeats, one shared context cache
+(<code>-kvu</code>) at <code>-c 32768 --parallel 64</code>. Total output
+tok/s:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-7.png"
+alt="Table: requests at once, E2B, 3050, E2B, L4, E4B, 3050, E4B, L4" /></p>
+<p><strong>This is where the L4's size shows: 1.61-1.65x the 3050 at 64
+requests.</strong> The drafter (2 tokens) helps on the L4 up to 16
+requests (E2B 1.06-1.19x, E4B 1.15-1.34x) and costs output at 64 (0.87x
+for both).</p>
+<hr />
+<h4 id="step-5--check-the-answers">Step 5 — Check the Answers</h4>
+<p><code>gen_eval.py</code> runs GSM8K (1,319 grade-school math
+questions, up to 2,048 tokens per reply) and BFCL simple (400 single
+function calls) at <code>-c 32768</code>, 8 requests at once, with and
+without the drafter at 2 tokens:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-8.png"
+alt="Table: L4, GSM8K, none / drafter, BFCL simple, none / drafter, GSM8K time, none / drafter" /></p>
+<p>Paired question by question, every drafter-against-none difference
+has a 95% range that includes zero. The 3050 scored E2B 0.8984 / 0.9022
+and E4B 0.9340 / 0.9325 on GSM8K under the same settings: the same model
+files give the same answers on every card.</p>
+<p><strong>E4B answers more GSM8K questions right than E2B</strong>,
++0.0318 without the drafter (range +0.0167 to +0.0470) and +0.0303 with
+it, and BFCL is level between the two. With its drafter E4B finishes
+GSM8K in 893 s, sooner than E2B without one (1,014 s).</p>
+<hr />
+<h4 id="step-6--price-it">Step 6 — Price It</h4>
+<p>The L4 instance, <code>g6.2xlarge</code> in <code>us-east-1</code>,
+listed at $0.9776/h on demand and $0.8393/h spot on the day of the runs.
+Per million output tokens, one machine kept busy:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-9.png"
+alt="Table: L4, spot, tok/s, $ per million tokens" /></p>
+<p>One user pays for the whole card while using 13-29% of its memory.
+Filled with 64 requests, the same card costs a sixth to a seventh as
+much per token. A local card's cost is the card and its electricity,
+neither measured here.</p>
+<hr />
+<h4 id="mag_right-tip-where-the-bigger-card-earns-its-keep">🔎 Tip:
+Where the Bigger Card Earns Its Keep</h4>
+<p>The 8 GB 3050 runs every larger Gemma 4 too, at a price paid in speed
+once the model outgrows the card. From the same series on the same
+card:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-10.png"
+alt="Table: on the RTX 3050, 8 GB, where the model lives, generation, with drafter" /></p>
+<p>All three fit a 24 GB card whole; this article measures them on the
+3050 only.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/size-your-model/medium/img/devto-size-your-model-table-11.png"
+alt="Table: Gemma 4 E2B / E4B, 4-bit QAT, RTX 3050, 8 GB, local, NVIDIA L4, 24 GB, AWS, GTX 1650 Ti, 4 GB, local" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For one user on E2B or E4B, a local 8 GB card. It delivers 69-81% of
+the L4's speed with the same answers, and the model uses a fraction of
+either card.</p>
+<p>For many users at once, the L4. At 64 requests it serves 1.6x the
+3050's output, and at about $0.25-0.30 per million tokens on spot.</p>
+<p>For quality at small-model speed, E4B with its drafter. On the L4 it
+generates at 0.97x E2B without a drafter and scores 3 points higher on
+GSM8K.</p>
+<p>For the 26B and 31B, a card that holds them. On 8 GB they spill into
+system RAM and slow to 34 and 4 tok/s.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find what a 24 GB cloud GPU buys over
+small local GPUs when serving Gemma 4's small models. The key to the
+answer was running the same llama.cpp build, model files, drafter and
+tests on all three cards. The results were:</p>
+<ul>
+<li>🟢 One user: the L4 is 1.23-1.27x the 3050 without the drafter and
+1.30-1.44x with it, at 13-29% of its memory</li>
+<li>🟢 The same model files give the same answers on every card; the
+drafter costs no GSM8K or BFCL answers</li>
+<li>🟢 The drafter's guesses are kept at the same rate on every card;
+the card's cost per guess sets the best draft length, 1 / 2 / 3 tokens
+on the 1650 Ti / 3050 / L4</li>
+<li>🟢 E4B with its drafter generates at 0.97x E2B without one, 3 GSM8K
+points higher</li>
+<li>🟢 64 users: the L4 serves 1.6x the 3050, $0.25-0.30 per million
+tokens on spot</li>
+<li>⚠️ The drafter helps on the L4 up to 16 users at once and costs
+output at 64</li>
+<li>❌ One user on the L4 pays for a whole card and uses under a third
+of its memory</li>
+</ul>
+<p>Scope: Gemma 4 E2B-it and E4B-it QAT only, exact Q4_0 GGUF files and
+exact Q4_0 QAT drafters, text only, llama.cpp <code>77c4540ce</code> on
+all three cards, 16-bit context cache, thinking off. One L4 instance on
+one day (spot <code>g6.2xlarge</code>, <code>us-east-1d</code>); the
+3050 (i7-5820K desktop) and 1650 Ti (laptop) runs are from 2026-10-14
+and 2026-10-15 on different hosts with the same prompts and scripts, so
+cross-card ratios are indicative. The many-users test uses short chat
+prompts and a shared context cache. Larger cloud GPUs and the 12B, 26B
+and 31B on the L4 were not run.</p>
+<p>The strategy for using MCP for local accelerator comparison was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Part 2, Do Drafters Work on Small Models?: <a
+href="https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g">https://dev.to/gde/do-drafters-work-on-small-models-gemma-4-e2b-and-e4b-on-two-small-gpus-1b4g</a></li>
+<li>Part 6, A Dense 31B on an 8 GB GPU: <a
+href="https://dev.to/gde/a-dense-31b-on-an-8-gb-gpu-gemma-4-31b-on-an-rtx-3050-26p9">https://dev.to/gde/a-dense-31b-on-an-8-gb-gpu-gemma-4-31b-on-an-rtx-3050-26p9</a></li>
+<li>Repository: <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></li>
+<li>E2B on the L4: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/gpu-llamacpp-g6-2b-q4_0/benchmarks/runs/2026-10-26-drafter-g6/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/gpu-llamacpp-g6-2b-q4_0/benchmarks/runs/2026-10-26-drafter-g6/REPORT.md</a></li>
+<li>E4B on the L4: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/gpu-llamacpp-g6-4b-q4_0/benchmarks/runs/2026-10-26-drafter-g6/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/gpu-llamacpp-g6-4b-q4_0/benchmarks/runs/2026-10-26-drafter-g6/REPORT.md</a></li>
+<li>Drafter cost and many users on the L4: <a
+href="https://github.com/xbill9/gemma4-dev/blob/main/gpu-llamacpp-g6-2b-q4_0/benchmarks/runs/2026-10-26-drafter-cost-g6/REPORT.md">https://github.com/xbill9/gemma4-dev/blob/main/gpu-llamacpp-g6-2b-q4_0/benchmarks/runs/2026-10-26-drafter-cost-g6/REPORT.md</a></li>
+<li>E2B GGUF: <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</a></li>
+<li>E4B GGUF: <a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf</a></li>
+<li>E2B drafter: <a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf</a></li>
+<li>E4B drafter: <a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf">https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf</a></li>
+<li>llama.cpp: <a
+href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+<li>Amazon EC2 G6 instances: <a
+href="https://aws.amazon.com/ec2/instance-types/g6/">https://aws.amazon.com/ec2/instance-types/g6/</a></li>
+</ul>
+</body>
+</html>
