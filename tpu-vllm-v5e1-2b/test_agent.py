@@ -43,10 +43,13 @@ from server import (  # noqa: E402
     _quota_id_for,
     _resolve_node_id,
     _status_model,
+    analyze_cloud_logging,
+    destroy_queued_resource,
     estimate_deployment_cost,
     get_help,
     get_metrics,
     get_model_details,
+    get_system_status,
     get_vllm_deployment_config,
     query_queued_gemma4_with_stats,
     save_hf_token,
@@ -523,6 +526,72 @@ class TestNodeDiscovery(unittest.IsolatedAsyncioTestCase):
             patch("server._probe_vllm", new=AsyncMock(return_value=None)),
         ):
             self.assertIsNone(await _resolve_node_id(RESOURCE_ID))
+
+
+class TestDemoTools(unittest.IsolatedAsyncioTestCase):
+    @patch("server.run_command", new_callable=AsyncMock)
+    async def test_destroy_forces_so_an_active_resource_is_deleted(self, mock_run_command):
+        mock_run_command.return_value = (0, "", "")
+
+        await destroy_queued_resource("qr-test")
+
+        self.assertIn("--force", mock_run_command.call_args[0][0])
+
+    @patch("server.query_queued_gemma4", new_callable=AsyncMock)
+    @patch("server.run_command", new_callable=AsyncMock)
+    async def test_log_filter_uses_an_absolute_timestamp(self, mock_run_command, mock_query):
+        mock_run_command.return_value = (0, "[]", "")
+
+        await analyze_cloud_logging(minutes=60)
+
+        log_filter = mock_run_command.call_args[0][0][3]
+        self.assertNotIn("-PT", log_filter)
+        self.assertRegex(log_filter, r'timestamp>="\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"')
+
+    @patch("server.query_queued_gemma4", new_callable=AsyncMock)
+    @patch("server.run_command", new_callable=AsyncMock)
+    async def test_no_errors_is_reported_without_asking_the_model(self, mock_run_command, mock_query):
+        mock_run_command.return_value = (0, "[]", "")
+
+        result = await analyze_cloud_logging(minutes=60)
+
+        self.assertIn("No TPU errors", result)
+        mock_query.assert_not_called()
+
+    @patch("server.query_queued_gemma4", new_callable=AsyncMock)
+    @patch("server.run_command", new_callable=AsyncMock)
+    async def test_error_entries_reach_the_model(self, mock_run_command, mock_query):
+        entry = {
+            "timestamp": "2026-10-29T15:00:00Z",
+            "resource": {"labels": {"node_id": "n1"}},
+            "textPayload": "ERROR: HBM OOM",
+        }
+        mock_run_command.return_value = (0, json.dumps([entry]), "")
+        mock_query.return_value = "root cause: OOM"
+
+        result = await analyze_cloud_logging(minutes=60)
+
+        self.assertIn("HBM OOM", mock_query.call_args[0][0])
+        self.assertIn("root cause: OOM", result)
+
+    @patch("server.run_command", new_callable=AsyncMock)
+    async def test_failed_log_fetch_is_reported_not_papered_over(self, mock_run_command):
+        mock_run_command.return_value = (1, "", "INVALID_ARGUMENT")
+
+        result = await analyze_cloud_logging(minutes=60)
+
+        self.assertIn("Failed to fetch Cloud Logs", result)
+
+    async def test_status_never_suggests_the_destructive_tool(self):
+        with (
+            patch("server.list_queued_resources", new=AsyncMock(return_value="none")),
+            patch("server._discover_vllm_node", new=AsyncMock(return_value=None)),
+            patch("server.run_command", new=AsyncMock(return_value=(0, "[]", ""))),
+        ):
+            result = await get_system_status()
+
+        self.assertIn("create_tpu_queued_resource", result)
+        self.assertNotIn("manage_queued_resource", result)
 
 
 if __name__ == "__main__":

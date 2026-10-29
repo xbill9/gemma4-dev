@@ -665,7 +665,12 @@ spec:
 
 @mcp.tool()
 async def destroy_queued_resource(resource_id: str, zone: str = ZONE) -> str:
-    """Safely deletes a Queued Resource and its node."""
+    """Deletes a Queued Resource and its node.
+
+    --force is required: the API refuses to delete an ACTIVE queued resource without it
+    ("DeleteQueuedResource is not supported when state is ACTIVE"), and under --async that
+    refusal never reaches this call, so the resource would keep running and billing.
+    """
     cmd = [
         "gcloud",
         "alpha",
@@ -676,6 +681,7 @@ async def destroy_queued_resource(resource_id: str, zone: str = ZONE) -> str:
         resource_id,
         f"--zone={zone}",
         f"--project={PROJECT_ID}",
+        "--force",
         "--async",
         "--quiet",
     ]
@@ -1327,7 +1333,7 @@ async def get_system_status() -> str:
     elif "ACTIVE" in resources_str:
         next_step = "Use `manage_vllm_docker` to start the service on the ACTIVE resource."
     else:
-        next_step = "Call `manage_queued_resource` to provision infrastructure."
+        next_step = "Call `create_tpu_queued_resource` to provision infrastructure."
 
     return (
         f"### 🌀 System Status ({ZONE})\n- **vLLM Health:** {health}\n"
@@ -1668,16 +1674,29 @@ async def get_cloud_logging_logs(log_filter: str = 'resource.type="tpu_worker"',
 @mcp.tool()
 async def analyze_cloud_logging(minutes: int = 60) -> str:
     """Summarizes TPU-related errors using the self-hosted Gemma 4 model."""
-    log_filter = f'resource.type="tpu_worker" severity>=ERROR timestamp>="-PT{minutes}M"'
-    logs_result = await get_cloud_logging_logs(log_filter=log_filter, limit=10)
+    # Cloud Logging rejects relative timestamps such as "-PT60M"; it needs RFC 3339.
+    since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - minutes * 60))
+    log_filter = f'resource.type="tpu_worker" severity>=ERROR timestamp>="{since}"'
+    cmd = ["gcloud", "logging", "read", log_filter, f"--project={PROJECT_ID}", "--limit=10", "--format=json"]
+    rc, out, err = await run_command(cmd)
+    if rc != 0:
+        return f"❌ Failed to fetch Cloud Logs: {err}"
+    try:
+        entries = json.loads(out or "[]")
+    except json.JSONDecodeError:
+        return f"❌ Could not parse Cloud Logging output:\n```\n{out[:2000]}\n```"
+    if not entries:
+        return f"✅ No TPU errors (severity>=ERROR, resource.type=tpu_worker) in the last {minutes} minutes."
 
-    if "error" in logs_result.lower() or "failed" in logs_result.lower() or "```\n\n```" in logs_result:
-        prompt = "Provide a summary of common TPU node issues (e.g. out of memory, VM preemption) and their standard remediations."
-    else:
-        prompt = (
-            f"Here are the recent TPU error logs:\n{logs_result}\n\n"
-            "Please analyze these logs, identify the root cause of the failures, and suggest remediations."
-        )
+    logs = "\n".join(
+        f"[{e.get('timestamp')}] {e.get('resource', {}).get('labels', {}).get('node_id', 'N/A')} - "
+        f"{e.get('textPayload', e.get('jsonPayload', {}))}"
+        for e in entries
+    )
+    prompt = (
+        f"Here are the {len(entries)} most recent TPU error logs:\n{logs}\n\n"
+        "Please analyze these logs, identify the root cause of the failures, and suggest remediations."
+    )
 
     try:
         summary = await query_queued_gemma4(prompt)
