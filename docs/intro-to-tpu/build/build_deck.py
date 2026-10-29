@@ -182,6 +182,22 @@ source(s, "Sources: github.com/vllm-project/tpu-inference; gemma4-dev tpu-jax-v5
 # ---------- 7 section 02 ----------
 section("sec02", "83", "87", "86", "The Chips", "Part 02")
 
+# ---------- 8a TPU vs GPU vs NPU ----------
+def vs_slide(s):
+    table(s, s + "_tb", [["", "TPU", "GPU", "NPU"],
+        ["Built for", "Large matrix operations in ML", "Graphics, plus parallel compute", "Deep learning math on the device"],
+        ["Inside", "MXU: a systolic array of 128x128 multiply-accumulators (256x256 on v6e, TPU7x)",
+         "Per Ada SM: 128 CUDA cores, 1 RT core, 4 Tensor Cores, 4 texture units", "Low-bit integer math such as int8"],
+        ["Where", "Google Cloud: v5e, v6e, TPU7x", "Cloud and desktop; the NVIDIA L4 is Ada", "AI PCs: Snapdragon X Elite, Ryzen AI 300, Core Ultra 200V"]],
+        widths=[100, 190, 190, 192], size=11, boldcol0=True)
+    card(s, s + "_k", 24, 262, 672, 92,
+         "TPU: a custom ASIC built around the systolic matrix unit, with HBM on the chip\n"
+         "GPU: tensor cores share each SM with the shader, ray-tracing and texture hardware that draws graphics\n"
+         "NPU: low power and on the device; Copilot+ PCs need 40+ TOPS for translation and image generation",
+         fill=BLU, size=12, bullets=True, valign="MIDDLE")
+    source(s, "Sources: Google Cloud TPU docs (Introduction to Cloud TPU; TPU system architecture); NVIDIA Ada GPU Architecture whitepaper; Microsoft Learn, Copilot+ PCs developer guide. Read 2026-10-29.")
+s = "slide08a"; content(s, "TPU vs GPU vs NPU: Who Does the Matrix Math"); vs_slide(s)
+
 # ---------- 8 chips ----------
 s = "slide08"; content(s, "TPU7x: About 13x v5e's Memory at 10x the Price")
 table(s, s + "_tb", [["Chip", "HBM", "Peak bf16", "Native low precision", "Max pod", "On-demand"],

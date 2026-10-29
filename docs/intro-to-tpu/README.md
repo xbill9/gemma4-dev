@@ -2,7 +2,7 @@
 
 A talk on serving Gemma 4 on Cloud TPU, ending in a live demo: Gemma 4 E2B on one v5e chip, provisioned and queried through the MCP server in [`tpu-vllm-v5e1-2b`](../../tpu-vllm-v5e1-2b).
 
-- Slides: [Google Slides](https://docs.google.com/presentation/d/1bMtCHpNWLK2ys_ZUGFl0V9g7RjNIsFajSHg46DTYTIQ/edit), 29 slides, DevFest 2026 / GDE style
+- Slides: [Google Slides](https://docs.google.com/presentation/d/1bMtCHpNWLK2ys_ZUGFl0V9g7RjNIsFajSHg46DTYTIQ/edit), 30 slides, DevFest 2026 / GDE style
 - Copies in this directory, exported 2026-10-24: [`intro-to-cloud-tpu.pdf`](intro-to-cloud-tpu.pdf), [`intro-to-cloud-tpu.pptx`](intro-to-cloud-tpu.pptx)
 - Reference article: [The unofficial TPU migration guide: Cloud TPU API to Compute Engine](https://dev.to/gde/the-unofficial-tpu-migration-guide-cloud-tpu-api-to-compute-engine-2co7)
 
