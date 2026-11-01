@@ -1,0 +1,28 @@
+[transformers] `run_compressed` is deprecated and will be removed in a future version. Use `dequantize=True` instead of `run_compressed=False`.
+/home/xbill/.local/lib/python3.14/site-packages/transformers/quantizers/auto.py:275: UserWarning: You passed `quantization_config` or equivalent parameters to `from_pretrained` but the model you're loading already has a `quantization_config` attribute. The `quantization_config` from the model will be used.However, loading attributes (e.g. ['dequantize', 'use_optimized_inference']) will be overwritten with the one you passed to `from_pretrained`. The rest will be ignored.
+  warnings.warn(warning_msg)
+Compressing model:   0%|          | 0/328 [00:00<?, ?it/s]Compressing model:  11%|█         | 35/328 [00:00<00:00, 346.73it/s]Compressing model:  23%|██▎       | 74/328 [00:00<00:00, 369.86it/s]Compressing model:  34%|███▍      | 113/328 [00:00<00:00, 377.64it/s]Compressing model:  46%|████▋     | 152/328 [00:00<00:00, 379.37it/s]Compressing model:  58%|█████▊    | 190/328 [00:00<00:00, 371.89it/s]Compressing model:  70%|██████▉   | 228/328 [00:00<00:00, 367.65it/s]Compressing model:  81%|████████  | 265/328 [00:00<00:00, 358.46it/s]Compressing model:  92%|█████████▏| 301/328 [00:00<00:00, 347.87it/s]Compressing model: 100%|██████████| 328/328 [00:00<00:00, 356.09it/s]
+Loading weights:   0%|          | 0/1322 [00:00<?, ?it/s]Loading weights:   9%|▊         | 115/1322 [00:00<00:01, 1098.38it/s]Loading weights:  17%|█▋        | 225/1322 [00:00<00:01, 902.27it/s] Loading weights:  24%|██▍       | 318/1322 [00:00<00:01, 895.06it/s]Loading weights:  31%|███       | 409/1322 [00:00<00:01, 839.94it/s]Loading weights:  37%|███▋      | 494/1322 [00:00<00:01, 782.39it/s]Loading weights:  43%|████▎     | 573/1322 [00:00<00:01, 738.07it/s]Loading weights:  49%|████▉     | 648/1322 [00:00<00:00, 720.89it/s]Loading weights:  55%|█████▍    | 721/1322 [00:00<00:00, 718.07it/s]Loading weights:  60%|█████▉    | 793/1322 [00:01<00:00, 701.59it/s]Loading weights:  65%|██████▌   | 864/1322 [00:01<00:00, 680.82it/s]Loading weights:  71%|███████   | 940/1322 [00:01<00:00, 697.40it/s]Loading weights:  76%|███████▋  | 1010/1322 [00:01<00:00, 688.66it/s]Loading weights:  82%|████████▏ | 1079/1322 [00:01<00:00, 689.01it/s]Loading weights:  87%|████████▋ | 1154/1322 [00:01<00:00, 701.26it/s]Loading weights:  93%|█████████▎| 1225/1322 [00:01<00:00, 683.91it/s]Loading weights:  98%|█████████▊| 1301/1322 [00:01<00:00, 705.82it/s]Loading weights: 100%|██████████| 1322/1322 [00:01<00:00, 735.53it/s]
+Some parameters are on the meta device because they were offloaded to the cpu.
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 752.75it/s]
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 791.68it/s]
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 676.28it/s]
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 608.93it/s]
+USDT:2026-11-01 00:32:25 2409224:2409224 SyncActivityProfilerHandler.cpp:39] profiler_start
+USDT:2026-11-01 00:32:26 2409224:2409224 SyncActivityProfilerHandler.cpp:46] profiler_stop
+{"device": "NVIDIA GeForce RTX 3050 OEM", "step_ms_wall": 36.271, "kernel_ms_sum": 36.463, "kernels_per_step": 611}
+ 33.8068 ms  193x  _w4_gemv
+  1.6533 ms   48x  _dec_split
+  0.2066 ms   47x  triton_red_fused__to_copy_add_mean_mul_pow_view_7
+  0.1713 ms   48x  _dec_combine
+  0.1609 ms   48x  triton_red_fused__to_copy_add_mean_mul_pow_view_5
+  0.0921 ms   40x  triton_per_fused__to_copy_add_bmm_cat_expand_mean_mul_neg_pow_slice_split_with_sizes_transpose_unsqueeze_view_1
+  0.0824 ms   40x  triton_per_fused__to_copy_add_bmm_cat_expand_index_copy_mean_mul_neg_pow_remainder_select_slice_split_with_sizes_transpo
+  0.0796 ms   48x  triton_poi_fused_gelu_mul_split_with_sizes_view_6
+  0.0734 ms    1x  triton_red_fused_argmax_div_mul_select_tanh_view_11
+  0.0565 ms   40x  triton_per_fused__to_copy_add_index_copy_mean_mul_pow_remainder_select_split_with_sizes_view_3
+  0.0379 ms   40x  triton_poi_fused__to_copy_index_copy_remainder_4
+  0.0182 ms    8x  triton_per_fused__to_copy_add_bmm_cat_expand_mean_mul_neg_pow_slice_split_with_sizes_transpose_unsqueeze_view_8
+  0.0161 ms    8x  triton_per_fused__to_copy_add_bmm_cat_expand_index_copy_mean_mul_neg_pow_select_slice_split_with_sizes_transpose_unsquee
+  0.0045 ms    1x  triton_red_fused__to_copy_add_mean_mul_pow_slice_view_10
+  0.0038 ms    1x  triton_red_fused___rshift____to_copy_add_bitwise_and_index_mean_mul_pow_sub_unsqueeze_view_0

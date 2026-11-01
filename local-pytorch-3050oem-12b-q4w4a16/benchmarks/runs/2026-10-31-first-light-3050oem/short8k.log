@@ -1,0 +1,79 @@
+[transformers] `run_compressed` is deprecated and will be removed in a future version. Use `dequantize=True` instead of `run_compressed=False`.
+/home/xbill/.local/lib/python3.14/site-packages/transformers/quantizers/auto.py:275: UserWarning: You passed `quantization_config` or equivalent parameters to `from_pretrained` but the model you're loading already has a `quantization_config` attribute. The `quantization_config` from the model will be used.However, loading attributes (e.g. ['dequantize', 'use_optimized_inference']) will be overwritten with the one you passed to `from_pretrained`. The rest will be ignored.
+  warnings.warn(warning_msg)
+Compressing model:   0%|          | 0/328 [00:00<?, ?it/s]Compressing model:  12%|█▏        | 40/328 [00:00<00:00, 397.02it/s]Compressing model:  25%|██▍       | 81/328 [00:00<00:00, 401.99it/s]Compressing model:  37%|███▋      | 122/328 [00:00<00:00, 403.40it/s]Compressing model:  50%|████▉     | 163/328 [00:00<00:00, 405.28it/s]Compressing model:  62%|██████▏   | 204/328 [00:00<00:00, 406.74it/s]Compressing model:  75%|███████▍  | 245/328 [00:00<00:00, 407.84it/s]Compressing model:  87%|████████▋ | 286/328 [00:00<00:00, 408.19it/s]Compressing model: 100%|█████████▉| 327/328 [00:00<00:00, 408.73it/s]Compressing model: 100%|██████████| 328/328 [00:00<00:00, 406.67it/s]
+Loading weights:   0%|          | 0/1322 [00:00<?, ?it/s]Loading weights:   8%|▊         | 101/1322 [00:00<00:01, 1006.69it/s]Loading weights:  15%|█▌        | 202/1322 [00:00<00:01, 861.14it/s] Loading weights:  22%|██▏       | 290/1322 [00:00<00:01, 805.88it/s]Loading weights:  28%|██▊       | 372/1322 [00:00<00:01, 778.90it/s]Loading weights:  34%|███▍      | 451/1322 [00:00<00:01, 779.01it/s]Loading weights:  40%|████      | 530/1322 [00:00<00:01, 759.99it/s]Loading weights:  46%|████▌     | 611/1322 [00:00<00:00, 766.65it/s]Loading weights:  52%|█████▏    | 688/1322 [00:00<00:00, 759.42it/s]Loading weights:  58%|█████▊    | 765/1322 [00:00<00:00, 750.89it/s]Loading weights:  64%|██████▎   | 841/1322 [00:01<00:00, 740.05it/s]Loading weights:  71%|███████   | 940/1322 [00:01<00:00, 812.32it/s]Loading weights:  79%|███████▉  | 1042/1322 [00:01<00:00, 872.72it/s]Loading weights:  87%|████████▋ | 1155/1322 [00:01<00:00, 948.38it/s]Loading weights:  96%|█████████▌| 1271/1322 [00:01<00:00, 999.97it/s]Loading weights: 100%|██████████| 1322/1322 [00:01<00:00, 850.83it/s]
+Some parameters are on the meta device because they were offloaded to the cpu.
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 723.53it/s]
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 736.49it/s]
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 768.89it/s]
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]Fetching 1 files: 100%|██████████| 1/1 [00:00<00:00, 1013.12it/s]
+{"step": "load", "device": "NVIDIA GeForce RTX 3050 OEM", "prefill_dtype": "torch.float16", "weights_mib": 6388, "kv_mib": 448, "load_s": 294.5, "cuda_alloc_mib": 6848, "torch": "2.14.1+cu130", "transformers": "5.16.1"}
+{"step": "depth", "depth": 0, "prompt_tokens": 65, "prompt_s": 0.38, "prompt_tok_per_s": 169.8, "decode_tokens": 63, "decode_tok_per_s": 27.42, "peak_cuda_mib": 7147, "recall_code": 915965, "answer": "915965", "recalled": true}
+[W1101 00:31:12.404277870 CUDACachingAllocator.cpp:528] expandable_segments: memory mapping failed with OOM on device 0 while trying to map 20971520 bytes (free: 7602176, total: 8275558400).
+[W1101 00:31:12.532123157 CUDACachingAllocator.cpp:528] expandable_segments: memory mapping failed with OOM on device 0 while trying to map 20971520 bytes (free: 9699328, total: 8275558400).
+Traceback (most recent call last):
+  File "/home/xbill/gemma4-dev/local-pytorch-3050oem-12b-q4w4a16/benchmarks/runs/2026-10-31-first-light-3050oem/depth_bench.py", line 66, in <module>
+    r = eng.generate(ids, max_new=64, stop_ids=[])
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/utils/_contextlib.py", line 124, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/xbill/gemma4-dev/local-pytorch-3050oem-12b-q4w4a16/e12b_engine.py", line 328, in generate
+    toks = [int(self.read_prompt(ids).argmax(-1))]
+                ~~~~~~~~~~~~~~~~^^^^^
+  File "/home/xbill/gemma4-dev/local-pytorch-3050oem-12b-q4w4a16/e12b_engine.py", line 280, in read_prompt
+    logits = self.model(input_ids=chunk, position_ids=pos, use_cache=False, logits_to_keep=1).logits[:, -1]
+             ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/xbill/.local/lib/python3.14/site-packages/transformers/utils/generic.py", line 939, in wrapper
+    output = func(self, *args, **kwargs)
+  File "/home/xbill/.local/lib/python3.14/site-packages/transformers/models/gemma4_unified/modeling_gemma4_unified.py", line 729, in forward
+    outputs: Gemma4UnifiedTextModelOutputWithPast = self.model(
+                                                    ~~~~~~~~~~^
+        input_ids=input_ids,
+        ^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    )
+    ^
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/xbill/.local/lib/python3.14/site-packages/transformers/utils/generic.py", line 1068, in wrapper
+    output = func(self, *args, **kwargs)
+  File "/home/xbill/.local/lib/python3.14/site-packages/transformers/utils/output_capturing.py", line 262, in wrapper
+    outputs = func(self, *args, **kwargs)
+  File "/home/xbill/.local/lib/python3.14/site-packages/transformers/models/gemma4_unified/modeling_gemma4_unified.py", line 660, in forward
+    hidden_states = decoder_layer(
+        hidden_states,
+    ...<5 lines>...
+        **kwargs,
+    )
+  File "/home/xbill/.local/lib/python3.14/site-packages/transformers/modeling_layers.py", line 114, in __call__
+    return super().__call__(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/xbill/.local/lib/python3.14/site-packages/transformers/models/gemma4_unified/modeling_gemma4_unified.py", line 520, in forward
+    hidden_states = self.mlp(hidden_states)
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/xbill/.local/lib/python3.14/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/xbill/gemma4-dev/local-pytorch-3050oem-12b-q4w4a16/e12b_engine.py", line 252, in mlp_forward
+    g, u = self.w4a16(x, pk, sc).split(sizes, dim=-1)
+           ~~~~~~~~~~^^^^^^^^^^^
+  File "/home/xbill/gemma4-dev/local-pytorch-3050oem-12b-q4w4a16/e12b_engine.py", line 172, in w4a16
+    return torch.nn.functional.linear(x.to(self.prefill_dtype), self._dequant(packed, scale)).to(x.dtype)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 16.00 MiB. GPU 0 has a total capacity of 7.71 GiB of which 9.25 MiB is free. Including non-PyTorch memory, this process has 7.69 GiB memory in use. Of the allocated memory 7.13 GiB is allocated by PyTorch, with 2.00 MiB allocated in private pools (e.g., CUDA Graphs), and 440.69 MiB is reserved by PyTorch but unallocated.
