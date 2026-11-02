@@ -180,6 +180,7 @@ The serving stack that actually loads the weights.
 | `jax` | JAX-native — Flax, MaxText, or a hand-rolled JAX server |
 | `jaxrust` | JAX-family graph execution driven from **Rust** — the forward pass is defined in Rust and lowered to XLA/StableHLO, not written in Python |
 | `pytorch` | PyTorch, via `torch_xla` on TPU or CUDA on GPU |
+| `pytorchrust` | PyTorch kernels driven from **Rust** — the forward pass is defined in Rust against libtorch's ATen and every op runs through PyTorch's dispatcher (TorchTPU on TPU), not written in Python |
 | `llamacpp` | `llama-server` from `ggml-org/llama.cpp`, driven directly — one process, one GGUF file you named |
 | `ollama` | The Ollama daemon, which **links llama.cpp as a library** and adds a registry, a blob store, its own chat-template renderer and model lifecycle management |
 
@@ -212,6 +213,15 @@ weights, and two rigs differing only in slot 2 are an A/B pair precisely because
 the result. Rust buys memory-safety and a single static binary; the arithmetic still runs in XLA, so a
 `jaxrust` rig and a `jax` rig on the same chip should be expected to land in the same place until measured
 otherwise.
+
+**`pytorchrust` is the same rule on the PyTorch side**, added 2026-11-02 for
+`~/torchtpu-dev/tpu-pytorchrust-v5e1-2b-q4w4a16emb4`. Its model, cache and decode loop are a Rust crate over
+ATen (through a small C++ shim of its own), loaded into a Python process as a PyO3 extension: Python hosts the process, tokenizes and serves HTTP,
+because TorchTPU links `libtorch_python` and ships no supported C++ API. Python being in the process does not
+make it `pytorch`, for the reason a Rust extension in a JAX rig does not make it `jaxrust`: the slot follows
+the language that defines the forward pass. One token, never `pytorch-rust` or `torchrust`. Unlike `jaxrust`
+it does carry a measured difference that matters for the name: `torch.compile` traces Python and cannot see a
+Rust model, so a `pytorchrust` rig runs TorchTPU's defer-and-fuse mode, not a compiled graph.
 
 ## Slot 3 — hardware
 
@@ -582,6 +592,7 @@ Three things that trip people up:
 | `~/torchtpu-dev/tpu-pytorch-v5e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-pytorch-v5e1` repo, moved into `torchtpu-dev` and renamed 2026-10-21 |
 | `~/torchtpu-dev/tpu-pytorch-v5e1-2b` | TPU | PyTorch / TorchTPU | v5e-1 | `gemma-4-E2B-it` | — — forked from `tpu-pytorch-v5e1-12b-w4a16` 2026-10-21; not provisioned. Unlike `~/gemma4-dev/tpu-pytorch-v5e1-2b`, which has no `tpu.env` and whose `server.py` defaults to `gemma-4-31B-it` on `v6e-8`, its `tpu.env` pins E2B on `v5e-1` |
 | `~/torchtpu-dev/tpu-pytorch-v5e1-2b-w4a16` | TPU | PyTorch / TorchTPU | v5e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — forked from `tpu-pytorch-v5e1-12b-w4a16` 2026-10-21; not provisioned |
+| `~/torchtpu-dev/tpu-pytorchrust-v5e1-2b-q4w4a16emb4` | TPU | Rust over ATen on TorchTPU (PyO3 extension) | v5e-1 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` | `q4w4a16emb4` — added 2026-11-02, forked from `tpu-pytorch-v5e1-2b-w4a16`, **the first `pytorchrust` rig**, and the slot-2 value was added for it. Slots 2 and 5 differ from that sister. The engine came from Colab notebook 06 (`~/torchtpu-dev/colab/rust/`) and reads the linears from `-ct-text` and the int4 tables from `-ct-text-emb4`. **First served 2026-11-02** on a v5e-1 queued resource in us-west4-a, torch 2.14.1, Python 3.14, rustc nightly: about 12 tokens per second streamed at an 8,192-token context |
 | `~/torchtpu-dev/tpu-pytorch-v6e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned |
 | `~/torchtpu-dev/tpu-pytorch-v5e4-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned. `TENSOR_PARALLEL_SIZE=1`: the static-shape server has no sharding path, so it serves from one of the four chips |
 | `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |
