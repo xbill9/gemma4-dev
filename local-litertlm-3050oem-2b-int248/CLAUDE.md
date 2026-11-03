@@ -48,6 +48,12 @@ repack's exact codes into that.
 
 - **`max_tokens` is ignored**; the server reads only `max_completion_tokens`. A request with
   `max_tokens: 256` runs to the end of the reply (1,100+ tokens on the A/B prompts).
+- **Constrained decoding is on for every chat request, and it costs tool calls.** With tools its grammar
+  forces arguments into the schema's declared order; the model learned alphabetical order from the
+  template and drops optional arguments. BFCL 0.825 → 0.890 here, and the exact QAT build 0.8625 → 0.9125
+  (level with llama.cpp), with it off via `serve_noconstraint.py`. Off, about 1 reply in 400 is a
+  malformed call that the server answers with HTTP 500
+  (`benchmarks/runs/2026-11-03-tools-constraint-3050oem`).
 - No `timings` in responses. Decode speed is measured on the stream (see `spec_ab.py`); the
   drafter's accepted runs arrive as multi-token chunks.
 - The first request loads the engine (about 4 s with the GPU cache present, 10 s without).
