@@ -1,0 +1,261 @@
+W1103 17:26:15.172000 249390 torch/_opaque_base.py:6] torch._opaque_base is deprecated, use torch._custom_class_base instead
+W1103 17:26:15.173000 249390 torch/_library/opaque_object.py:288] register_opaque_type is deprecated, use register_custom_class instead
+W1103 17:26:15.173000 249390 torch/_library/opaque_object.py:211] typ='value' is deprecated, use typ='constant' instead
+(APIServer pid=249390) INFO 11-03 17:26:20 [startup.py:38] 
+(APIServer pid=249390) INFO 11-03 17:26:20 [startup.py:38]        █     █     █▄   ▄█
+(APIServer pid=249390) INFO 11-03 17:26:20 [startup.py:38]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.33.0
+(APIServer pid=249390) INFO 11-03 17:26:20 [startup.py:38]   █▄█▀ █     █     █     █  model   xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4
+(APIServer pid=249390) INFO 11-03 17:26:20 [startup.py:38]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=249390) INFO 11-03 17:26:20 [startup.py:38] 
+(APIServer pid=249390) INFO 11-03 17:26:20 [startup.py:96] non-default args: {'model_tag': 'xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', 'enable_auto_tool_choice': True, 'tool_call_parser': 'gemma4', 'host': '127.0.0.1', 'port': 8010, 'model': 'xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', 'revision': 'db715f83da4f13289761d7c45f4d19ceac84695d', 'max_model_len': 16384, 'reasoning_parser': 'gemma4', 'gpu_memory_utilization': 0.85, 'language_model_only': True, 'max_num_seqs': 64, 'speculative_config': {'model': '/home/xbill/.cache/huggingface/hub/models--google--gemma-4-E2B-it-qat-q4_0-unquantized-assistant/snapshots/ebc7e1a211354561464cb82ed6d886792138dcb6', 'num_speculative_tokens': 3}}
+(APIServer pid=249390) INFO 11-03 17:26:20 [model.py:744] Resolved architecture: Gemma4ForCausalLM
+(APIServer pid=249390) INFO 11-03 17:26:20 [model.py:2170] Using max model len 16384
+(APIServer pid=249390) INFO 11-03 17:26:22 [model.py:744] Resolved architecture: Gemma4MTPModel
+(APIServer pid=249390) INFO 11-03 17:26:22 [model.py:2170] Using max model len 131072
+(APIServer pid=249390) WARNING 11-03 17:26:22 [speculative.py:1491] Enabling num_speculative_tokens > 1 will run multiple times of forward on same MTP layer,which may result in lower acceptance rate
+(APIServer pid=249390) INFO 11-03 17:26:22 [speculative.py:1799] Overriding draft model max model len from 131072 to 16384
+(APIServer pid=249390) INFO 11-03 17:26:22 [config.py:364] Gemma4 model has heterogeneous head dimensions {'sliding_attention': 256, 'full_attention': 512}. FA4 not available, forcing TRITON_ATTN backend.
+(APIServer pid=249390) INFO 11-03 17:26:22 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=249390) WARNING 11-03 17:26:22 [vllm.py:2360] max_num_scheduled_tokens is set to 2048 based on the speculative decoding settings. This may lead to suboptimal performance. Consider increasing max_num_batched_tokens to accommodate the additional draft token slots, or decrease num_speculative_tokens.
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 1719.13it/s]
+W1103 17:26:31.988000 249538 torch/_opaque_base.py:6] torch._opaque_base is deprecated, use torch._custom_class_base instead
+W1103 17:26:31.989000 249538 torch/_library/opaque_object.py:288] register_opaque_type is deprecated, use register_custom_class instead
+W1103 17:26:31.989000 249538 torch/_library/opaque_object.py:211] typ='value' is deprecated, use typ='constant' instead
+(EngineCore pid=249538) INFO 11-03 17:26:37 [core.py:139] Initializing a V1 LLM engine (v0.33.0) with config: model='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', speculative_config=SpeculativeConfig(method='mtp', model='/home/xbill/.cache/huggingface/hub/models--google--gemma-4-E2B-it-qat-q4_0-unquantized-assistant/snapshots/ebc7e1a211354561464cb82ed6d886792138dcb6', num_spec_tokens=3), tokenizer='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', skip_tokenizer_init=False, tokenizer_mode=auto, revision=db715f83da4f13289761d7c45f4d19ceac84695d, tokenizer_revision=db715f83da4f13289761d7c45f4d19ceac84695d, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=16384, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=compressed-tensors, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='gemma4', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::qwen4_exp_qsa_prepare_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [2048], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=True, monokernel=False, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=249538) INFO 11-03 17:26:38 [parallel_state.py:1929] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///tmp/vllm_dist_91e4a97ea44c4358a2d910f7c7996825 backend=nccl
+(EngineCore pid=249538) INFO 11-03 17:26:38 [parallel_state.py:2385] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=249538) INFO 11-03 17:26:38 [gpu_worker.py:513] Using V2 Model Runner
+(EngineCore pid=249538) INFO 11-03 17:26:39 [model_runner.py:399] Loading model from scratch...
+(EngineCore pid=249538) INFO 11-03 17:26:39 [__init__.py:945] Using MarlinLinearKernel for mixed-precision linear
+(EngineCore pid=249538) INFO 11-03 17:26:39 [compressed_tensors_wNa16.py:153] Using MarlinLinearKernel for CompressedTensorsWNA16
+(EngineCore pid=249538) INFO 11-03 17:26:40 [cuda.py:448] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=249538) INFO 11-03 17:26:40 [cuda.py:448] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=249538) INFO 11-03 17:26:40 [base_loader.py:82] Initializing model took 0.425692 seconds
+(EngineCore pid=249538) INFO 11-03 17:26:40 [weight_utils.py:1144] Filesystem type for checkpoints: EXT4. Checkpoint size: 2.64 GiB. Available RAM: 40.88 GiB.
+(EngineCore pid=249538) INFO 11-03 17:26:40 [weight_utils.py:1167] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+Loading safetensors checkpoint shards:   0% Completed | 0/38 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards:  24% Completed | 9/38 [00:00<00:00, 85.44it/s]
+Loading safetensors checkpoint shards:  50% Completed | 19/38 [00:00<00:00, 88.38it/s]
+Loading safetensors checkpoint shards:  74% Completed | 28/38 [00:00<00:00, 85.88it/s]
+(EngineCore pid=249538) WARNING 11-03 17:26:41 [utils.py:333] Attempted to load weight lm_head.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+(EngineCore pid=249538) WARNING 11-03 17:26:41 [utils.py:333] Attempted to load weight embed_tokens.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+(EngineCore pid=249538) WARNING 11-03 17:26:41 [utils.py:333] Attempted to load weight embed_tokens_per_layer.weight_scale with dtype torch.float16 into parameter with dtype torch.bfloat16
+Loading safetensors checkpoint shards:  97% Completed | 37/38 [00:00<00:00, 36.29it/s]
+Loading safetensors checkpoint shards: 100% Completed | 38/38 [00:00<00:00, 46.93it/s]
+
+(EngineCore pid=249538) INFO 11-03 17:26:41 [default_loader.py:506] Loading weights took 0.81 seconds
+(EngineCore pid=249538) INFO 11-03 17:26:42 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(EngineCore pid=249538) WARNING 11-03 17:26:42 [vllm.py:2360] max_num_scheduled_tokens is set to 2048 based on the speculative decoding settings. This may lead to suboptimal performance. Consider increasing max_num_batched_tokens to accommodate the additional draft token slots, or decrease num_speculative_tokens.
+(EngineCore pid=249538) INFO 11-03 17:26:42 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(EngineCore pid=249538) INFO 11-03 17:26:42 [gemma4_mtp.py:505] Gemma4 MTP: centroids masking enabled (num_centroids=2048, top_k=32, active_tokens=4096/262144).
+(EngineCore pid=249538) INFO 11-03 17:26:42 [base_loader.py:82] Initializing model took 0.020306 seconds
+(EngineCore pid=249538) INFO 11-03 17:26:42 [weight_utils.py:1144] Filesystem type for checkpoints: EXT4. Checkpoint size: 0.15 GiB. Available RAM: 41.70 GiB.
+Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00, 28.97it/s]
+
+(EngineCore pid=249538) INFO 11-03 17:26:42 [default_loader.py:506] Loading weights took 0.04 seconds
+(EngineCore pid=249538) INFO 11-03 17:26:43 [speculator.py:166] Gemma4 MTP: draft layer 0 (sliding_attention) -> model.layers.13.self_attn.attn
+(EngineCore pid=249538) INFO 11-03 17:26:43 [speculator.py:166] Gemma4 MTP: draft layer 1 (sliding_attention) -> model.layers.13.self_attn.attn
+(EngineCore pid=249538) INFO 11-03 17:26:43 [speculator.py:166] Gemma4 MTP: draft layer 2 (sliding_attention) -> model.layers.13.self_attn.attn
+(EngineCore pid=249538) INFO 11-03 17:26:43 [speculator.py:166] Gemma4 MTP: draft layer 3 (full_attention) -> model.layers.14.self_attn.attn
+(EngineCore pid=249538) INFO 11-03 17:26:43 [model_runner.py:428] Model loading took 3.0 GiB memory and 4.440727 seconds
+(EngineCore pid=249538) INFO 11-03 17:26:43 [topk_topp_sampler.py:149] Using FlashInfer for top-p & top-k sampling.
+(EngineCore pid=249538) INFO 11-03 17:26:43 [torch_utils.py:281] Reducing Torch threads from 6 to 1 for serving. Set OMP_NUM_THREADS in the external environment to override.
+(EngineCore pid=249538) INFO 11-03 17:26:43 [utils.py:381] Using LBNHC KV cache layout.
+(EngineCore pid=249538) INFO 11-03 17:26:45 [monitor.py:40] [backbone] Starting torch.compile
+(EngineCore pid=249538) INFO 11-03 17:27:02 [backends.py:1125] [backbone] Using cache directory: /home/xbill/.cache/vllm/torch_compile_cache/d5805ead87/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=249538) INFO 11-03 17:27:02 [backends.py:1187] [backbone] Dynamo bytecode transform time: 16.28 s
+(EngineCore pid=249538) INFO 11-03 17:27:27 [backends.py:417] [backbone] Compiling a graph for compile range (1, 2048) takes 25.49 s
+(EngineCore pid=249538) INFO 11-03 17:27:35 [backends.py:948] collected artifacts: 36 entries, 9 artifacts, 33755832 bytes total
+(EngineCore pid=249538) INFO 11-03 17:27:35 [decorators.py:752] [backbone] saved AOT compiled function to /home/xbill/.cache/vllm/torch_compile_cache/torch_aot_compile/fccfb30918fc60b6948f1a4cfd7e363f82011ef09579d7d704410734eafa5940/rank_0_0/model
+(EngineCore pid=249538) INFO 11-03 17:27:35 [monitor.py:62] [backbone] torch.compile took 49.69 s in total
+(EngineCore pid=249538) INFO 11-03 17:27:35 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.13 s
+(EngineCore pid=249538) INFO 11-03 17:27:36 [monitor.py:40] [eagle_head] Starting torch.compile
+(EngineCore pid=249538) INFO 11-03 17:27:37 [backends.py:1125] [eagle_head] Using cache directory: /home/xbill/.cache/vllm/torch_compile_cache/d5805ead87/rank_0_0/eagle_head for vLLM's torch.compile
+(EngineCore pid=249538) INFO 11-03 17:27:37 [backends.py:1187] [eagle_head] Dynamo bytecode transform time: 1.19 s
+[rank0]:W1103 17:27:37.746000 249538 torch/_inductor/utils.py:1806] Not enough SMs to use max_autotune_gemm mode
+[rank0]:[W1103 17:27:38.834313044 CUDACachingAllocator.cpp:3934] memory allocation failed with OOM on device 0 while trying to allocate 67108864 bytes (free: 55836672, total: 8275558400).
+[rank0]:[W1103 17:27:42.032189496 CUDACachingAllocator.cpp:3934] memory allocation failed with OOM on device 0 while trying to allocate 134217728 bytes (free: 87293952, total: 8275558400).
+(EngineCore pid=249538) INFO 11-03 17:27:43 [backends.py:417] [eagle_head] Compiling a graph for compile range (1, 2048) takes 5.80 s
+(EngineCore pid=249538) INFO 11-03 17:27:43 [backends.py:948] collected artifacts: 5 entries, 4 artifacts, 8679920 bytes total
+(EngineCore pid=249538) INFO 11-03 17:27:43 [decorators.py:752] [eagle_head] saved AOT compiled function to /home/xbill/.cache/vllm/torch_compile_cache/torch_aot_compile/f18f89e20caac68342f9de18c822f51585fcbedef30097eca992d7ffad0a4e52/rank_0_0/model
+(EngineCore pid=249538) INFO 11-03 17:27:43 [monitor.py:62] [eagle_head] torch.compile took 7.56 s in total
+(EngineCore pid=249538) INFO 11-03 17:27:43 [monitor.py:91] [eagle_head] Initial profiling/warmup run took 0.01 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/51 [00:01<01:36,  1.93s/it]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:02<00:44,  1.11it/s]Capturing CUDA graphs (PIECEWISE):   6%|▌         | 3/51 [00:02<00:27,  1.75it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:02<00:19,  2.40it/s]Capturing CUDA graphs (PIECEWISE):  10%|▉         | 5/51 [00:02<00:15,  3.06it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:02<00:12,  3.68it/s]Capturing CUDA graphs (PIECEWISE):  14%|█▎        | 7/51 [00:02<00:10,  4.23it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:03<00:09,  4.73it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:03<00:08,  5.19it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:03<00:07,  5.56it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 11/51 [00:03<00:06,  5.88it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:03<00:06,  6.16it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 13/51 [00:03<00:05,  6.46it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:03<00:05,  6.73it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 15/51 [00:04<00:05,  6.99it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:04<00:04,  7.23it/s]Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 17/51 [00:06<00:23,  1.46it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:06<00:17,  1.92it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:06<00:12,  2.49it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:06<00:09,  3.15it/s]Capturing CUDA graphs (PIECEWISE):  41%|████      | 21/51 [00:06<00:07,  3.89it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:06<00:06,  4.64it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 23/51 [00:06<00:05,  5.39it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:07<00:04,  6.09it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:07<00:03,  6.82it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 26/51 [00:07<00:03,  7.34it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:07<00:03,  7.84it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 28/51 [00:07<00:02,  8.26it/s]Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:07<00:02,  8.62it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:07<00:02,  8.91it/s]Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:07<00:02,  9.17it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:07<00:02,  9.38it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:08<00:01,  9.83it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:08<00:01, 10.09it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:08<00:01, 10.32it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 40/51 [00:08<00:01, 10.53it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:10<00:03,  2.56it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:10<00:02,  3.40it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:10<00:01,  4.34it/s]Capturing CUDA graphs (PIECEWISE):  94%|█████████▍| 48/51 [00:11<00:00,  5.34it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:11<00:00,  6.37it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:13<00:00,  3.84it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):  50%|█████     | 1/2 [00:00<00:00,  8.52it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00,  8.48it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:00<00:00,  8.47it/s]
+(EngineCore pid=249538) INFO 11-03 17:28:01 [speculator.py:110] Capturing model for speculator...
+Capturing prefill CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing prefill CUDA graphs (PIECEWISE):   2%|▏         | 1/51 [00:01<01:19,  1.58s/it]Capturing prefill CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:01<00:05,  7.16it/s]Capturing prefill CUDA graphs (PIECEWISE):  33%|███▎      | 17/51 [00:03<00:06,  5.05it/s]Capturing prefill CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:03<00:02,  8.69it/s]Capturing prefill CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:03<00:01, 13.87it/s]Capturing prefill CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:05<00:01,  7.69it/s]Capturing prefill CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:07<00:00,  6.25it/s]Capturing prefill CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:07<00:00,  6.64it/s]
+Capturing prefill CUDA graphs (FULL):   0%|          | 0/33 [00:00<?, ?it/s]Capturing prefill CUDA graphs (FULL):  27%|██▋       | 9/33 [00:00<00:00, 88.73it/s]Capturing prefill CUDA graphs (FULL):  58%|█████▊    | 19/33 [00:00<00:00, 94.09it/s]Capturing prefill CUDA graphs (FULL):  94%|█████████▍| 31/33 [00:00<00:00, 105.10it/s]Capturing prefill CUDA graphs (FULL): 100%|██████████| 33/33 [00:00<00:00, 102.93it/s]
+Capturing decode CUDA graphs (FULL):   0%|          | 0/11 [00:00<?, ?it/s]Capturing decode CUDA graphs (FULL):   9%|▉         | 1/11 [00:00<00:01,  6.27it/s]Capturing decode CUDA graphs (FULL):  73%|███████▎  | 8/11 [00:00<00:00, 35.91it/s]Capturing decode CUDA graphs (FULL): 100%|██████████| 11/11 [00:00<00:00, 36.56it/s]
+(EngineCore pid=249538) INFO 11-03 17:28:10 [model_runner.py:1163] Graph capturing finished in 23 secs, took 0.89 GiB
+(EngineCore pid=249538) INFO 11-03 17:28:11 [gpu_worker.py:772] Available KV cache memory: 1.23 GiB
+(EngineCore pid=249538) INFO 11-03 17:28:11 [gpu_worker.py:787] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.8500 is equivalent to --gpu-memory-utilization=0.7289 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9711. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=249538) INFO 11-03 17:28:11 [kv_cache_utils.py:1147] GPU KV cache size: 136,781 tokens, Maximum concurrency for 16,384 tokens per request: 8.35x
+(EngineCore pid=249538) INFO 11-03 17:28:11 [kv_cache_utils.py:865] kv cache group sizes (32, 32, 32, 32, 16)
+(EngineCore pid=249538) INFO 11-03 17:28:11 [kv_cache_utils.py:866] kv lcm block sizes 32
+(EngineCore pid=249538) INFO 11-03 17:28:11 [kernel_warmup.py:179] JIT kernel warmup starting.
+JIT kernel warmup (28 compile keys):   0%|          | 0/4 [00:00<?, ?kernel/s]JIT kernel warmup (28 compile keys):  25%|██▌       | 1/4 [00:00<00:00,  9.99kernel/s, _DecoratedTritonJitKernel (12 keys)]JIT kernel warmup (28 compile keys):  75%|███████▌  | 3/4 [00:00<00:00, 15.44kernel/s, _DecoratedTritonJitKernel (8 keys)] JIT kernel warmup (28 compile keys): 100%|██████████| 4/4 [00:10<00:00, 15.44kernel/s, _DecoratedTritonJitKernel (4 keys)]JIT kernel warmup (28 compile keys): 100%|██████████| 4/4 [00:16<00:00,  4.08s/kernel, _DecoratedTritonJitKernel (4 keys)]
+(EngineCore pid=249538) INFO 11-03 17:28:27 [kernel_warmup.py:192] JIT kernel warmup finished in 16.42s.
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/51 [00:00<00:09,  5.09it/s]Capturing CUDA graphs (PIECEWISE):   4%|▍         | 2/51 [00:00<00:09,  5.28it/s]Capturing CUDA graphs (PIECEWISE):   6%|▌         | 3/51 [00:00<00:08,  5.44it/s]Capturing CUDA graphs (PIECEWISE):   8%|▊         | 4/51 [00:00<00:08,  5.55it/s]Capturing CUDA graphs (PIECEWISE):  10%|▉         | 5/51 [00:00<00:08,  5.71it/s]Capturing CUDA graphs (PIECEWISE):  12%|█▏        | 6/51 [00:01<00:07,  5.83it/s]Capturing CUDA graphs (PIECEWISE):  14%|█▎        | 7/51 [00:01<00:07,  5.95it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▌        | 8/51 [00:01<00:07,  6.08it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:01<00:06,  6.27it/s]Capturing CUDA graphs (PIECEWISE):  20%|█▉        | 10/51 [00:01<00:06,  6.40it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 11/51 [00:01<00:06,  6.54it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 12/51 [00:01<00:05,  6.66it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 13/51 [00:02<00:05,  6.87it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 14/51 [00:02<00:05,  7.04it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 15/51 [00:02<00:04,  7.24it/s]Capturing CUDA graphs (PIECEWISE):  31%|███▏      | 16/51 [00:02<00:04,  7.44it/s]Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 17/51 [00:02<00:04,  7.64it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:02<00:04,  7.74it/s]Capturing CUDA graphs (PIECEWISE):  37%|███▋      | 19/51 [00:02<00:04,  7.89it/s]Capturing CUDA graphs (PIECEWISE):  39%|███▉      | 20/51 [00:02<00:03,  8.00it/s]Capturing CUDA graphs (PIECEWISE):  41%|████      | 21/51 [00:03<00:03,  8.16it/s]Capturing CUDA graphs (PIECEWISE):  43%|████▎     | 22/51 [00:03<00:03,  8.28it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 23/51 [00:03<00:03,  8.43it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 24/51 [00:03<00:03,  8.55it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 25/51 [00:03<00:02,  8.79it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 26/51 [00:03<00:02,  8.87it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:03<00:02,  9.01it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 28/51 [00:03<00:02,  9.14it/s]Capturing CUDA graphs (PIECEWISE):  57%|█████▋    | 29/51 [00:03<00:02,  9.30it/s]Capturing CUDA graphs (PIECEWISE):  59%|█████▉    | 30/51 [00:04<00:02,  9.43it/s]Capturing CUDA graphs (PIECEWISE):  61%|██████    | 31/51 [00:04<00:02,  9.57it/s]Capturing CUDA graphs (PIECEWISE):  63%|██████▎   | 32/51 [00:04<00:01,  9.68it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 34/51 [00:04<00:01, 10.01it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:04<00:01, 10.22it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 38/51 [00:04<00:01, 10.44it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 40/51 [00:05<00:01, 10.60it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 42/51 [00:05<00:00, 10.78it/s]Capturing CUDA graphs (PIECEWISE):  86%|████████▋ | 44/51 [00:05<00:00, 10.90it/s]Capturing CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:05<00:00, 10.99it/s]Capturing CUDA graphs (PIECEWISE):  94%|█████████▍| 48/51 [00:05<00:00, 11.06it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 50/51 [00:05<00:00, 11.15it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:06<00:00,  8.49it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/33 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):   3%|▎         | 1/33 [00:00<00:03,  9.07it/s]Capturing CUDA graphs (FULL):   6%|▌         | 2/33 [00:00<00:03,  8.93it/s]Capturing CUDA graphs (FULL):   9%|▉         | 3/33 [00:00<00:03,  9.03it/s]Capturing CUDA graphs (FULL):  12%|█▏        | 4/33 [00:00<00:03,  9.12it/s]Capturing CUDA graphs (FULL):  15%|█▌        | 5/33 [00:00<00:03,  9.27it/s]Capturing CUDA graphs (FULL):  18%|█▊        | 6/33 [00:00<00:02,  9.39it/s]Capturing CUDA graphs (FULL):  21%|██        | 7/33 [00:00<00:02,  9.55it/s]Capturing CUDA graphs (FULL):  24%|██▍       | 8/33 [00:00<00:02,  9.68it/s]Capturing CUDA graphs (FULL):  30%|███       | 10/33 [00:01<00:02, 10.05it/s]Capturing CUDA graphs (FULL):  36%|███▋      | 12/33 [00:01<00:02, 10.30it/s]Capturing CUDA graphs (FULL):  42%|████▏     | 14/33 [00:01<00:01, 10.46it/s]Capturing CUDA graphs (FULL):  48%|████▊     | 16/33 [00:01<00:01, 10.72it/s]Capturing CUDA graphs (FULL):  55%|█████▍    | 18/33 [00:01<00:01, 11.06it/s]Capturing CUDA graphs (FULL):  61%|██████    | 20/33 [00:01<00:01, 11.36it/s]Capturing CUDA graphs (FULL):  67%|██████▋   | 22/33 [00:02<00:00, 11.66it/s]Capturing CUDA graphs (FULL):  73%|███████▎  | 24/33 [00:02<00:00, 11.84it/s]Capturing CUDA graphs (FULL):  79%|███████▉  | 26/33 [00:02<00:00, 12.10it/s]Capturing CUDA graphs (FULL):  85%|████████▍ | 28/33 [00:02<00:00, 12.33it/s]Capturing CUDA graphs (FULL):  91%|█████████ | 30/33 [00:02<00:00, 12.49it/s]Capturing CUDA graphs (FULL):  97%|█████████▋| 32/33 [00:02<00:00, 12.62it/s]Capturing CUDA graphs (FULL): 100%|██████████| 33/33 [00:02<00:00, 11.18it/s]
+(EngineCore pid=249538) INFO 11-03 17:28:41 [speculator.py:110] Capturing model for speculator...
+Capturing prefill CUDA graphs (PIECEWISE):   0%|          | 0/51 [00:00<?, ?it/s]Capturing prefill CUDA graphs (PIECEWISE):  18%|█▊        | 9/51 [00:00<00:00, 81.77it/s]Capturing prefill CUDA graphs (PIECEWISE):  35%|███▌      | 18/51 [00:00<00:00, 84.57it/s]Capturing prefill CUDA graphs (PIECEWISE):  53%|█████▎    | 27/51 [00:00<00:00, 84.67it/s]Capturing prefill CUDA graphs (PIECEWISE):  71%|███████   | 36/51 [00:00<00:00, 85.86it/s]Capturing prefill CUDA graphs (PIECEWISE):  90%|█████████ | 46/51 [00:00<00:00, 90.56it/s]Capturing prefill CUDA graphs (PIECEWISE): 100%|██████████| 51/51 [00:00<00:00, 90.19it/s]
+Capturing prefill CUDA graphs (FULL):   0%|          | 0/33 [00:00<?, ?it/s]Capturing prefill CUDA graphs (FULL):  27%|██▋       | 9/33 [00:00<00:00, 88.69it/s]Capturing prefill CUDA graphs (FULL):  58%|█████▊    | 19/33 [00:00<00:00, 93.84it/s]Capturing prefill CUDA graphs (FULL):  94%|█████████▍| 31/33 [00:00<00:00, 104.60it/s]Capturing prefill CUDA graphs (FULL): 100%|██████████| 33/33 [00:00<00:00, 102.55it/s]
+Capturing decode CUDA graphs (FULL):   0%|          | 0/11 [00:00<?, ?it/s]Capturing decode CUDA graphs (FULL):  64%|██████▎   | 7/11 [00:00<00:00, 65.39it/s]Capturing decode CUDA graphs (FULL): 100%|██████████| 11/11 [00:00<00:00, 69.02it/s]
+(EngineCore pid=249538) INFO 11-03 17:28:43 [model_runner.py:1163] Graph capturing finished in 11 secs, took 0.60 GiB
+(EngineCore pid=249538) INFO 11-03 17:28:43 [gpu_worker.py:1003] CUDA graph pool memory: 0.6 GiB (actual), 0.93 GiB (estimated), difference: 0.33 GiB (55.7%).
+(EngineCore pid=249538) INFO 11-03 17:28:43 [gpu_worker.py:1066] Free memory on device (7.58/7.71 GiB) on startup. Desired GPU memory utilization is (0.85, 6.55 GiB). Actual usage is 3.13 GiB for consumed memory (weights + non-torch), 2.2 GiB for peak activation, and 0.6 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=515340800` (0.48 GiB) to fit into requested memory, or `--kv-cache-memory=1617279488` (1.51 GiB) to fully utilize gpu memory. Current kv cache memory in use is 1.23 GiB.
+(EngineCore pid=249538) INFO 11-03 17:28:43 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=249538) INFO 11-03 17:28:44 [core.py:405] init engine (profile, create kv cache, warmup model) took 120.54 s (compilation: 57.25 s)
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 1616.99it/s]
+(EngineCore pid=249538) INFO 11-03 17:28:46 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=249390) INFO 11-03 17:28:46 [entry.py:135] Supported tasks: ['generate']
+(APIServer pid=249390) INFO 11-03 17:28:46 [factories.py:105] Scale-out endpoints are disabled. Restart vllm serve with --enable-scale-out to enable them.
+(APIServer pid=249390) INFO 11-03 17:28:46 [parser_manager.py:36] "auto" tool choice has been enabled.
+(APIServer pid=249390) INFO 11-03 17:28:46 [hf.py:736] Detected the chat template content format to be 'openai'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=249390) WARNING 11-03 17:28:46 [model.py:1907] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0, 'top_k': 64, 'top_p': 0.95}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=249390) INFO 11-03 17:28:47 [entry.py:139] Starting vLLM server on http://127.0.0.1:8010
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:188] Available routes are:
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /openapi.json, Methods: HEAD, GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /docs, Methods: HEAD, GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /docs/oauth2-redirect, Methods: HEAD, GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /redoc, Methods: HEAD, GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /load, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /version, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /kv_event_sources, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /health, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /metrics, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /tokenize, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /detokenize, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/models, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/systemone, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/decisions, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /ping, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /ping, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /invocations, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/responses, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/completions, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/messages, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /generative_scoring, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /is_scaling_elastic_ep, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/chat/completions/render, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/messages/render, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/completions/render, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/responses/render, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/chat/completions/derender, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /v1/completions/derender, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /inference/v1/generate, Methods: POST
+(APIServer pid=249390) INFO 11-03 17:28:47 [launcher.py:197] Route: /inference/v1/abort_requests, Methods: POST
+INFO:     Started server process [249390]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:46088 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46098 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(EngineCore pid=249538) WARNING 11-03 17:28:48 [jit_monitor.py:140] Triton kernel JIT compilation during inference: kernel_unified_attention. This causes a latency spike; consider extending warmup to cover this shape/config.
+INFO:     127.0.0.1:46114 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46128 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46142 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46146 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46154 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46170 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46184 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46186 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46200 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46202 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46208 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46210 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46226 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46236 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46242 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46256 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46258 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46270 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46286 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46292 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=249390) INFO 11-03 17:28:57 [loggers.py:335] Engine 000: Avg prompt throughput: 18.0 tokens/s, Avg generation throughput: 140.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.1%, Prefix cache hit rate: 0.0%
+(APIServer pid=249390) INFO 11-03 17:28:57 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.59, Accepted throughput: 85.73 tokens/s, Drafted throughput: 161.45 tokens/s, Accepted: 951 tokens, Drafted: 1791 tokens, Per-position acceptance rate: 0.720, 0.492, 0.380, Avg Draft acceptance rate: 53.1%
+INFO:     127.0.0.1:49234 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49250 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49260 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49276 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49278 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49284 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49296 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49308 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49320 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49332 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49340 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49344 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49356 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49370 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49382 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49384 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49396 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49406 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49416 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49420 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49432 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=249390) INFO 11-03 17:29:07 [loggers.py:335] Engine 000: Avg prompt throughput: 16.0 tokens/s, Avg generation throughput: 197.7 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.3%, Prefix cache hit rate: 0.0%
+(APIServer pid=249390) INFO 11-03 17:29:07 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 1.94, Accepted throughput: 95.79 tokens/s, Drafted throughput: 304.77 tokens/s, Accepted: 958 tokens, Drafted: 3048 tokens, Per-position acceptance rate: 0.526, 0.285, 0.132, Avg Draft acceptance rate: 31.4%
+INFO:     127.0.0.1:49444 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49458 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49464 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34508 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34522 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34530 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34534 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34542 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34544 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34550 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34554 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34566 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34576 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34584 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34598 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(EngineCore pid=249538) WARNING 11-03 17:29:11 [jit_monitor.py:140] Triton kernel JIT compilation during inference: _gumbel_sample_kernel. This causes a latency spike; consider extending warmup to cover this shape/config.
+INFO:     127.0.0.1:34608 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34610 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34616 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34618 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34632 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34638 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34648 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34658 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34670 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34678 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34686 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34698 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=249390) INFO 11-03 17:29:17 [loggers.py:335] Engine 000: Avg prompt throughput: 20.9 tokens/s, Avg generation throughput: 197.3 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.3%, Prefix cache hit rate: 0.0%
+(APIServer pid=249390) INFO 11-03 17:29:17 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.09, Accepted throughput: 103.09 tokens/s, Drafted throughput: 283.47 tokens/s, Accepted: 1031 tokens, Drafted: 2835 tokens, Per-position acceptance rate: 0.580, 0.321, 0.190, Avg Draft acceptance rate: 36.4%
+INFO:     127.0.0.1:34714 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34730 - "GET /metrics HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34738 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43094 - "GET /metrics HTTP/1.1" 200 OK
+(EngineCore pid=249538) INFO 11-03 17:29:18 [core.py:1525] [shutdown] EngineCore: trigger received signal=SIGTERM
+(APIServer pid=249390) INFO 11-03 17:29:18 [launcher.py:256] [shutdown] API server: shutdown triggered
+(APIServer pid=249390) INFO 11-03 17:29:18 [launcher.py:272] [shutdown] API server: stopping engine client mode=abort timeout=0s
+(EngineCore pid=249538) INFO 11-03 17:29:18 [core.py:1712] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=249538) INFO 11-03 17:29:18 [core.py:1743] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=249538) INFO 11-03 17:29:18 [core.py:1573] [shutdown] EngineCore: exiting busy loop
+(APIServer pid=249390) INFO 11-03 17:29:18 [core_client.py:792] [shutdown] MPClient: start timeout=0s
+(APIServer pid=249390) INFO 11-03 17:29:18 [core_client.py:794] [shutdown] MPClient: stopping engine manager
+(APIServer pid=249390) INFO 11-03 17:29:18 [utils.py:628] [shutdown] Process manager: send sigterm to process EngineCore
+(APIServer pid=249390) WARNING 11-03 17:29:18 [utils.py:648] [shutdown] Process manager: force killing remaining processes count=1
+(APIServer pid=249390) WARNING 11-03 17:29:18 [utils.py:653] [shutdown] Process manager: force killing remaining process EngineCore pid 249538
+(APIServer pid=249390) INFO 11-03 17:29:18 [core_client.py:796] [shutdown] MPClient: engine manager stopped
+(APIServer pid=249390) INFO 11-03 17:29:18 [core_client.py:797] [shutdown] MPClient: cleaning up background resources
+(APIServer pid=249390) INFO 11-03 17:29:18 [core_client.py:799] [shutdown] MPClient: complete
+(APIServer pid=249390) INFO 11-03 17:29:18 [launcher.py:281] [shutdown] API server: engine client stopped
+(APIServer pid=249390) INFO 11-03 17:29:18 [launcher.py:284] [shutdown] API server: signalling HTTP server shutdown
+(APIServer pid=249390) INFO 11-03 17:29:18 [launcher.py:306] [shutdown] API server: shutting down FastAPI HTTP server
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+/usr/lib/python3.14/multiprocessing/resource_tracker.py:475: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-qknzyho1'}
+  warnings.warn(
