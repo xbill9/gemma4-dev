@@ -19,3 +19,4 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-10-31-correctness-1650ti` | 10 | 0 | 0 | **no** |
 | `2026-10-31-first-light-1650ti` | 8 | 2 | 0 | **no** |
 | `2026-10-31-tune-1650ti` | 3 | 0 | 0 | **no** |
+| `2026-11-01-depth-profile-1650ti` | 11 | 1 | 0 | yes |

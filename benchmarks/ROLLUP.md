@@ -238,6 +238,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-t4-embed2 | `2026-10-08-embed-sweep-t4` | 6 | 0 | 0 | **no** | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-08-jev-tasks-t4` | 6 | 0 | 0 | **no** | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
+| local-litertlm-3050oem-2b-int248 | `2026-11-02-first-light-3050oem` | 21 | 4 | 0 | yes | **no** |
 | local-litertlm-i71360p-2b-q4wi4b32 | `2026-10-15-qat-grid-bf16-scales-i71360p` | 5 | 2 | 0 | **no** | **no** |
 | local-llamacpp-1650ti-12b-q4_0 | `2026-10-21-accuracy-12b-1650ti` | 9 | 0 | 0 | **no** | **no** |
 | local-llamacpp-1650ti-12b-q4_0 | `2026-10-21-first-light-1650ti` | 157 | 0 | 0 | yes | **no** |
@@ -313,6 +314,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-pytorch-1650ti-4b-q4w4a16 | `2026-10-31-correctness-1650ti` | 10 | 0 | 0 | **no** | **no** |
 | local-pytorch-1650ti-4b-q4w4a16 | `2026-10-31-first-light-1650ti` | 8 | 2 | 0 | **no** | **no** |
 | local-pytorch-1650ti-4b-q4w4a16 | `2026-10-31-tune-1650ti` | 3 | 0 | 0 | **no** | **no** |
+| local-pytorch-1650ti-4b-q4w4a16 | `2026-11-01-depth-profile-1650ti` | 11 | 1 | 0 | yes | **no** |
 | local-pytorch-3050oem-12b-q4w4a16 | `2026-10-31-accuracy-3050oem` | 5 | 0 | 0 | yes | **no** |
 | local-pytorch-3050oem-12b-q4w4a16 | `2026-10-31-first-light-3050oem` | 10 | 1 | 0 | yes | **no** |
 | local-pytorch-3050oem-2b-q4w4a16 | `2026-10-31-accuracy-3050oem` | 9 | 0 | 0 | yes | **no** |
@@ -579,6 +581,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-t4-4b-q4w4a16emb4 | 1 | 1 |
 | gpu-vllm-t4-embed2 | 1 | 4 |
 | local-jax-cpu-2b | 0 | 1 |
+| local-litertlm-3050oem-2b-int248 | 0 | 1 |
 | local-litertlm-i71360p-2b-q4wi4b32 | 0 | 1 |
 | local-llamacpp-1650ti-12b-q4_0 | 0 | 2 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 15 |
@@ -596,7 +599,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-sdm850-2b-q4_0 | 0 | 1 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
 | local-pytorch-1650ti-2b-q4w4a16 | 0 | 6 |
-| local-pytorch-1650ti-4b-q4w4a16 | 0 | 4 |
+| local-pytorch-1650ti-4b-q4w4a16 | 0 | 5 |
 | local-pytorch-3050oem-12b-q4w4a16 | 0 | 2 |
 | local-pytorch-3050oem-2b-q4w4a16 | 0 | 2 |
 | local-pytorch-cpu-2b | 0 | 1 |

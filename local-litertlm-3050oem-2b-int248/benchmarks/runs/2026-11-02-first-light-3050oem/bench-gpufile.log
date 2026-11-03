@@ -1,0 +1,139 @@
+Benchmarking model: gemma-4-E2B-it-gpu.litertlm (/home/xbill/models/litert/gemma-4-E2B-it-gpu.litertlm)
+Backend                    : gpu
+Number of tokens in prefill: 256
+Number of tokens in decode : 256
+Max number of tokens       : 4096
+Cache                      : disk
+Speculative decoding       : auto
+Running warmup..
+WARNING: Logging before InitGoogle() is written to STDERR
+W0000 00:00:1793669287.210042 2744481 litert_lm_loader.cc:407] Section not found: TFLiteModel
+W0000 00:00:1793669287.210061 2744481 litert_lm_loader.cc:497] TFLite model for type: tf_lite_prefill_decode not found. Skipping.
+I0000 00:00:1793669287.210064 2744481 litert_executor_utils.cc:448] Build ModelResources for Artisan Text Decoder.
+W0000 00:00:1793669287.210162 2744481 litert_lm_loader.cc:532] TFLite model type: tf_lite_prefill_decode not found for backend constraints. Skipping.
+W0000 00:00:1793669287.210170 2744481 litert_lm_loader.cc:532] TFLite model type: tf_lite_vision_encoder not found for backend constraints. Skipping.
+W0000 00:00:1793669287.210172 2744481 litert_lm_loader.cc:532] TFLite model type: tf_lite_audio_encoder_hw not found for backend constraints. Skipping.
+W0000 00:00:1793669287.210174 2744481 litert_lm_loader.cc:550] TFLite model type: tf_lite_prefill_decode not found for prefer activation type. Use system's default backend activation type. System's default activation type for Text decoder is fp16. Vision encoder and audio encoder default is fp32.
+W0000 00:00:1793669287.210176 2744481 litert_lm_loader.cc:550] TFLite model type: tf_lite_vision_encoder not found for prefer activation type. Use system's default backend activation type. System's default activation type for Text decoder is fp16. Vision encoder and audio encoder default is fp32.
+W0000 00:00:1793669287.210178 2744481 litert_lm_loader.cc:550] TFLite model type: tf_lite_audio_encoder_hw not found for prefer activation type. Use system's default backend activation type. System's default activation type for Text decoder is fp16. Vision encoder and audio encoder default is fp32.
+W0000 00:00:1793669287.210206 2744494 litert_lm_loader.cc:407] Section not found: SP_Tokenizer
+W0000 00:00:1793669287.210383 2744481 litert_lm_loader.cc:407] Section not found: TFLiteModel
+W0000 00:00:1793669287.210392 2744481 litert_lm_loader.cc:497] TFLite model for type: tf_lite_end_of_vision not found. Skipping.
+I0000 00:00:1793669287.210397 2744481 llm_gpu_artisan_executor.cc:324] LlmGpuArtisanExecutor::Create with the following config: 
+I0000 00:00:1793669287.210398 2744481 llm_gpu_artisan_executor.cc:325]   LlmExecutorSettings: backend: GPU_ARTISAN
+backend_config:
+num_output_candidates: 1
+wait_for_weight_uploads: true
+num_decode_steps_per_sync: 1
+sequence_batch_size: 0
+supported_lora_ranks: vector of 0 elements: []
+max_top_k: 64
+enable_decode_logits: false
+enable_external_embeddings: false
+use_submodel: false
+prefer_texture_weights: true
+set_enable_host_mapped_pointer: true
+disallow_8bit_convs: true
+
+max_tokens: 4096
+activation_data_type: Not set
+max_num_images: 0
+lora_rank: 0
+pad_token_id: -1
+cache_dir: 
+cache_file: Not set
+litert_dispatch_lib_dir: Not set
+model_assets: model_path: /home/xbill/models/litert/gemma-4-E2B-it-gpu.litertlm
+fake_weights_mode: FAKE_WEIGHTS_NONE
+
+advanced_settings: prefill_batch_sizes: []
+num_output_candidates: 1
+configure_magic_numbers: true
+verify_magic_numbers: false
+clear_kv_cache_before_prefill: true
+num_logits_to_print_after_decode: 0
+gpu_madvise_original_shared_tensors: true
+gpu_enable_metal_residency_set: false
+is_benchmark: true
+enable_profiling: false
+preferred_device_substr: 
+num_threads_to_upload: -1
+num_threads_to_compile: -1
+convert_weights_on_gpu: true
+wait_for_weights_conversion_complete_in_benchmark: true
+optimize_shader_compilation: true
+cache_compiled_shaders_only: false
+share_constant_tensors: true
+sampler_handles_input: true
+allow_src_quantized_fc_conv_ops: true
+hint_waiting_for_completion: false
+gpu_context_low_priority: Not set
+enable_speculative_decoding: false
+disable_delegate_clustering: true
+hint_kernel_batch_size: Not set
+error_on_invalid_sampled_token_id: false
+mtp_gating_config: Not set
+
+speculative_decoding_config: SpeculativeDecodingConfig{mode: Not set}
+diffusion_config: Not set
+I0000 00:00:1793669287.210421 2744481 gpu_model_info_generator.cc:32] CalculationsPrecision::F16
+I0000 00:00:1793669287.210423 2744481 gpu_model_info_generator.cc:43] Prefer Texture Weights
+I0000 00:00:1793669287.210424 2744481 gpu_model_info_generator.cc:47] Enable Host Mapped Pointer
+I0000 00:00:1793669287.210426 2744481 gpu_model_info_generator.cc:51] Fast Tuning
+I0000 00:00:1793669287.210427 2744481 gpu_model_info_generator.cc:55] No Winograd
+I0000 00:00:1793669287.210429 2744481 gpu_model_info_generator.cc:59] Disallow 8bit convs
+Warning: ../src/intel/vulkan/anv_physical_device.c:2836: Unable to open device /dev/dri/renderD128: Permission denied (VK_ERROR_INCOMPATIBLE_DRIVER)
+TU: error: ../src/freedreno/vulkan/tu_knl.cc:395: failed to open device /dev/dri/renderD128 (VK_ERROR_INCOMPATIBLE_DRIVER)
+Warning: maxDynamicUniformBuffersPerPipelineLayout artificially reduced from 507904 to 16 to fit dynamic offset allocation limit.
+Warning: maxDynamicStorageBuffersPerPipelineLayout artificially reduced from 507904 to 16 to fit dynamic offset allocation limit.
+I0000 00:00:1793669287.993616 2744481 environment.cc:570] Selected adapter: NVIDIA GeForce RTX 3050 OEM, arch=ampere, vendor=nvidia, backend=Vulkan, adapterType=Discrete GPU
+INFO: [environment.cc:36] Creating LiteRT environment with options
+WARNING: [npu_registry.cc:34] NPU accelerator could not be loaded and registered: kLiteRtStatusErrorNotFound.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0x3726baa0, name=GPU WebGPU
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuBuffer
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuBufferFp16
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuTexture
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuTextureFp16
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuImageBuffer
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuImageBufferFp16
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuBufferPacked
+INFO: [gpu_registry.cc:121] Statically linked GPU accelerator registered.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0x3784bfa0, name=CpuAccelerator
+INFO: [cpu_registry.cc:73] XNNPACK CPU accelerator registered.
+I0000 00:00:1793669293.023479 2744481 session_advanced.cc:76] Benchmark has num_prefill_tokens > 0; forcing apply_prompt_template_in_session to false.
+INFO: [environment.cc:36] Creating LiteRT environment with options
+WARNING: [npu_registry.cc:34] NPU accelerator could not be loaded and registered: kLiteRtStatusErrorNotFound.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0x3759c840, name=GPU WebGPU
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuBuffer
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuBufferFp16
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuTexture
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuTextureFp16
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuImageBuffer
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuImageBufferFp16
+VERBOSE: [tensor_buffer_registry.cc:54] Custom tensor buffer handler is registered for buffer type WebGpuBufferPacked
+INFO: [gpu_registry.cc:121] Statically linked GPU accelerator registered.
+INFO: [accelerator_registry.cc:54] RegisterAccelerator: ptr=0x329493e0, name=CpuAccelerator
+INFO: [cpu_registry.cc:73] XNNPACK CPU accelerator registered.
+W0000 00:00:1793669293.682313 2744527 tasks.cc:647] Failed to get prefill profile summary: UNIMPLEMENTED: GetProfileSummary not implemented for backend: GpuArtisan
+=== Source Location Trace: === 
+third_party/odml/litert_lm/runtime/executor/llm_executor_base.h:250
+W0000 00:00:1793669297.317178 2744527 tasks.cc:722] Failed to get decode profile summary: UNIMPLEMENTED: GetProfileSummary not implemented for backend: GpuArtisan
+=== Source Location Trace: === 
+third_party/odml/litert_lm/runtime/executor/llm_executor_base.h:250
+Running iteration 1 of 1..
+I0000 00:00:1793669297.317673 2744481 session_advanced.cc:76] Benchmark has num_prefill_tokens > 0; forcing apply_prompt_template_in_session to false.
+W0000 00:00:1793669297.375531 2744527 tasks.cc:647] Failed to get prefill profile summary: UNIMPLEMENTED: GetProfileSummary not implemented for backend: GpuArtisan
+=== Source Location Trace: === 
+third_party/odml/litert_lm/runtime/executor/llm_executor_base.h:250
+W0000 00:00:1793669300.872052 2744527 tasks.cc:722] Failed to get decode profile summary: UNIMPLEMENTED: GetProfileSummary not implemented for backend: GpuArtisan
+=== Source Location Trace: === 
+third_party/odml/litert_lm/runtime/executor/llm_executor_base.h:250
+INFO: [accelerator_registry.cc:43] DestroyAccelerator: ptr=0x3784bfa0, name=CpuAccelerator
+INFO: [accelerator_registry.cc:43] DestroyAccelerator: ptr=0x3726baa0, name=GPU WebGPU
+----- Results -----
+Prefill speed:        4446.83 tokens/s
+Decode speed:         73.22 tokens/s
+Init time:            11.6885 s
+Time to first token:  0.0712 s
+INFO: [accelerator_registry.cc:43] DestroyAccelerator: ptr=0x329493e0, name=CpuAccelerator
+INFO: [accelerator_registry.cc:43] DestroyAccelerator: ptr=0x3759c840, name=GPU WebGPU

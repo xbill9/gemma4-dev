@@ -1,0 +1,70 @@
+# Weight encoding of litert-community/gemma-4-E2B-it-litert-lm gemma-4-E2B-it.litertlm
+# sha256 181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c, sections dumped with
+# litert-lm-peek --dump_files_dir (litert-lm-builder 0.19.0), read with the PyPI tflite 2.18.0 schema
+# (TensorType 19 is INT2, newer than that schema: 262144 x 1536 in 100,663,296 bytes = 2 bits).
+
+## Section10_TFLiteModel_tf_lite_prefill_decode (2-D weights, buffers deduped across subgraphs)
+unique const bytes 777983264
+FLOAT32 other      (1, 1)             x1
+INT2   gating     (12288, 1536)      x40
+INT2   linear     (1536, 12288)      x20
+INT2   other      (262144, 1536)     x1
+INT4   attn_vec   (1536, 2048)       x28
+INT4   attn_vec   (1536, 4096)       x7
+INT4   gating     (6144, 1536)       x30
+INT4   linear     (1536, 6144)       x15
+INT4   other      (256, 1536)        x24
+INT4   other      (512, 1536)        x6
+INT4   q_einsum   (2048, 1536)       x28
+INT4   q_einsum   (4096, 1536)       x7
+INT8   embedding  (8960, 1536)       x1
+INT8   embedding  (256, 1536)        x35
+INT8   embedding  (1536, 256)        x35
+
+## Section2_TFLiteModel_tf_lite_embedder (2-D weights, buffers deduped across subgraphs)
+unique const bytes 100663324
+INT2   embedding  (262144, 1536)     x1
+INT32  embedding  (1, 1)             x1
+
+## Section3_TFLiteModel_tf_lite_per_layer_embedder (2-D weights, buffers deduped across subgraphs)
+unique const bytes 1174405148
+INT32  embedding  (1, 1)             x1
+INT4   embedding  (262144, 256)      x35
+
+## Section11_TFLiteModel_tf_lite_mtp_drafter (2-D weights, buffers deduped across subgraphs)
+unique const bytes 40779552
+INT4   gating     (2048, 256)        x8
+INT4   linear     (256, 2048)        x4
+INT4   other      (262144, 256)      x1
+INT8   attn_vec   (256, 1024)        x3
+INT8   attn_vec   (256, 2048)        x1
+INT8   other      (256, 3072)        x1
+INT8   other      (1536, 256)        x1
+INT8   q_einsum   (1024, 256)        x3
+INT8   q_einsum   (2048, 256)        x1
+
+## quantization parameters, first tensors of each type (prefill_decode, per-layer embedder)
+INT8 (8960, 1536) scales=8960 zp=8960 zp_nonzero=0 qdim=0 details_type=0 name=r_inputs/per_layer_model_projection/btm,mH->btH/dot_general1
+    scale[0:4] [1.7778235e-05 2.1743936e-05 2.0704581e-05 1.7355340e-05]
+INT4 (2048, 1536) scales=2048 zp=2048 zp_nonzero=0 qdim=0 details_type=0 name=_qkv/attn._pre_attention_fn/q_einsum/btd,dH->btH/dot_general
+    scale[0:4] [0.00194452 0.00550692 0.00376984 0.00483784]
+INT4 (256, 1536) scales=256 zp=256 zp_nonzero=0 qdim=0 details_type=0 name=_qkv/attn._pre_attention_fn/k_einsum/btd,dH->btH/dot_general
+    scale[0:4] [0.00825086 0.00487179 0.00729501 0.00753072]
+INT4 (256, 1536) scales=256 zp=256 zp_nonzero=0 qdim=0 details_type=0 name=_qkv/attn._pre_attention_fn/v_einsum/btd,dH->btH/dot_general
+    scale[0:4] [0.00886737 0.00895774 0.00930556 0.01001426]
+INT8 (256, 1536) scales=256 zp=256 zp_nonzero=0 qdim=0 details_type=0 name=_0.post_qkv/per_layer_embedding_gate/btd,dp->btp/dot_general
+    scale[0:4] [2.0631976e-05 2.0874431e-05 2.0790734e-05 2.6606620e-05]
+INT8 (1536, 256) scales=1536 zp=1536 zp_nonzero=0 qdim=0 details_type=0 name=t_qkv/per_layer_embedding_projection/btp,pd->btd/dot_general
+    scale[0:4] [0.00185983 0.00356055 0.00096492 0.00242825]
+INT2 (12288, 1536) scales=12288 zp=12288 zp_nonzero=0 qdim=0 details_type=0 name=layer_15.post_qkv/mlp/gating_einsum1/btd,df->btf/dot_general
+    scale[0:4] [0.02474663 0.02288576 0.05314467 0.02462403]
+INT2 (12288, 1536) scales=12288 zp=12288 zp_nonzero=0 qdim=0 details_type=0 name=layer_15.post_qkv/mlp/gating_einsum2/btd,df->btf/dot_general
+    scale[0:4] [0.02589487 0.02672817 0.01993666 0.02662919]
+INT2 (1536, 12288) scales=1536 zp=1536 zp_nonzero=0 qdim=0 details_type=0 name=ayer_15/layer_15.post_qkv/mlp/linear/btf,fd->btd/dot_general
+    scale[0:4] [0.0090575  0.00909775 0.0091438  0.01069638]
+INT4 (262144, 256) scales=262144 zp=262144 zp_nonzero=0 qdim=0 details_type=0 name=per_layer_embedder.lookup_embedding_table/composite
+    scale[0:4] [0.1198407  0.01898672 0.05276926 0.02071994]
+INT4 (262144, 256) scales=262144 zp=262144 zp_nonzero=0 qdim=0 details_type=0 name=per_layer_embedder.lookup_embedding_table/composite1
+    scale[0:4] [0.07046417 0.01893597 0.04228245 0.01977226]
+INT4 (262144, 256) scales=262144 zp=262144 zp_nonzero=0 qdim=0 details_type=0 name=per_layer_embedder.lookup_embedding_table/composite2
+    scale[0:4] [0.06930055 0.0212386  0.02588344 0.02156243]
