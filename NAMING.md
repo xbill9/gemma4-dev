@@ -608,6 +608,7 @@ Three things that trip people up:
 | `~/torchtpu-dev/tpu-pytorch-v6e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned |
 | `~/torchtpu-dev/tpu-pytorch-v5e4-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned. `TENSOR_PARALLEL_SIZE=1`: the static-shape server has no sharding path, so it serves from one of the four chips |
 | `~/jax-dev/tpu-jax-v6e1-2b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax`, moved 2026-11-03 |
+| `~/jax-dev/tpu-jax-v6e1-2b-q4w4a16` | TPU | JAX | v6e-1 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text` | `q4w4a16` — added 2026-11-03, forked from `tpu-jax-v6e1-2b-w4a16`; slot 5 is the only slot that differs. Engine unchanged; the first jax-dev rig with a `tpu.env`. Header-checked against the loader, not yet run on a chip |
 | `~/jax-dev/tpu-jax-v5e1-4b-w4a16` | TPU | JAX | v5e-1 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-4b`, moved 2026-11-03 |
 | `~/jax-dev/tpu-jax-v6e1-12b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-12b`: the engine half of the artifact rig of the same name here |
 | `~/jax-dev/tpu-jax-v6e1-26b-q4_0` | TPU | JAX | v6e-1 (target) | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | `q4_0` — the former `xbill9/tpu-jax-26b`: engine half of the artifact rig of the same name here |
