@@ -7,7 +7,7 @@ laid out like this one (one plugin per rig directory, root `marketplace.json`); 
 serving code for a Colab runtime and is outside the scheme, because nothing there is provisioned.
 `~/jax-dev` is the `xbill9/jax-dev` monorepo (2026-11-03): the standalone `xbill9/tpu-jax*` and `colab-jax`
 repos, imported with full history under scheme names and then archived. Its own `NAMING.md` maps old repo
-to new directory; its rigs have not yet had the per-rig plugin/MCP/skill rename, so it has no `marketplace.json`.
+to new directory; each rig's plugin, MCP server and skill are named after its directory, and the root `marketplace.json` lists them.
 
 ## The slots
 
