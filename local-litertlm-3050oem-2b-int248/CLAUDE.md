@@ -40,7 +40,9 @@ projection, the MLPs of the first 15 layers and the 35 per-layer embedding table
 per-layer embedding gates and projections. **Every quantized tensor has one scale per output row**
 (symmetric, zero points 0). Google calls it the "Gemma-4 mobile quantization scheme". It is not
 the QAT Q4_0 grid the xbill9 repacks keep: those have one scale per group of 32, which this
-format cannot hold, so their values cannot be written into this file.
+format cannot hold, so their values cannot be written into this file. The sister rig
+`local-litertlm-3050oem-2b-q4w4a16emb4` builds its own `.litertlm` with int4 blocks of 32 and writes the
+repack's exact codes into that.
 
 ## Server quirks
 
