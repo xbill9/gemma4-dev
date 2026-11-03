@@ -2,7 +2,7 @@
 
 Canonical reference for how accelerator rig repos are named. Rigs currently live in five trees — `~/tpu-*`,
 `~/gemma4-dev/*`, `~/gemma4-queens/*`, `~/torchtpu-dev/*` and `~/jax-dev/*` — and the scheme is the same regardless of which
-tree a rig sits in. Location is not part of the name. `~/torchtpu-dev` is the `xbill9/torchtpu-dev` monorepo,
+tree a rig sits in. Location is not part of the name, and **a name is unique within its tree, not across trees**: each tree compares along its own axis (`~/gemma4-dev` across Gemma runtimes, `~/jax-dev` across JAX rigs), so two trees can each hold a rig for the same cell under the same name, and those are two rigs. `tpu-jax-v5e1-2b` exists in both. Their derived names (skill, MCP key, zone cache) collide only when both are installed into one user scope. `~/torchtpu-dev` is the `xbill9/torchtpu-dev` monorepo,
 laid out like this one (one plugin per rig directory, root `marketplace.json`); its `colab/` directory holds
 serving code for a Colab runtime and is outside the scheme, because nothing there is provisioned.
 `~/jax-dev` is the `xbill9/jax-dev` monorepo (2026-11-03): the standalone `xbill9/tpu-jax*` and `colab-jax`
@@ -610,6 +610,7 @@ Three things that trip people up:
 | `~/jax-dev/tpu-jax-v6e1-2b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax`, moved 2026-11-03 |
 | `~/jax-dev/tpu-jax-v6e1-2b-q4w4a16` | TPU | JAX | v6e-1 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text` | `q4w4a16` — added 2026-11-03, forked from `tpu-jax-v6e1-2b-w4a16`; slot 5 is the only slot that differs. Engine unchanged; the first jax-dev rig with a `tpu.env`. Header-checked against the loader, not yet run on a chip. Its `server.py` derives the queued-resource runtime, quota metric and machine type from `ACCELERATOR_TYPE` |
 | `~/jax-dev/tpu-jax-v5e1-2b-q4w4a16` | TPU | JAX | v5e-1 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text` | `q4w4a16` — added 2026-11-03, the v5e-1 sibling of `tpu-jax-v6e1-2b-q4w4a16`; **slot 3 is the only slot that differs**, and the two differ in nothing but `tpu.env` (`ACCELERATOR_TYPE=v5litepod-1`, `us-west4-a`): one shared `server.py`, with the per-family values ported from `tpu-jax-v5e1-2b`. Not yet provisioned |
+| `~/jax-dev/tpu-jax-v5e1-2b` | TPU | JAX | v5e-1 | `google/gemma-4-E2B-it` | — — added 2026-11-03, the bf16 baseline for the jax-dev `q4w4a16` rigs: same engine and `server.py` as `tpu-jax-v5e1-2b-q4w4a16`, served dense (`--quant-mode fp16`). **A different rig from `~/gemma4-dev/tpu-jax-v5e1-2b`**, which shares the name under the within-a-tree rule above. Not yet provisioned |
 | `~/jax-dev/tpu-jax-v5e1-4b-w4a16` | TPU | JAX | v5e-1 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-4b`, moved 2026-11-03 |
 | `~/jax-dev/tpu-jax-v6e1-12b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-12b`: the engine half of the artifact rig of the same name here |
 | `~/jax-dev/tpu-jax-v6e1-26b-q4_0` | TPU | JAX | v6e-1 (target) | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | `q4_0` — the former `xbill9/tpu-jax-26b`: engine half of the artifact rig of the same name here |
@@ -833,7 +834,7 @@ project's README and env file, not its directory name.
    rename. Three of these can name one chip, so slot 1 is the only thing telling them apart.
 2. Add slot 5 if the weights aren't the reference build — one lowercase token naming the **encoding**
    (`w4a16`, `q4_0`, `int4`), read off `MODEL_NAME`. Not `qat`, not the container, not a runtime flag.
-3. Check the name is unique. Two rigs differing only in something no slot captures (zone, batch settings,
+3. Check the name is unique within its tree. Two rigs differing only in something no slot captures (zone, batch settings,
    KV-cache dtype) need a suffix of their own, not a reused name and not a misused encoding slot.
 4. Create the GitHub repo under the **same** name — don't inherit a shorter remote from the rig you forked.
 5. Set the authoritative values in `tpu.env` (`MODEL_NAME`, `ACCELERATOR_TYPE`, `TENSOR_PARALLEL_SIZE`, zone).
