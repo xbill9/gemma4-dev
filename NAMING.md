@@ -1,10 +1,13 @@
 # Rig naming scheme
 
-Canonical reference for how accelerator rig repos are named. Rigs currently live in four trees — `~/tpu-*`,
-`~/gemma4-dev/*`, `~/gemma4-queens/*`, and `~/torchtpu-dev/*` — and the scheme is the same regardless of which
+Canonical reference for how accelerator rig repos are named. Rigs currently live in five trees — `~/tpu-*`,
+`~/gemma4-dev/*`, `~/gemma4-queens/*`, `~/torchtpu-dev/*` and `~/jax-dev/*` — and the scheme is the same regardless of which
 tree a rig sits in. Location is not part of the name. `~/torchtpu-dev` is the `xbill9/torchtpu-dev` monorepo,
 laid out like this one (one plugin per rig directory, root `marketplace.json`); its `colab/` directory holds
 serving code for a Colab runtime and is outside the scheme, because nothing there is provisioned.
+`~/jax-dev` is the `xbill9/jax-dev` monorepo (2026-11-03): the standalone `xbill9/tpu-jax*` and `colab-jax`
+repos, imported with full history under scheme names and then archived. Its own `NAMING.md` maps old repo
+to new directory; its rigs have not yet had the per-rig plugin/MCP/skill rename, so it has no `marketplace.json`.
 
 ## The slots
 
@@ -76,7 +79,7 @@ This revises the older reading of the slot as "the accelerator family, not the c
 consequences, none of which renames an existing rig:
 
 - **Inferentia keeps `tpu`.** AWS Neuron is its own control plane, which is the same *shape* of thing as the
-  Cloud TPU API, and both existing repos already spell it that way (`~/tpu-jax-inf2`,
+  Cloud TPU API, and both existing repos already spell it that way (`~/jax-dev/tpu-jax-inf2-2b-w4a16`,
   `~/tpu-pytorch-inf2-2b`). The part lives in the hardware slot as `inf2`. This is the one value where `tpu`
   does not literally mean the Cloud TPU API.
 - **`gce` still covers CPU-only rigs**, its original meaning — the hardware slot settles which it is.
@@ -273,7 +276,7 @@ confusion that cost that rig a sweep on 2026-09-22. The four existing `local-*-c
 keep their names; their `tpu.env` pins the host. `cpu` stays the value for `gce` CPU rigs.
 
 The value is always **`inf2`**, never bare `inf` — the generation is part of the part name, both existing
-rigs already spell it that way (`~/tpu-jax-inf2`, `~/tpu-pytorch-inf2-2b`), and a family-only value would be
+rigs already spell it that way (`~/jax-dev/tpu-jax-inf2-2b-w4a16`, `~/tpu-pytorch-inf2-2b`), and a family-only value would be
 the one hardware slot that doesn't pin a generation. Later parts take `inf3`, `trn1`, and so on.
 
 Note the trailing digit means something different here: in `v6e4` it's the chip count, in `inf2` it's the
@@ -311,8 +314,8 @@ Gemma 4 parameter size, lowercase `b`. Verified mappings from rigs that exist to
 | `2b` | `google/gemma-4-E2B-it` (QAT build: `google/gemma-4-E2B-it-qat-w4a16-ct` → slot 5 `w4a16`) |
 | `4b` | `google/gemma-4-E4B-it` |
 | `12b` | `google/gemma-4-12B-it` (QAT build: `google/gemma-4-12B-it-qat-w4a16-ct` → slot 5 `w4a16`) |
-| `26b` | `~/tpu-jax-26b` |
-| `31b` | `~/tpu-jax-31b` |
+| `26b` | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` (`~/jax-dev/tpu-jax-v6e1-26b-q4_0`) |
+| `31b` | `google/gemma-4-31B-it-qat-w4a16-ct` (`~/jax-dev/tpu-jax-v6e1-31b-w4a16`) |
 | `embed2` | `google/embeddinggemma-2` — **not a Gemma 4 size**: EmbeddingGemma 2 (740M, multimodal embedding model built on the Gemma 4 architecture, released 2026-10-06). Added 2026-10-09 for `gpu-vllm-mi300x-embed2`; the family name stands in for a size because a size alone would collide with the generators. A later embedding release takes its own number (`embed3`) |
 
 Use **`2b`**, not `e2b` — every existing directory does, even though the checkpoint is `E2B` and the
@@ -604,7 +607,13 @@ Three things that trip people up:
 | `~/torchtpu-dev/tpu-pytorchrust-v5e1-2b-q4w4a16emb4` | TPU | Rust over ATen on TorchTPU (PyO3 extension) | v5e-1 | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` | `q4w4a16emb4` — added 2026-11-02, forked from `tpu-pytorch-v5e1-2b-w4a16`, **the first `pytorchrust` rig**, and the slot-2 value was added for it. Slots 2 and 5 differ from that sister. The engine came from Colab notebook 06 (`~/torchtpu-dev/colab/rust/`) and reads the linears from `-ct-text` and the int4 tables from `-ct-text-emb4`. **First served 2026-11-02** on a v5e-1 queued resource in us-west4-a, torch 2.14.1, Python 3.14, rustc nightly: about 12 tokens per second streamed at an 8,192-token context |
 | `~/torchtpu-dev/tpu-pytorch-v6e1-12b-w4a16` | TPU | PyTorch / TorchTPU | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned |
 | `~/torchtpu-dev/tpu-pytorch-v5e4-12b-w4a16` | TPU | PyTorch / TorchTPU | v5e-4 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — forked from the v5e-1 rig 2026-10-21; not provisioned. `TENSOR_PARALLEL_SIZE=1`: the static-shape server has no sharding path, so it serves from one of the four chips |
-| `~/tpu-jax-v6e1-2b` | TPU | JAX | v6e-1 | 2B | — |
+| `~/jax-dev/tpu-jax-v6e1-2b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax`, moved 2026-11-03 |
+| `~/jax-dev/tpu-jax-v5e1-4b-w4a16` | TPU | JAX | v5e-1 | `gemma-4-E4B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-4b`, moved 2026-11-03 |
+| `~/jax-dev/tpu-jax-v6e1-12b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-12B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-12b`: the engine half of the artifact rig of the same name here |
+| `~/jax-dev/tpu-jax-v6e1-26b-q4_0` | TPU | JAX | v6e-1 (target) | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` | `q4_0` — the former `xbill9/tpu-jax-26b`: engine half of the artifact rig of the same name here |
+| `~/jax-dev/tpu-jax-v6e1-31b-w4a16` | TPU | JAX | v6e-1 | `gemma-4-31B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-31b`: engine half of the artifact rig of the same name here |
+| `~/jax-dev/tpu-jax-inf2-2b-w4a16` | Inferentia (slot `tpu`) | pure JAX (`jax-neuronx`) | inf2 | `gemma-4-E2B-it-qat-w4a16-ct` | `w4a16` — the former `xbill9/tpu-jax-inf2`; separate from `tpu-jax-inf2-2b` here, which serves bf16 |
+| `~/jax-dev/legacy/tpu-jax-v5e1-2b`, `legacy/tpu-jax-v6e1-2b` | TPU | JAX | v5e-1 / v6e-1 | 2B | frozen standalone predecessors of the rigs of the same name here |
 | `~/tpu-pytorch-v6e1-2b` | TPU | PyTorch | v6e-1 | 2B | — |
 | `~/tpu-pytorch-inf2-2b` | Inferentia (slot `tpu`) | PyTorch | inf2 | 2B | — |
 
@@ -785,9 +794,7 @@ pair: `gpu-jax-g6-2b` talks about the L4 and about Ada throughout its README, an
 
 | Rig | Missing |
 | --- | --- |
-| `~/tpu-jax-4b`, `-12b`, `-26b`, `-31b` | hardware slot — **12b/26b/31b artifacts migrated** to the three artifact rigs above on 2026-08-07; the source repos keep the engine code and are unchanged |
-| `~/tpu-jax-inf2` | model slot — **artifacts migrated** to `tpu-pytorch-inf2-2b` on 2026-08-07 |
-| `~/tpu-jax` | hardware and model slots |
+| `~/tpu-jax`, `~/tpu-jax-4b`, `-12b`, `-26b`, `-31b`, `-inf2`, `-v5e1-2b`, `-v6e1-2b` | **moved** into `~/jax-dev` under scheme names on 2026-11-03 and archived on GitHub; `~/jax-dev/NAMING.md` maps each one |
 | `~/tpu-skill-claude`, `-codex`, `-agy` | not rigs — skill repos |
 | `~/tpu-inference` | not a rig |
 
