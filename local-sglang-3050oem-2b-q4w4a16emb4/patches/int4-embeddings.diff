@@ -1,5 +1,5 @@
 --- a/sglang/srt/models/gemma4_causal.py	2026-11-04 12:31:52.794325387 -0500
-+++ b/sglang/srt/models/gemma4_causal.py	2026-11-04 12:31:52.796067988 -0500
++++ b/sglang/srt/models/gemma4_causal.py	2026-11-04 12:36:53.738660089 -0500
 @@ -88,6 +88,62 @@
  Gemma4TextScaledWordEmbedding = Gemma3TextScaledWordEmbedding
  
@@ -115,3 +115,15 @@
  
              self.per_layer_model_projection = ReplicatedLinear(
                  self.hidden_size,
+@@ -1486,7 +1556,10 @@
+         embed = self._shard_weight(
+             self.model.embed_tokens.weight, draft_embedding=draft_embedding
+         )
+-        head = self._shard_weight(self.lm_head.weight, draft_embedding=draft_embedding)
++        # An int4 lm_head (compressed-tensors) has no dense weight; the Gemma 4 assistant keeps its own head.
++        head = getattr(self.lm_head, "weight", None)
++        if head is not None:
++            head = self._shard_weight(head, draft_embedding=draft_embedding)
+         return embed, head
+ 
+     def get_embed_and_head_for_draft(self, draft_embedding):

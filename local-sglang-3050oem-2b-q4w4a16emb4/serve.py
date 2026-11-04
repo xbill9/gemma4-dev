@@ -58,6 +58,8 @@ def command(env: Dict[str, str]) -> List[str]:
         cmd.append("--disable-radix-cache")
     if env.get("DISABLE_PREFILL_CUDA_GRAPH", "").lower() == "true":
         cmd.append("--disable-prefill-cuda-graph")
+    if env.get("CUDA_GRAPH_MAX_BS_DECODE"):
+        cmd += ["--cuda-graph-max-bs-decode", env["CUDA_GRAPH_MAX_BS_DECODE"]]
     if env.get("SPECULATIVE_MODEL"):
         steps = int(env["SPECULATIVE_NUM_STEPS"])
         cmd += ["--speculative-algorithm", "NEXTN", "--speculative-draft-model-path", env["SPECULATIVE_MODEL"],

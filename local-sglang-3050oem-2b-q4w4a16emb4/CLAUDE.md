@@ -35,7 +35,8 @@ rigs; they do not run beside each other.
     something asks for `.weight` (the drafter's shared embedding), 768 MiB bf16.
 - **Decode CUDA graphs only** (`DISABLE_PREFILL_CUDA_GRAPH=true`): prefill graph capture refuses the 20
   KV-shared layers, which reuse an earlier layer's attention id. Decode capture takes about 6 minutes per
-  start (graphs for 1, 2, 4 and 8 requests).
+  start. `CUDA_GRAPH_MAX_BS_DECODE=64` captures up to `MAX_RUNNING_REQUESTS`; unset, SGLang
+  sizes it from card memory and captures 1, 2, 4 and 8 only, so 16 requests and more would run without graphs.
 - **Port 8030.** Radix (prefix) cache off. Drafter: `SPECULATIVE_MODEL` (Google's assistant), served as
   `--speculative-algorithm NEXTN`, which SGLang promotes to `FROZEN_KV_MTP` for
   `Gemma4AssistantForCausalLM`.
