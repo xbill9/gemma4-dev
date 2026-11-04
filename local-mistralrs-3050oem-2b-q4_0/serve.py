@@ -51,6 +51,8 @@ def command(env: Dict[str, str]) -> List[str]:
         env["PREFIX_CACHE_N"],
         "--kv-cache",
         env["KV_CACHE"],
+        "--max-num-batched-tokens",
+        env["MAX_NUM_BATCHED_TOKENS"],
         "--no-ui",
     ]
     if env.get("MTP_MODEL"):

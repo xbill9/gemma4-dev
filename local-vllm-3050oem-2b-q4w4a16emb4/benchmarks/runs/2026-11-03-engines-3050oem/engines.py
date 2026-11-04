@@ -9,6 +9,7 @@ Arms (one server each, started and stopped here, card cooled to <= COOL_C before
     mistralrs, mistralrs-dN
                         mistral.rs v0.9.5, local-mistralrs-3050oem-2b-q4_0 serve.py (4 requests, 8,192-token cache);
                         -dN = Google's QAT assistant (bf16 safetensors), N drafted tokens, 4,096-token cache
+    sglang, sglang-dN   SGLang 0.5.23, local-sglang-3050oem-2b-q4w4a16emb4 serve.py; -dN = W4A16 drafter, N tokens
     pytorch             local-pytorch-3050oem-2b-q4w4a16 openai_server.py (greedy only, no streaming)
     litert-q4, litert-int248, litert-int248-d
                         litert-lm serve 0.19.0: this paper's exact Q4_0 build, Google's int248 file, and
@@ -41,6 +42,7 @@ VRIG = os.path.join(ROOT, "local-vllm-3050oem-2b-q4w4a16emb4")
 LRIG = os.path.join(ROOT, "local-llamacpp-3050oem-2b-q4_0")
 PRIG = os.path.join(ROOT, "local-pytorch-3050oem-2b-q4w4a16")
 MRIG = os.path.join(ROOT, "local-mistralrs-3050oem-2b-q4_0")
+SRIG = os.path.join(ROOT, "local-sglang-3050oem-2b-q4w4a16emb4")
 MTP = ("/home/xbill/.cache/huggingface/hub/models--google--gemma-4-E2B-it-qat-q4_0-unquantized-assistant/"
        "snapshots/ebc7e1a211354561464cb82ed6d886792138dcb6")
 PROMPTS = {
@@ -95,6 +97,13 @@ def server(arm):
             env.update(MTP_MODEL=MTP, MTP_N_PREDICT=arm[len("mistralrs-d"):], KV_CACHE="4096tokens",
                        MAX_MODEL_LEN="4096")
         return ["python3", os.path.join(MRIG, "serve.py")], env, v["ENDPOINT"], "default", "/health", True
+    if arm.startswith("sglang"):
+        v = load_env(os.path.join(SRIG, "tpu.env"))
+        env["SPECULATIVE_MODEL"] = ""
+        if arm.startswith("sglang-d"):  # W4A16 drafter (vLLM's best), N drafted tokens
+            env.update(SPECULATIVE_MODEL="/home/xbill/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-assistant",
+                       SPECULATIVE_NUM_STEPS=arm[len("sglang-d"):])
+        return ["python3", os.path.join(SRIG, "serve.py")], env, v["ENDPOINT"], v["MODEL_NAME"], "/health", True
     if arm == "pytorch":
         return (["python3", os.path.join(PRIG, "openai_server.py"), "--port", "8100", "--max-ctx", "8192"], env,
                 "http://127.0.0.1:8100", "google/gemma-4-E2B-it", "/health", False)
