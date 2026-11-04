@@ -37,6 +37,9 @@ GSM8K_PROMPT = (
 GSM8K_MAX_TOKENS = int(os.environ.get("JEV_GEN_MAX_TOKENS", "768"))
 # JEV_CACHE_PROMPT=0 sends llama.cpp's "cache_prompt": false (unset: the server default, on).
 CACHE_PROMPT = os.environ.get("JEV_CACHE_PROMPT")
+# JEV_ENABLE_THINKING=0/1 sends chat_template_kwargs {"enable_thinking": ...} (unset: the server default).
+# mistral.rs v0.9.5 thinks by default on Gemma 4; llama.cpp, vLLM, PyTorch and LiteRT do not.
+ENABLE_THINKING = os.environ.get("JEV_ENABLE_THINKING")
 TYPES = {"dict": "object", "float": "number", "tuple": "array", "any": None}
 
 
@@ -206,6 +209,8 @@ def one(upstream, model, task, rec):
         }
     if CACHE_PROMPT is not None:
         body["cache_prompt"] = CACHE_PROMPT != "0"
+    if ENABLE_THINKING is not None:
+        body["chat_template_kwargs"] = {"enable_thinking": ENABLE_THINKING != "0"}
     out = {"id": rec["id"], "task": task, "max_tokens": body["max_tokens"]}
     try:
         r = post(upstream, body)

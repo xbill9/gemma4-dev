@@ -25,6 +25,10 @@ beside each other.
   drafter needs paged attention.
 - **`/health` answers before requests are admitted**: wait for a first reply, not for `/health`.
 - **Port 8020**, model id `default`. Prefix cache off (`PREFIX_CACHE_N=0`).
+- **It thinks by default on Gemma 4** (the other engines here do not): send
+  `chat_template_kwargs: {"enable_thinking": false}` for short replies. GSM8K 0.9030 and BFCL 0.915 with it
+  off, level with llama.cpp, vLLM, PyTorch and LiteRT; BFCL 0.860 with the default, 19 replies cut off at 512
+  tokens (`benchmarks/runs/2026-11-04-accuracy-3050oem`).
 - **Drafter:** `--mtp-model` takes Google's QAT assistant as bf16 safetensors (`MTP_MODEL`, empty = none).
 
 ## Commands
