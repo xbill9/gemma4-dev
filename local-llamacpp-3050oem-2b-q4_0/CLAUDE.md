@@ -151,6 +151,11 @@ layout there (shared 0.49–0.53x at 32 requests, time to first token up to 2x) 
 This build scored suite 0.683 (E2B bf16 on TPU: 0.683), GSM8K 0.898 (bf16: 0.910),
 BFCL 0.925 (bf16: 0.927). E4B is +4.8 suite and +3.5 GSM8K points, level on BFCL.
 
+**The whole card makes it no faster under load** (`benchmarks/runs/2026-11-04-fullcard-3050oem/`): the
+2026-11-03 sweeps ran without `-ot` (2,621 MiB). With `-ot` and `-ub 2048 -b 2048` (4,257 MiB) 1–64 requests
+are 0.996–1.024x those, and the drafter slows to 0.39–0.92x; `-kvu` gives 0.56–0.71x at 64. The limit is time
+per generated token (110 ms at 64 requests on 512/128, SGLang 33 ms on the same card).
+
 **Not measured:** a `sweep.py` context sweep, `GGML_CUDA_FORCE_MMQ`, and a CPU-only arm here.
 
 ## Inherited and still true here
