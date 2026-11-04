@@ -6,6 +6,9 @@ Arms (one server each, started and stopped here, card cooled to <= COOL_C before
     vllm, vllm-d4       vLLM 0.33.0, local-vllm-3050oem-2b-q4w4a16emb4 serve.py; -d4 = W4A16 drafter, 4 tokens
     llama, llama-d2     llama.cpp, local-llamacpp-3050oem-2b-q4_0 tpu.env serving flags at -c 8192 --parallel 4;
                         -d2 = exact Q4_0 drafter, 2 tokens (the rig's serving setting)
+    mistralrs, mistralrs-dN
+                        mistral.rs v0.9.5, local-mistralrs-3050oem-2b-q4_0 serve.py (4 requests, 8,192-token cache);
+                        -dN = Google's QAT assistant (bf16 safetensors), N drafted tokens, 4,096-token cache
     pytorch             local-pytorch-3050oem-2b-q4w4a16 openai_server.py (greedy only, no streaming)
     litert-q4, litert-int248, litert-int248-d
                         litert-lm serve 0.19.0: this paper's exact Q4_0 build, Google's int248 file, and
@@ -37,6 +40,9 @@ ROOT = os.path.expanduser("~/gemma4-dev")
 VRIG = os.path.join(ROOT, "local-vllm-3050oem-2b-q4w4a16emb4")
 LRIG = os.path.join(ROOT, "local-llamacpp-3050oem-2b-q4_0")
 PRIG = os.path.join(ROOT, "local-pytorch-3050oem-2b-q4w4a16")
+MRIG = os.path.join(ROOT, "local-mistralrs-3050oem-2b-q4_0")
+MTP = ("/home/xbill/.cache/huggingface/hub/models--google--gemma-4-E2B-it-qat-q4_0-unquantized-assistant/"
+       "snapshots/ebc7e1a211354561464cb82ed6d886792138dcb6")
 PROMPTS = {
     "code": "Write a Python function that checks whether a number is prime, with a docstring and two doctests.",
     "chat": "I just moved to a new city and feel a bit lonely. Any advice?",
@@ -81,6 +87,14 @@ def server(arm):
         if arm == "llama-d2":
             cmd += ["-md", v["SPEC_DRAFT_MODEL"], "--spec-type", "draft-mtp", "-ngld", "all", "--spec-draft-n-max", "2"]
         return cmd, env, "http://127.0.0.1:8099", v["MODEL_NAME"], "/health", True
+    if arm.startswith("mistralrs"):
+        v = load_env(os.path.join(MRIG, "tpu.env"))
+        env["MTP_MODEL"] = ""
+        if arm.startswith("mistralrs-d"):
+            # the drafter fits beside 4 requests with a 4,096-token cache, not 8,192
+            env.update(MTP_MODEL=MTP, MTP_N_PREDICT=arm[len("mistralrs-d"):], KV_CACHE="4096tokens",
+                       MAX_MODEL_LEN="4096")
+        return ["python3", os.path.join(MRIG, "serve.py")], env, v["ENDPOINT"], "default", "/health", True
     if arm == "pytorch":
         return (["python3", os.path.join(PRIG, "openai_server.py"), "--port", "8100", "--max-ctx", "8192"], env,
                 "http://127.0.0.1:8100", "google/gemma-4-E2B-it", "/health", False)
@@ -101,6 +115,8 @@ def body(model, prompt, stream):
     b = {"model": model, "messages": [{"role": "user", "content": prompt}], "max_tokens": 256,
          "max_completion_tokens": 256, "temperature": 0, "chat_template_kwargs": {"enable_thinking": False},
          "cache_prompt": False}
+    if model == "default":  # mistral.rs: max_completion_tokens is an alias of max_tokens and both is a 400
+        del b["max_completion_tokens"]
     if stream:
         b.update(stream=True, stream_options={"include_usage": True})
     return json.dumps(b).encode()
@@ -168,8 +184,14 @@ for arm in ARMLIST.split(","):
     if srv.poll() is not None:
         print(f"{arm}: server exited, see server-{arm}.log", flush=True)
         continue
+    # mistral.rs answers /health before it admits requests (503 service_unavailable): ready = first reply
+    for _ in range(300):
+        try:
+            e2e(url, model, "Hello")  # warm-up
+            break
+        except Exception:
+            time.sleep(2)
     ready_s = round(time.time() - t_start, 1)
-    e2e(url, model, "Hello")  # warm-up
     if streams:
         stream(url, model, "Hello")
     mem = gpu()

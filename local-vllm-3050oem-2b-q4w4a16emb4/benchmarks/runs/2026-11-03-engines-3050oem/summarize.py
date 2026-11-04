@@ -3,6 +3,7 @@ end-to-end tok/s (non-streaming, all engines), stream decode tok/s and TTFT; the
 requests at once and its ratio to one request end-to-end; GPU memory after warm-up; greedy repeatability
 (prompts whose three e2e replies are identical) and ratio to llama.cpp without a drafter."""
 
+import sys
 import json
 import math
 import os
@@ -10,7 +11,7 @@ import statistics
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-rows = [json.loads(x) for x in open(os.path.join(HERE, "results.jsonl"))]
+rows = [json.loads(x) for x in open(os.path.join(sys.argv[1] if len(sys.argv) > 1 else HERE, "results.jsonl"))]
 seen, uniq = set(), []
 for r in rows:  # engines.py printed and wrote each row once; guard against a doubled line
     k = (r["arm"], r["kind"], r.get("prompt"), r["rep"])
