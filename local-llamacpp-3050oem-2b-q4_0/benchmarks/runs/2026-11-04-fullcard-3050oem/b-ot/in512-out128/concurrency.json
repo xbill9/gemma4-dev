@@ -1,0 +1,110 @@
+{
+  "rig": null,
+  "attestation": {
+    "serving": true,
+    "port": 8080,
+    "pid": 967468,
+    "exe": "/home/xbill/llama.cpp/build/bin/llama-server",
+    "exe_sha256": "8817f80f51b62cb9a12fd90afb9993c08f329ad3e833094e3fda948d056a225f",
+    "device": "gpu",
+    "gpu_libs": [
+      "ggml-cuda",
+      "libcublas",
+      "libcuda",
+      "libcudart"
+    ],
+    "n_gpu_layers": 99,
+    "cuda_visible_devices": "0",
+    "model_arg": "/home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf",
+    "threads": "6",
+    "threads_batch": "12",
+    "ctx_size": "65536",
+    "argv": [
+      "/home/xbill/llama.cpp/build/bin/llama-server",
+      "-m",
+      "/home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "99",
+      "-c",
+      "65536",
+      "--parallel",
+      "64",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "6",
+      "-tb",
+      "12",
+      "--reasoning",
+      "off",
+      "--metrics",
+      "-ot",
+      "per_layer_token_embd.weight=CUDA0"
+    ]
+  },
+  "device": "gpu",
+  "build_id": null,
+  "model": "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf",
+  "health": {
+    "status": "ok"
+  },
+  "mode": "concurrency",
+  "shape": {
+    "input": 512,
+    "output": 128
+  },
+  "prompt_mode": "unique",
+  "concurrency": [
+    {
+      "concurrency": 8,
+      "status": "ok",
+      "requests": 8,
+      "requests_ok": 8,
+      "output_tokens_total": 1024,
+      "output_tokens_per_second": 239.06,
+      "duration_s": 4.283,
+      "ttft_ms_median": 1217.34,
+      "ttft_ms_p99": 1231.59,
+      "tpot_ms_median": 24.613,
+      "per_stream_tps_median": 40.629,
+      "repeats": 3,
+      "output_tps_min": 237.664,
+      "output_tps_max": 241.654,
+      "output_tps_spread_pct": 1.7
+    },
+    {
+      "concurrency": 64,
+      "status": "ok",
+      "requests": 64,
+      "requests_ok": 64,
+      "output_tokens_total": 8192,
+      "output_tokens_per_second": 372.442,
+      "duration_s": 21.995,
+      "ttft_ms_median": 8034.42,
+      "ttft_ms_p99": 10579.82,
+      "tpot_ms_median": 110.0,
+      "per_stream_tps_median": 9.094,
+      "repeats": 3,
+      "output_tps_min": 371.858,
+      "output_tps_max": 382.067,
+      "output_tps_spread_pct": 2.7
+    }
+  ],
+  "summary": {
+    "levels": [
+      8,
+      64
+    ],
+    "peak_output_tokens_per_second": 372.442,
+    "peak_at_concurrency": 64,
+    "scaling_1_to_peak": null
+  }
+}

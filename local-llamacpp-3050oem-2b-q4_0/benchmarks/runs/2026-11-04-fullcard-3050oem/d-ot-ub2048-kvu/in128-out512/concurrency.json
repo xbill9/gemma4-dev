@@ -1,0 +1,115 @@
+{
+  "rig": null,
+  "attestation": {
+    "serving": true,
+    "port": 8080,
+    "pid": 970014,
+    "exe": "/home/xbill/llama.cpp/build/bin/llama-server",
+    "exe_sha256": "8817f80f51b62cb9a12fd90afb9993c08f329ad3e833094e3fda948d056a225f",
+    "device": "gpu",
+    "gpu_libs": [
+      "ggml-cuda",
+      "libcublas",
+      "libcuda",
+      "libcudart"
+    ],
+    "n_gpu_layers": 99,
+    "cuda_visible_devices": "0",
+    "model_arg": "/home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf",
+    "threads": "6",
+    "threads_batch": "12",
+    "ctx_size": "65536",
+    "argv": [
+      "/home/xbill/llama.cpp/build/bin/llama-server",
+      "-m",
+      "/home/xbill/models/gemma-4-E2B-it-qat-q4_0-exact-v2/gemma-4-E2B-it-q4_0-exact.gguf",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8080",
+      "-ngl",
+      "99",
+      "-c",
+      "65536",
+      "--parallel",
+      "64",
+      "-ctk",
+      "f16",
+      "-ctv",
+      "f16",
+      "-fa",
+      "1",
+      "-t",
+      "6",
+      "-tb",
+      "12",
+      "--reasoning",
+      "off",
+      "--metrics",
+      "-ot",
+      "per_layer_token_embd.weight=CUDA0",
+      "-ub",
+      "2048",
+      "-b",
+      "2048",
+      "-kvu"
+    ]
+  },
+  "device": "gpu",
+  "build_id": null,
+  "model": "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf",
+  "health": {
+    "status": "ok"
+  },
+  "mode": "concurrency",
+  "shape": {
+    "input": 128,
+    "output": 512
+  },
+  "prompt_mode": "unique",
+  "concurrency": [
+    {
+      "concurrency": 8,
+      "status": "ok",
+      "requests": 8,
+      "requests_ok": 8,
+      "output_tokens_total": 3518,
+      "output_tokens_per_second": 287.726,
+      "duration_s": 12.227,
+      "ttft_ms_median": 1044.29,
+      "ttft_ms_p99": 1047.24,
+      "tpot_ms_median": 25.675,
+      "per_stream_tps_median": 38.948,
+      "repeats": 3,
+      "output_tps_min": 286.37,
+      "output_tps_max": 309.767,
+      "output_tps_spread_pct": 8.2
+    },
+    {
+      "concurrency": 64,
+      "status": "ok",
+      "requests": 64,
+      "requests_ok": 64,
+      "output_tokens_total": 28134,
+      "output_tokens_per_second": 442.597,
+      "duration_s": 63.566,
+      "ttft_ms_median": 8829.38,
+      "ttft_ms_p99": 9058.4,
+      "tpot_ms_median": 125.671,
+      "per_stream_tps_median": 7.957,
+      "repeats": 3,
+      "output_tps_min": 440.58,
+      "output_tps_max": 473.112,
+      "output_tps_spread_pct": 7.4
+    }
+  ],
+  "summary": {
+    "levels": [
+      8,
+      64
+    ],
+    "peak_output_tokens_per_second": 442.597,
+    "peak_at_concurrency": 64,
+    "scaling_1_to_peak": null
+  }
+}
