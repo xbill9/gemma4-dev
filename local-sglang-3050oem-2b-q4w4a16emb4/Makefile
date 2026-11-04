@@ -30,6 +30,8 @@ install:
 	$(PIP) --no-deps $(WHEELDIR)/$(WHEEL314)
 	$(PIP) --no-deps $(MISSING)
 	$(PIP) ipython pycparser
+	patch -N -p1 -d $(HOME)/.local/lib/python3.14/site-packages < patches/text-config-per-layer.diff || true
+	patch -N -p1 -d $(HOME)/.local/lib/python3.14/site-packages < patches/int4-embeddings.diff || true
 
 command:
 	@python3 serve.py --print

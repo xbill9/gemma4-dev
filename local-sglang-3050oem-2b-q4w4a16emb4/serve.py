@@ -56,6 +56,8 @@ def command(env: Dict[str, str]) -> List[str]:
         cmd += ["--reasoning-parser", env["REASONING_PARSER"]]
     if env.get("DISABLE_RADIX_CACHE", "").lower() == "true":
         cmd.append("--disable-radix-cache")
+    if env.get("DISABLE_PREFILL_CUDA_GRAPH", "").lower() == "true":
+        cmd.append("--disable-prefill-cuda-graph")
     if env.get("SPECULATIVE_MODEL"):
         steps = int(env["SPECULATIVE_NUM_STEPS"])
         cmd += ["--speculative-algorithm", "NEXTN", "--speculative-draft-model-path", env["SPECULATIVE_MODEL"],

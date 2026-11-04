@@ -21,6 +21,21 @@ rigs; they do not run beside each other.
 - **Its five Rust extensions are cp313 builds** (`srt/rust_extensions/*`, `rust_tree_core`) and do not load
   on 3.14; they serve gRPC, the Rust server, some multimodal processors and the unified radix tree, none
   of which the HTTP path here uses.
+- **Two patches to the installed SGLang** (`patches/`, applied by `make install`; originals restore with
+  `patch -R`):
+  - `text-config-per-layer.diff` (`srt/utils/hf_transformers/config.py`): the Gemma 4 attention shim ran
+    only for multimodal configs, and this text-only checkpoint's config is `gemma4_text`, so model load
+    raised `AmbiguousGlobalPerLayerAttributeError` on `head_dim` (sliding layers 256 wide, full 512).
+    The heterogeneity code is the same in transformers 5.16.1 and 5.19, so the older transformers is not
+    the cause.
+  - `int4-embeddings.diff` (`srt/models/gemma4_causal.py`): SGLang 0.5.23 quantizes the int4 `lm_head`
+    from compressed-tensors but not `embed_tokens` or `embed_tokens_per_layer`; it allocated them as bf16
+    and left them uninitialized (6.93 GB of weights, no room for the cache). The patch keeps both tables
+    packed on the card and unpacks only the gathered rows: weights 3.25 GB. A dense table is built only if
+    something asks for `.weight` (the drafter's shared embedding), 768 MiB bf16.
+- **Decode CUDA graphs only** (`DISABLE_PREFILL_CUDA_GRAPH=true`): prefill graph capture refuses the 20
+  KV-shared layers, which reuse an earlier layer's attention id. Decode capture takes about 6 minutes per
+  start (graphs for 1, 2, 4 and 8 requests).
 - **Port 8030.** Radix (prefix) cache off. Drafter: `SPECULATIVE_MODEL` (Google's assistant), served as
   `--speculative-algorithm NEXTN`, which SGLang promotes to `FROZEN_KV_MTP` for
   `Gemma4AssistantForCausalLM`.
