@@ -127,7 +127,8 @@ def server(arm):
         spec = "on" if arm.endswith("-d") else "off"
         json.dump({"models": {mid: {"backend": "gpu", "cache": "disk", "speculative_decoding": spec}}}, open(cfg, "w"))
         env["LITERT_LM_DIR"] = r["LITERT_LM_DIR"]
-        return (["litert-lm", "serve", "--config", cfg, "--host", "127.0.0.1", "--port", "9399"], env,
+        litert = os.path.join(os.path.expanduser("~"), ".local/bin/litert-lm")  # pip --user script dir
+        return ([litert, "serve", "--config", cfg, "--host", "127.0.0.1", "--port", "9399"], env,
                 "http://127.0.0.1:9399", mid, "/v1/models", True)
     raise SystemExit(f"unknown arm {arm}")
 

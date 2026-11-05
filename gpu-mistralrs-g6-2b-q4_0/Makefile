@@ -23,7 +23,7 @@ help:
 	@echo "  make status | query | test | lint"
 
 deps:
-	apt-get -o DPkg::Lock::Timeout=600 install -y build-essential pkg-config libssl-dev git
+	apt-get -o DPkg::Lock::Timeout=600 install -y build-essential pkg-config libssl-dev git libcurand-dev-13-1
 
 rust:
 	test -x $(CARGO) || (curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal)

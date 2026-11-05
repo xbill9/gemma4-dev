@@ -4,6 +4,8 @@
 # from tpu.env, exported to every recipe; override one on the make command line.
 include tpu.env
 export
+# pip --user puts the litert-lm script in ~/.local/bin, not on root's PATH under SSM.
+export PATH := $(HOME)/.local/bin:$(PATH)
 
 CONFIG := run/config.json
 PIP = $(PYTHON) -m pip install --user --break-system-packages
