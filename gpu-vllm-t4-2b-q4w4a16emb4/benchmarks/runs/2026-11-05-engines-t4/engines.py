@@ -3,17 +3,18 @@
     python3 engines.py OUT_DIR ARM[,ARM...]
 
 Arms (one server each, started and stopped here, card cooled to <= COOL_C before each):
-    vllm, vllm-d4       vLLM 0.33.0, gpu-vllm-t4-2b-q4w4a16emb4 serve.py; -d4 = W4A16 drafter, 4 tokens
-    llama, llama-d2     llama.cpp, gpu-llamacpp-t4-2b-q4_0 tpu.env serving flags at -c 8192 --parallel 4;
-                        -d2 = exact Q4_0 drafter, 2 tokens (the rig's serving setting)
+    vllm, vllm-dN       vLLM 0.33.0, gpu-vllm-t4-2b-q4w4a16emb4 serve.py; -dN = W4A16 drafter, N tokens
+    llama, llama-dN     llama.cpp, gpu-llamacpp-t4-2b-q4_0 tpu.env serving flags at -c 8192 --parallel 4;
+                        -dN = exact Q4_0 drafter, N tokens
     mistralrs, mistralrs-dN
                         mistral.rs v0.9.5, gpu-mistralrs-t4-2b-q4_0 serve.py (4 requests, 8,192-token cache);
                         -dN = Google's QAT assistant (bf16 safetensors), N drafted tokens, 4,096-token cache
-    sglang, sglang-dN   SGLang 0.5.23, gpu-sglang-t4-2b-q4_0 serve.py; -dN = W4A16 drafter, N tokens
+    sglang, sglang-dN   SGLang 0.5.23, gpu-sglang-t4-2b-q4_0 serve.py (QAT grid in float16);
+                        -dN = Google's QAT drafter in float16, N tokens
     pytorch             gpu-pytorch-t4-2b-q4w4a16 openai_server.py (greedy only, no streaming)
     litert-q4, litert-int248, litert-int248-d
-                        litert-lm serve 0.19.0: this paper's exact Q4_0 build, Google's int248 file, and
-                        Google's file with its built-in drafter on
+                        litert-lm serve 0.19.0: the 3050 paper's exact Q4_0 build (not on this host: it needs
+                        ~45 GB of RAM to convert), Google's int248 file, and Google's file with its drafter on
 
 Requests: the six prompts of the 2026-10-13/14 and 2026-11-02/03 drafter runs, greedy, thinking off,
 256 tokens (max_completion_tokens as well, which LiteRT needs), prompt cache off on llama.cpp.
@@ -35,7 +36,6 @@ import threading
 import time
 import urllib.request
 
-OUT, ARMLIST = sys.argv[1:3]
 COOL_C = int(os.environ.get("COOL_C", "50"))
 ROOT = os.path.expanduser("~/gemma4-dev")
 VRIG = os.path.join(ROOT, "gpu-vllm-t4-2b-q4w4a16emb4")
@@ -81,17 +81,18 @@ def server(arm):
     if arm.startswith("vllm"):
         v = load_env(os.path.join(VRIG, "tpu.env"))
         env["SPECULATIVE_MODEL"] = ""
-        if arm == "vllm-d4":
+        if arm.startswith("vllm-d"):  # W4A16 drafter, N drafted tokens
             env.update(SPECULATIVE_MODEL="/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-assistant",
-                       NUM_SPECULATIVE_TOKENS="4")
+                       NUM_SPECULATIVE_TOKENS=arm[len("vllm-d"):])
         return [PY, os.path.join(VRIG, "serve.py")], env, v["ENDPOINT"], v["MODEL_NAME"], "/health", True
     if arm.startswith("llama"):
         v = load_env(os.path.join(LRIG, "tpu.env"))
         cmd = [v["LLAMA_SERVER_BIN"], "-m", v["MODEL_PATH"], "--host", "127.0.0.1", "--port", "8099", "-ngl", "99",
-               "-c", "8192", "--parallel", "4", "-ctk", "f16", "-ctv", "f16", "-fa", "1", "-t", "2", "-tb", "2",
+               "-c", os.environ.get("LLAMA_CTX", "8192"), "--parallel", os.environ.get("LLAMA_PARALLEL", "4"), "-ctk", "f16", "-ctv", "f16", "-fa", "1", "-t", "2", "-tb", "2",
                "--reasoning", "off", "-ot", v["OVERRIDE_TENSORS"], "--metrics"]
-        if arm == "llama-d2":
-            cmd += ["-md", v["SPEC_DRAFT_MODEL"], "--spec-type", "draft-mtp", "-ngld", "all", "--spec-draft-n-max", "2"]
+        if arm.startswith("llama-d"):  # exact Q4_0 drafter, N drafted tokens
+            cmd += ["-md", v["SPEC_DRAFT_MODEL"], "--spec-type", "draft-mtp", "-ngld", "all", "--spec-draft-n-max",
+                    arm[len("llama-d"):]]
         return cmd, env, "http://127.0.0.1:8099", v["MODEL_NAME"], "/health", True
     if arm.startswith("mistralrs"):
         v = load_env(os.path.join(MRIG, "tpu.env"))
@@ -104,9 +105,9 @@ def server(arm):
     if arm.startswith("sglang"):
         v = load_env(os.path.join(SRIG, "tpu.env"))
         env["SPECULATIVE_MODEL"] = ""
-        if arm.startswith("sglang-d"):  # W4A16 drafter (vLLM's best), N drafted tokens
-            env.update(SPECULATIVE_MODEL="/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-assistant",
-                       SPECULATIVE_NUM_STEPS=arm[len("sglang-d"):])
+        if arm.startswith("sglang-d"):  # Google's QAT drafter (bf16 on its grid, served float16): SGLang's
+            # W4A16 path is empty below sm_80, so the 3050's W4A16 drafter cannot run on the T4
+            env.update(SPECULATIVE_MODEL=MTP, SPECULATIVE_NUM_STEPS=arm[len("sglang-d"):])
         return [PY, os.path.join(SRIG, "serve.py")], env, v["ENDPOINT"], v["MODEL_NAME"], "/health", True
     if arm == "pytorch":
         return ([PY, os.path.join(PRIG, "openai_server.py"), "--port", "8100", "--max-ctx", "8192"], env,
@@ -171,8 +172,8 @@ def stream(url, model, prompt):
     return n, tps, (stamps[0] - t0) if stamps else 0.0, "".join(text)
 
 
-os.makedirs(OUT, exist_ok=True)
-out = open(os.path.join(OUT, "results.jsonl"), "a")
+out = None
+OUT = "."
 
 
 def emit(rec):
@@ -181,63 +182,72 @@ def emit(rec):
     print(json.dumps(rec), flush=True)
 
 
-for arm in ARMLIST.split(","):
-    cmd, env, url, model, health, streams = server(arm)
-    while int(gpu().split(",")[0]) > COOL_C:
-        time.sleep(5)
-    log = open(os.path.join(OUT, f"server-{arm}.log"), "w")
-    t_start = time.time()
-    srv = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env, start_new_session=True)
-    while srv.poll() is None:
-        try:
-            urllib.request.urlopen(url + health, timeout=2)
-            break
-        except Exception:
-            time.sleep(2)
-    if srv.poll() is not None:
-        print(f"{arm}: server exited, see server-{arm}.log", flush=True)
-        continue
-    # mistral.rs answers /health before it admits requests (503 service_unavailable): ready = first reply
-    for _ in range(300):
-        try:
-            e2e(url, model, "Hello")  # warm-up
-            break
-        except Exception:
-            time.sleep(2)
-    ready_s = round(time.time() - t_start, 1)
-    if streams:
-        stream(url, model, "Hello")
-    mem = gpu()
-    base = {"arm": arm, "gpu": mem, "ready_s": ready_s}
-    for name, prompt in PROMPTS.items():
-        for rep in range(REPEATS):
-            n, w, text = e2e(url, model, prompt)
-            emit(dict(base, kind="e2e", prompt=name, rep=rep, tokens=n, wall_s=w, tps=n / w,
-                      sha=hashlib.sha256(text.encode()).hexdigest()[:16]))
-    if streams:
+def main():
+    global out, OUT
+    OUT, ARMLIST = sys.argv[1:3]
+    os.makedirs(OUT, exist_ok=True)
+    out = open(os.path.join(OUT, "results.jsonl"), "a")
+    for arm in ARMLIST.split(","):
+        cmd, env, url, model, health, streams = server(arm)
+        while float(gpu().split(",")[0]) > COOL_C:
+            time.sleep(5)
+        log = open(os.path.join(OUT, f"server-{arm}.log"), "w")
+        t_start = time.time()
+        srv = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=env, start_new_session=True)
+        while srv.poll() is None:
+            try:
+                urllib.request.urlopen(url + health, timeout=2)
+                break
+            except Exception:
+                time.sleep(2)
+        if srv.poll() is not None:
+            print(f"{arm}: server exited, see server-{arm}.log", flush=True)
+            continue
+        # mistral.rs answers /health before it admits requests (503 service_unavailable): ready = first reply
+        for _ in range(300):
+            try:
+                e2e(url, model, "Hello")  # warm-up
+                break
+            except Exception:
+                time.sleep(2)
+        ready_s = round(time.time() - t_start, 1)
+        if streams:
+            stream(url, model, "Hello")
+        mem = gpu()
+        base = {"arm": arm, "gpu": mem, "ready_s": ready_s}
         for name, prompt in PROMPTS.items():
             for rep in range(REPEATS):
-                n, tps, ttft, text = stream(url, model, prompt)
-                emit(dict(base, kind="stream", prompt=name, rep=rep, tokens=n, tps=tps, ttft_s=ttft,
+                n, w, text = e2e(url, model, prompt)
+                emit(dict(base, kind="e2e", prompt=name, rep=rep, tokens=n, wall_s=w, tps=n / w,
                           sha=hashlib.sha256(text.encode()).hexdigest()[:16]))
-    four = list(PROMPTS.values())[:4]
-    for rep in range(REPEATS):
-        res = [None] * 4
+        if streams:
+            for name, prompt in PROMPTS.items():
+                for rep in range(REPEATS):
+                    n, tps, ttft, text = stream(url, model, prompt)
+                    emit(dict(base, kind="stream", prompt=name, rep=rep, tokens=n, tps=tps, ttft_s=ttft,
+                              sha=hashlib.sha256(text.encode()).hexdigest()[:16]))
+        four = list(PROMPTS.values())[:4]
+        for rep in range(REPEATS):
+            res = [None] * 4
 
-        def go(i):
-            res[i] = e2e(url, model, four[i])
+            def go(i):
+                res[i] = e2e(url, model, four[i])
 
-        ts = [threading.Thread(target=go, args=(i,)) for i in range(4)]
-        t0 = time.perf_counter()
-        for t in ts:
-            t.start()
-        for t in ts:
-            t.join()
-        w = time.perf_counter() - t0
-        tok = sum(r[0] for r in res if r)
-        emit(dict(base, kind="batch4", rep=rep, tokens=tok, wall_s=w, tps=tok / w, ok=sum(r is not None for r in res)))
-    os.killpg(srv.pid, signal.SIGTERM)
-    srv.wait()
-    log.close()
-    while int(gpu().split(",")[2].split()[0]) > 100:
-        time.sleep(2)
+            ts = [threading.Thread(target=go, args=(i,)) for i in range(4)]
+            t0 = time.perf_counter()
+            for t in ts:
+                t.start()
+            for t in ts:
+                t.join()
+            w = time.perf_counter() - t0
+            tok = sum(r[0] for r in res if r)
+            emit(dict(base, kind="batch4", rep=rep, tokens=tok, wall_s=w, tps=tok / w, ok=sum(r is not None for r in res)))
+        os.killpg(srv.pid, signal.SIGTERM)
+        srv.wait()
+        log.close()
+        while int(gpu().split(",")[2].split()[0]) > 100:
+            time.sleep(2)
+
+
+if __name__ == "__main__":
+    main()

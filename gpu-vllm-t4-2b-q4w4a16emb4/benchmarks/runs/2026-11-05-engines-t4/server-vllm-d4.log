@@ -1,0 +1,728 @@
+W1105 19:02:11.610000 47947 torch/_opaque_base.py:6] torch._opaque_base is deprecated, use torch._custom_class_base instead
+W1105 19:02:11.611000 47947 torch/_library/opaque_object.py:288] register_opaque_type is deprecated, use register_custom_class instead
+W1105 19:02:11.612000 47947 torch/_library/opaque_object.py:211] typ='value' is deprecated, use typ='constant' instead
+(APIServer pid=47947) INFO 11-05 19:02:20 [startup.py:38] 
+(APIServer pid=47947) INFO 11-05 19:02:20 [startup.py:38]        █     █     █▄   ▄█
+(APIServer pid=47947) INFO 11-05 19:02:20 [startup.py:38]  ▄▄ ▄█ █     █     █ ▀▄▀ █  version 0.33.0
+(APIServer pid=47947) INFO 11-05 19:02:20 [startup.py:38]   █▄█▀ █     █     █     █  model   xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4
+(APIServer pid=47947) INFO 11-05 19:02:20 [startup.py:38]    ▀▀  ▀▀▀▀▀ ▀▀▀▀▀ ▀     ▀
+(APIServer pid=47947) INFO 11-05 19:02:20 [startup.py:38] 
+(APIServer pid=47947) INFO 11-05 19:02:20 [startup.py:96] non-default args: {'model_tag': 'xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', 'enable_auto_tool_choice': True, 'tool_call_parser': 'gemma4', 'host': '127.0.0.1', 'port': 8010, 'model': 'xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', 'dtype': 'float16', 'revision': 'db715f83da4f13289761d7c45f4d19ceac84695d', 'max_model_len': 16384, 'reasoning_parser': 'gemma4', 'gpu_memory_utilization': 0.85, 'language_model_only': True, 'max_num_seqs': 64, 'speculative_config': {'model': '/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-assistant', 'num_speculative_tokens': 4}}
+(APIServer pid=47947) INFO 11-05 19:02:20 [model.py:744] Resolved architecture: Gemma4ForCausalLM
+(APIServer pid=47947) WARNING 11-05 19:02:20 [model.py:2516] Casting torch.bfloat16 to torch.float16.
+(APIServer pid=47947) INFO 11-05 19:02:20 [model.py:2170] Using max model len 16384
+(APIServer pid=47947) INFO 11-05 19:02:24 [model.py:744] Resolved architecture: Gemma4MTPModel
+(APIServer pid=47947) WARNING 11-05 19:02:24 [model.py:2516] Casting torch.bfloat16 to torch.float16.
+(APIServer pid=47947) INFO 11-05 19:02:24 [model.py:2170] Using max model len 131072
+(APIServer pid=47947) WARNING 11-05 19:02:24 [speculative.py:1491] Enabling num_speculative_tokens > 1 will run multiple times of forward on same MTP layer,which may result in lower acceptance rate
+(APIServer pid=47947) INFO 11-05 19:02:24 [speculative.py:1799] Overriding draft model max model len from 131072 to 16384
+(APIServer pid=47947) INFO 11-05 19:02:24 [config.py:364] Gemma4 model has heterogeneous head dimensions {'sliding_attention': 256, 'full_attention': 512}. FA4 not available, forcing TRITON_ATTN backend.
+(APIServer pid=47947) INFO 11-05 19:02:24 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=47947) WARNING 11-05 19:02:24 [vllm.py:2360] max_num_scheduled_tokens is set to 2048 based on the speculative decoding settings. This may lead to suboptimal performance. Consider increasing max_num_batched_tokens to accommodate the additional draft token slots, or decrease num_speculative_tokens.
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 829.92it/s]
+W1105 19:02:43.445000 48157 torch/_opaque_base.py:6] torch._opaque_base is deprecated, use torch._custom_class_base instead
+W1105 19:02:43.446000 48157 torch/_library/opaque_object.py:288] register_opaque_type is deprecated, use register_custom_class instead
+W1105 19:02:43.446000 48157 torch/_library/opaque_object.py:211] typ='value' is deprecated, use typ='constant' instead
+(EngineCore pid=48157) INFO 11-05 19:02:50 [core.py:139] Initializing a V1 LLM engine (v0.33.0) with config: model='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', speculative_config=SpeculativeConfig(method='mtp', model='/opt1/models/gemma-4-E2B-it-qat-q4_0-w4a16-ct-assistant', num_spec_tokens=4), tokenizer='xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4', skip_tokenizer_init=False, tokenizer_mode=auto, revision=db715f83da4f13289761d7c45f4d19ceac84695d, tokenizer_revision=db715f83da4f13289761d7c45f4d19ceac84695d, trust_remote_code=False, dtype=torch.float16, max_seq_len=16384, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, decode_context_parallel_size=1, dcp_comm_backend=ag_rs, disable_custom_all_reduce=False, quantization=compressed-tensors, quantization_config=None, enforce_eager=False, aux_output_config=AuxOutputConfig(enable_return_routed_experts=False, max_bytes=None), kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='gemma4', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, per_request_spec_decode_metrics='none', kv_cache_metrics=False, kv_cache_metrics_sample=0.01, custom_histogram_buckets=None, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False, jit_monitor_mode='warn', jit_monitor_verbose=False), seed=0, served_model_name=xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'mode': <CompilationMode.VLLM_COMPILE: 3>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['none'], 'ir_enable_torch_wrap': True, 'splitting_ops': ['vllm::unified_attention_with_output', 'vllm::unified_mla_attention_with_output', 'vllm::mamba_mixer2', 'vllm::mamba_mixer', 'vllm::short_conv', 'vllm::qwen4_exp_ple_short_conv', 'vllm::qwen4_exp_qsa_with_output', 'vllm::qwen4_exp_qsa_prepare_with_output', 'vllm::linear_attention', 'vllm::qwen_gdn_attention_core', 'vllm::qwen_gdn_attention_core_fused_norm_packed', 'vllm::gdn_attention_core_xpu', 'vllm::olmo_hybrid_gdn_full_forward', 'vllm::sparse_attn_indexer', 'vllm::rocm_aiter_sparse_attn_indexer', 'vllm::deepseek_v4_attention', 'vllm::hpc_rope_norm_forward', 'vllm::unified_kv_cache_update', 'vllm::unified_mla_kv_cache_update'], 'compile_mm_encoder': False, 'cudagraph_mm_encoder': False, 'encoder_cudagraph_token_budgets': [], 'encoder_cudagraph_max_vision_items_per_batch': 0, 'encoder_cudagraph_max_frames_per_batch': None, 'cudagraph_decoder_replay': True, 'decoder_replay_cudagraph_capture_sizes': [], 'decoder_replay_trim_threshold': 768, 'compile_sizes': [], 'compile_ranges_endpoints': [2048], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.FULL_AND_PIECEWISE: (2, 1)>, 'cudagraph_num_of_warmups': 1, 'cudagraph_capture_sizes': [1, 2, 4, 5, 8, 10, 16, 20, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 280, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'fuse_allreduce_rms': False, 'enable_qk_norm_rope_fusion': False, 'fuse_rope_kvcache_cat_mla': False, 'fuse_act_padding': False, 'fuse_qk_norm_rope_kvcache': False}, 'max_cudagraph_capture_size': 512, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': False, 'static_all_moe_layers': []}, kernel_config=KernelConfig(ir_op_priority=IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native']), enable_flashinfer_autotune=True, enable_rocm_segmented_attn_autotune=False, enable_cutedsl_warmup=True, enable_jit_warmup=True, monokernel=False, moe_backend='auto', sparse_indexer_topk_backend='auto', linear_backend='auto', linear_backend_per_quant=None)
+(EngineCore pid=48157) INFO 11-05 19:02:52 [parallel_state.py:1929] world_size=1 rank=0 local_rank=0 distributed_init_method=file:///opt1/tmp/vllm_dist_07ee5b7359234bb489666625154fec1e backend=nccl
+(EngineCore pid=48157) INFO 11-05 19:02:52 [parallel_state.py:2385] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, PCP rank 0, TP rank 0, ETP rank 0, EP rank N/A, EPLB rank N/A
+(EngineCore pid=48157) INFO 11-05 19:02:52 [gpu_worker.py:513] Using V2 Model Runner
+(EngineCore pid=48157) INFO 11-05 19:02:57 [model_runner.py:399] Loading model from scratch...
+(EngineCore pid=48157) INFO 11-05 19:02:57 [__init__.py:945] Using MarlinLinearKernel for mixed-precision linear
+(EngineCore pid=48157) INFO 11-05 19:02:57 [compressed_tensors_wNa16.py:153] Using MarlinLinearKernel for CompressedTensorsWNA16
+(EngineCore pid=48157) INFO 11-05 19:02:58 [cuda.py:448] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=48157) INFO 11-05 19:02:58 [cuda.py:448] Using AttentionBackendEnum.TRITON_ATTN backend.
+(EngineCore pid=48157) INFO 11-05 19:02:58 [base_loader.py:82] Initializing model took 1.262435 seconds
+(EngineCore pid=48157) INFO 11-05 19:02:59 [weight_utils.py:1144] Filesystem type for checkpoints: EXT4. Checkpoint size: 2.64 GiB. Available RAM: 3.23 GiB.
+(EngineCore pid=48157) INFO 11-05 19:02:59 [weight_utils.py:1167] Auto-prefetch is disabled because the filesystem (EXT4) is not a recognized network FS (NFS/Lustre). If you want to force prefetching, start vLLM with --safetensors-load-strategy=prefetch.
+Loading safetensors checkpoint shards:   0% Completed | 0/38 [00:00<?, ?it/s]
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.0.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.1.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:   5% Completed | 2/38 [00:00<00:02, 15.28it/s]
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.2.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.3.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  11% Completed | 4/38 [00:00<00:02, 14.02it/s]
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.4.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:02:59 [utils.py:333] Attempted to load weight layers.5.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  16% Completed | 6/38 [00:00<00:02, 11.74it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.6.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.7.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  21% Completed | 8/38 [00:00<00:02, 11.35it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.8.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.9.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  26% Completed | 10/38 [00:00<00:02, 10.76it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.10.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.11.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  32% Completed | 12/38 [00:01<00:02, 10.78it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.12.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.13.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  37% Completed | 14/38 [00:01<00:02, 10.79it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.self_attn.k_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.14.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.15.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.15.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:00 [utils.py:333] Attempted to load weight layers.15.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.15.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  42% Completed | 16/38 [00:01<00:02,  9.36it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.16.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  45% Completed | 17/38 [00:01<00:02,  8.54it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.17.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  47% Completed | 18/38 [00:01<00:02,  7.89it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.18.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  50% Completed | 19/38 [00:02<00:02,  7.40it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.19.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  53% Completed | 20/38 [00:02<00:02,  6.86it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.20.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  55% Completed | 21/38 [00:02<00:02,  6.65it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.21.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.21.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:01 [utils.py:333] Attempted to load weight layers.21.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.21.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  58% Completed | 22/38 [00:02<00:02,  6.51it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.22.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  61% Completed | 23/38 [00:02<00:02,  6.40it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.23.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  63% Completed | 24/38 [00:02<00:02,  6.33it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.24.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  66% Completed | 25/38 [00:03<00:02,  6.16it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.25.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  68% Completed | 26/38 [00:03<00:01,  6.14it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.26.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  71% Completed | 27/38 [00:03<00:01,  6.38it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.27.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  74% Completed | 28/38 [00:03<00:01,  6.38it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.28.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:02 [utils.py:333] Attempted to load weight layers.28.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.28.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  76% Completed | 29/38 [00:03<00:01,  6.72it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.29.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  79% Completed | 30/38 [00:03<00:01,  6.36it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.30.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  82% Completed | 31/38 [00:03<00:01,  6.27it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.31.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.32.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  87% Completed | 33/38 [00:04<00:00,  6.83it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.33.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  89% Completed | 34/38 [00:04<00:00,  7.31it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.per_layer_input_gate.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.per_layer_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.post_per_layer_input_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:03 [utils.py:333] Attempted to load weight layers.34.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:04 [utils.py:333] Attempted to load weight layers.34.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards:  92% Completed | 35/38 [00:04<00:00,  6.80it/s]
+Loading safetensors checkpoint shards:  95% Completed | 36/38 [00:06<00:01,  1.82it/s]
+Loading safetensors checkpoint shards:  97% Completed | 37/38 [00:10<00:01,  1.64s/it]
+(EngineCore pid=48157) WARNING 11-05 19:03:10 [utils.py:333] Attempted to load weight norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:10 [utils.py:333] Attempted to load weight per_layer_model_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:10 [utils.py:333] Attempted to load weight per_layer_projection_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards: 100% Completed | 38/38 [00:10<00:00,  3.59it/s]
+
+(EngineCore pid=48157) INFO 11-05 19:03:10 [default_loader.py:506] Loading weights took 10.60 seconds
+(EngineCore pid=48157) INFO 11-05 19:03:11 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(EngineCore pid=48157) WARNING 11-05 19:03:11 [vllm.py:2360] max_num_scheduled_tokens is set to 2048 based on the speculative decoding settings. This may lead to suboptimal performance. Consider increasing max_num_batched_tokens to accommodate the additional draft token slots, or decrease num_speculative_tokens.
+(EngineCore pid=48157) INFO 11-05 19:03:11 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(EngineCore pid=48157) INFO 11-05 19:03:11 [gemma4_mtp.py:505] Gemma4 MTP: centroids masking enabled (num_centroids=2048, top_k=32, active_tokens=4096/262144).
+(EngineCore pid=48157) INFO 11-05 19:03:11 [base_loader.py:82] Initializing model took 0.170095 seconds
+(EngineCore pid=48157) INFO 11-05 19:03:11 [weight_utils.py:1144] Filesystem type for checkpoints: EXT4. Checkpoint size: 0.13 GiB. Available RAM: 3.38 GiB.
+Loading safetensors checkpoint shards:   0% Completed | 0/1 [00:00<?, ?it/s]
+(EngineCore pid=48157) WARNING 11-05 19:03:11 [utils.py:333] Attempted to load weight masked_embedding.centroids.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:11 [utils.py:333] Attempted to load weight model.embed_tokens.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.0.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.1.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.2.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.input_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.layer_scalar with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.mlp.down_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.post_attention_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.post_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.pre_feedforward_layernorm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.self_attn.o_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.self_attn.q_norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.layers.3.self_attn.q_proj.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.norm.weight with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.post_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+(EngineCore pid=48157) WARNING 11-05 19:03:12 [utils.py:333] Attempted to load weight model.pre_projection.weight_scale with dtype torch.bfloat16 into parameter with dtype torch.float16
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  1.68it/s]
+Loading safetensors checkpoint shards: 100% Completed | 1/1 [00:00<00:00,  1.68it/s]
+
+(EngineCore pid=48157) INFO 11-05 19:03:12 [default_loader.py:506] Loading weights took 0.60 seconds
+(EngineCore pid=48157) INFO 11-05 19:03:13 [speculator.py:166] Gemma4 MTP: draft layer 0 (sliding_attention) -> model.layers.13.self_attn.attn
+(EngineCore pid=48157) INFO 11-05 19:03:13 [speculator.py:166] Gemma4 MTP: draft layer 1 (sliding_attention) -> model.layers.13.self_attn.attn
+(EngineCore pid=48157) INFO 11-05 19:03:13 [speculator.py:166] Gemma4 MTP: draft layer 2 (sliding_attention) -> model.layers.13.self_attn.attn
+(EngineCore pid=48157) INFO 11-05 19:03:13 [speculator.py:166] Gemma4 MTP: draft layer 3 (full_attention) -> model.layers.14.self_attn.attn
+(EngineCore pid=48157) INFO 11-05 19:03:14 [model_runner.py:428] Model loading took 2.98 GiB memory and 17.899159 seconds
+(EngineCore pid=48157) WARNING 11-05 19:03:14 [topk_topp_sampler.py:156] FlashInfer top-p/top-k sampling unavailable: unsupported compute capability 7.5; falling back. Set VLLM_USE_FLASHINFER_SAMPLER=0 to silence.
+(EngineCore pid=48157) INFO 11-05 19:03:14 [utils.py:381] Using LBNHC KV cache layout.
+(EngineCore pid=48157) INFO 11-05 19:03:18 [monitor.py:40] [backbone] Starting torch.compile
+(EngineCore pid=48157) INFO 11-05 19:03:40 [backends.py:1125] [backbone] Using cache directory: /home/xbill_glitnir_com/.cache/vllm/torch_compile_cache/6f5e40046a/rank_0_0/backbone for vLLM's torch.compile
+(EngineCore pid=48157) INFO 11-05 19:03:40 [backends.py:1187] [backbone] Dynamo bytecode transform time: 21.79 s
+(EngineCore pid=48157) INFO 11-05 19:04:09 [backends.py:417] [backbone] Compiling a graph for compile range (1, 2048) takes 27.77 s
+(EngineCore pid=48157) INFO 11-05 19:04:19 [backends.py:948] collected artifacts: 36 entries, 9 artifacts, 32439839 bytes total
+(EngineCore pid=48157) INFO 11-05 19:04:19 [decorators.py:752] [backbone] saved AOT compiled function to /home/xbill_glitnir_com/.cache/vllm/torch_compile_cache/torch_aot_compile/c03cd0d7e1edf593e3999f6cff4f08f7675ed25e60cba4cd7302005b5abc07cb/rank_0_0/model
+(EngineCore pid=48157) INFO 11-05 19:04:19 [monitor.py:62] [backbone] torch.compile took 60.66 s in total
+(EngineCore pid=48157) INFO 11-05 19:04:19 [monitor.py:91] [backbone] Initial profiling/warmup run took 0.06 s
+(EngineCore pid=48157) INFO 11-05 19:04:20 [monitor.py:40] [eagle_head] Starting torch.compile
+(EngineCore pid=48157) INFO 11-05 19:04:23 [backends.py:1125] [eagle_head] Using cache directory: /home/xbill_glitnir_com/.cache/vllm/torch_compile_cache/6f5e40046a/rank_0_0/eagle_head for vLLM's torch.compile
+(EngineCore pid=48157) INFO 11-05 19:04:23 [backends.py:1187] [eagle_head] Dynamo bytecode transform time: 3.29 s
+(EngineCore pid=48157) INFO 11-05 19:04:30 [backends.py:417] [eagle_head] Compiling a graph for compile range (1, 2048) takes 7.45 s
+(EngineCore pid=48157) INFO 11-05 19:04:31 [backends.py:948] collected artifacts: 5 entries, 4 artifacts, 8413015 bytes total
+(EngineCore pid=48157) INFO 11-05 19:04:31 [decorators.py:752] [eagle_head] saved AOT compiled function to /home/xbill_glitnir_com/.cache/vllm/torch_compile_cache/torch_aot_compile/0e339175ab02bf839fe47ab3ad2a8cbf1305be7b43e0614ab56e95755b20219d/rank_0_0/model
+(EngineCore pid=48157) INFO 11-05 19:04:31 [monitor.py:62] [eagle_head] torch.compile took 11.78 s in total
+(EngineCore pid=48157) INFO 11-05 19:04:31 [monitor.py:91] [eagle_head] Initial profiling/warmup run took 0.01 s
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/55 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/55 [00:05<05:11,  5.76s/it]Capturing CUDA graphs (PIECEWISE):   4%|▎         | 2/55 [00:05<02:11,  2.48s/it]Capturing CUDA graphs (PIECEWISE):   5%|▌         | 3/55 [00:06<01:14,  1.43s/it]Capturing CUDA graphs (PIECEWISE):   7%|▋         | 4/55 [00:06<00:47,  1.07it/s]Capturing CUDA graphs (PIECEWISE):   9%|▉         | 5/55 [00:06<00:32,  1.53it/s]Capturing CUDA graphs (PIECEWISE):  11%|█         | 6/55 [00:06<00:23,  2.06it/s]Capturing CUDA graphs (PIECEWISE):  13%|█▎        | 7/55 [00:06<00:18,  2.63it/s]Capturing CUDA graphs (PIECEWISE):  15%|█▍        | 8/55 [00:06<00:14,  3.24it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▋        | 9/55 [00:07<00:11,  3.86it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 10/55 [00:07<00:10,  4.45it/s]Capturing CUDA graphs (PIECEWISE):  20%|██        | 11/55 [00:07<00:08,  5.01it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 12/55 [00:07<00:07,  5.52it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 13/55 [00:07<00:06,  6.04it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 14/55 [00:07<00:06,  6.35it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 15/55 [00:07<00:06,  6.64it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 16/55 [00:08<00:05,  6.91it/s]Capturing CUDA graphs (PIECEWISE):  31%|███       | 17/55 [00:08<00:05,  7.16it/s]Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 18/55 [00:12<00:51,  1.39s/it]Capturing CUDA graphs (PIECEWISE):  35%|███▍      | 19/55 [00:12<00:36,  1.02s/it]Capturing CUDA graphs (PIECEWISE):  36%|███▋      | 20/55 [00:12<00:26,  1.32it/s]Capturing CUDA graphs (PIECEWISE):  38%|███▊      | 21/55 [00:12<00:19,  1.76it/s]Capturing CUDA graphs (PIECEWISE):  40%|████      | 22/55 [00:13<00:14,  2.28it/s]Capturing CUDA graphs (PIECEWISE):  42%|████▏     | 23/55 [00:13<00:11,  2.90it/s]Capturing CUDA graphs (PIECEWISE):  44%|████▎     | 24/55 [00:13<00:08,  3.55it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 25/55 [00:13<00:07,  4.22it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 26/55 [00:13<00:05,  4.94it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 27/55 [00:13<00:05,  5.53it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 28/55 [00:13<00:04,  6.11it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 29/55 [00:13<00:03,  6.56it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 30/55 [00:14<00:03,  6.87it/s]Capturing CUDA graphs (PIECEWISE):  56%|█████▋    | 31/55 [00:14<00:03,  7.25it/s]Capturing CUDA graphs (PIECEWISE):  58%|█████▊    | 32/55 [00:14<00:03,  7.31it/s]Capturing CUDA graphs (PIECEWISE):  60%|██████    | 33/55 [00:14<00:02,  7.48it/s]Capturing CUDA graphs (PIECEWISE):  62%|██████▏   | 34/55 [00:14<00:02,  7.63it/s]Capturing CUDA graphs (PIECEWISE):  64%|██████▎   | 35/55 [00:14<00:02,  7.74it/s]Capturing CUDA graphs (PIECEWISE):  65%|██████▌   | 36/55 [00:14<00:02,  7.82it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 37/55 [00:14<00:02,  7.86it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▉   | 38/55 [00:15<00:02,  7.75it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████   | 39/55 [00:15<00:02,  7.87it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 40/55 [00:15<00:01,  7.75it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 41/55 [00:15<00:01,  7.69it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 42/55 [00:15<00:01,  7.81it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 43/55 [00:19<00:16,  1.39s/it]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 44/55 [00:20<00:11,  1.01s/it]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 45/55 [00:20<00:07,  1.33it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▎ | 46/55 [00:20<00:05,  1.78it/s]Capturing CUDA graphs (PIECEWISE):  85%|████████▌ | 47/55 [00:20<00:03,  2.32it/s]Capturing CUDA graphs (PIECEWISE):  87%|████████▋ | 48/55 [00:20<00:02,  2.96it/s]Capturing CUDA graphs (PIECEWISE):  89%|████████▉ | 49/55 [00:20<00:01,  3.63it/s]Capturing CUDA graphs (PIECEWISE):  91%|█████████ | 50/55 [00:20<00:01,  4.34it/s]Capturing CUDA graphs (PIECEWISE):  93%|█████████▎| 51/55 [00:20<00:00,  4.66it/s]Capturing CUDA graphs (PIECEWISE):  95%|█████████▍| 52/55 [00:21<00:00,  5.26it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▋| 53/55 [00:21<00:00,  5.88it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 54/55 [00:21<00:00,  6.33it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 55/55 [00:25<00:00,  1.39s/it]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 55/55 [00:25<00:00,  2.15it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/2 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):  50%|█████     | 1/2 [00:00<00:00,  6.39it/s]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:05<00:00,  2.97s/it]Capturing CUDA graphs (FULL): 100%|██████████| 2/2 [00:05<00:00,  2.55s/it]
+(EngineCore pid=48157) INFO 11-05 19:05:14 [speculator.py:110] Capturing model for speculator...
+Capturing prefill CUDA graphs (PIECEWISE):   0%|          | 0/55 [00:00<?, ?it/s]Capturing prefill CUDA graphs (PIECEWISE):   2%|▏         | 1/55 [00:04<04:29,  4.98s/it]Capturing prefill CUDA graphs (PIECEWISE):  11%|█         | 6/55 [00:05<00:31,  1.58it/s]Capturing prefill CUDA graphs (PIECEWISE):  22%|██▏       | 12/55 [00:05<00:11,  3.77it/s]Capturing prefill CUDA graphs (PIECEWISE):  29%|██▉       | 16/55 [00:09<00:23,  1.67it/s]Capturing prefill CUDA graphs (PIECEWISE):  38%|███▊      | 21/55 [00:10<00:12,  2.68it/s]Capturing prefill CUDA graphs (PIECEWISE):  47%|████▋     | 26/55 [00:10<00:07,  4.06it/s]Capturing prefill CUDA graphs (PIECEWISE):  58%|█████▊    | 32/55 [00:10<00:03,  6.26it/s]Capturing prefill CUDA graphs (PIECEWISE):  69%|██████▉   | 38/55 [00:10<00:01,  9.10it/s]Capturing prefill CUDA graphs (PIECEWISE):  78%|███████▊  | 43/55 [00:14<00:04,  2.88it/s]Capturing prefill CUDA graphs (PIECEWISE):  91%|█████████ | 50/55 [00:15<00:01,  4.46it/s]Capturing prefill CUDA graphs (PIECEWISE): 100%|██████████| 55/55 [00:19<00:00,  2.46it/s]Capturing prefill CUDA graphs (PIECEWISE): 100%|██████████| 55/55 [00:19<00:00,  2.81it/s]
+Capturing prefill CUDA graphs (FULL):   0%|          | 0/38 [00:00<?, ?it/s]Capturing prefill CUDA graphs (FULL):  16%|█▌        | 6/38 [00:00<00:00, 55.29it/s]Capturing prefill CUDA graphs (FULL):  32%|███▏      | 12/38 [00:00<00:00, 56.53it/s]Capturing prefill CUDA graphs (FULL):  50%|█████     | 19/38 [00:00<00:00, 60.53it/s]Capturing prefill CUDA graphs (FULL):  68%|██████▊   | 26/38 [00:00<00:00, 64.12it/s]Capturing prefill CUDA graphs (FULL):  89%|████████▉ | 34/38 [00:00<00:00, 67.92it/s]Capturing prefill CUDA graphs (FULL): 100%|██████████| 38/38 [00:00<00:00, 65.64it/s]
+Capturing decode CUDA graphs (FULL):   0%|          | 0/14 [00:00<?, ?it/s]Capturing decode CUDA graphs (FULL):   7%|▋         | 1/14 [00:00<00:02,  4.92it/s]Capturing decode CUDA graphs (FULL):  29%|██▊       | 4/14 [00:00<00:00, 14.94it/s]Capturing decode CUDA graphs (FULL):  57%|█████▋    | 8/14 [00:00<00:00, 21.69it/s]Capturing decode CUDA graphs (FULL):  79%|███████▊  | 11/14 [00:00<00:00, 24.33it/s]Capturing decode CUDA graphs (FULL): 100%|██████████| 14/14 [00:00<00:00, 22.06it/s]
+(EngineCore pid=48157) INFO 11-05 19:05:36 [model_runner.py:1163] Graph capturing finished in 53 secs, took 1.02 GiB
+(EngineCore pid=48157) INFO 11-05 19:05:37 [gpu_worker.py:772] Available KV cache memory: 6.93 GiB
+(EngineCore pid=48157) INFO 11-05 19:05:37 [gpu_worker.py:787] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.8500 is equivalent to --gpu-memory-utilization=0.7764 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9236. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+(EngineCore pid=48157) INFO 11-05 19:05:37 [kv_cache_utils.py:1147] GPU KV cache size: 772,969 tokens, Maximum concurrency for 16,384 tokens per request: 47.18x
+(EngineCore pid=48157) INFO 11-05 19:05:37 [kv_cache_utils.py:865] kv cache group sizes (32, 32, 32, 32, 16)
+(EngineCore pid=48157) INFO 11-05 19:05:37 [kv_cache_utils.py:866] kv lcm block sizes 32
+(EngineCore pid=48157) INFO 11-05 19:05:37 [kernel_warmup.py:179] JIT kernel warmup starting.
+JIT kernel warmup (28 compile keys):   0%|          | 0/4 [00:00<?, ?kernel/s]JIT kernel warmup (28 compile keys): 100%|██████████| 4/4 [00:52<00:00, 13.00s/kernel, _DecoratedTritonJitKernel (4 keys)]
+(EngineCore pid=48157) INFO 11-05 19:06:29 [kernel_warmup.py:192] JIT kernel warmup finished in 52.12s.
+(EngineCore pid=48157) ERROR 11-05 19:06:29 [fa_utils.py:212] Cannot use FA version 2 is not supported due to FA2 is only supported on devices with compute capability >= 8
+Capturing CUDA graphs (PIECEWISE):   0%|          | 0/55 [00:00<?, ?it/s]Capturing CUDA graphs (PIECEWISE):   2%|▏         | 1/55 [00:00<00:15,  3.56it/s]Capturing CUDA graphs (PIECEWISE):   4%|▎         | 2/55 [00:00<00:12,  4.42it/s]Capturing CUDA graphs (PIECEWISE):   5%|▌         | 3/55 [00:00<00:10,  4.93it/s]Capturing CUDA graphs (PIECEWISE):   7%|▋         | 4/55 [00:00<00:09,  5.26it/s]Capturing CUDA graphs (PIECEWISE):   9%|▉         | 5/55 [00:00<00:09,  5.54it/s]Capturing CUDA graphs (PIECEWISE):  11%|█         | 6/55 [00:01<00:08,  5.74it/s]Capturing CUDA graphs (PIECEWISE):  13%|█▎        | 7/55 [00:01<00:08,  5.90it/s]Capturing CUDA graphs (PIECEWISE):  15%|█▍        | 8/55 [00:01<00:07,  6.05it/s]Capturing CUDA graphs (PIECEWISE):  16%|█▋        | 9/55 [00:01<00:07,  6.35it/s]Capturing CUDA graphs (PIECEWISE):  18%|█▊        | 10/55 [00:01<00:06,  6.56it/s]Capturing CUDA graphs (PIECEWISE):  20%|██        | 11/55 [00:01<00:06,  6.73it/s]Capturing CUDA graphs (PIECEWISE):  22%|██▏       | 12/55 [00:02<00:06,  6.88it/s]Capturing CUDA graphs (PIECEWISE):  24%|██▎       | 13/55 [00:02<00:05,  7.12it/s]Capturing CUDA graphs (PIECEWISE):  25%|██▌       | 14/55 [00:02<00:05,  7.18it/s]Capturing CUDA graphs (PIECEWISE):  27%|██▋       | 15/55 [00:02<00:05,  7.31it/s]Capturing CUDA graphs (PIECEWISE):  29%|██▉       | 16/55 [00:02<00:05,  7.40it/s]Capturing CUDA graphs (PIECEWISE):  31%|███       | 17/55 [00:02<00:05,  7.48it/s]Capturing CUDA graphs (PIECEWISE):  33%|███▎      | 18/55 [00:02<00:04,  7.58it/s]Capturing CUDA graphs (PIECEWISE):  35%|███▍      | 19/55 [00:02<00:04,  7.46it/s]Capturing CUDA graphs (PIECEWISE):  36%|███▋      | 20/55 [00:03<00:04,  7.56it/s]Capturing CUDA graphs (PIECEWISE):  38%|███▊      | 21/55 [00:03<00:04,  7.57it/s]Capturing CUDA graphs (PIECEWISE):  40%|████      | 22/55 [00:03<00:04,  7.69it/s]Capturing CUDA graphs (PIECEWISE):  42%|████▏     | 23/55 [00:03<00:04,  7.79it/s]Capturing CUDA graphs (PIECEWISE):  44%|████▎     | 24/55 [00:03<00:03,  7.88it/s]Capturing CUDA graphs (PIECEWISE):  45%|████▌     | 25/55 [00:03<00:03,  7.85it/s]Capturing CUDA graphs (PIECEWISE):  47%|████▋     | 26/55 [00:03<00:03,  8.00it/s]Capturing CUDA graphs (PIECEWISE):  49%|████▉     | 27/55 [00:03<00:03,  7.94it/s]Capturing CUDA graphs (PIECEWISE):  51%|█████     | 28/55 [00:04<00:03,  7.91it/s]Capturing CUDA graphs (PIECEWISE):  53%|█████▎    | 29/55 [00:04<00:03,  7.95it/s]Capturing CUDA graphs (PIECEWISE):  55%|█████▍    | 30/55 [00:04<00:03,  7.94it/s]Capturing CUDA graphs (PIECEWISE):  56%|█████▋    | 31/55 [00:04<00:03,  7.92it/s]Capturing CUDA graphs (PIECEWISE):  58%|█████▊    | 32/55 [00:04<00:02,  8.01it/s]Capturing CUDA graphs (PIECEWISE):  60%|██████    | 33/55 [00:04<00:02,  8.04it/s]Capturing CUDA graphs (PIECEWISE):  62%|██████▏   | 34/55 [00:04<00:02,  8.14it/s]Capturing CUDA graphs (PIECEWISE):  64%|██████▎   | 35/55 [00:04<00:02,  8.15it/s]Capturing CUDA graphs (PIECEWISE):  65%|██████▌   | 36/55 [00:05<00:02,  8.12it/s]Capturing CUDA graphs (PIECEWISE):  67%|██████▋   | 37/55 [00:05<00:02,  8.12it/s]Capturing CUDA graphs (PIECEWISE):  69%|██████▉   | 38/55 [00:05<00:02,  8.09it/s]Capturing CUDA graphs (PIECEWISE):  71%|███████   | 39/55 [00:05<00:01,  8.10it/s]Capturing CUDA graphs (PIECEWISE):  73%|███████▎  | 40/55 [00:05<00:01,  8.09it/s]Capturing CUDA graphs (PIECEWISE):  75%|███████▍  | 41/55 [00:05<00:01,  8.08it/s]Capturing CUDA graphs (PIECEWISE):  76%|███████▋  | 42/55 [00:05<00:01,  8.17it/s]Capturing CUDA graphs (PIECEWISE):  78%|███████▊  | 43/55 [00:05<00:01,  8.24it/s]Capturing CUDA graphs (PIECEWISE):  80%|████████  | 44/55 [00:06<00:01,  8.35it/s]Capturing CUDA graphs (PIECEWISE):  82%|████████▏ | 45/55 [00:06<00:01,  8.47it/s]Capturing CUDA graphs (PIECEWISE):  84%|████████▎ | 46/55 [00:06<00:01,  8.54it/s]Capturing CUDA graphs (PIECEWISE):  85%|████████▌ | 47/55 [00:06<00:00,  8.53it/s]Capturing CUDA graphs (PIECEWISE):  87%|████████▋ | 48/55 [00:06<00:00,  8.58it/s]Capturing CUDA graphs (PIECEWISE):  89%|████████▉ | 49/55 [00:06<00:00,  8.64it/s]Capturing CUDA graphs (PIECEWISE):  91%|█████████ | 50/55 [00:06<00:00,  8.52it/s]Capturing CUDA graphs (PIECEWISE):  93%|█████████▎| 51/55 [00:06<00:00,  8.37it/s]Capturing CUDA graphs (PIECEWISE):  95%|█████████▍| 52/55 [00:06<00:00,  8.36it/s]Capturing CUDA graphs (PIECEWISE):  96%|█████████▋| 53/55 [00:07<00:00,  8.39it/s]Capturing CUDA graphs (PIECEWISE):  98%|█████████▊| 54/55 [00:07<00:00,  8.37it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 55/55 [00:07<00:00,  8.41it/s]Capturing CUDA graphs (PIECEWISE): 100%|██████████| 55/55 [00:07<00:00,  7.50it/s]
+Capturing CUDA graphs (FULL):   0%|          | 0/38 [00:00<?, ?it/s]Capturing CUDA graphs (FULL):   3%|▎         | 1/38 [00:00<00:05,  7.12it/s]Capturing CUDA graphs (FULL):   5%|▌         | 2/38 [00:00<00:04,  7.37it/s]Capturing CUDA graphs (FULL):   8%|▊         | 3/38 [00:00<00:04,  7.98it/s]Capturing CUDA graphs (FULL):  11%|█         | 4/38 [00:00<00:04,  8.27it/s]Capturing CUDA graphs (FULL):  13%|█▎        | 5/38 [00:00<00:03,  8.54it/s]Capturing CUDA graphs (FULL):  16%|█▌        | 6/38 [00:00<00:03,  8.95it/s]Capturing CUDA graphs (FULL):  18%|█▊        | 7/38 [00:00<00:03,  9.26it/s]Capturing CUDA graphs (FULL):  24%|██▎       | 9/38 [00:01<00:03,  9.61it/s]Capturing CUDA graphs (FULL):  29%|██▉       | 11/38 [00:01<00:02,  9.85it/s]Capturing CUDA graphs (FULL):  32%|███▏      | 12/38 [00:01<00:02,  9.87it/s]Capturing CUDA graphs (FULL):  34%|███▍      | 13/38 [00:01<00:02,  9.71it/s]Capturing CUDA graphs (FULL):  39%|███▉      | 15/38 [00:01<00:02,  9.91it/s]Capturing CUDA graphs (FULL):  45%|████▍     | 17/38 [00:01<00:02,  9.98it/s]Capturing CUDA graphs (FULL):  50%|█████     | 19/38 [00:02<00:01, 10.05it/s]Capturing CUDA graphs (FULL):  55%|█████▌    | 21/38 [00:02<00:01, 10.12it/s]Capturing CUDA graphs (FULL):  61%|██████    | 23/38 [00:02<00:01,  9.86it/s]Capturing CUDA graphs (FULL):  63%|██████▎   | 24/38 [00:02<00:01,  9.73it/s]Capturing CUDA graphs (FULL):  66%|██████▌   | 25/38 [00:02<00:01,  9.68it/s]Capturing CUDA graphs (FULL):  68%|██████▊   | 26/38 [00:02<00:01,  9.63it/s]Capturing CUDA graphs (FULL):  71%|███████   | 27/38 [00:02<00:01,  9.55it/s]Capturing CUDA graphs (FULL):  74%|███████▎  | 28/38 [00:02<00:01,  9.53it/s]Capturing CUDA graphs (FULL):  76%|███████▋  | 29/38 [00:03<00:00,  9.50it/s]Capturing CUDA graphs (FULL):  79%|███████▉  | 30/38 [00:03<00:00,  9.34it/s]Capturing CUDA graphs (FULL):  84%|████████▍ | 32/38 [00:03<00:00,  9.62it/s]Capturing CUDA graphs (FULL):  87%|████████▋ | 33/38 [00:03<00:00,  9.65it/s]Capturing CUDA graphs (FULL):  92%|█████████▏| 35/38 [00:03<00:00,  9.73it/s]Capturing CUDA graphs (FULL):  95%|█████████▍| 36/38 [00:03<00:00,  9.70it/s]Capturing CUDA graphs (FULL): 100%|██████████| 38/38 [00:03<00:00,  9.89it/s]Capturing CUDA graphs (FULL): 100%|██████████| 38/38 [00:03<00:00,  9.57it/s]
+(EngineCore pid=48157) INFO 11-05 19:06:47 [speculator.py:110] Capturing model for speculator...
+Capturing prefill CUDA graphs (PIECEWISE):   0%|          | 0/55 [00:00<?, ?it/s]Capturing prefill CUDA graphs (PIECEWISE):   9%|▉         | 5/55 [00:00<00:01, 49.54it/s]Capturing prefill CUDA graphs (PIECEWISE):  18%|█▊        | 10/55 [00:00<00:00, 49.46it/s]Capturing prefill CUDA graphs (PIECEWISE):  29%|██▉       | 16/55 [00:00<00:00, 50.59it/s]Capturing prefill CUDA graphs (PIECEWISE):  40%|████      | 22/55 [00:00<00:00, 50.90it/s]Capturing prefill CUDA graphs (PIECEWISE):  51%|█████     | 28/55 [00:00<00:00, 51.82it/s]Capturing prefill CUDA graphs (PIECEWISE):  62%|██████▏   | 34/55 [00:00<00:00, 51.73it/s]Capturing prefill CUDA graphs (PIECEWISE):  73%|███████▎  | 40/55 [00:00<00:00, 52.60it/s]Capturing prefill CUDA graphs (PIECEWISE):  84%|████████▎ | 46/55 [00:00<00:00, 54.57it/s]Capturing prefill CUDA graphs (PIECEWISE):  96%|█████████▋| 53/55 [00:00<00:00, 57.32it/s]Capturing prefill CUDA graphs (PIECEWISE): 100%|██████████| 55/55 [00:01<00:00, 54.13it/s]
+Capturing prefill CUDA graphs (FULL):   0%|          | 0/38 [00:00<?, ?it/s]Capturing prefill CUDA graphs (FULL):  18%|█▊        | 7/38 [00:00<00:00, 62.40it/s]Capturing prefill CUDA graphs (FULL):  37%|███▋      | 14/38 [00:00<00:00, 63.65it/s]Capturing prefill CUDA graphs (FULL):  58%|█████▊    | 22/38 [00:00<00:00, 67.00it/s]Capturing prefill CUDA graphs (FULL):  76%|███████▋  | 29/38 [00:00<00:00, 65.92it/s]Capturing prefill CUDA graphs (FULL):  97%|█████████▋| 37/38 [00:00<00:00, 68.92it/s]Capturing prefill CUDA graphs (FULL): 100%|██████████| 38/38 [00:00<00:00, 67.54it/s]
+Capturing decode CUDA graphs (FULL):   0%|          | 0/14 [00:00<?, ?it/s]Capturing decode CUDA graphs (FULL):  21%|██▏       | 3/14 [00:00<00:00, 28.83it/s]Capturing decode CUDA graphs (FULL):  50%|█████     | 7/14 [00:00<00:00, 29.25it/s]Capturing decode CUDA graphs (FULL):  71%|███████▏  | 10/14 [00:00<00:00, 29.37it/s]Capturing decode CUDA graphs (FULL): 100%|██████████| 14/14 [00:00<00:00, 29.91it/s]Capturing decode CUDA graphs (FULL): 100%|██████████| 14/14 [00:00<00:00, 29.65it/s]
+(EngineCore pid=48157) INFO 11-05 19:06:50 [model_runner.py:1163] Graph capturing finished in 15 secs, took 0.63 GiB
+(EngineCore pid=48157) INFO 11-05 19:06:50 [gpu_worker.py:1003] CUDA graph pool memory: 0.63 GiB (actual), 1.07 GiB (estimated), difference: 0.44 GiB (69.6%).
+(EngineCore pid=48157) INFO 11-05 19:06:50 [gpu_worker.py:1066] Free memory on device (14.43/14.58 GiB) on startup. Desired GPU memory utilization is (0.85, 12.39 GiB). Actual usage is 3.16 GiB for consumed memory (weights + non-torch), 2.3 GiB for peak activation, and 0.63 GiB for CUDAGraph memory. Replace gpu_memory_utilization config with `--kv-cache-memory=6602333594` (6.15 GiB) to fit into requested memory, or `--kv-cache-memory=8789738496` (8.19 GiB) to fully utilize gpu memory. Current kv cache memory in use is 6.93 GiB.
+(EngineCore pid=48157) INFO 11-05 19:06:51 [jit_monitor.py:84] Kernel JIT monitor activated; monitored JIT compilations during inference will use mode=warn.
+(EngineCore pid=48157) INFO 11-05 19:06:52 [core.py:405] init engine (profile, create kv cache, warmup model) took 218.30 s (compilation: 72.44 s)
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 1074.33it/s]
+(EngineCore pid=48157) INFO 11-05 19:06:55 [kernel.py:480] Final IR op priority after setting platform defaults: IrOpPriorityConfig(rms_norm=['native'], fused_add_rms_norm=['native'], gelu_and_mul_sparse=['triton', 'native'])
+(APIServer pid=47947) INFO 11-05 19:06:55 [entry.py:135] Supported tasks: ['generate']
+(APIServer pid=47947) INFO 11-05 19:06:56 [factories.py:105] Scale-out endpoints are disabled. Restart vllm serve with --enable-scale-out to enable them.
+(APIServer pid=47947) INFO 11-05 19:06:56 [parser_manager.py:36] "auto" tool choice has been enabled.
+(APIServer pid=47947) INFO 11-05 19:06:56 [hf.py:736] Detected the chat template content format to be 'openai'. You can set `--chat-template-content-format` to override this.
+(APIServer pid=47947) WARNING 11-05 19:06:56 [model.py:1907] Default vLLM sampling parameters have been overridden by the model's `generation_config.json`: `{'temperature': 1.0, 'top_k': 64, 'top_p': 0.95}`. If this is not intended, please relaunch vLLM instance with `--generation-config vllm`.
+(APIServer pid=47947) INFO 11-05 19:06:56 [entry.py:139] Starting vLLM server on http://127.0.0.1:8010
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:188] Available routes are:
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /openapi.json, Methods: HEAD, GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /docs, Methods: HEAD, GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /docs/oauth2-redirect, Methods: HEAD, GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /redoc, Methods: HEAD, GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /load, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /version, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /kv_event_sources, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /health, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /metrics, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /tokenize, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /detokenize, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/models, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/systemone, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/decisions, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /ping, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /ping, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /invocations, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/chat/completions, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/chat/completions/batch, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/responses, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/responses/{response_id}, Methods: GET
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/responses/{response_id}/cancel, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/completions, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/messages, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/messages/count_tokens, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /generative_scoring, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /scale_elastic_ep, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /is_scaling_elastic_ep, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/chat/completions/render, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/messages/render, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/completions/render, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/responses/render, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/chat/completions/derender, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /v1/completions/derender, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /inference/v1/generate, Methods: POST
+(APIServer pid=47947) INFO 11-05 19:06:56 [launcher.py:197] Route: /inference/v1/abort_requests, Methods: POST
+INFO:     Started server process [47947]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:52874 - "GET /health HTTP/1.1" 200 OK
+(EngineCore pid=48157) WARNING 11-05 19:07:01 [jit_monitor.py:140] Triton kernel JIT compilation during inference: kernel_unified_attention. This causes a latency spike; consider extending warmup to cover this shape/config.
+INFO:     127.0.0.1:52888 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46034 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46046 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46062 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46066 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46070 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46076 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46080 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46086 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=47947) INFO 11-05 19:07:17 [loggers.py:335] Engine 000: Avg prompt throughput: 23.5 tokens/s, Avg generation throughput: 182.0 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=47947) INFO 11-05 19:07:17 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.55, Accepted throughput: 51.42 tokens/s, Drafted throughput: 132.28 tokens/s, Accepted: 1104 tokens, Drafted: 2840 tokens, Per-position acceptance rate: 0.646, 0.410, 0.277, 0.221, Avg Draft acceptance rate: 38.9%
+INFO:     127.0.0.1:45538 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45552 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45560 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45570 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45580 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45594 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=47947) INFO 11-05 19:07:27 [loggers.py:335] Engine 000: Avg prompt throughput: 13.5 tokens/s, Avg generation throughput: 169.6 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.1%, Prefix cache hit rate: 0.0%
+(APIServer pid=47947) INFO 11-05 19:07:27 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.03, Accepted throughput: 85.90 tokens/s, Drafted throughput: 333.59 tokens/s, Accepted: 859 tokens, Drafted: 3336 tokens, Per-position acceptance rate: 0.546, 0.267, 0.127, 0.090, Avg Draft acceptance rate: 25.7%
+INFO:     127.0.0.1:41622 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41634 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41640 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41644 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41660 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41662 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41678 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41680 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41688 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41702 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57652 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=47947) INFO 11-05 19:07:37 [loggers.py:335] Engine 000: Avg prompt throughput: 25.0 tokens/s, Avg generation throughput: 210.9 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=47947) INFO 11-05 19:07:37 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.58, Accepted throughput: 129.09 tokens/s, Drafted throughput: 327.58 tokens/s, Accepted: 1291 tokens, Drafted: 3276 tokens, Per-position acceptance rate: 0.659, 0.418, 0.281, 0.219, Avg Draft acceptance rate: 39.4%
+INFO:     127.0.0.1:57662 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57666 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57676 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57678 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57692 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59048 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=47947) INFO 11-05 19:07:47 [loggers.py:335] Engine 000: Avg prompt throughput: 14.1 tokens/s, Avg generation throughput: 151.4 tokens/s, Running: 1 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=47947) INFO 11-05 19:07:47 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 1.85, Accepted throughput: 69.59 tokens/s, Drafted throughput: 325.97 tokens/s, Accepted: 696 tokens, Drafted: 3260 tokens, Per-position acceptance rate: 0.506, 0.212, 0.080, 0.056, Avg Draft acceptance rate: 21.3%
+INFO:     127.0.0.1:59060 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59072 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59074 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59078 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59094 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59098 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=47947) INFO 11-05 19:07:57 [loggers.py:335] Engine 000: Avg prompt throughput: 12.9 tokens/s, Avg generation throughput: 145.1 tokens/s, Running: 0 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.0%, Prefix cache hit rate: 0.0%
+(APIServer pid=47947) INFO 11-05 19:07:57 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.22, Accepted throughput: 79.99 tokens/s, Drafted throughput: 261.56 tokens/s, Accepted: 800 tokens, Drafted: 2616 tokens, Per-position acceptance rate: 0.584, 0.323, 0.183, 0.133, Avg Draft acceptance rate: 30.6%
+INFO:     127.0.0.1:59114 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59120 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59150 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59122 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40014 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40020 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40042 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40036 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=47947) INFO 11-05 19:08:07 [loggers.py:335] Engine 000: Avg prompt throughput: 30.6 tokens/s, Avg generation throughput: 259.8 tokens/s, Running: 4 reqs, Waiting: 0 reqs, GPU KV cache usage: 0.2%, Prefix cache hit rate: 0.0%
+(APIServer pid=47947) INFO 11-05 19:08:07 [metrics.py:120] SpecDecoding metrics: Mean acceptance length: 2.35, Accepted throughput: 148.78 tokens/s, Drafted throughput: 441.15 tokens/s, Accepted: 1488 tokens, Drafted: 4412 tokens, Per-position acceptance rate: 0.625, 0.360, 0.209, 0.155, Avg Draft acceptance rate: 33.7%
+INFO:     127.0.0.1:40058 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40068 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40076 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40064 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+(APIServer pid=47947) INFO 11-05 19:08:09 [launcher.py:256] [shutdown] API server: shutdown triggered
+(APIServer pid=47947) INFO 11-05 19:08:09 [launcher.py:272] [shutdown] API server: stopping engine client mode=abort timeout=0s
+(APIServer pid=47947) INFO 11-05 19:08:09 [core_client.py:792] [shutdown] MPClient: start timeout=0s
+(APIServer pid=47947) INFO 11-05 19:08:09 [core_client.py:794] [shutdown] MPClient: stopping engine manager
+(APIServer pid=47947) INFO 11-05 19:08:09 [utils.py:628] [shutdown] Process manager: send sigterm to process EngineCore
+(APIServer pid=47947) WARNING 11-05 19:08:09 [utils.py:648] [shutdown] Process manager: force killing remaining processes count=1
+(APIServer pid=47947) WARNING 11-05 19:08:09 [utils.py:653] [shutdown] Process manager: force killing remaining process EngineCore pid 48157
+(EngineCore pid=48157) INFO 11-05 19:08:09 [core.py:1525] [shutdown] EngineCore: trigger received signal=SIGTERM
+(EngineCore pid=48157) INFO 11-05 19:08:09 [core.py:1712] [shutdown] EngineCore: start mode=abort timeout=0s
+(EngineCore pid=48157) INFO 11-05 19:08:09 [core.py:1743] [shutdown] EngineCore: request processing complete; starting resource teardown
+(EngineCore pid=48157) INFO 11-05 19:08:09 [core.py:1573] [shutdown] EngineCore: exiting busy loop
+(APIServer pid=47947) INFO 11-05 19:08:09 [core_client.py:796] [shutdown] MPClient: engine manager stopped
+(APIServer pid=47947) INFO 11-05 19:08:09 [core_client.py:797] [shutdown] MPClient: cleaning up background resources
+(APIServer pid=47947) INFO 11-05 19:08:09 [core_client.py:799] [shutdown] MPClient: complete
+(APIServer pid=47947) INFO 11-05 19:08:09 [launcher.py:281] [shutdown] API server: engine client stopped
+(APIServer pid=47947) INFO 11-05 19:08:09 [launcher.py:284] [shutdown] API server: signalling HTTP server shutdown
+(APIServer pid=47947) INFO 11-05 19:08:09 [launcher.py:306] [shutdown] API server: shutting down FastAPI HTTP server
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+/usr/lib/python3.13/multiprocessing/resource_tracker.py:301: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-6r_35e4r'}
+  warnings.warn(
