@@ -1,0 +1,158 @@
+make: Entering directory '/opt/gemma4-dev/gpu-sglang-g6-2b-q4w4a16emb4'
+mkdir -p /opt/cache/sglang-install
+/usr/bin/python3 -m pip freeze --user > /opt/cache/sglang-install/freeze-before-install.txt
+cd /opt/cache/sglang-install && /usr/bin/python3 -m pip download --no-deps --only-binary :all: --python-version 3.13 sglang==0.5.23
+Collecting sglang==0.5.23
+  Downloading sglang-0.5.23-cp313-cp313-manylinux_2_34_x86_64.whl.metadata (29 kB)
+Downloading sglang-0.5.23-cp313-cp313-manylinux_2_34_x86_64.whl (39.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 39.0/39.0 MB 9.0 MB/s eta 0:00:00
+Saved ./sglang-0.5.23-cp313-cp313-manylinux_2_34_x86_64.whl
+Successfully downloaded sglang
+cp /opt/cache/sglang-install/sglang-0.5.23-cp313-cp313-manylinux_2_34_x86_64.whl /opt/cache/sglang-install/sglang-0.5.23-cp314-cp314-manylinux_2_34_x86_64.whl
+/usr/bin/python3 -m pip install --user --break-system-packages --no-deps /opt/cache/sglang-install/sglang-0.5.23-cp314-cp314-manylinux_2_34_x86_64.whl
+Processing /opt/cache/sglang-install/sglang-0.5.23-cp314-cp314-manylinux_2_34_x86_64.whl
+Installing collected packages: sglang
+  WARNING: The scripts killall_sglang and sglang are installed in '/root/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+Successfully installed sglang-0.5.23
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+/usr/bin/python3 -m pip install --user --break-system-packages --no-deps sglang-kernel==0.4.10 blobfile==3.0.0 easydict gguf openai-harmony==0.0.4 soundfile==0.13.1 timm==1.0.25 torch_memory_saver zstandard pycryptodomex cffi
+Collecting sglang-kernel==0.4.10
+  Downloading sglang_kernel-0.4.10-cp310-abi3-manylinux2014_x86_64.whl.metadata (19 kB)
+Collecting blobfile==3.0.0
+  Downloading blobfile-3.0.0-py3-none-any.whl.metadata (15 kB)
+Collecting easydict
+  Downloading easydict-1.13-py3-none-any.whl.metadata (4.2 kB)
+Collecting gguf
+  Downloading gguf-0.19.0-py3-none-any.whl.metadata (4.1 kB)
+Collecting openai-harmony==0.0.4
+  Downloading openai_harmony-0.0.4-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (8.0 kB)
+Collecting soundfile==0.13.1
+  Downloading soundfile-0.13.1-py2.py3-none-manylinux_2_28_x86_64.whl.metadata (16 kB)
+Collecting timm==1.0.25
+  Downloading timm-1.0.25-py3-none-any.whl.metadata (38 kB)
+Collecting torch_memory_saver
+  Downloading torch_memory_saver-0.0.10-cp39-abi3-manylinux2014_x86_64.whl.metadata (109 bytes)
+Collecting zstandard
+  Downloading zstandard-0.25.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (3.3 kB)
+Collecting pycryptodomex
+  Downloading pycryptodomex-3.24.1-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (3.4 kB)
+Collecting cffi
+  Downloading cffi-2.1.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+Downloading sglang_kernel-0.4.10-cp310-abi3-manylinux2014_x86_64.whl (373.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 373.0/373.0 MB 149.6 MB/s eta 0:00:00
+Downloading blobfile-3.0.0-py3-none-any.whl (75 kB)
+Downloading openai_harmony-0.0.4-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 134.4 MB/s eta 0:00:00
+Downloading soundfile-0.13.1-py2.py3-none-manylinux_2_28_x86_64.whl (1.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 72.4 MB/s eta 0:00:00
+Downloading timm-1.0.25-py3-none-any.whl (2.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.6/2.6 MB 119.0 MB/s eta 0:00:00
+Downloading easydict-1.13-py3-none-any.whl (6.8 kB)
+Downloading gguf-0.19.0-py3-none-any.whl (118 kB)
+Downloading torch_memory_saver-0.0.10-cp39-abi3-manylinux2014_x86_64.whl (2.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.6/2.6 MB 117.6 MB/s eta 0:00:00
+Downloading zstandard-0.25.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (5.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.6/5.6 MB 138.0 MB/s eta 0:00:00
+Downloading pycryptodomex-3.24.1-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (2.3 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.3/2.3 MB 114.2 MB/s eta 0:00:00
+Downloading cffi-2.1.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+Installing collected packages: soundfile, easydict, zstandard, torch_memory_saver, timm, sglang-kernel, pycryptodomex, openai-harmony, gguf, cffi, blobfile
+  WARNING: The scripts gguf-convert-endian, gguf-dump, gguf-editor-gui, gguf-new-metadata and gguf-set-metadata are installed in '/root/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+  WARNING: The script cffi-gen-src is installed in '/root/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+
+Successfully installed blobfile-3.0.0 cffi-2.1.1 easydict-1.13 gguf-0.19.0 openai-harmony-0.0.4 pycryptodomex-3.24.1 sglang-kernel-0.4.10 soundfile-0.13.1 timm-1.0.25 torch_memory_saver-0.0.10 zstandard-0.25.0
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+/usr/bin/python3 -m pip install --user --break-system-packages ipython pycparser
+Collecting ipython
+  Downloading ipython-9.18.1-py3-none-any.whl.metadata (4.6 kB)
+Collecting pycparser
+  Downloading pycparser-3.12-py3-none-any.whl.metadata (9.7 kB)
+Collecting ipython-pygments-lexers>=1.0.0 (from ipython)
+  Downloading ipython_pygments_lexers-1.1.1-py3-none-any.whl.metadata (1.1 kB)
+Collecting jedi>=0.18.2 (from ipython)
+  Downloading jedi-0.20.1-py2.py3-none-any.whl.metadata (23 kB)
+Collecting matplotlib-inline>=0.1.6 (from ipython)
+  Downloading matplotlib_inline-0.2.2-py3-none-any.whl.metadata (2.4 kB)
+Requirement already satisfied: pexpect>4.6 in /usr/lib/python3/dist-packages (from ipython) (4.9.0)
+Collecting prompt_toolkit<3.1.0,>=3.0.41 (from ipython)
+  Downloading prompt_toolkit-3.0.53-py3-none-any.whl.metadata (6.4 kB)
+Requirement already satisfied: psutil>=7 in /root/.local/lib/python3.14/site-packages (from ipython) (7.2.2)
+Requirement already satisfied: pygments>=2.14.0 in /usr/lib/python3/dist-packages (from ipython) (2.19.2)
+Collecting stack_data>=0.6.0 (from ipython)
+  Downloading stack_data-0.6.3-py3-none-any.whl.metadata (18 kB)
+Collecting traitlets>=5.13.0 (from ipython)
+  Downloading traitlets-5.16.1-py3-none-any.whl.metadata (10 kB)
+Collecting wcwidth>=0.1.4 (from prompt_toolkit<3.1.0,>=3.0.41->ipython)
+  Downloading wcwidth-0.9.4-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (23 kB)
+Collecting parso<0.9.0,>=0.8.7 (from jedi>=0.18.2->ipython)
+  Downloading parso-0.8.7-py2.py3-none-any.whl.metadata (8.2 kB)
+Requirement already satisfied: ptyprocess>=0.5 in /usr/lib/python3/dist-packages (from pexpect>4.6->ipython) (0.7.0)
+Collecting executing>=1.2.0 (from stack_data>=0.6.0->ipython)
+  Downloading executing-2.3.0-py3-none-any.whl.metadata (9.1 kB)
+Collecting asttokens>=2.1.0 (from stack_data>=0.6.0->ipython)
+  Downloading asttokens-3.0.2-py3-none-any.whl.metadata (5.7 kB)
+Collecting pure-eval (from stack_data>=0.6.0->ipython)
+  Downloading pure_eval-0.2.4-py3-none-any.whl.metadata (6.4 kB)
+Downloading ipython-9.18.1-py3-none-any.whl (649 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 649.8/649.8 kB 16.0 MB/s eta 0:00:00
+Downloading prompt_toolkit-3.0.53-py3-none-any.whl (392 kB)
+Downloading pycparser-3.12-py3-none-any.whl (62 kB)
+Downloading ipython_pygments_lexers-1.1.1-py3-none-any.whl (8.1 kB)
+Downloading jedi-0.20.1-py2.py3-none-any.whl (4.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.9/4.9 MB 99.2 MB/s eta 0:00:00
+Downloading parso-0.8.7-py2.py3-none-any.whl (107 kB)
+Downloading matplotlib_inline-0.2.2-py3-none-any.whl (9.5 kB)
+Downloading stack_data-0.6.3-py3-none-any.whl (24 kB)
+Downloading asttokens-3.0.2-py3-none-any.whl (28 kB)
+Downloading executing-2.3.0-py3-none-any.whl (29 kB)
+Downloading traitlets-5.16.1-py3-none-any.whl (86 kB)
+Downloading wcwidth-0.9.4-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (785 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 785.9/785.9 kB 48.4 MB/s eta 0:00:00
+Downloading pure_eval-0.2.4-py3-none-any.whl (11 kB)
+Installing collected packages: pure-eval, wcwidth, traitlets, pycparser, parso, ipython-pygments-lexers, executing, asttokens, stack_data, prompt_toolkit, matplotlib-inline, jedi, ipython
+  WARNING: The scripts ipython and ipython3 are installed in '/root/.local/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+sglang 0.5.23 requires build, which is not installed.
+sglang 0.5.23 requires datasets, which is not installed.
+sglang 0.5.23 requires deepseek-recipe==0.2.0; (sys_platform == "linux" and (platform_machine == "x86_64" or platform_machine == "aarch64")) or sys_platform == "darwin", which is not installed.
+sglang 0.5.23 requires flash-attn-4>=4.0.0b18, which is not installed.
+sglang 0.5.23 requires kernels<0.15,>=0.14.1, which is not installed.
+sglang 0.5.23 requires modelscope, which is not installed.
+sglang 0.5.23 requires nvidia-mathdx==25.6.0, which is not installed.
+sglang 0.5.23 requires nvshmem4py-cu13, which is not installed.
+sglang 0.5.23 requires outlines==0.1.11, which is not installed.
+sglang 0.5.23 requires py-spy, which is not installed.
+sglang 0.5.23 requires scipy, which is not installed.
+sglang 0.5.23 requires sgl-deep-ep==0.1.2.post1, which is not installed.
+sglang 0.5.23 requires sgl-deep-gemm==0.2.3.post2, which is not installed.
+sglang 0.5.23 requires sgl-flash-mla==1.0.0, which is not installed.
+sglang 0.5.23 requires smg-grpc-servicer>=0.9.0, which is not installed.
+sglang 0.5.23 requires tml-renderers==0.1.0; (sys_platform == "linux" and (platform_machine == "x86_64" or platform_machine == "aarch64")) or (sys_platform == "darwin" and platform_machine == "arm64"), which is not installed.
+sglang 0.5.23 requires xxhash, which is not installed.
+sglang 0.5.23 requires compressed-tensors==0.18.0, but you have compressed-tensors 0.17.0 which is incompatible.
+sglang 0.5.23 requires flashinfer_python[cu13]==0.7.2, but you have flashinfer-python 0.7.2.post1 which is incompatible.
+sglang 0.5.23 requires humming-kernels[cu13]==0.1.12, but you have humming-kernels 0.1.19 which is incompatible.
+sglang 0.5.23 requires numba==0.65.1, but you have numba 0.65.0 which is incompatible.
+sglang 0.5.23 requires openai==2.8.0, but you have openai 3.46.0 which is incompatible.
+sglang 0.5.23 requires sentencepiece==0.2.1, but you have sentencepiece 0.2.3 which is incompatible.
+sglang 0.5.23 requires tokenizers==0.23.2, but you have tokenizers 0.23.3 which is incompatible.
+sglang 0.5.23 requires torch==2.14.1, but you have torch 2.14.0 which is incompatible.
+sglang 0.5.23 requires transformers==5.19.0, but you have transformers 5.20.2 which is incompatible.
+sglang 0.5.23 requires xgrammar==0.2.7, but you have xgrammar 0.2.8 which is incompatible.
+Successfully installed asttokens-3.0.2 executing-2.3.0 ipython-9.18.1 ipython-pygments-lexers-1.1.1 jedi-0.20.1 matplotlib-inline-0.2.2 parso-0.8.7 prompt_toolkit-3.0.53 pure-eval-0.2.4 pycparser-3.12 stack_data-0.6.3 traitlets-5.16.1 wcwidth-0.9.4
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+patch -N -p1 -d /root/.local/lib/python3.14/site-packages < patches/text-config-per-layer.diff || true
+patching file sglang/srt/utils/hf_transformers/config.py
+patch -N -p1 -d /root/.local/lib/python3.14/site-packages < patches/int4-embeddings.diff || true
+patching file sglang/srt/models/gemma4_causal.py
+/usr/bin/python3 -m sglang.launch_server --help > /dev/null && /usr/bin/python3 -c "import sglang; print('sglang', sglang.__version__)"
+/root/.local/lib/python3.14/site-packages/sglang/launch_server.py:71: UserWarning: 'python -m sglang.launch_server' is still supported, but 'sglang serve' is the recommended entrypoint.
+  Example: sglang serve --model-path <model> [options]
+  warnings.warn(
+sglang 0.5.23
+make: Leaving directory '/opt/gemma4-dev/gpu-sglang-g6-2b-q4w4a16emb4'

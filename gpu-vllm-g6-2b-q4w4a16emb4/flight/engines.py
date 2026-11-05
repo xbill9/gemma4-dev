@@ -12,7 +12,7 @@ started and stopped here, card cooled to <= COOL_C before each):
     mistralrs, mistralrs-dN
                         gpu-mistralrs-g6-2b-q4_0 serve.py (the 3050's 4 requests, 8,192-token cache);
                         -dN = Google's QAT assistant (bf16), N drafted tokens, 4,096-token cache
-    mistralrs-card      the same at 64 requests, 65,536-token cache, 4,096 tokens per step (UNTESTED)
+    mistralrs-card      the same at 32 requests, 16,384-token cache, 4,096 tokens per step (64 does not load)
     sglang, sglang-dN   gpu-sglang-g6-2b-q4w4a16emb4 serve.py; -dN = W4A16 drafter, N tokens
     pytorch             gpu-pytorch-g6-2b-q4w4a16 openai_server.py on the DLAMI interpreter (greedy only,
                         no streaming)
@@ -84,6 +84,8 @@ def mtp_dir():
 def server(arm):
     """(cmd, env, url, model, health path, streams)"""
     env = dict(os.environ)
+    # pip --user scripts (vllm, ninja for SGLang's JIT kernels, litert-lm) live here; SSM's PATH lacks it.
+    env["PATH"] = os.path.expanduser("~/.local/bin") + os.pathsep + env.get("PATH", "")
     if arm.startswith("vllm"):
         v = load_env(os.path.join(VRIG, "tpu.env"))
         env["SPECULATIVE_MODEL"] = ""
@@ -105,8 +107,11 @@ def server(arm):
             # the drafter fits beside 4 requests with a 4,096-token cache, not 8,192
             env.update(MTP_MODEL=mtp_dir(), MTP_N_PREDICT=arm[len("mistralrs-d"):], KV_CACHE="4096tokens",
                        MAX_MODEL_LEN="4096")
-        if arm == "mistralrs-card":  # the whole L4, not the 3050's 8 GB limits (UNTESTED)
-            env.update(MAX_SEQS="64", KV_CACHE="65536tokens", MAX_NUM_BATCHED_TOKENS="4096")
+        # The whole L4, not the 3050's 8 GB limits. 64 requests does not load (2026-11-05): mistral.rs plans
+        # 25,316 MiB of activations (~395 MiB a request) + 2,976 MiB fixed against 21,192 MiB usable. 32 requests
+        # with a 65,536-token cache does not either (15,966 MiB of activations; "requested KV capacity cannot fit").
+        if arm == "mistralrs-card":
+            env.update(MAX_SEQS="32", KV_CACHE="16384tokens", MAX_NUM_BATCHED_TOKENS="4096")
         return [SYS_PY, os.path.join(MRIG, "serve.py")], env, v["ENDPOINT"], "default", "/health", True
     if arm.startswith("sglang"):
         v = load_env(os.path.join(SRIG, "tpu.env"))

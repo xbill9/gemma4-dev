@@ -2,7 +2,7 @@
 
 The 3050 flight (`local-vllm-3050oem-2b-q4w4a16emb4/benchmarks/runs/2026-11-03-engines-3050oem/PAPER-TABLE.md`)
 on one NVIDIA L4 in an EC2 G6: the same six engines, the same Gemma 4 E2B weights on the QAT Q4_0 grid, the same
-requests and statistics. Scaffolded 2026-11-05; nothing here has run.
+requests and statistics. Scaffolded 2026-11-05; steps 1–5 ran the same day (`../benchmarks/runs/2026-11-05-engines-g6/REPORT.md`), step 6 has not.
 
 | engine | rig | port | weights |
 |---|---|---|---|
@@ -34,11 +34,14 @@ requests and statistics. Scaffolded 2026-11-05; nothing here has run.
 
 ## Unknowns the first steps answer
 
-- vLLM brings its own `torch==2.14.0` from PyPI here (the 3050 skipped the pin over a system 2.14.1): which
-  CUDA that wheel targets and whether driver 595.112.07 runs it (`make check`).
-- Whether the DLAMI enumerates the L4 as a Vulkan device for LiteRT-LM (`make vulkan`).
-- Whether SGLang needs requirements beyond the 3050's list on a fresh interpreter (`make check`).
-- mistral.rs at the whole card (`mistralrs-card`): its 8 GB limits were the 3050's, untested here.
+Answered 2026-11-05:
+
+- vLLM's PyPI `torch==2.14.0` is `+cu130` (CUDA 13.0) and runs on driver 595.112.07.
+- The DLAMI lists the L4 as a Vulkan device; LiteRT-LM serves on it.
+- SGLang needed nothing beyond the 3050's list; its JIT kernels need `ninja`, found only with `~/.local/bin` on PATH.
+- mistral.rs does not load 64 requests (25,316 MiB of planned activations) or 32 with a 65,536-token cache;
+  `mistralrs-card` is 32 requests with a 16,384-token cache.
+- mistral.rs links `libcurand` (now in its `deps`); pip `--user` scripts need `~/.local/bin` on PATH under SSM.
 
 ## Compare with the 3050
 

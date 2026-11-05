@@ -1,0 +1,107 @@
+make: Entering directory '/opt/gemma4-dev/gpu-mistralrs-g6-2b-q4_0'
+apt-get -o DPkg::Lock::Timeout=600 install -y build-essential pkg-config libssl-dev git libcurand-dev-13-1
+Reading package lists...
+Building dependency tree...
+Reading state information...
+build-essential is already the newest version (12.12ubuntu2.26.04.2).
+pkg-config is already the newest version (2.5.1-4).
+libssl-dev is already the newest version (3.5.5-1ubuntu3.7).
+git is already the newest version (1:2.53.0-1ubuntu1.1).
+Solving dependencies...
+The following additional packages will be installed:
+  libcurand-13-1
+The following NEW packages will be installed:
+  libcurand-13-1 libcurand-dev-13-1
+0 upgraded, 2 newly installed, 0 to remove and 12 not upgraded.
+Need to get 87.7 MB of archives.
+After this operation, 269 MB of additional disk space will be used.
+Get:1 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute/multiverse amd64v3 libcurand-13-1 amd64 10.4.1.81-0ubuntu1 [43.8 MB]
+Get:2 http://us-east-1.ec2.archive.ubuntu.com/ubuntu resolute/multiverse amd64v3 libcurand-dev-13-1 amd64 10.4.1.81-0ubuntu1 [43.9 MB]
+debconf: unable to initialize frontend: Dialog
+debconf: (TERM is not set, so the dialog frontend is not usable.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+debconf: unable to initialize frontend: Teletype
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Noninteractive
+Fetched 87.7 MB in 1s (104 MB/s)
+Selecting previously unselected package libcurand-13-1.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 113228 files and directories currently installed.)
+Preparing to unpack .../libcurand-13-1_10.4.1.81-0ubuntu1_amd64v3.deb ...
+Unpacking libcurand-13-1 (10.4.1.81-0ubuntu1) ...
+Selecting previously unselected package libcurand-dev-13-1.
+Preparing to unpack .../libcurand-dev-13-1_10.4.1.81-0ubuntu1_amd64v3.deb ...
+Unpacking libcurand-dev-13-1 (10.4.1.81-0ubuntu1) ...
+Setting up libcurand-13-1 (10.4.1.81-0ubuntu1) ...
+Setting up libcurand-dev-13-1 (10.4.1.81-0ubuntu1) ...
+Processing triggers for libc-bin (2.43-2ubuntu2.4) ...
+debconf: unable to initialize frontend: Dialog
+debconf: (TERM is not set, so the dialog frontend is not usable.)
+debconf: falling back to frontend: Readline
+debconf: unable to initialize frontend: Readline
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Teletype
+debconf: unable to initialize frontend: Teletype
+debconf: (This frontend requires a controlling tty.)
+debconf: falling back to frontend: Noninteractive
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+
+Service restarts being deferred:
+ /etc/needrestart/restart.d/dbus.service
+ systemctl restart networkd-dispatcher.service
+ systemctl restart systemd-logind.service
+ systemctl restart unattended-upgrades.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+test -x /root/.cargo/bin/cargo || (curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal)
+python3 -c "from huggingface_hub import hf_hub_download as d; d('google/gemma-4-E2B-it-qat-q4_0-gguf', 'gemma-4-E2B-it-mmproj.gguf', revision='675cff42a74c774d6cb76f76d8eacb49b48c9b93', local_dir='/opt/models/e2b-mmproj/')"
+echo "021059cce659fe7f9170d5599761d7bbaf644b798dab9503aca30dc43e6beb14  /opt/models/e2b-mmproj/gemma-4-E2B-it-mmproj.gguf" | sha256sum -c -
+/opt/models/e2b-mmproj/gemma-4-E2B-it-mmproj.gguf: OK
+test -d /opt/mistralrs/mistral.rs || git clone --depth 50 --branch v0.9.5 https://github.com/EricLBuehler/mistral.rs.git /opt/mistralrs/mistral.rs
+test "$(git -C /opt/mistralrs/mistral.rs rev-parse --short=7 HEAD)" = "465191d"
+/opt/models/e2b/gemma-4-E2B-it-q4_0-exact.gguf: OK
+/opt/models/e2b-mmproj/gemma-4-E2B-it-mmproj.gguf: OK
+cd /opt/mistralrs/mistral.rs && PATH=/usr/local/cuda-13.1/bin:$PATH CUDA_COMPUTE_CAP=89 \
+  /root/.cargo/bin/cargo install --locked --path mistralrs-cli -j 8 \
+  --features "cuda,flash-attn" --root /opt/mistralrs/v0.9.5/
+  Installing mistralrs-cli v0.9.5 (/opt/mistralrs/mistral.rs/mistralrs-cli)
+    Updating crates.io index
+warning: package `clipboard-win v5.4.1` in Cargo.lock is yanked in registry `crates-io`
+  |
+  = help: consider running without --locked
+warning: package `core2 v0.4.0` in Cargo.lock is yanked in registry `crates-io`
+  |
+  = help: consider running without --locked
+warning: package `spin v0.9.8` in Cargo.lock is yanked in registry `crates-io`
+  |
+  = help: consider running without --locked
+warning: mistralrs-flash-attn@0.9.5: Using 8 threads for compilation
+warning: mistralrs-flash-attn@0.9.5: Using cached cutlass at /root/.cudaforge/git/checkouts/cutlass-7127592069c2fe01
+warning: mistralrs-flash-attn@0.9.5: Compiling 53 of 53 kernels
+warning: mistralrs-paged-attn@0.9.5: Using 8 threads for compilation
+warning: mistralrs-paged-attn@0.9.5: Compiling 15 of 15 kernels
+warning: mistralrs-quant@0.9.5: Using 8 threads for compilation
+warning: mistralrs-quant@0.9.5: Cloning cutlass from https://github.com/NVIDIA/cutlass.git
+warning: mistralrs-quant@0.9.5: Fetching cutlass commit 7127592069c2fe01b041e174ba4345ef9b279671
+warning: mistralrs-quant@0.9.5: Cached cutlass at /root/.cudaforge/git/checkouts/cutlass-7127592069c2fe01
+warning: mistralrs-quant@0.9.5: Compiling 45 of 45 kernels
+   Compiling mistralrs-core v0.9.5 (/opt/mistralrs/mistral.rs/mistralrs-core)
+warning: mistralrs-core@0.9.5: Using 8 threads for compilation
+warning: mistralrs-core@0.9.5: All library kernels up-to-date, skipping compilation
+   Compiling mistralrs v0.9.5 (/opt/mistralrs/mistral.rs/mistralrs)
+   Compiling mistralrs-server-core v0.9.5 (/opt/mistralrs/mistral.rs/mistralrs-server-core)
+   Compiling mistralrs-cli v0.9.5 (/opt/mistralrs/mistral.rs/mistralrs-cli)
+    Finished `release` profile [optimized] target(s) in 2m 25s
+  Installing /opt/mistralrs/v0.9.5/bin/mistralrs
+   Installed package `mistralrs-cli v0.9.5 (/opt/mistralrs/mistral.rs/mistralrs-cli)` (executable `mistralrs`)
+warning: be sure to add `/opt/mistralrs/v0.9.5/bin` to your PATH to be able to run the installed binaries
+make: Leaving directory '/opt/gemma4-dev/gpu-mistralrs-g6-2b-q4_0'
