@@ -1,0 +1,17 @@
+g6.4xlarge on-demand $1.3232/hr, us-east-1; g6.2xlarge $0.9776/hr (same L4, not measured)
+setting                            shape            tok/s  $ per M output tokens
+vLLM + drafter, 1 request          in128-out512     452.9                 0.8115  ($0.81)
+vLLM + drafter, 1 request          in512-out128     345.2                 1.0646  ($1.06)
+vLLM + drafter (4), 64 requests    in128-out512    4516.3                 0.0814  ($0.08)
+vLLM + drafter (4), 64 requests    in512-out128    1629.3                 0.2256  ($0.23)
+vLLM + drafter (1), 64 requests    in128-out512    4364.5                 0.0842  ($0.08)
+vLLM + drafter (1), 64 requests    in512-out128    1710.0                 0.2149  ($0.21)
+SGLang, 64 requests                in128-out512    2967.1                 0.1239  ($0.12)
+SGLang, 64 requests                in512-out128    1373.0                 0.2677  ($0.27)
+mistral.rs (32 seqs), 64 requests  in128-out512    1825.2                 0.2014  ($0.20)
+mistral.rs (32 seqs), 64 requests  in512-out128    1132.0                 0.3247  ($0.32)
+llama.cpp + drafter, 64 requests   in128-out512    1170.3                 0.3141  ($0.31)
+llama.cpp + drafter, 64 requests   in512-out128     622.0                 0.5909  ($0.59)
+llama.cpp, 64 requests             in128-out512    1056.3                 0.3480  ($0.35)
+llama.cpp, 64 requests             in512-out128     630.8                 0.5827  ($0.58)
+suite run 04:06-16:18 UTC = 12.20 h, $16.14 on-demand
