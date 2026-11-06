@@ -282,14 +282,23 @@ shutting-down
 
 #### Compare and Contrast
 
-| | vLLM | SGLang | llama.cpp | mistral.rs | PyTorch | LiteRT-LM |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 request, best | 🥇 275.3 | 189.6 | 207.7 | 144.6 | 134.7 | 112.8 |
-| 64 requests, 128/512, best | 🥇 4,516 | 2,967 | 1,170 | 1,825 | one at a time | one at a time |
-| Drafter under load | 🟢 pays at every level | ❌ 0.69x at 64 | 🟢 to 16–64 | ❌ slower | — | — |
-| GSM8K level | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
-| BFCL level | 🟢 | ⚠️ 4 behind | 🟢 | 🟢 | 🟢 | ❌ 26–40 behind |
-| Runs as installed | 🟢 | ❌ two patches | 🟢 | ⚠️ needs cuRAND, fixed cache | 🟢 | ⚠️ Vulkan |
+| | vLLM | SGLang | llama.cpp | mistral.rs |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 request, best | 🥇 275.3 | 189.6 | 207.7 | 144.6 |
+| 64 requests, 128/512, best | 🥇 4,516 | 2,967 | 1,170 | 1,825 |
+| Drafter under load | 🟢 pays at every level | ❌ 0.69x at 64 | 🟢 to 16–64 | ❌ slower |
+| GSM8K level | 🟢 yes | 🟢 yes | 🟢 yes | 🟢 yes |
+| BFCL level | 🟢 yes | ⚠️ 4 behind | 🟢 yes | 🟢 yes |
+| Runs as installed | 🟢 yes | ❌ two patches | 🟢 yes | ⚠️ needs cuRAND, fixed cache |
+
+PyTorch and LiteRT-LM serve one request at a time:
+
+| | PyTorch | LiteRT-LM |
+| :--- | :--- | :--- |
+| 1 request, best | 134.7 | 112.8 |
+| GSM8K level | 🟢 yes | 🟢 yes |
+| BFCL level | 🟢 yes | ❌ 26–40 behind |
+| Runs as installed | 🟢 yes | ⚠️ Vulkan |
 
 ---
 
