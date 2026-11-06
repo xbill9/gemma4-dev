@@ -3,7 +3,7 @@
 Step 6 of `../../../flight/FLIGHT.md`: the 3050's concurrency sweeps (1–64 requests) and GSM8K/BFCL accuracy, run
 for every engine of the G6 flight on the same instance as `../2026-11-05-engines-g6` (`i-040ed957b67c2d514`,
 g6.4xlarge, one L4, driver 595.112.07, the same engine builds, weights and drafters). One engine served at a time;
-all 19 jobs ran in one sitting from 04:05 UTC (LiteRT Q4_0 GSM8K still running at this commit), driven by `suite.py`.
+all 19 jobs ran in one sitting, 04:05–16:18 UTC, driven by `suite.py`.
 
 ## Method
 
@@ -120,7 +120,7 @@ sglang-d4       1319  1186  0.8992     2   1955.5   0.492    0.8992    2601     
 mistralrs       1319  1189  0.9014     2   3918.4   0.987    0.9030    4664        0.840  -0.0015 [-0.0121, +0.0099]    54   +0.0030 [-0.0076, +0.0144]
 pytorch         1319  1182  0.8961     5   3990.8   1.005    0.8992    4377        0.912  -0.0030 [-0.0068, +0.0008]     6   -0.0023 [-0.0129, +0.0083]
 litert-int248   1319  1175  0.8908     0   5017.7   1.264    0.8795    7266        0.691  +0.0114 [-0.0023, +0.0258]    93   -0.0076 [-0.0220, +0.0068]
-litert-q4      (not run)
+litert-q4       1319  1187  0.8999     0   5850.7   1.473    0.8992    7805        0.750  +0.0008 [-0.0053, +0.0068]    17   +0.0015 [-0.0083, +0.0121]
 
 bfcl_simple: one request at a time, thinking off
 arm                n right     acc trunc   wall s x llama  3050 acc  3050 s L4/3050 time  L4-3050 paired [95%]       differ   L4 arm - L4 llama [95%]
@@ -133,7 +133,7 @@ sglang-d4        400   366  0.9150     0     56.9   0.512    0.9175      75     
 mistralrs        400   368  0.9200     0     92.8   0.835    0.9150     119        0.779  +0.0050 [+0.0000, +0.0125]     2   -0.0050 [-0.0175, +0.0075]
 pytorch          400   369  0.9225     0    124.5   1.120    0.9225     156        0.800  +0.0000 [+0.0000, +0.0000]     0   -0.0025 [-0.0125, +0.0050]
 litert-int248    400   330  0.8250     0    311.2   2.799    0.8250     478        0.652  +0.0000 [-0.0125, +0.0125]     6   -0.1000 [-0.1350, -0.0675]
-litert-q4      (not run)
+litert-q4        400   344  0.8600     0    325.8   2.930    0.8625     489        0.667  -0.0025 [-0.0075, +0.0000]     1   -0.0650 [-0.0925, -0.0400]
 ```
 
 `differ` counts questions right on one card and wrong on the other; the paired range is a 95% bootstrap over
@@ -142,15 +142,15 @@ questions. `x llama` and `L4/3050 time` are wall-clock ratios.
 #### Findings
 
 - **The L4 gives the same answers as the 3050**: every engine's paired range against its own 3050 run includes
-  zero on both tasks. GSM8K 0.8954–0.9014 for the five CUDA engines, with and without drafters; LiteRT int248
-  0.8908. BFCL 0.915–0.925; LiteRT int248 0.825, the same 330 of 400 as on the 3050, and LiteRT Q4_0 0.860
+  zero on both tasks. GSM8K 0.8954–0.9014 for the five CUDA engines, with and without drafters; LiteRT Q4_0
+  0.8999 and int248 0.8908. BFCL 0.915–0.925; LiteRT int248 0.825, the same 330 of 400 as on the 3050, and LiteRT Q4_0 0.860
   against 0.8625.
 - **Between engines on the L4, GSM8K is level for every engine against llama.cpp** (paired ranges include zero).
   On BFCL, SGLang (0.915, with or without its drafter) is below llama.cpp (0.925, range −0.0200 to −0.0025), as it
-  was 4 behind vLLM on the 3050; LiteRT int248 is 0.100 below.
+  was 4 behind vLLM on the 3050; LiteRT is below too (int248 −0.100, Q4_0 −0.065).
 - **Drafters change no score and cut the time**: GSM8K takes 1,270 s with vLLM's drafter, 0.32x llama.cpp without
   one (3,971 s); llama.cpp's drafter 0.51x, SGLang's 0.49x. Without drafters the CUDA engines take
-  3,918–4,035 s, and LiteRT int248 5,018 s (1.26x).
+  3,918–4,035 s, LiteRT int248 5,018 s (1.26x) and LiteRT Q4_0 5,851 s (1.47x).
 - One request at a time, GSM8K runs 0.69–0.91x the 3050's time. The 2026-10-26 L4 llama.cpp run
   (`gpu-llamacpp-g6-2b-q4_0/benchmarks/runs/2026-10-26-drafter-g6`, 1,013.6 s) sent 8 requests at once, so its
   time does not compare with these.
@@ -161,6 +161,6 @@ questions. `x llama` and `L4/3050 time` are wall-clock ratios.
   `command.txt` (the server's command line), `server.log`, `gpu.csv` (nvidia-smi once a second).
 - `acc-<arm>/` — `gsm8k.jsonl`, `bfcl_simple.jsonl` (every question, reply and verdict), their logs, `command.txt`,
   `server.log`, `gpu.csv`; LiteRT arms also `config.json`.
-- `driver.log` — every job's start, readiness, result and end.
+- `driver.log` — every job's start, readiness, result and end; `suite.out` — the driver's own output.
 - `suite.py`, `proxy.py`, `sweep.py` — the driver, the LiteRT proxy and the sweep as run (copies of `../../../flight/`
   and `../../../sweep.py`); `analyze.py` writes `SWEEP.txt`, `COMPARE-3050.txt` and `ACCURACY.txt`.
