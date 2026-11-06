@@ -1,0 +1,15 @@
+Six Serving Engines on One EC2 G6: Gemma 4 E2B on an NVIDIA L4
+
+llama.cpp, vLLM, SGLang, mistral.rs, a plain PyTorch engine and LiteRT-LM serve the same 4-bit Gemma 4 E2B on one g6.4xlarge, measured with the same prompts, the same 1-to-64-request sweep and the same GSM8K and BFCL questions. Answers are level on every engine; vLLM with Google's drafter is the fastest at every load, up to 4,516 output tokens per second.
+
+What is in it:
+
+- 🟢 All six engines give the same GSM8K answers (0.8908 to 0.9014) with the drafter on or off.
+- 🟢 vLLM with its drafter is the fastest engine at every level from 1 to 64 requests: 275.3 tokens per second for one request and 4,516 at 64 (128 in / 512 out).
+- 🟢 vLLM's drafter pays at every load on the L4, and finishes GSM8K 3.08x sooner.
+- 🟢 At full load vLLM serves a million output tokens for $0.08 on demand.
+
+dev.to (AWS Community Builders): https://dev.to/aws-builders/six-serving-engines-on-one-ec2-g6-gemma-4-e2b-on-an-nvidia-l4-3ff3
+AWS Builder Center: https://builder.aws.com/content/3LkJbIXPJxarzoZDc3HWg4ZzBZY/six-serving-engines-on-one-ec2-g6-gemma-4-e2b-on-an-nvidia-l4
+Medium: https://medium.com/@xbill999/six-serving-engines-on-one-ec2-g6-gemma-4-e2b-on-an-nvidia-l4-8f4b719f1ecb
+Substack: https://xbill9.substack.com/p/six-serving-engines-on-one-ec2-g6
