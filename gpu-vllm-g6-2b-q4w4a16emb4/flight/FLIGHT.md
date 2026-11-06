@@ -2,7 +2,8 @@
 
 The 3050 flight (`local-vllm-3050oem-2b-q4w4a16emb4/benchmarks/runs/2026-11-03-engines-3050oem/PAPER-TABLE.md`)
 on one NVIDIA L4 in an EC2 G6: the same six engines, the same Gemma 4 E2B weights on the QAT Q4_0 grid, the same
-requests and statistics. Scaffolded 2026-11-05; steps 1–5 ran the same day (`../benchmarks/runs/2026-11-05-engines-g6/REPORT.md`), step 6 has not.
+requests and statistics. Scaffolded 2026-11-05; steps 1–5 ran the same day (`../benchmarks/runs/2026-11-05-engines-g6/REPORT.md`) and step 6 on 2026-11-06
+(`../benchmarks/runs/2026-11-06-suite-g6/REPORT.md`).
 
 | engine | rig | port | weights |
 |---|---|---|---|
@@ -30,7 +31,9 @@ requests and statistics. Scaffolded 2026-11-05; steps 1–5 ran the same day (`.
    with `engines.py` and `summarize.py` copied beside the results.
 6. **Concurrency and accuracy**, per rig, as on the 3050: each rig's `sweep.py` (512/128 and 128/512 at
    1–64 requests), and GSM8K (1,319) and BFCL simple (400) through `jev-tpu-v5e1/gen_eval.py`, one request at
-   a time, greedy, thinking off.
+   a time, greedy, thinking off. **`flight/suite.py OUT sweep:<arm>,acc:<arm>,...`** runs both, one server at a
+   time, and skips jobs already marked `DONE`, so a failed job reruns alone; `flight/proxy.py` puts LiteRT-LM's
+   `max_tokens` where its server reads it. File the run as `<date>-suite-g6/` with copies of both.
 
 ## Unknowns the first steps answer
 
