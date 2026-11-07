@@ -104,4 +104,4 @@ about 08:30 UTC.
 `vllm-text-d4` ran out of TPU memory in warmup at 0.70 and again on a rerun at 0.60 (`ladder.py` now passes 0.60
 for d4; `finish.sh` takes a start time so an earlier failure does not block the delete); A was deleted by hand at
 15:01 UTC. Archives verified by SHA-256 and unpacked into `benchmarks/runs/2026-11-06-ladder-v5e1/`, one
-directory per VM, with `REPORT.md` and `SUMMARY.txt` from `analyze.py`; the bucket is deleted.
+directory per VM, with `REPORT.md` and `SUMMARY.txt` from `analyze.py`. The bucket `gs://aisprint-491218-ladder-v5e1` still holds the three archives.
