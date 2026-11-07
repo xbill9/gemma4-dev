@@ -6,6 +6,7 @@
 # downloaded once into /opt/hf (the vLLM container mounts it as its HF cache).
 set -euo pipefail
 L=${LADDER:-/opt/ladder}
+export HOME=${HOME:-/root}  # systemd-run units have no HOME; rustup and cargo need it
 export HF_HOME=/opt/hf HF_TOKEN=$(cat $L/hf_token)
 mkdir -p /opt/hf
 step() { echo "$(date +%T) START $1"; }

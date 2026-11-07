@@ -12,8 +12,15 @@ pure-JAX engine, its Rust front end, and TorchTPU in Python and in Rust. Started
 | `jax` | pure-JAX engine | `~/jax-dev/tpu-jax-v5e1-2b-q4w4a16` | `xbill9/...-w4a16-ct-text`, `--quant-mode w4a16` |
 | `jax-bf16` | pure-JAX engine | `~/jax-dev/tpu-jax-v5e1-2b` | `google/gemma-4-E2B-it`, dense |
 | `jaxrust` | Rust model over PJRT | `~/jax-dev/tpu-jaxrust-v5e1-2b` | `google/gemma-4-E2B-it` (bf16 only) |
-| `torchtpu` | TorchTPU 0.2.0, Python | `~/torchtpu-dev/tpu-pytorch-v5e1-2b-w4a16` | `google/gemma-4-E2B-it-qat-w4a16-ct` |
+| `torchtpu`, `torchtpu-bf16` | TorchTPU 0.2.0, Python | `~/torchtpu-dev/tpu-pytorch-v5e1-2b-w4a16` | `google/gemma-4-E2B-it-qat-w4a16-ct`; `-bf16` `google/gemma-4-E2B-it` |
 | `torchtpu-rust` | TorchTPU 0.2.0, Rust (PyO3) | `~/torchtpu-dev/tpu-pytorchrust-v5e1-2b-q4w4a16emb4` | `-text` linears with the `-emb4` int4 tables |
+
+**Dropped from the 2026-11-06 run (user, 2026-11-07): both TorchTPU arms.** `torchtpu` (w4a16) does not
+serve: `torch.compile` fails tracing compressed-tensors' int4 unpack (`index_put_(): cannot record EventSnapshot
+during an FX trace`). `torchtpu-bf16` served, 5/5 on the first five GSM8K questions in 1,000 s, three of them at
+the 2,048-token cap. `torchtpu-rust` answered GSM8K at about 29 s a question. Their `one` results (six prompts)
+were measured and are in the run's `results.jsonl`; their GSM8K runs were stopped and deleted. Also not run:
+`vllm-text-d1` (time).
 
 Why the drafter arms use `-text`: vLLM's MTP drafter copies the target's bf16 `embed_tokens` and cannot pair with
 the int4-table build; Google's QAT drafter was slower than none on this chip at every load (`QUANTIZATION.md`,
@@ -45,3 +52,50 @@ two v5e-1s.
   `tool_calls`, so BFCL there would score a missing server feature, not the model.
 
 Not measured: TPU memory in use (no `nvidia-smi` equivalent wired in).
+
+## The 2026-11-06 run, and how to pick it up
+
+Output directory on every VM: `/opt/ladder-out/2026-11-06-ladder-v5e1` (`driver.log`, `results.jsonl` for the
+`one` jobs, `one-*/`, `sweep-*/`, `acc-*/`, `versions.txt`, `setup-jax*.log`, `finish.log`). Settings that differ
+from the defaults above, found by the five-question smoke tests (`/opt/ladder-out/smoke*`):
+
+- vLLM drafter arms serve at `--gpu-memory-utilization 0.70`: `-text` plus the drafter ran out of HBM during
+  warmup at 0.80 (`RESOURCE_EXHAUSTED ... Attempting to allocate 64.00M ... 25.12M free`).
+- vLLM's first start on each arm takes 31 to 34 minutes (ready_s 2,055 and 1,860), so `ladder.py` runs all of an
+  arm's jobs (`one+sweep+acc:<arm>`) against one server start.
+- `setup-jax.sh` exports `HOME`: under `systemd-run` it was unset and the first run stopped at the Rust step; it
+  was rerun on B and C after the TorchTPU `one` jobs had finished (`setup-jax-2.log`).
+
+| VM (queued resource) | Jobs | Unit |
+| --- | --- | --- |
+| `tpu-vllm-v5e1-2b-q4w4a16emb4` (A) | `one+sweep+acc` for `vllm`, `vllm-text`, `vllm-text-d4` | `ladder-full` |
+| `ladder-v5e1-torchtpu` (B) | `one+acc:jax-bf16` | `ladder-jax` |
+| `ladder-v5e1-torchtpurs` (C) | `one+acc:jaxrust`, then `one+acc:jax` (moved off A: A's `one-jax/`, `acc-jax/` hold only `MOVED` and `DONE`) | `ladder-jax` |
+
+**Each VM finishes by itself.** `finish.sh` runs as the `ladder-finish` unit: it waits for the ladder unit to
+end, uploads the run directory as `gs://aisprint-491218-ladder-v5e1/2026-11-06-ladder-v5e1/<queued resource>/ladder-run.tgz`
+(with `ladder-run.sha256` and `finish.log`), downloads it back and compares SHA-256, then deletes its own queued
+resource. It does **not** delete when the upload fails or `driver.log` has a `FAIL` / `ok=False` line outside
+the TorchTPU arms; that VM then stays up until the 24-hour flex-start limit (about 19:35 UTC on 2026-11-07). The
+VMs run as the default compute service account, which holds `roles/editor` and `roles/tpu.admin`.
+
+To pick up:
+
+```
+gcloud storage ls -r gs://aisprint-491218-ladder-v5e1/2026-11-06-ladder-v5e1/
+gcloud storage cat gs://aisprint-491218-ladder-v5e1/2026-11-06-ladder-v5e1/*/finish.log
+gcloud compute tpus queued-resources list --zone us-west4-a --project aisprint-491218
+```
+
+A VM still listed with a `NOT deleting` finish.log needs its failed job rerun (`ladder.py` skips jobs with a
+`DONE` marker, so rerunning the same job list redoes only the failed ones), then a new `ladder-finish` unit. Then:
+unpack the three archives into `benchmarks/runs/2026-11-06-ladder-v5e1/` (one subdirectory per VM, or merged:
+the arm directories do not overlap except A's `MOVED` placeholders), copy `ladder.py`, `setup-jax.sh`,
+`finish.sh` beside them, write REPORT.md with the tables computed by a script, commit, push, and delete the
+bucket. No comparison paper.
+
+State at 2026-11-07 01:19 UTC (from each `driver.log`): A has finished `vllm` (BFCL 368/400 = 0.920, GSM8K
+1188/1319 = 0.9007, 3,630 s) and `vllm-text` (BFCL 368/400 = 0.920, GSM8K 1186/1319 = 0.8992, 3,948 s), and is
+starting `vllm-text-d4`. B is on `acc:jax-bf16` (GSM8K since 00:41), C on `acc:jaxrust` (since 00:41), every
+`one` job done. Expected ends, from smoke-test rates and so approximate: A about 04:00, B about 04:30, C
+about 08:30 UTC.
