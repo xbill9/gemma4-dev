@@ -99,3 +99,9 @@ State at 2026-11-07 01:19 UTC (from each `driver.log`): A has finished `vllm` (B
 starting `vllm-text-d4`. B is on `acc:jax-bf16` (GSM8K since 00:41), C on `acc:jaxrust` (since 00:41), every
 `one` job done. Expected ends, from smoke-test rates and so approximate: A about 04:00, B about 04:30, C
 about 08:30 UTC.
+
+**Result (2026-11-07).** B and C finished every job and deleted themselves (01:48 and 03:11 UTC). On A
+`vllm-text-d4` ran out of TPU memory in warmup at 0.70 and again on a rerun at 0.60 (`ladder.py` now passes 0.60
+for d4; `finish.sh` takes a start time so an earlier failure does not block the delete); A was deleted by hand at
+15:01 UTC. Archives verified by SHA-256 and unpacked into `benchmarks/runs/2026-11-06-ladder-v5e1/`, one
+directory per VM, with `REPORT.md` and `SUMMARY.txt` from `analyze.py`; the bucket is deleted.

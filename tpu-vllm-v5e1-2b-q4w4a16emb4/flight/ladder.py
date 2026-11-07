@@ -102,7 +102,8 @@ class Server:
                 "512",
                 "--gpu-memory-utilization",
                 # -text weights + the drafter ran out of HBM in warmup at 0.80 (smoke test, 2026-11-06)
-                "0.70" if a.startswith("vllm-text-d") else "0.80",
+                # 4 drafted tokens ran out at 0.70 (needed 512 MiB, 429.5 MiB free, 2026-11-07 01:47)
+                "0.60" if a == "vllm-text-d4" else "0.70" if a.startswith("vllm-text-d") else "0.80",
                 "--limit-mm-per-prompt",
                 '{"image":0,"audio":0,"video":0}',
                 "--enable-auto-tool-choice",
@@ -165,7 +166,9 @@ class Server:
             self.cmd = [PY, "tpu_openai_server.py", "--model", self.model, "--seq", "4096", "--port", str(PORT)]
         elif a == "torchtpu-bf16":
             self.model = "google/gemma-4-E2B-it"
-            self.cwd = os.path.join(L, "torchtpu-dev", "tpu-pytorch-v5e1-2b-w4a16")  # tpu_openai_server.py identical to tpu-pytorch-v5e1-2b's
+            self.cwd = os.path.join(
+                L, "torchtpu-dev", "tpu-pytorch-v5e1-2b-w4a16"
+            )  # tpu_openai_server.py identical to tpu-pytorch-v5e1-2b's
             self.cmd = [PY, "tpu_openai_server.py", "--model", self.model, "--seq", "4096", "--port", str(PORT)]
         elif a == "torchtpu-rust":
             self.model = EMB4
