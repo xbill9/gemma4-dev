@@ -21,6 +21,9 @@ Arms
   torchtpu-bf16   the same server file (identical in tpu-pytorch-v5e1-2b), google/gemma-4-E2B-it (bf16)
   torchtpu-rust   torchtpu-dev/tpu-pytorchrust-v5e1-2b-q4w4a16emb4: the torchtpu-rs systemd unit its startup
                   script installs (the -text linears with the -emb4 int4 tables), started and stopped here
+  sglang          SGLang-JAX (sgl-project/sglang-jax, SGL_COMMIT in setup-sgl.sh), google/gemma-4-E2B-it bf16,
+                  --reasoning-parser gemma4; it has no Gemma 4 tool-call parser, so no BFCL. Its acc job scores
+                  the first 50 GSM8K questions first and runs the rest (and the sweep) only at accuracy >= 0.5
 
 Jobs
   one     the G6 engines.py requests: six prompts, greedy, thinking off, 256 tokens; non-streaming (e2e) and
@@ -81,7 +84,7 @@ class Server:
     def __init__(self, arm):
         self.arm, self.proc, self.unit = arm, None, None
         self.env = dict(os.environ, HF_TOKEN=hf_token(), HF_HOME="/opt/hf")
-        self.model, self.bfcl, self.cwd = BF16, False, None
+        self.model, self.bfcl, self.cwd, self.broken = BF16, False, None, False
         a = arm
         if a.startswith("vllm"):
             self.model = EMB4 if a == "vllm" else TEXT
@@ -170,6 +173,32 @@ class Server:
                 L, "torchtpu-dev", "tpu-pytorch-v5e1-2b-w4a16"
             )  # tpu_openai_server.py identical to tpu-pytorch-v5e1-2b's
             self.cmd = [PY, "tpu_openai_server.py", "--model", self.model, "--seq", "4096", "--port", str(PORT)]
+        elif a == "sglang":
+            self.cmd = [
+                PY,
+                "-m",
+                "sgl_jax.launch_server",
+                "--model-path",
+                BF16,
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(PORT),
+                "--device",
+                "tpu",
+                "--tp-size",
+                "1",
+                "--dtype",
+                "bfloat16",
+                "--context-length",
+                "16384",
+                "--max-running-requests",
+                "64",
+                "--mem-fraction-static",
+                "0.8",
+                "--reasoning-parser",
+                "gemma4",
+            ]
         elif a == "torchtpu-rust":
             self.model = EMB4
             self.unit = "torchtpu-rs"
@@ -346,6 +375,10 @@ def job_one(s, d, base):
 
 
 def job_sweep(s, d, base):
+    if s.broken:
+        log(f"  sweep:{s.arm} skipped: GSM8K gate failed")
+        open(os.path.join(d, "SKIPPED"), "w").write("GSM8K gate failed\n")
+        return True
     ok = True
     for i, o in ((512, 128), (128, 512)):
         rc = subprocess.run(
@@ -384,6 +417,26 @@ def job_sweep(s, d, base):
 def job_acc(s, d, base):
     ok = True
     tasks = (["bfcl_simple"] if s.bfcl else []) + ["gsm8k"]
+    if s.arm == "sglang" and not LIMIT:
+        p = subprocess.run(
+            [PY, "gen_eval.py", "run", URL, s.model, "gsm8k", os.path.join(d, "gsm8k-gate.jsonl"), "--concurrency", "1",
+             "--limit", "50"],
+            cwd=JEV,
+            env=dict(os.environ, JEV_GEN_MAX_TOKENS="2048"),
+            capture_output=True,
+            text=True,
+        )
+        open(os.path.join(d, "gsm8k-gate.log"), "w").write(p.stdout + p.stderr)
+        last = (p.stdout.strip().splitlines() or [""])[-1]
+        log(f"  acc:{s.arm} gsm8k-gate rc={p.returncode} {last}")
+        try:
+            accu = json.loads(last)["accuracy"]
+        except Exception:
+            accu = 0.0
+        if accu < 0.5:
+            s.broken = True
+            log(f"  acc:{s.arm} GATE accuracy {accu} < 0.5 on the first 50: full GSM8K and sweep not run")
+            return True
     for t in tasks:
         p = subprocess.run(
             [PY, "gen_eval.py", "run", URL, s.model, t, os.path.join(d, f"{t}.jsonl"), "--concurrency", "1"]
