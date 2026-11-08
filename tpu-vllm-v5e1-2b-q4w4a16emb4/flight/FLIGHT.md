@@ -109,3 +109,29 @@ about 08:30 UTC.
 for d4; `finish.sh` takes a start time so an earlier failure does not block the delete); A was deleted by hand at
 15:01 UTC. Archives verified by SHA-256 and unpacked into `benchmarks/runs/2026-11-06-ladder-v5e1/`, one
 directory per VM, with `REPORT.md` and `SUMMARY.txt` from `analyze.py`. The bucket `gs://aisprint-491218-ladder-v5e1` still holds the three archives.
+
+## The SGLang-JAX arm (2026-11-08), and how to pick it up
+
+Added so the write-up can say SGLang was tried on the TPU. One flex-start v5e-1, queued resource
+`ladder-v5e1-sglang2` in `us-west4-a`, unattended: `run-sgl.sh` (as systemd unit `ladder-sgl`) runs `setup-sgl.sh`
+(Python 3.13, `sglang-jax[tpu]` at `b3e3e16b2`, CPU torch + torchvision for `Gemma4Processor`,
+`google/gemma-4-E2B-it` bf16), then `ladder.py one+acc+sweep:sglang`, then `finish.sh` with `ALWAYS_DELETE=1`:
+upload, read back, SHA-256 check, **delete the queued resource whatever the outcome**. The 24-hour flex-start
+limit is the backstop.
+
+What to expect: sglang-jax main implements the Gemma 4 31B and 26B A4B decoders only (`models/gemma4.py` has no
+per-layer embedding or KV-sharing code) and its loader drops checkpoint keys it has no mapping for, so E2B may load
+and answer wrongly. The `acc` job scores the first 50 GSM8K questions (`gsm8k-gate.jsonl`) and runs the full GSM8K
+and the sweep only at accuracy >= 0.5. It has no Gemma 4 tool-call parser, so no BFCL. Compare it with `jax-bf16`
+and `jaxrust` (also bf16 `google/gemma-4-E2B-it`), not with the int4 `vllm` arm.
+
+Pickup:
+
+```
+B=gs://aisprint-491218-ladder-v5e1/2026-11-08-ladder-sglang-v5e1/ladder-v5e1-sglang2
+gcloud storage cat $B/finish.log          # "delete requested" = done and torn down
+gcloud alpha compute tpus queued-resources list --zone us-west4-a --project aisprint-491218
+```
+
+Unpack `ladder-run.tgz` (check `ladder-run.sha256`) into `benchmarks/runs/2026-11-08-ladder-sglang-v5e1/`, add
+the arm to `analyze.py`, REPORT.md and SUMMARY.txt, commit, push.

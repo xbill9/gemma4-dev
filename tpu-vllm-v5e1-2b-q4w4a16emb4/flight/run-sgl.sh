@@ -4,7 +4,7 @@
 # a failed job, so the VM uploads what it has and deletes itself whatever the outcome).
 set -u
 QR=$1
-export LADDER=/opt/ladder HOME=${HOME:-/root} RUN=2026-11-08-ladder-sglang-v5e1
+export LADDER=/opt/ladder HOME=${HOME:-/root} RUN=${RUN:-2026-11-08-ladder-sglang-v5e1}
 O=/opt/ladder-out/$RUN
 mkdir -p $O
 cd $LADDER/flight

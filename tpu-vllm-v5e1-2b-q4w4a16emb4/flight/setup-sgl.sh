@@ -23,6 +23,12 @@ step sglang-jax
 python3.13 -m pip install -q --ignore-installed blinker \
   "sglang-jax[tpu] @ git+https://github.com/sgl-project/sglang-jax@${SGL_COMMIT}#subdirectory=python"
 
+step torch-cpu
+# transformers builds Gemma4Processor only with torch + torchvision; without them the server dies at
+# TokenizerManager (2026-11-08 19:11, "Could not import module 'Gemma4Processor'"). CPU wheels: the TPU does the work.
+python3.13 -m pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
+python3.13 -c "from transformers import Gemma4Processor; print('Gemma4Processor ok')"
+
 step weights
 python3.13 -c "from huggingface_hub import snapshot_download as s; print(s('google/gemma-4-E2B-it'), flush=True)"
 
@@ -32,7 +38,7 @@ step versions
   python3.13 -m pip show sglang-jax | grep -E '^Version'
   python3.13 -c "import jax, jaxlib; print('jax', jax.__version__, 'jaxlib', jaxlib.__version__)"
   python3.13 -m pip show libtpu 2>/dev/null | grep -E '^(Name|Version)' | tr '\n' ' '; echo
-  python3.13 -c "import transformers; print('transformers', transformers.__version__)"
+  python3.13 -c "import transformers, torch; print('transformers', transformers.__version__, 'torch', torch.__version__)"
 } > $L/versions-sgl.txt 2>&1
 cat $L/versions-sgl.txt
 echo "$(date +%T) SETUP-DONE"
