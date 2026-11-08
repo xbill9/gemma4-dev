@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Six Serving Engines, One 8 GB GPU: Gemma 4 E2B on an RTX 3050</title>
+  <meta name="description" content="llama.cpp, vLLM, SGLang, mistral.rs, a plain PyTorch engine and LiteRT-LM serve the same 4-bit Gemma 4 E2B on one 8 GB RTX 3050, measured with the same prompts, the same load sweep and the same GSM8K and BFCL questions. GSM8K is level on every engine; vLLM is the fastest up to 16 requests and within 3% of SGLang beyond." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step comparison of six inference
+serving engines on one consumer GPU: llama.cpp, vLLM, SGLang,
+mistral.rs, a plain PyTorch engine and Google's LiteRT-LM, each serving
+Gemma 4 E2B on Google's QAT 4-bit weights from an 8 GB RTX 3050 in a
+desktop.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-cover.91723b8d.jpg" alt="Six Serving Engines, One 8 GB GPU: Gemma 4 E2B on an RTX 3050" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p>The question is which engine to run when the model lives on a small
+local card that does nothing else. Each engine gets the same weights,
+the same prompts, the same 1-to-64-request load sweep and the same 1,319
+GSM8K and 400 BFCL questions, and each is measured with and without
+Google's E2B drafter wherever the engine supports one.</p>
+<hr />
+<h4 id="the-results-in-brief">The Results in Brief</h4>
+<p>Answer quality barely moves between engines. GSM8K lands between
+0.8992 and 0.9030 and BFCL between 0.9125 and 0.925 on all six, with the
+drafter on or off, and on GSM8K every paired difference is within the
+run-to-run range. On BFCL two engines trail vLLM by 4 and 5
+questions.</p>
+<p>For one request, five engines are within 12% of each other without a
+drafter (108.8 to 121.1 tokens per second end to end) and LiteRT-LM runs
+at about half that. The drafter decides the order: it gives vLLM 1.90x,
+llama.cpp 1.35x, SGLang 1.33x and LiteRT-LM 1.10x, and it slows
+mistral.rs to 0.72x.</p>
+<p>Under load the batching engines separate. At 64 requests of 128
+tokens in and 512 out without a drafter, vLLM reaches 1,651 tokens per
+second and SGLang 1,711, against 633 for llama.cpp and 308 for
+mistral.rs. PyTorch and LiteRT-LM serve one request at a time.</p>
+<p>With each engine at its best setting, vLLM is the fastest from 1 to
+16 requests, and SGLang leads it by 1 to 3% at 32 and 64 requests on
+long replies. llama.cpp gains nothing from the rest of the card: with
+every table on the GPU and larger batches it uses 4.3 GB and runs at
+0.996 to 1.024x its 2.6 GB speed.</p>
+<hr />
+<h4 id="what-changes-and-what-stays">What Changes and What Stays</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-1.png"
+alt="Table: Engine, Version, Weights, Installed with" /></p>
+<p>The same for all six: one RTX 3050 OEM (GA106, sm_86, 8,192 MiB,
+driver 615.78.08) in an i7-5820K desktop, Gemma 4 E2B on Google's QAT
+Q4_0 grid in every container, greedy decoding, and one Python 3.14
+interpreter with no virtual environment. The exact Q4_0 GGUF and the
+W4A16 checkpoint carry the same 4-bit values:
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</code> for llama.cpp and
+mistral.rs,
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</code> for vLLM
+and SGLang.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA GPU with 8 GB and a CUDA toolkit</li>
+<li>The system <code>python3</code> with pip, and a Rust toolchain for
+mistral.rs</li>
+<li>A clone:
+<code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+<li>Google's E2B QAT assistant drafter, as exact Q4_0 GGUF for
+llama.cpp, W4A16 for vLLM and SGLang, bf16 for mistral.rs</li>
+</ul>
+<hr />
+<h4 id="step-1--one-rig-directory-per-engine">Step 1 — One Rig Directory
+per Engine</h4>
+<p>Each engine has its own directory with a <code>tpu.env</code> that
+decides every serving flag, a <code>serve.py</code> or Makefile that
+turns it into a command, and its measurements under
+<code>benchmarks/runs/</code>:</p>
+<pre class="text"><code>local-llamacpp-3050oem-2b-q4_0/
+local-vllm-3050oem-2b-q4w4a16emb4/
+local-sglang-3050oem-2b-q4w4a16emb4/
+local-mistralrs-3050oem-2b-q4_0/
+local-pytorch-3050oem-2b-q4w4a16/
+local-litertlm-3050oem-2b-int248/
+cd local-sglang-3050oem-2b-q4w4a16emb4 &amp;&amp; make command
+python3 -m sglang.launch_server --model-path xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4 --revision db715f83da4f13289761d7c45f4d19ceac84695d --host 127.0.0.1 --port 8030 --mem-fraction-static 0.80 ...</code></pre>
+<p>Only one engine serves at a time; none of them fits beside another on
+8 GB.</p>
+<hr />
+<h4 id="step-2--install-vllm-and-sglang-on-the-system-python">Step 2 —
+Install vLLM and SGLang on the System Python</h4>
+<p>vLLM 0.33.0 pins <code>torch==2.14.0</code> and the machine has
+2.14.1. Its kernels are built against libtorch's stable ABI, so
+<code>make install</code> installs its other requirements and then vLLM
+itself with <code>--no-deps</code>, and it serves on 2.14.1.</p>
+<p>SGLang 0.5.23 ships wheels for Python 3.11 to 3.13. Its HTTP server
+runs on 3.14 from the cp313 wheel retagged, installed with
+<code>--no-deps</code>, plus only the requirements that were missing. No
+package already installed changed version.</p>
+<p>🔎 <strong>Tip: SGLang 0.5.23 needs two patches for this
+checkpoint.</strong> Its Gemma 4 attention shim runs only for multimodal
+configs, and a text-only checkpoint fails at load on
+<code>head_dim</code> (Gemma 4's sliding layers are 256 wide, its full
+layers 512). And it reads the int4 <code>lm_head</code> from
+compressed-tensors but leaves the int4 <code>embed_tokens</code> and
+per-layer table as uninitialized bf16, which takes 6.93 GB. The rig's
+<code>patches/</code> keep both tables packed on the card and unpack
+only the rows a request uses:</p>
+<pre class="text"><code>Load weight end. elapsed=1.15 s, type=Gemma4ForCausalLM, quant=compressed-tensors, avail mem=4.34 GB, mem usage=3.25 GB.</code></pre>
+<hr />
+<h4 id="step-3--size-each-engine-for-8-gb">Step 3 — Size Each Engine for
+8 GB</h4>
+<p>Each engine needs a setting that fits the card:</p>
+<ul>
+<li><strong>vLLM</strong> reserves 85% of the card up front
+(<code>--gpu-memory-utilization 0.85</code>), 64 running requests.</li>
+<li><strong>SGLang</strong> reserves 80%
+(<code>--mem-fraction-static 0.80</code>), 64 running requests, decode
+CUDA graphs captured up to 64. Prompt-reading graphs are off, because
+capture refuses Gemma 4's 20 layers that share another layer's
+cache.</li>
+<li><strong>llama.cpp</strong> runs 64 slots of 1,024 tokens for the
+load sweep.</li>
+<li><strong>mistral.rs</strong> runs 4 requests with a fixed 8,192-token
+cache and 1,024 tokens per step.</li>
+</ul>
+<p>🔎 <strong>Tip: size mistral.rs by tokens, never by memory
+share.</strong> With <code>--gpu-memory-utilization</code> it reserves
+about 300 MiB of image and audio encoder memory per running request and
+then answers every request with HTTP 503 ("Memory pressure prevented
+forward admission"), even one at a time.
+<code>--kv-cache 8192tokens --max-seqs 4 --max-num-batched-tokens 1024</code>
+serves.</p>
+<hr />
+<h4 id="step-4--one-request-at-a-time">Step 4 — One Request at a
+Time</h4>
+<p><code>engines.py</code> sends six chat prompts, 256 tokens each,
+three times per engine, and takes the geometric mean of each prompt's
+median, end to end:</p>
+<pre class="text"><code>arm              e2e tok/s vs llama  decode TTFT ms 4 at once  x one    memory ready s repeat
+pytorch              118.9    1.093       -       -     119.1   1.00  3121 MiB   236.1   6/6
+litert-q4             61.9    0.569    79.5     828      63.6   1.03  1846 MiB     2.0   6/6
+llama                108.8    1.000   110.5      42     277.4   2.55  2809 MiB     4.0   6/6
+llama-d2             147.4    1.355   150.7      42     285.4   1.94  2885 MiB     4.0   6/6
+vllm                 121.1    1.113   124.5      53     454.6   3.75  6697 MiB    48.0   6/6
+vllm-d4              230.5    2.118   244.5      55     470.7   2.04  7345 MiB    66.0   6/6</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-2.png"
+alt="Table: Engine, No drafter, Best drafter, Drafter gain" /></p>
+<p>SGLang and mistral.rs ran the next day beside a same-day reference
+engine (vLLM for SGLang, llama.cpp for mistral.rs); each matched its
+reference within 1%. Every engine repeats its own greedy text on all six
+prompts.</p>
+<hr />
+<h4 id="step-5--why-the-drafter-pays-more-on-vllm">Step 5 — Why the
+Drafter Pays More on vLLM</h4>
+<p>Every engine accepts about the same share of drafted tokens at each
+draft length: vLLM 0.602 / 0.482 / 0.378 / 0.310 at 1 to 4 tokens,
+llama.cpp 0.588 / 0.455 / 0.376 / 0.311, SGLang 0.62 / 0.45 / 0.35 /
+0.29, mistral.rs 61.6% / 49.4% / 42.7% at 1 to 3. What differs is what
+each engine pays to check a drafted step. vLLM keeps gaining up to 4
+drafted tokens; llama.cpp peaks at 2; mistral.rs loses at every
+length.</p>
+<p>🔎 <strong>Tip: drafter precision does not change
+acceptance.</strong> On vLLM the W4A16 drafter is level with bf16 (1.009
+to 1.013x) at the same acceptance, and on llama.cpp the exact Q4_0
+drafter matches Q8_0 and beats bf16. Use the 4-bit drafter.</p>
+<hr />
+<h4 id="step-6--1-to-64-requests-no-drafter">Step 6 — 1 to 64 Requests,
+No Drafter</h4>
+<p><code>sweep.py</code> runs two shapes, 512 tokens in / 128 out and
+128 in / 512 out, at 1 to 64 requests at once, five repeats, a unique
+prompt per request so no prefix cache can hit, thinking on, output timed
+from the stream:</p>
+<pre class="text"><code>python3 sweep.py --base &quot;$ENDPOINT/v1&quot; --model &quot;$MODEL_NAME&quot; --out &quot;$R/$3&quot; \
+  --concurrency 1,2,4,8,16,32,64 --conc-input &quot;$1&quot; --conc-output &quot;$2&quot; \
+  --repeats 5 --prompt-mode unique --decode-source auto --expect-device gpu</code></pre>
+<p>Aggregate output tokens per second, 128 in / 512 out:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-3.png"
+alt="Table: Requests, vLLM, SGLang, llama.cpp, mistral.rs" /></p>
+<p>512 in / 128 out:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-4.png"
+alt="Table: Requests, vLLM, SGLang, llama.cpp, mistral.rs" /></p>
+<p>SGLang is level with vLLM on long replies (1.00 to 1.04x) and gives
+0.90 to 0.98x on long prompts. mistral.rs leads llama.cpp up to 4
+requests and then stays at 258 to 309 tokens per second, because it
+holds 4 requests at a time on this card.</p>
+<hr />
+<h4 id="step-7--1-to-64-requests-each-engine-at-its-best">Step 7 — 1 to
+64 Requests, Each Engine at Its Best</h4>
+<p>The same sweep with every drafter length, one server per length.
+<code>best_per_level.py</code> picks each engine's fastest setting at
+each level, 128 in / 512 out:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-5.png"
+alt="Table: Requests, vLLM, SGLang, llama.cpp, mistral.rs" /></p>
+<p>512 in / 128 out:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-6.png"
+alt="Table: Requests, vLLM, SGLang, llama.cpp, mistral.rs" /></p>
+<p>vLLM's best draft length falls from 4 tokens to 1 as requests rise,
+and its drafter is level with none from 32 requests on. SGLang's drafter
+pays only at 1 and 2 requests: from 8 requests on, with any draft
+length, its output stays at or below 271 tokens per second on 512/128
+and 518 on 128/512, 0.30 to 0.49x of running without it at 64.
+llama.cpp's 2-token drafter pays up to 16 or 32 requests.</p>
+<hr />
+<h4 id="step-8--give-llamacpp-the-whole-card">Step 8 — Give llama.cpp
+the Whole Card</h4>
+<p>The card serves nothing but the model, so memory an engine leaves
+unused buys nothing. llama.cpp's sweep used 2,621 MiB, with its 1,260
+MiB per-layer table in CPU RAM and default batches. Four settings, at 8
+and 64 requests:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-7.png"
+alt="Table: Setting, 512/128 at 64, 128/512 at 64, Peak memory" /></p>
+<p>The full 1-to-64 sweep with the table on the card and 2,048-token
+batches runs at 0.996 to 1.024x the original at every level, and with
+the drafter on it falls to 0.39 to 0.92x. llama.cpp's limit under load
+is the time per generated token: 110 ms at 64 requests on 512/128,
+against 33 ms for SGLang and 60 ms for vLLM on the same card.</p>
+<hr />
+<h4 id="step-9--answer-quality">Step 9 — Answer Quality</h4>
+<p><code>gen_eval.py</code> asks each engine all 1,319 GSM8K test
+questions (2,048-token limit) and the 400 BFCL simple function-calling
+questions (512), one request at a time, greedy, thinking off:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-8.png"
+alt="Table: Engine, GSM8K, BFCL, GSM8K with drafter, BFCL with drafter" /></p>
+<p>Paired question by question, every engine is level with every other
+on GSM8K, and the drafter changes no score anywhere. On BFCL two pairs
+fall outside the run-to-run range. SGLang is 4 questions behind vLLM on
+the same checkpoint (0 won, 4 lost), and two of the four are SGLang's
+tool-call parser returning <code>1e-9</code> and <code>100e-06</code> as
+strings where vLLM returns numbers. LiteRT-LM is 5 behind vLLM (0 won, 5
+lost).</p>
+<p>🔎 <strong>Tip: mistral.rs thinks by default on Gemma 4.</strong>
+Left at its default it scores BFCL 0.860 with 19 replies cut off at 512
+tokens and takes 9.94x as long. Send
+<code>"chat_template_kwargs": {"enable_thinking": false}</code> for
+short replies; the other five engines default to thinking off.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-3050/medium/img/devto-serving-engines-3050-table-9.png"
+alt="Table: vLLM, SGLang, llama.cpp, mistral.rs, PyTorch, LiteRT-LM" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>On a card that serves only the model, run vLLM with Google's W4A16
+drafter: it is the fastest engine for one request (230.5 tokens per
+second) and at every load to 16 requests, within 3% of the best at 32
+and 64, and its drafter costs nothing under load. SGLang matches vLLM
+without a drafter and slightly passes it at 32 to 64 requests on long
+replies, but it needs two patches for this checkpoint and its drafter is
+a loss beyond two requests. llama.cpp with its 2-token drafter is the
+simplest engine to run and serves one user at 147.4 tokens per second;
+under load it reaches 0.38x vLLM, and more memory does not change that.
+mistral.rs, PyTorch and LiteRT-LM suit one user at a time.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find the inference serving engine to
+run for Gemma 4 E2B on an 8 GB consumer GPU. The key was holding
+everything else fixed: the same 4-bit values in every container, the
+same prompts, load sweep and question sets, and each engine given its
+best setting for the whole card. The six-engine results were:</p>
+<ul>
+<li>🟢 All six engines give the same GSM8K answers (0.8992 to 0.9030)
+with the drafter on or off; BFCL spans 0.9125 to 0.925, SGLang and
+LiteRT-LM 4 and 5 questions behind vLLM.</li>
+<li>🟢 vLLM with its drafter is the fastest engine from 1 to 16
+requests: 230.5 tokens per second for one request and 1,265 at 8 (128 in
+/ 512 out), and 1,658 at 64.</li>
+<li>🟢 SGLang without a drafter matches vLLM under load and leads it by
+1 to 3% at 32 and 64 requests on long replies, peaking at 1,711 tokens
+per second.</li>
+<li>🟢 llama.cpp with its drafter serves one request at 147.4 tokens per
+second, the fastest after vLLM and SGLang.</li>
+<li>⚠️ The drafter's gain depends on the engine, at the same acceptance:
+1.90x vLLM, 1.35x llama.cpp, 1.33x SGLang, 0.72x mistral.rs.</li>
+<li>⚠️ llama.cpp runs at the same speed with 4.3 GB as with 2.6 GB; its
+limit under load is the time per generated token.</li>
+<li>❌ SGLang's drafter cuts output to 0.30 to 0.49x of running without
+it at 64 requests.</li>
+<li>❌ mistral.rs holds 4 requests at a time on 8 GB and stays at 258 to
+309 tokens per second under load.</li>
+</ul>
+<p>Scope: one RTX 3050 OEM (8 GB) in one desktop, Gemma 4 E2B on
+Google's QAT Q4_0 grid, one engine at a time, greedy decoding.
+One-request speed is six prompts of 256 tokens, three repeats; load is
+two synthetic shapes at 1 to 64 requests, five repeats each; accuracy is
+one pass of GSM8K (1,319) and BFCL simple (400). The engines ran on
+2026-10-14 to 2026-11-04 and some on different llama.cpp or engine
+builds; same-day reference runs agree within 1%, and wall times from
+different days are indicative.</p>
+<p>The strategy for comparing inference serving engines on one local GPU
+was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/blob/main/local-vllm-3050oem-2b-q4w4a16emb4/benchmarks/runs/2026-11-03-engines-3050oem/PAPER-TABLE.md">All
+six engines in one table: PAPER-TABLE.md</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-sglang-3050oem-2b-q4w4a16emb4/patches">SGLang
+patches for Gemma 4 text checkpoints</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></li>
+<li><a href="https://github.com/vllm-project/vllm">vLLM</a></li>
+<li><a href="https://github.com/sgl-project/sglang">SGLang</a></li>
+<li><a
+href="https://github.com/EricLBuehler/mistral.rs">mistral.rs</a></li>
+<li><a
+href="https://github.com/google-ai-edge/LiteRT-LM">LiteRT-LM</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4">xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it">google/gemma-4-E2B-it</a></li>
+<li><a href="https://github.com/openai/grade-school-math">GSM8K</a></li>
+<li><a href="https://gorilla.cs.berkeley.edu/leaderboard.html">Berkeley
+Function Calling Leaderboard</a></li>
+</ul>
+</body>
+</html>

@@ -20,7 +20,7 @@ Answer quality barely moves between engines. GSM8K lands between 0.8992 and 0.90
 
 For one request, five engines are within 12% of each other without a drafter (108.8 to 121.1 tokens per second end to end) and LiteRT-LM runs at about half that. The drafter decides the order: it gives vLLM 1.90x, llama.cpp 1.35x, SGLang 1.33x and LiteRT-LM 1.10x, and it slows mistral.rs to 0.72x.
 
-Under load the batching engines separate. At 64 requests of 128 tokens in and 512 out, vLLM reaches 1,658 tokens per second and SGLang 1,711, against 633 for llama.cpp and 308 for mistral.rs. PyTorch and LiteRT-LM serve one request at a time.
+Under load the batching engines separate. At 64 requests of 128 tokens in and 512 out without a drafter, vLLM reaches 1,651 tokens per second and SGLang 1,711, against 633 for llama.cpp and 308 for mistral.rs. PyTorch and LiteRT-LM serve one request at a time.
 
 With each engine at its best setting, vLLM is the fastest from 1 to 16 requests, and SGLang leads it by 1 to 3% at 32 and 64 requests on long replies. llama.cpp gains nothing from the rest of the card: with every table on the GPU and larger batches it uses 4.3 GB and runs at 0.996 to 1.024x its 2.6 GB speed.
 
@@ -229,9 +229,9 @@ Paired question by question, every engine is level with every other on GSM8K, an
 | | vLLM | SGLang | llama.cpp | mistral.rs | PyTorch | LiteRT-LM |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | 1 request, best | 🥇 230.5 | 158.9 | 147.4 | 118.9 | 118.9 | 68.1 |
-| 64 requests, 128/512 | 1,658 | 🥇 1,711 | 633 | 308 | one at a time | one at a time |
+| 64 requests, 128/512, best | 1,658 | 🥇 1,711 | 633 | 308 | one at a time | one at a time |
 | Drafter under load | 🟢 level or ahead | ❌ 0.30x at 64 | 🟢 to 16–32 | ❌ slower | — | — |
-| GSM8K / BFCL level | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 | 🟢 |
+| GSM8K / BFCL level | 🟢 yes | 🟢 yes | 🟢 yes | 🟢 yes | 🟢 yes | 🟢 yes |
 | Runs as installed | ⚠️ `--no-deps` | ❌ two patches | 🟢 | ⚠️ fixed cache | 🟢 | ⚠️ newer protobuf |
 | Peak memory | 7,091 MiB | 6,966 MiB | 2,621 MiB | 4,755 MiB | 3,121 MiB | 1,846 MiB |
 
