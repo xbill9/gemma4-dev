@@ -232,7 +232,7 @@ Paired question by question, every engine is level with every other on GSM8K, an
 | 64 requests, 128/512, best | 1,658 | 🥇 1,711 | 633 | 308 | one at a time | one at a time |
 | Drafter under load | 🟢 level or ahead | ❌ 0.30x at 64 | 🟢 to 16–32 | ❌ slower | — | — |
 | GSM8K / BFCL level | 🟢 yes | 🟢 yes | 🟢 yes | 🟢 yes | 🟢 yes | 🟢 yes |
-| Runs as installed | ⚠️ `--no-deps` | ❌ two patches | 🟢 | ⚠️ fixed cache | 🟢 | ⚠️ newer protobuf |
+| Runs as installed | ⚠️ `--no-deps` | ❌ two patches | 🟢 as installed | ⚠️ fixed cache | 🟢 as installed | ⚠️ newer protobuf |
 | Peak memory | 7,091 MiB | 6,966 MiB | 2,621 MiB | 4,755 MiB | 3,121 MiB | 1,846 MiB |
 
 ---
