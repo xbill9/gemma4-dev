@@ -1,9 +1,13 @@
 # The v5e-1 ladder
 
 The G6 ladder (`gpu-vllm-g6-2b-q4w4a16emb4/benchmarks/runs/2026-11-0{5,6}-*-g6`) on one Cloud TPU v5e chip:
-every engine that serves Gemma 4 E2B on a v5e-1, the same requests and statistics. The CUDA engines of the G6
-ladder (llama.cpp, SGLang, mistral.rs, LiteRT-LM) have no TPU build; the TPU set is vLLM (`tpu_inference`), the
-pure-JAX engine, its Rust front end, and TorchTPU in Python and in Rust. Started 2026-11-06.
+every engine that serves Gemma 4 E2B on a v5e-1, the same requests and statistics. Started 2026-11-06. The TPU set
+run is vLLM (`tpu_inference`), the pure-JAX engine, its Rust front end, and TorchTPU in Python and in Rust.
+llama.cpp has no TPU backend (`ggml/src` on 2026-11-08 lists blas, cann, cpu, cuda, et, hexagon, hip, metal, musa,
+opencl, openvino, rpc, sycl, virtgpu, vulkan, webgpu, zdnn, zendnn). **SGLang does have TPU builds and was not
+run**: SGLang-JAX (`sgl-project/sglang-jax`, v0.1.0rc0 2026-08-29) carries Gemma 4 model code
+(`python/sgl_jax/srt/models/gemma4.py`, tested upstream on 31B and 26B A4B at TP=4) and lists v5e in its topology
+reference, and lmsys announced SGLang on TorchTPU on 2026-10-20. E2B on a v5e-1 under either is untested here.
 
 | Arm | Engine | Rig | Weights |
 | --- | --- | --- | --- |
