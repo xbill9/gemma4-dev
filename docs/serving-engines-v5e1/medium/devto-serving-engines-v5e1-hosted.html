@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Six Serving Engines on One Cloud TPU v5e Chip: Gemma 4 E2B</title>
+  <meta name="description" content="vLLM, SGLang-JAX, a pure-JAX engine, a Rust model over PJRT, and TorchTPU in Python and Rust serve Gemma 4 E2B on one flex-start v5e-1, with the same prompts, the same 1-to-64-request sweep and the same GSM8K questions. vLLM is the engine that serves out of the box; SGLang-JAX with an E2B patch is the fastest at every load from 8 requests up." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step comparison of six inference
+serving engines on one Cloud TPU v5e chip: vLLM, SGLang-JAX, a pure-JAX
+engine, a Rust model of Gemma 4 over PJRT, and TorchTPU in Python and in
+Rust, each serving Gemma 4 E2B from a flex-start
+<code>v5litepod-1</code>.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-cover.7c2d5345.jpg" alt="Six Serving Engines on One Cloud TPU v5e Chip: Gemma 4 E2B" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p>The question is which engine to put on a v5e-1 when one small model
+has the chip to itself. Each engine gets the same six chat prompts, the
+same 1-to-64-request load sweep where it can batch, and the same 1,319
+GSM8K questions. Every engine ran alone on its own v5e-1, of the same
+type and zone, and each VM ran its jobs unattended and deleted itself
+when done.</p>
+<hr />
+<h4 id="the-results-in-brief">The Results in Brief</h4>
+<p>Answer quality is level across the engines that finished GSM8K:
+0.8969 to 0.9143, and every engine's paired difference against vLLM
+includes zero except SGLang-JAX's, which is ahead.</p>
+<p>For one request, four engines are within 12% of each other:
+SGLang-JAX 159.9 tokens per second end to end, the Rust model over PJRT
+145.2, vLLM 143.9 and the JAX engine 134.3. TorchTPU runs at 6.6
+(Python) and 13.4 (Rust).</p>
+<p>Under load two engines batch. vLLM on its int4 build reaches 1,689.1
+tokens per second at 64 requests of 128 tokens in and 512 out.
+SGLang-JAX, with a patch that adds what E2B needs, reaches 4,249, 2.52x
+vLLM, and leads from 8 requests up on both shapes. The JAX, Rust and
+TorchTPU servers serve one request at a time.</p>
+<p>vLLM is the engine that serves Gemma 4 E2B on a v5e-1 as shipped,
+with tool calling and the int4 checkpoint. SGLang-JAX is the fastest,
+once patched.</p>
+<hr />
+<h4 id="what-changes-and-what-stays">What Changes and What Stays</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-1.png"
+alt="Table: Engine, Version, Weights, Installed with" /></p>
+<p>The same for all: one TPU v5e chip (<code>v5litepod-1</code>, 15.75
+GiB of HBM as vLLM reports it) on a flex-start queued resource in
+<code>us-west4-a</code>, runtime <code>v2-alpha-tpuv5-lite</code>, Gemma
+4 E2B, greedy decoding, thinking off, and the system Python with no
+virtual environment. vLLM's checkpoint is
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</code>: Google's
+QAT 4-bit values with the vocabulary tables in int4 too. The bf16
+engines serve <code>google/gemma-4-E2B-it</code>.</p>
+<p>llama.cpp is absent because it has no TPU backend: its
+<code>ggml/src</code> lists blas, cann, cpu, cuda, et, hexagon, hip,
+metal, musa, opencl, openvino, rpc, sycl, virtgpu, vulkan, webgpu, zdnn
+and zendnn.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Google Cloud project with TPU v5e quota in
+<code>us-west4-a</code></li>
+<li>A Cloud Storage bucket for results</li>
+<li><code>gcloud</code> with the <code>alpha</code> component</li>
+<li>A clone:
+<code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+</ul>
+<hr />
+<h4 id="step-1--get-a-v5e-1-on-flex-start">Step 1 — Get a v5e-1 on
+Flex-Start</h4>
+<p>Flex-start <code>v5litepod-1</code> is accepted in
+<code>us-west4-a</code>. Each engine got its own queued resource,
+created like this:</p>
+<pre class="text"><code>gcloud alpha compute tpus queued-resources create tpu-sglangjax-v5e1-2b \
+  --node-id tpu-sglangjax-v5e1-2b-node --zone us-west4-a --project aisprint-491218 \
+  --accelerator-type v5litepod-1 --runtime-version v2-alpha-tpuv5-lite \
+  --provisioning-model=flex-start --max-run-duration=24h --valid-until-duration=2h --async</code></pre>
+<p>The node's chip, as vLLM sees it:</p>
+<pre class="text"><code>INFO 11-06 21:46:48 [__init__.py:75] TPU info: node_name=tpu-vllm-v5e1-2b-q4w4a16emb4-node | tpu_type=v5litepod-1 | worker_id=0 | num_chips=1 | num_cores_per_chip=1
+(EngineCore pid=187) INFO 11-06 21:51:03 [tpu_runner.py:1300] Init model | hbm=[(2.84, 15.75)]GiB</code></pre>
+<p>The int4 build takes 2.84 GiB of the chip's 15.75 GiB.</p>
+<p>🔎 <strong>Tip: <code>--max-run-duration=24h</code> is the
+backstop.</strong> A flex-start VM is deleted at the end of its run
+duration whatever it is doing, so a run that hangs costs at most a
+day.</p>
+<hr />
+<h4 id="step-2--one-chip-per-engine-unattended">Step 2 — One Chip per
+Engine, Unattended</h4>
+<p><code>flight/ladder.py</code> runs each engine's jobs against one
+server start: <code>one</code> (six prompts), <code>sweep</code> (1 to
+64 requests) and <code>acc</code> (GSM8K, and BFCL where the server
+returns tool calls). It runs as a systemd unit, and
+<code>finish.sh</code> waits for it, uploads the run directory, reads
+the upload back, compares SHA-256 and deletes the queued resource:</p>
+<pre class="text"><code>2026-11-09 02:59:59 waiting for none
+2026-11-09 03:00:00 none ended: success
+2026-11-09 03:00:08 uploaded gs://aisprint-491218-ladder-v5e1/2026-11-08-first-light-v5e1/tpu-sglangjax-v5e1-2b/ladder-run.tgz sha256 2c35d88e65a7b8190f90ba1cc6b44638c013d047d1376ef94d054cd159a6a57c (29 entries)
+2026-11-09 03:00:08 deleting queued resource tpu-sglangjax-v5e1-2b
+2026-11-09 03:00:10 delete requested (rc=0)</code></pre>
+<p>Four VMs carried the six engines: one for vLLM, one for TorchTPU in
+Python and the bf16 JAX engine, one for TorchTPU in Rust, the Rust model
+and the int4 JAX engine, and one for SGLang-JAX.</p>
+<hr />
+<h4 id="step-3--what-each-engine-needs-on-a-v5e">Step 3 — What Each
+Engine Needs on a v5e</h4>
+<ul>
+<li><strong>vLLM</strong> serves from its pinned TPU image with this
+repo's patches, which add an int4 method for the vocabulary tables and
+an int4 <code>lm_head</code> to <code>tpu_inference</code>. It reserves
+80% of the chip and holds 568,256 tokens of cache at a 16,384-token
+context.</li>
+<li><strong>SGLang-JAX</strong> implements the Gemma 4 31B and 26B A4B
+decoders only. Gemma 4 E2B adds per-layer embeddings, a double-wide MLP
+on its last 20 layers and K/V shared from earlier layers, and its config
+leaves <code>num_global_key_value_heads</code> null. A 190-line patch
+adds all four; a separate article covers it.</li>
+<li><strong>The JAX engine and the Rust model</strong> serve one request
+at a time at a 4,096-token context.</li>
+<li><strong>TorchTPU in Python</strong> serves bf16. Its int4 path does
+not compile: <code>torch.compile</code> fails tracing
+compressed-tensors' int4 unpack
+(<code>index_put_(): cannot record EventSnapshot during an FX trace</code>).</li>
+</ul>
+<p>🔎 <strong>Tip: SGLang-JAX needs <code>--page-size 128</code> for
+E2B.</strong> At the default page size of 1 its FlashAttention backend
+caps the server at 8 running requests at a 16,384-token context; at 128
+it runs 64.</p>
+<hr />
+<h4 id="step-4--start-up-time">Step 4 — Start-Up Time</h4>
+<p>Seconds from launch to the first answer:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-2.png"
+alt="Table: Engine, Start s" /></p>
+<p>vLLM compiles every request shape before it serves, for 31 to 34
+minutes on its two builds. SGLang-JAX's 270 s came with a compile cache
+already on the VM; on a fresh VM its 512-wide attention kernel compiles
+each prefill shape for about five minutes:</p>
+<pre class="text"><code>[EXTEND] PRECOMPILE:  14%|█▍| 1/7 [05:06&lt;30:36, 306.02s/it, bs=8, tokens=64]
+[EXTEND] PRECOMPILE:  29%|██▊| 2/7 [10:08&lt;25:19, 303.90s/it, bs=8, tokens=128]</code></pre>
+<p>🔎 <strong>Tip: give SGLang-JAX <code>--watchdog-timeout 7200</code>
+and a JAX compile cache.</strong> Its default 300 s watchdog stops the
+scheduler during a compile that long, and
+<code>JAX_COMPILATION_CACHE_DIR</code> makes a second start fast.</p>
+<hr />
+<h4 id="step-5--one-request-at-a-time">Step 5 — One Request at a
+Time</h4>
+<p>Six chat prompts, 256 tokens each, three repeats; the geometric mean
+of each prompt's median, end to end. Then 4 requests at once:</p>
+<pre class="text"><code>arm            e2e tok/s  decode TTFT ms 4 at once    x1 repeat start s x vllm
+vllm               143.9   145.1    15.4     477.2  3.32    6/6    2055  1.000
+vllm-text          134.2   135.2    16.2     449.8  3.35    6/6    1860  0.932
+jax                104.1       -    15.9     122.1  1.17    6/6      46  0.723
+jax-bf16           134.3   131.7    11.3     150.1  1.12    6/6      42  0.933
+jaxrust            145.2   145.5     9.4     145.4  1.00    6/6      22  1.009
+torchtpu-bf16        6.6       -   153.6       6.7  1.00    6/6      31  0.046
+torchtpu-rust       13.4    13.4    81.3      13.6  1.02    6/6      45  0.093
+arm            e2e  decode  ttft ms 4 at once  x vllm repeat
+sglang       159.9   161.7     20.2     631.5   1.111 6/6</code></pre>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-3.png"
+alt="Table: Engine, 1 request, 4 at once, x vLLM" /></p>
+<p>The Rust model has the shortest time to first token, 9.4 ms. Every
+engine repeats its own greedy text on all six prompts.</p>
+<hr />
+<h4 id="step-6--1-to-64-requests">Step 6 — 1 to 64 Requests</h4>
+<p><code>sweep.py</code> runs two shapes, 512 tokens in / 128 out and
+128 in / 512 out, at 1 to 64 requests at once, five repeats, a unique
+prompt per request, output timed from the stream. Aggregate output
+tokens per second, 128 in / 512 out:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-4.png"
+alt="Table: Requests, SGLang-JAX, vLLM, vLLM, bf16 tables" /></p>
+<p>512 in / 128 out:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-5.png"
+alt="Table: Requests, SGLang-JAX, vLLM, vLLM, bf16 tables" /></p>
+<p>SGLang-JAX is 2.52x vLLM at 64 requests on long replies and 2.14x on
+long prompts. At 2 to 4 requests it trails on two of four levels: 117.4
+against 257.4 at 2 requests of 512 in / 128 out. Its five repeats spread
+49 to 205% from slowest to fastest, against at most 5.0% for vLLM, so
+the medians above are its typical figure and a single run can land well
+below them.</p>
+<p>The int4 vocabulary tables are worth 1.07x to vLLM for one request
+and 1.02x at 64.</p>
+<p>🔎 <strong>Tip: one v5e chip against one NVIDIA L4.</strong> Against
+vLLM on an EC2 G6 with the same checkpoint, the v5e-1 runs at 1.06x and
+1.04x for one request and 0.81x and 0.46x at 64 requests (512 in / 128
+out, 128 in / 512 out).</p>
+<hr />
+<h4 id="step-7--answer-quality">Step 7 — Answer Quality</h4>
+<p>Each engine answered all 1,319 GSM8K test questions (2,048-token
+limit), one request at a time, greedy, thinking off. Paired question by
+question against vLLM, with a 95% range from 2,000 resamples:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-6.png"
+alt="Table: Engine, GSM8K, Minus vLLM 95%, Time s" /></p>
+<p>SGLang-JAX against the bf16 JAX engine it was ported from is +0.0015
+[−0.0091, +0.0121], level. The three bf16 engines lead the int4 builds
+by about one point, and only SGLang-JAX's lead has a range above
+zero.</p>
+<p>BFCL simple (400 function-calling questions) scores 0.920 on both
+vLLM builds, with the same answer on all 400. The other engines return
+no tool calls, so BFCL ran on vLLM only.</p>
+<p>TorchTPU's GSM8K runs were stopped: the Rust build answered at about
+29 s a question.</p>
+<hr />
+<h4 id="step-8--what-does-not-fit-on-one-chip">Step 8 — What Does Not
+Fit on One Chip</h4>
+<p>vLLM with Google's <code>gemma-4-E2B-it-assistant</code> drafter at 4
+tokens ran out of HBM during warmup at
+<code>--gpu-memory-utilization</code> 0.70 and again at 0.60:</p>
+<pre class="text"><code>(EngineCore pid=291) ERROR 11-07 12:46:38 [core.py:1434] Error allocating device buffer: Attempting to allocate 512.00M. That was not possible. There are 450.17M free.; (0x0x0_HBM0)</code></pre>
+<p>Lowering the setting shrank the cache and left about the same memory
+free. A smaller request limit or a fixed cache size is untested.</p>
+<hr />
+<h4 id="step-9--tear-down">Step 9 — Tear Down</h4>
+<p>Each VM deleted its own queued resource after its upload checked out.
+Only the bucket remains, and listing the zone shows no ladder VMs:</p>
+<pre class="text"><code>gcloud alpha compute tpus queued-resources list --zone us-west4-a --project aisprint-491218
+NAME              ZONE        NODE_COUNT  ACCELERATOR_TYPE  TYPE  TOPOLOGY  STATE
+tpu-vllm-v5e1-2b  us-west4-a  1           v5litepod-1                       SUSPENDED</code></pre>
+<p>The one entry is an older rig's queued resource, unrelated to this
+run.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-7.png"
+alt="Table: vLLM, SGLang-JAX, Rust model over PJRT" /></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-v5e1/medium/img/devto-serving-engines-v5e1-table-8.png"
+alt="Table: JAX engine, TorchTPU, Python, TorchTPU, Rust" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>To serve Gemma 4 E2B on a v5e-1 today, run vLLM from its pinned TPU
+image on the int4 build: it serves 1 to 64 requests (1,689.1 tokens per
+second at 64), answers GSM8K level with every bf16 engine, returns tool
+calls, and needs nothing beyond the image and its patches. Plan for a
+34-minute start. For the most throughput, SGLang-JAX with the E2B patch
+is 2.14 to 2.52x vLLM at 64 requests and the fastest for one request, at
+the cost of a patch, no tool calls and wide run-to-run spread. For one
+user who restarts often, the Rust model over PJRT starts in 22 s and
+matches vLLM for one request. TorchTPU is too slow on this chip to
+serve.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find the inference serving engine to
+run for Gemma 4 E2B on one Cloud TPU v5e chip. The key was holding
+everything else fixed: one chip per engine of the same type and zone,
+the same prompts, load sweep and GSM8K questions, unattended runs that
+delete their own VM. The six-engine results were:</p>
+<ul>
+<li>🟢 Every engine that finished GSM8K scores 0.8969 to 0.9143;
+SGLang-JAX leads vLLM by 0.0136 with a range above zero.</li>
+<li>🟢 vLLM serves as shipped from its pinned image, batches to 64
+requests and is the only engine with tool calls (BFCL 0.920).</li>
+<li>🟢 SGLang-JAX with the E2B patch is the fastest: 159.9 tokens per
+second for one request and 4,249 at 64, 2.52x vLLM.</li>
+<li>🟢 The Rust model over PJRT starts in 22 s and is level with vLLM
+for one request.</li>
+<li>⚠️ vLLM takes 31 to 34 minutes to start; SGLang-JAX about five
+minutes per prefill shape on a fresh VM.</li>
+<li>⚠️ SGLang-JAX's repeats spread up to 205% at a level; vLLM's at most
+5%.</li>
+<li>❌ vLLM with Google's drafter runs out of HBM in warmup on one
+chip.</li>
+<li>❌ TorchTPU runs at 6.6 and 13.4 tokens per second, and its int4
+path does not compile in Python.</li>
+</ul>
+<p>Scope: four flex-start <code>v5litepod-1</code> VMs in
+<code>us-west4-a</code>, one engine at a time on each, Gemma 4 E2B,
+greedy decoding, thinking off. vLLM serves the int4 build and SGLang-JAX
+and the JAX engines bf16, so the load comparison is engine and weights
+together; no bf16 vLLM sweep was run. The JAX servers ran at a
+4,096-token context and vLLM and SGLang-JAX at 16,384. SGLang-JAX ran on
+2026-11-09 on jax 0.11.1, the others on 2026-11-06 and 07 on jax
+0.12.0.1. One-request speed is six prompts of 256 tokens, three repeats;
+load is two synthetic shapes at 1 to 64 requests, five repeats each;
+accuracy is one pass of GSM8K (1,319) and, for vLLM, BFCL simple (400).
+TPU memory in use and cost were not measured.</p>
+<p>The strategy for comparing inference serving engines on Cloud TPU v5e
+was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/blob/main/tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-11-06-ladder-v5e1/REPORT.md">The
+v5e-1 ladder run: 2026-11-06-ladder-v5e1</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/blob/main/tpu-sglangjax-v5e1-2b/benchmarks/runs/2026-11-08-first-light-v5e1/REPORT.md">SGLang-JAX
+first light: 2026-11-08-first-light-v5e1</a></li>
+<li><a
+href="https://dev.to/aws-builders/six-serving-engines-on-one-ec2-g6-gemma-4-e2b-on-an-nvidia-l4-3ff3">Six
+Serving Engines on One EC2 G6</a></li>
+<li><a href="https://docs.cloud.google.com/tpu/docs/v5e">Cloud TPU
+v5e</a></li>
+<li><a href="https://github.com/vllm-project/vllm">vLLM</a></li>
+<li><a
+href="https://github.com/vllm-project/tpu-inference">tpu-inference</a></li>
+<li><a
+href="https://github.com/sgl-project/sglang-jax">SGLang-JAX</a></li>
+<li><a href="https://github.com/jax-ml/jax">JAX</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it">google/gemma-4-E2B-it</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4">xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</a></li>
+<li><a href="https://github.com/openai/grade-school-math">GSM8K</a></li>
+<li><a href="https://gorilla.cs.berkeley.edu/leaderboard.html">Berkeley
+Function Calling Leaderboard</a></li>
+</ul>
+</body>
+</html>
