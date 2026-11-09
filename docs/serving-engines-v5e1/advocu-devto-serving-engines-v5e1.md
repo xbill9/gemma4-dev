@@ -26,7 +26,7 @@ googlecloud, tpu, vllm, jax
 https://dev.to/gde/six-serving-engines-on-one-cloud-tpu-v5e-chip-gemma-4-e2b-22hn
 
 ## Cover image
-advocu-devto-serving-engines-v5e1-cover.webp (1200x675 WebP, 79 KB, from builder-cover.jpg)
+advocu-devto-serving-engines-v5e1-cover.webp (1376x578 WebP, 94 KB, from devto-cover.7c2d5345.jpg)
 
 ---
 Save as draft rather than submitting, and read it back before you do.
