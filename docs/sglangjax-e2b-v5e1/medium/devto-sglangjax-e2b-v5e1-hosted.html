@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Porting Gemma 4 E2B to SGLang-JAX: The Fastest Engine on One TPU v5e</title>
+  <meta name="description" content="SGLang-JAX serves the Gemma 4 31B and 26B A4B on TPU and fails to load E2B. A two-file patch adds per-layer embeddings, shared K/V and the double-wide MLP; on one flex-start v5e-1 it then serves 159.9 tokens per second for one request and 4,249.4 at 64, 2.52x vLLM, with GSM8K level with the bf16 JAX engine." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to porting Gemma 4 E2B
+into SGLang-JAX and serving it on one Cloud TPU v5e chip, from the patch
+through an unattended benchmark run on a flex-start VM that deletes
+itself when it finishes.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/sglangjax-e2b-v5e1/medium/img/devto-cover.1cd3c453.jpg" alt="Porting Gemma 4 E2B to SGLang-JAX: The Fastest Engine on One TPU v5e" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<p>SGLang-JAX is the TPU build of SGLang: a Flax model library over
+Pallas attention kernels, with SGLang's scheduler and radix cache. It
+ships Gemma 4 model code for the 31B and the 26B A4B. The question is
+what it takes to serve the 2B-class E2B on it, and how the result stands
+against the other engines measured on the same chip type.</p>
+<hr />
+<h4 id="the-results-in-brief">The Results in Brief</h4>
+<p>Unpatched, SGLang-JAX stops at model load on E2B. A patch to two
+files, 175 added lines and 14 removed, adds the four things E2B has that
+the larger Gemma 4 models lack: a null config field, per-layer
+embeddings, K/V shared from earlier layers, and a double-wide MLP on the
+sharing layers.</p>
+<p>Patched, it serves <code>google/gemma-4-E2B-it</code> in bf16 on one
+<code>v5litepod-1</code> at 159.9 tokens per second for one request, the
+fastest of six engines measured on this chip. At 64 requests it reaches
+4,249.4 tokens per second on 128 in / 512 out, 2.52x vLLM serving the
+int4 build.</p>
+<p>GSM8K is 0.9143 on all 1,319 questions, level with the bf16 JAX
+engine the patch was ported from (+0.0015, 95% range −0.0091 to
++0.0121).</p>
+<hr />
+<h4 id="why-a-patch">Why a Patch?</h4>
+<p>Two unattended runs on the unpatched code, sglang-jax
+<code>b3e3e16b2</code>, failed before serving a request. The second
+reached the scheduler and stopped here:</p>
+<pre class="text"><code>TypeError: &#39;&gt;=&#39; not supported between instances of &#39;int&#39; and &#39;NoneType&#39;</code></pre>
+<p>E2B's <code>config.json</code> carries
+<code>"num_global_key_value_heads": null</code>, and SGLang-JAX reads it
+with
+<code>getattr(tc, "num_global_key_value_heads", &lt;sliding count&gt;)</code>,
+which returns the <code>None</code>. Past that line, its
+<code>models/gemma4.py</code> has no per-layer embedding and no
+K/V-sharing code, and E2B uses both.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Google Cloud project with TPU v5e quota in
+<code>us-west4-a</code></li>
+<li>A Cloud Storage bucket for results</li>
+<li><code>gcloud</code> with the <code>alpha</code> component</li>
+<li>A clone:
+<code>git clone https://github.com/xbill9/gemma4-dev</code></li>
+<li>The rig: <code>tpu-sglangjax-v5e1-2b/</code> (<code>tpu.env</code>,
+<code>patches/</code>, <code>flight/</code>)</li>
+</ul>
+<hr />
+<h4 id="step-1--what-e2b-adds">Step 1 — What E2B Adds</h4>
+<p>From the published <code>config.json</code>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/sglangjax-e2b-v5e1/medium/img/devto-sglangjax-e2b-v5e1-table-1.png"
+alt="Table: Field, E2B" /></p>
+<ul>
+<li><strong>Per-layer embeddings.</strong> A second token table, 262,144
+rows by 35 x 256, gives every layer its own 256-wide input, mixed into
+the stream after the MLP.</li>
+<li><strong>Shared K/V.</strong> The last 20 layers compute no K or V;
+each reads the K/V of the last earlier layer of its own type.</li>
+<li><strong>A double-wide MLP</strong> on those 20 layers: 12,288
+against 6,144.</li>
+<li><strong><code>num_global_key_value_heads: null</code></strong>,
+where the 31B config has a number.</li>
+</ul>
+<p>The reference is this repo's pure-JAX E2B engine, which serves the
+same checkpoint and implements all four.</p>
+<hr />
+<h4 id="step-2--fix-the-config">Step 2 — Fix the Config</h4>
+<p>One expression in <code>configs/gemma4.py</code>:</p>
+<pre class="python"><code>tc.num_key_value_heads = (
+    getattr(tc, &quot;num_global_key_value_heads&quot;, None) or tc.swa_num_key_value_heads
+)</code></pre>
+<hr />
+<h4 id="step-3--per-layer-embeddings">Step 3 — Per-Layer Embeddings</h4>
+<p>The model builds a <code>[tokens, 35, 256]</code> tensor once per
+pass, from the per-layer token table and a projection of the main
+embedding, as Hugging Face's <code>Gemma4TextModel</code> does:</p>
+<pre class="python"><code>tok = self.embed_tokens_per_layer(input_ids) * ple_dim**0.5
+tok = tok.reshape(-1, num_layers, ple_dim)
+proj, _ = self.per_layer_model_projection(inputs_embeds)
+proj = self.per_layer_projection_norm((proj * hidden_size**-0.5).reshape(-1, num_layers, ple_dim))
+per_layer_inputs = (proj + tok) * 2.0**-0.5</code></pre>
+<p>Each decoder layer takes its slice after the MLP residual and before
+its layer scale:</p>
+<pre class="python"><code>gate, _ = self.per_layer_input_gate(outputs)
+gate = jax.nn.gelu(gate, approximate=True) * per_layer_input
+ple_out, _ = self.per_layer_projection(gate)
+outputs = outputs + self.post_per_layer_input_norm(ple_out)</code></pre>
+<p>🔎 <strong>Tip: SGLang-JAX's model is functional over its K/V
+pool.</strong> Each layer returns its cache update, so a new input per
+layer is one more argument down the layer loop and no change to the
+scheduler.</p>
+<hr />
+<h4 id="step-4--shared-kv-by-copy">Step 4 — Shared K/V, by Copy</h4>
+<p>The model loop keeps this pass's post-norm, post-RoPE K/V for each
+source layer, and hands it to the layers that share it:</p>
+<pre class="python"><code>shared_kv = None
+if layer_id &gt;= self.first_kv_shared:
+    shared_kv = pass_kv[self.kv_share_source[layer_id]]
+hidden_states, kv_fused, _, _, layer_kv = layer(..., per_layer_input=..., shared_kv=shared_kv)
+if layer_id &lt; self.first_kv_shared:
+    pass_kv[layer_id] = layer_kv</code></pre>
+<p>A sharing layer applies RoPE to its queries only and writes the
+source's K/V into its own cache slot. Every layer then holds its own
+history, so the memory pool and the attention kernel stay as they are.
+The cost is cache for 35 layers in place of 15:</p>
+<pre class="text"><code>[2026-11-09 01:46:24] TPU Memory profiling: available_kv_cache=3.6GB, max_tokens=89345, cell_size=43008 bytes
+[2026-11-09 01:46:24] ModelRunner final max_total_num_tokens: 103040</code></pre>
+<p>103,040 tokens of cache at 43,008 bytes a token is enough for 64
+running requests at a 16,384-token context. vLLM on the int4 build holds
+568,256 tokens on the same chip type.</p>
+<hr />
+<h4 id="step-5--double-wide-mlp-and-weight-names">Step 5 — Double-Wide
+MLP and Weight Names</h4>
+<p>The MLP width doubles from layer 15 on when the config sets
+<code>use_double_wide_mlp</code>, and the loader gains the per-layer
+names: <code>model.embed_tokens_per_layer</code>,
+<code>model.per_layer_model_projection</code>,
+<code>model.per_layer_projection_norm</code>, and per layer
+<code>per_layer_input_gate</code>, <code>per_layer_projection</code> and
+<code>post_per_layer_input_norm</code>. The server log on the TPU:</p>
+<pre class="text"><code>[2026-11-09 01:46:22] Loaded 600 parameters in 6.27s
+[2026-11-09 01:46:22] Gemma4 weights loaded successfully!</code></pre>
+<hr />
+<h4 id="step-6--install-and-patch-on-the-vm">Step 6 — Install and Patch
+on the VM</h4>
+<p><code>flight/setup-sgl.sh</code> installs Python 3.13, SGLang-JAX at
+the pinned commit with its own <code>jax[tpu]</code>, applies the patch
+to the installed package, and checks that it took:</p>
+<pre class="bash"><code>python3.13 -m pip install -q --ignore-installed blinker \
+  &quot;sglang-jax[tpu] @ git+https://github.com/sgl-project/sglang-jax@${SGL_COMMIT}#subdirectory=python&quot;
+SP=$(python3.13 -c &quot;import sgl_jax, os; print(os.path.dirname(os.path.dirname(sgl_jax.__file__)))&quot;)
+patch -d &quot;$SP&quot; -p2 --forward &lt; $L/patches/gemma4-e2b.diff
+python3.13 -c &quot;import sgl_jax.srt.models.gemma4 as m; assert hasattr(m, &#39;_kv_share_source&#39;); print(&#39;patch ok&#39;)&quot;</code></pre>
+<p>It records the stack:</p>
+<pre class="text"><code>sglang-jax b3e3e16b2d3f0281a9e23f547cd4382f4a166eb6 + patches/gemma4-e2b.diff sha256 d6ac1d7a2f8f6e55
+Version: 0.1.0rc1.dev113+gb3e3e16b2
+jax 0.11.1 jaxlib 0.11.1
+Name: libtpu Version: 0.0.46.3 
+transformers 5.12.1 torch 2.15.0+cpu</code></pre>
+<p>🔎 <strong>Tip: install CPU torch and torchvision.</strong>
+Transformers builds <code>Gemma4Processor</code> only when both are
+present, and the server stops at its tokenizer without it. The TPU does
+all the model work.</p>
+<hr />
+<h4 id="step-7--three-serving-flags">Step 7 — Three Serving Flags</h4>
+<pre class="text"><code>python3.13 -m sgl_jax.launch_server --model-path google/gemma-4-E2B-it --device tpu --tp-size 1 \
+  --dtype bfloat16 --context-length 16384 --max-running-requests 64 --mem-fraction-static 0.8 \
+  --reasoning-parser gemma4 --page-size 128 --watchdog-timeout 7200</code></pre>
+<ul>
+<li><strong><code>--page-size 128</code>.</strong> At the default page
+size of 1, the FlashAttention backend caps the server at 8 running
+requests at a 16,384-token context. The server logs, at page size 1 and
+then at 128:</li>
+</ul>
+<pre class="text"><code>[2026-11-09 01:32:06]   → Final max_running_requests: 8
+[2026-11-09 01:41:37]   → Final max_running_requests: 64</code></pre>
+<ul>
+<li><strong><code>--watchdog-timeout 7200</code>.</strong> E2B's
+full-attention layers are 512 wide, and their Pallas kernel compiles for
+about five minutes per prefill shape on a fresh v5e:</li>
+</ul>
+<pre class="text"><code>[EXTEND] PRECOMPILE:  14%|█▍| 1/7 [05:06&lt;30:36, 306.02s/it, bs=8, tokens=64]
+[EXTEND] PRECOMPILE:  29%|██▊| 2/7 [10:08&lt;25:19, 303.90s/it, bs=8, tokens=128]</code></pre>
+<p>The default 300 s watchdog stops the scheduler during a compile that
+long:</p>
+<pre class="text"><code>[2026-11-09 01:39:36] Watchdog timeout (watchdog_timeout=300)</code></pre>
+<ul>
+<li><strong><code>JAX_COMPILATION_CACHE_DIR</code>.</strong> With the
+cache on disk, the next start compiles the same shapes from it: 94 s for
+seven prefill shapes and 88 s for seven decode shapes.</li>
+</ul>
+<hr />
+<h4 id="step-8--run-unattended-on-flex-start">Step 8 — Run Unattended on
+Flex-Start</h4>
+<p>Create the queued resource:</p>
+<pre class="text"><code>gcloud alpha compute tpus queued-resources create tpu-sglangjax-v5e1-2b \
+  --node-id tpu-sglangjax-v5e1-2b-node --zone us-west4-a --project aisprint-491218 \
+  --accelerator-type v5litepod-1 --runtime-version v2-alpha-tpuv5-lite \
+  --provisioning-model=flex-start --max-run-duration=24h --valid-until-duration=2h --async</code></pre>
+<p>Copy <code>flight/</code> and <code>patches/</code> to
+<code>/opt/ladder</code> on the VM and start one systemd unit:</p>
+<pre class="text"><code>sudo systemd-run --unit=ladder-sgl bash /opt/ladder/flight/run-sgl.sh tpu-sglangjax-v5e1-2b</code></pre>
+<p>It runs setup, the six-prompt timing, a 50-question GSM8K check, the
+full GSM8K and the load sweep, then uploads the results and deletes the
+queued resource whatever the outcome:</p>
+<pre class="text"><code>2026-11-09 01:50:23 START one:sglang ready_s=270.2 server_log=/opt/ladder-out/2026-11-08-first-light-v5e1/one-sglang/server.log
+2026-11-09 01:53:27   acc:sglang gsm8k-gate rc=0 {&quot;task&quot;: &quot;gsm8k&quot;, &quot;max_tokens&quot;: 2048, &quot;n&quot;: 50, &quot;right&quot;: 45, &quot;accuracy&quot;: 0.9, &quot;errors&quot;: 0, &quot;truncated&quot;: 0, &quot;wall_s&quot;: 125.4}
+2026-11-09 02:55:56   acc:sglang gsm8k rc=0 {&quot;task&quot;: &quot;gsm8k&quot;, &quot;max_tokens&quot;: 2048, &quot;n&quot;: 1319, &quot;right&quot;: 1206, &quot;accuracy&quot;: 0.9143, &quot;errors&quot;: 0, &quot;truncated&quot;: 3, &quot;wall_s&quot;: 3748.3}
+2026-11-09 02:59:53 END sweep:sglang ok=True
+2026-11-09 02:59:58 SUITE-DONE</code></pre>
+<hr />
+<h4 id="step-9--one-request-at-a-time">Step 9 — One Request at a
+Time</h4>
+<p>Six chat prompts, 256 tokens each, greedy, thinking off, three
+repeats; the geometric mean of each prompt's median. The other engines
+are from the v5e-1 serving ladder on the same chip type:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/sglangjax-e2b-v5e1/medium/img/devto-sglangjax-e2b-v5e1-table-2.png"
+alt="Table: Engine, Weights, 1 request, 4 at once, x vLLM" /></p>
+<p>SGLang-JAX runs at 1.19x the JAX engine whose E2B code the patch
+follows. Its time to first token is 20.2 ms, and it repeats its own
+greedy text on all six prompts.</p>
+<p>Its greedy text matches none of the other engines word for word on
+these prompts; the bf16 JAX engine and the Rust model match each other
+on 3 of 6. GSM8K below is the check on its answers.</p>
+<hr />
+<h4 id="step-10--1-to-64-requests">Step 10 — 1 to 64 Requests</h4>
+<p>Two shapes, five repeats, a unique prompt per request, aggregate
+output tokens per second:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/sglangjax-e2b-v5e1/medium/img/devto-sglangjax-e2b-v5e1-table-3.png"
+alt="Table: Requests, SGLang-JAX, 128/512, vLLM, 128/512, SGLang-JAX, 512/128, vLLM, 512/128" /></p>
+<p>From 8 requests up SGLang-JAX leads on both shapes, 2.52x and 2.14x
+vLLM at 64. At 2 requests of 512 in / 128 out it trails (117.4 against
+257.4).</p>
+<p>🔎 <strong>Tip: read its medians, and expect spread.</strong>
+SGLang-JAX's fastest repeat was 49% to 205% above its slowest at a
+level; vLLM's spread was at most 5.0%.</p>
+<hr />
+<h4 id="step-11--answers">Step 11 — Answers</h4>
+<p>All 1,319 GSM8K test questions, 2,048-token limit, one request at a
+time, paired question by question with a 95% range from 2,000
+resamples:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/sglangjax-e2b-v5e1/medium/img/devto-sglangjax-e2b-v5e1-table-4.png"
+alt="Table: Against, Their GSM8K, SGLang-JAX minus theirs 95%" /></p>
+<p>SGLang-JAX scores 0.9143 (1,206 right, 3 replies at the token limit)
+in 3,748 s. It is level with both bf16 engines, so the patched model
+answers as the reference does. Its lead over the int4 vLLM build has a
+range above zero.</p>
+<p>SGLang-JAX has no Gemma 4 tool-call parser, so BFCL was not run.</p>
+<hr />
+<h4 id="step-12--tear-down">Step 12 — Tear Down</h4>
+<p>The run deletes its own queued resource after the upload checks
+out:</p>
+<pre class="text"><code>2026-11-09 03:00:08 uploaded gs://aisprint-491218-ladder-v5e1/2026-11-08-first-light-v5e1/tpu-sglangjax-v5e1-2b/ladder-run.tgz sha256 2c35d88e65a7b8190f90ba1cc6b44638c013d047d1376ef94d054cd159a6a57c (29 entries)
+2026-11-09 03:00:08 deleting queued resource tpu-sglangjax-v5e1-2b
+2026-11-09 03:00:10 delete requested (rc=0)</code></pre>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/sglangjax-e2b-v5e1/medium/img/devto-sglangjax-e2b-v5e1-table-5.png"
+alt="Table: SGLang-JAX, patched, vLLM, JAX engine" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For the most throughput from one v5e chip on Gemma 4 E2B, run
+SGLang-JAX with this patch: it is the fastest engine measured for one
+request and at every load from 8 requests up, and its answers match the
+bf16 reference. Give it <code>--page-size 128</code>, a long watchdog
+and a compile cache. When the workload needs tool calls, a deep cache or
+an unpatched install, vLLM remains the engine to serve.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to serve Gemma 4 E2B on SGLang-JAX on
+one Cloud TPU v5e chip. The key was porting E2B's four differences from
+an engine that already serves it, and storing shared K/V again in each
+sharing layer so the cache and kernels needed no change. The results
+were:</p>
+<ul>
+<li>🟢 A two-file patch, 175 lines added and 14 removed, makes
+SGLang-JAX load and serve E2B.</li>
+<li>🟢 159.9 tokens per second for one request, the fastest of six
+engines measured on this chip, and 1.19x the JAX engine it was ported
+from.</li>
+<li>🟢 4,249.4 tokens per second at 64 requests of 128 in / 512 out,
+2.52x vLLM; 2,759 on 512 / 128, 2.14x.</li>
+<li>🟢 GSM8K 0.9143, level with the bf16 JAX engine and the Rust
+model.</li>
+<li>⚠️ Shared K/V stored per layer costs 43,008 bytes a token, 103,040
+tokens on the chip.</li>
+<li>⚠️ Without <code>--page-size 128</code> the server runs 8 requests
+at once; without a long watchdog a fresh start dies compiling.</li>
+<li>⚠️ Repeat-to-repeat spread of up to 205% at a load level.</li>
+<li>❌ No Gemma 4 tool-call parser, so no BFCL.</li>
+</ul>
+<p>Scope: one flex-start <code>v5litepod-1</code> in
+<code>us-west4-a</code>, sglang-jax <code>b3e3e16b2</code> with the
+patch (sha256 <code>d6ac1d7a2f8f6e55…</code>), jax 0.11.1,
+<code>google/gemma-4-E2B-it</code> bf16 at a 16,384-token context,
+greedy decoding, thinking off, on 2026-11-09. The other engines ran on
+2026-11-06 and 07 on other v5e-1 VMs on jax 0.12.0.1, vLLM on the int4
+build, so the throughput comparison is engine and weights together.
+One-request speed is six prompts of 256 tokens, three repeats; load is
+two synthetic shapes at 1 to 64 requests, five repeats each; accuracy is
+one pass of GSM8K. The start-up time in the run came with a compile
+cache already on the VM.</p>
+<p>The strategy for porting Gemma 4 E2B to SGLang-JAX on Cloud TPU was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/tpu-sglangjax-v5e1-2b">The
+rig: tpu-sglangjax-v5e1-2b</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/blob/main/tpu-sglangjax-v5e1-2b/patches/gemma4-e2b.diff">The
+patch: gemma4-e2b.diff</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/blob/main/tpu-sglangjax-v5e1-2b/benchmarks/runs/2026-11-08-first-light-v5e1/REPORT.md">First-light
+run: 2026-11-08-first-light-v5e1</a></li>
+<li><a
+href="https://dev.to/gde/six-serving-engines-on-one-cloud-tpu-v5e-chip-gemma-4-e2b-22hn">Six
+Serving Engines on One Cloud TPU v5e Chip</a></li>
+<li><a
+href="https://github.com/sgl-project/sglang-jax">SGLang-JAX</a></li>
+<li><a href="https://docs.cloud.google.com/tpu/docs/v5e">Cloud TPU
+v5e</a></li>
+<li><a href="https://github.com/jax-ml/jax">JAX</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it">google/gemma-4-E2B-it</a></li>
+<li><a href="https://github.com/openai/grade-school-math">GSM8K</a></li>
+</ul>
+</body>
+</html>
