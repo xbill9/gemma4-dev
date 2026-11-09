@@ -1,5 +1,5 @@
 ---
-title: "Porting Gemma 4 E2B to SGLang-JAX: The Fastest Engine on One TPU v5e"
+title: "Porting Gemma 4 E2B to SGLang-JAX on One Cloud TPU v5e"
 published: false
 description: "SGLang-JAX serves the Gemma 4 31B and 26B A4B on TPU and fails to load E2B. A two-file patch adds per-layer embeddings, shared K/V and the double-wide MLP; on one flex-start v5e-1 it then serves 159.9 tokens per second for one request and 4,249.4 at 64, 2.52x vLLM, with GSM8K level with the bf16 JAX engine."
 tags: googlecloud, tpu, jax, gemma
