@@ -1,0 +1,30 @@
+| v5e | yes | yes (2x bf16) | **no** | Google publishes bf16 and Int8 peaks only |
+**This is the single most consequential fact for quantization work.** On v5e and v6e:
+a v5e/v6e quantization conclusion forward to Ironwood without rechecking it.**
+"e" efficiency part), and folding it into a v5e-vs-v6e ratio column would invite exactly the wrong comparison.
+| Spec | v5e | v6e (Trillium) | Ratio |
+**Both columns are now verified directly against Google**, v5e against
+[the v5e page](https://docs.cloud.google.com/tpu/docs/v5e) on 2026-08-07 and v6e against
+rows were previously carried second-hand via `tpu-vllm-v5e1-2b/v5e.md` and that caveat is now
+Two 256x256 MXUs is 131,072 MACs, exactly 2x v5e's four 128x128 (65,536) — but the published peak is
+v5e ordering, where spot undercut flex-start. Never assume spot is cheapest; read the catalog. The
+**Units trap — confirmed on both pages 2026-08-10.** Google quotes v5e bandwidth as **`800 GiBps`** and
+v6e as **`1638 GBps`**, and the mismatch is real, not a transcription slip: the v5e page uses GiBps for
+decode-bound workload — which is bandwidth-bound, not FLOPS-bound — v5e is priced close to right. The
+### v5e-1 — 16 GB nominal
+Measured on `v5litepod-1` with vLLM:
+repack on a v5e-1"). Its compile also needs more than the host's 48 GB: it peaked at 45.7 GB plus 2.75 GB of
+`[E, groups, 1, N]`). Put the size-1 dim elsewhere. Mosaic on v5e also rejects a zero-stride load of
+**Scoped VMEM limit: 115.20M per kernel.** Measured 2026-09-27 on `v5litepod-1`
+(`jev-tpu-v5e1/results/2026-09-27-v5e1-w4a16-logs/`). The W4A16 `gmm_v2` kernel from
+same at 4 ids as at 512. A single-row gather is unaffected. Measured 2026-09-29 on `v5litepod-1`, JAX
+0.11.0, int4 tables packed eight to an int32 (`jev-tpu-v5e1/tpu/lookup_bench.py`; output in
+`tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-09-29-lookup-v5e1/`):
+262,144 x 1,536 head on `v5litepod-1` (`jev-tpu-v5e1/tpu/lm_head_bench.py`; output in
+`tpu-vllm-v5e1-2b-q4w4a16emb4/benchmarks/runs/2026-09-29-lmh-v5e1/`):
+### v5e-4 — four 16 GB chips on one host
+`v5litepod-4`, topology `2x2`, the same `v2-alpha-tpuv5-lite` runtime as v5e-1. The host is
+reports 15.75 GiB to vLLM, as on v5e-1. Flex-start was accepted in `us-west4-a` on 2026-10-02 and granted
+five slices within five minutes; the v5e quota is 512 chips per zone in 44 zones.
+`tpu-vllm-v5e4-*` rigs (`benchmarks/runs/2026-10-02-rig-boot-v5e4` in each):
+- **12B** (`12b-w8a8emb4`): 2.25x / 2.09x / 1.70x the v5e-1 rig's output tok/s at 1 / 4 / 16 requests, and
