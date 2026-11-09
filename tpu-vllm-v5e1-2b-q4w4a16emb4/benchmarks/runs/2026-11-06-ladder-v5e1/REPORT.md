@@ -86,3 +86,5 @@ or a fixed KV size is untested. Logs: `tpu-vllm-v5e1-2b-q4w4a16emb4/one-vllm-tex
 One v5e chip per arm, three chips of the same type and zone, so a ratio between engines on different VMs is a
 ratio between two v5e-1s. TorchTPU arms were dropped after their `one` jobs (the Rust build's GSM8K ran at about 29 s a question);
 `vllm-text-d1` was not run. TPU memory in use while serving was not measured.
+
+SGLang-JAX (sglang-jax `b3e3e16b2`) was tried on 2026-11-08 and does not load Gemma 4 E2B: `../2026-11-08-ladder-sglang-v5e1/REPORT.md`.
