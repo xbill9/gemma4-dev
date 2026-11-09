@@ -37,3 +37,9 @@ to `gs://aisprint-491218-ladder-v5e1/<RUN>/<QR>/`, delete the queued resource wh
 `flight/parity.py` compares the six greedy replies with the bf16 JAX engine's hashes from the ladder.
 
 Compare with the ladder's `jax-bf16` and `jaxrust` arms (same bf16 checkpoint), not with the int4 `vllm` arm.
+
+## First light (2026-11-09)
+
+`benchmarks/runs/2026-11-08-first-light-v5e1`: one request 159.9 tok/s (1.19x `jax-bf16`, 1.11x int4 `vllm`); 4,249 /
+2,759 tok/s at 64 requests (128/512, 512/128), 2.52x / 2.14x int4 `vllm`, with wide repeat spread; GSM8K 0.9143, level
+with `jax-bf16` and `jaxrust`.
