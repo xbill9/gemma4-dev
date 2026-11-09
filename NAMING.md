@@ -189,6 +189,7 @@ The serving stack that actually loads the weights.
 | `litertlm` | `litert-lm serve` from Google's LiteRT-LM (`pip install litert-lm`): one `.litertlm` bundle of LiteRT graphs, run on XNNPACK (CPU) or ML Drift (GPU; WebGPU on Vulkan under Linux) |
 | `mistralrs` | `mistralrs serve` from `EricLBuehler/mistral.rs`: a Rust engine (Candle kernels) with its own GGUF and safetensors loaders, paged attention and batching |
 | `sglang` | SGLang (`pip install sglang`), OpenAI-compatible server over its own scheduler and radix cache |
+| `sglangjax` | SGLang-JAX (`sgl-project/sglang-jax`, package `sglang-jax`): SGLang's scheduler and radix cache over a JAX/Flax model and Pallas kernels, for TPU |
 
 `vllm` names the server, not the backend it compiles to — vLLM on TPU is `vllm`, never `pytorch`, even though
 `torch_xla` sits underneath. Pick the layer you'd file a bug against.
@@ -242,6 +243,10 @@ llama.cpp's quantized matrix-multiply CUDA kernels (`mistralrs-quant/kernels/mmq
 the two can share kernel behaviour while differing in everything around it. **`sglang` is
 its own engine**, not a vLLM build, though both serve compressed-tensors checkpoints. Both added 2026-11-03
 for the 3050 serving-engine comparison.
+
+**`sglangjax` is one token, by the rule that makes `jaxrust` one**, and a separate value from `sglang` because it is a
+separate package with its own model code: a Gemma 4 bug in one is not a bug in the other. Added 2026-11-08 for
+`tpu-sglangjax-v5e1-2b`.
 
 ## Slot 3 — hardware
 
@@ -558,6 +563,7 @@ Three things that trip people up:
 | `~/gemma4-dev/gpu-llamacpp-g6-4b-q4_0` | **EC2 G6** (x86_64 host), instance from `gpu-pytorch-g6-2b-q4w4a16` | llama.cpp `77c4540ce`, CUDA 13.1 | g6 (NVIDIA L4, Ada, sm_89) | `xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf` | `q4_0` — added 2026-10-26, the E4B sister of `gpu-llamacpp-g6-2b-q4_0` on the same instance, no MCP server. The exact Q4_0 QAT drafter: 1.75x at 3 drafted tokens (1.65x at 2), against 1.72x on the 3050 and 1.49x on the 1650 Ti at the same acceptance |
 | `~/gemma4-dev/gpu-vllm-g6-2b-q4w4a16emb4` | **EC2 G6** (x86_64 host), instance from `gpu-pytorch-g6-2b-q4w4a16` | vLLM 0.33.0, system python3 | g6 (NVIDIA L4, Ada, sm_89) | `xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4` | `q4w4a16emb4` — added 2026-11-05, forked from `local-vllm-3050oem-2b-q4w4a16emb4` for the G6 serving-engine flight (slots 1 and 3 differ), no MCP server. Holds the flight driver (`flight/`). Nothing measured |
 | `~/gemma4-dev/gpu-sglang-g6-2b-q4w4a16emb4` | **EC2 G6** (x86_64 host), instance from `gpu-pytorch-g6-2b-q4w4a16` | `sglang` 0.5.23 (cp313 wheel on python 3.14, two patches) | g6 (NVIDIA L4, Ada, sm_89) | the same checkpoint and revision as `gpu-vllm-g6-2b-q4w4a16emb4` | `q4w4a16emb4` — added 2026-11-05, forked from `local-sglang-3050oem-2b-q4w4a16emb4`, no MCP server. Nothing measured |
+| `~/gemma4-dev/tpu-sglangjax-v5e1-2b` | Cloud TPU API, flex-start queued resource | `sglangjax` (sglang-jax `b3e3e16b2` + `patches/gemma4-e2b.diff`) | v5e1 (`v5litepod-1`) | `google/gemma-4-E2B-it` | — — added 2026-11-08, flight forked from `tpu-vllm-v5e1-2b-q4w4a16emb4/flight`, no MCP server. Reference bf16 weights, so no encoding slot |
 | `~/gemma4-dev/gpu-mistralrs-g6-2b-q4_0` | **EC2 G6** (x86_64 host), instance from `gpu-pytorch-g6-2b-q4w4a16` | `mistralrs serve` (mistral.rs v0.9.5, CUDA + flash-attn, sm_89) | g6 (NVIDIA L4, Ada, sm_89) | `xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf` — the same file as `gpu-llamacpp-g6-2b-q4_0` | `q4_0` — added 2026-11-05, forked from `local-mistralrs-3050oem-2b-q4_0`, no MCP server. Nothing measured |
 | `~/gemma4-dev/gpu-litertlm-g6-2b-int248` | **EC2 G6** (x86_64 host), instance from `gpu-pytorch-g6-2b-q4w4a16` | `litert-lm serve` 0.19.0 (WebGPU on Vulkan) | g6 (NVIDIA L4, Ada, sm_89) | `litert-community/gemma-4-E2B-it-litert-lm` `gemma-4-E2B-it.litertlm` | `int248` — added 2026-11-05, forked from `local-litertlm-3050oem-2b-int248`, no MCP server. Nothing measured |
 | `~/gemma4-dev/gpu-litertlm-g6-2b-q4w4a16emb4` | **EC2 G6** (x86_64 host), instance from `gpu-pytorch-g6-2b-q4w4a16` | `litert-lm serve` 0.19.0 (WebGPU on Vulkan) | g6 (NVIDIA L4, Ada, sm_89) | the `.litertlm` built by `local-litertlm-3050oem-2b-q4w4a16emb4`, copied through S3 by hash | `q4w4a16emb4` — added 2026-11-05, the sister of `gpu-litertlm-g6-2b-int248`, slot 5 the only slot that differs. Nothing measured |
