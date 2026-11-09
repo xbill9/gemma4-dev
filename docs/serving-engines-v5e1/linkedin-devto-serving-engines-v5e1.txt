@@ -1,0 +1,14 @@
+Six Serving Engines on One Cloud TPU v5e Chip: Gemma 4 E2B
+
+vLLM, SGLang-JAX, a pure-JAX engine, a Rust model over PJRT, and TorchTPU in Python and Rust serve Gemma 4 E2B on one flex-start v5e-1, with the same prompts, the same 1-to-64-request sweep and the same GSM8K questions. vLLM is the engine that serves out of the box; SGLang-JAX with an E2B patch is the fastest at every load from 8 requests up.
+
+What is in it:
+
+- 🟢 Every engine that finished GSM8K scores 0.8969 to 0.9143; SGLang-JAX leads vLLM by 0.0136 with a range above zero.
+- 🟢 vLLM serves as shipped from its pinned image, batches to 64 requests and is the only engine with tool calls (BFCL 0.920).
+- 🟢 SGLang-JAX with the E2B patch is the fastest: 159.9 tokens per second for one request and 4,249 at 64, 2.52x vLLM.
+- 🟢 The Rust model over PJRT starts in 22 s and is level with vLLM for one request.
+
+dev.to (Google Developer Experts): https://dev.to/gde/six-serving-engines-on-one-cloud-tpu-v5e-chip-gemma-4-e2b-22hn
+Medium: https://medium.com/@xbill999/six-serving-engines-on-one-cloud-tpu-v5e-chip-gemma-4-e2b-7d767dd0c521
+Substack: https://xbill9.substack.com/p/six-serving-engines-on-one-cloud
