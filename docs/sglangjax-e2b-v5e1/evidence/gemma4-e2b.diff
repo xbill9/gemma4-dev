@@ -1,0 +1,345 @@
+diff --git a/python/sgl_jax/srt/configs/gemma4.py b/python/sgl_jax/srt/configs/gemma4.py
+index 2ea51df5..d5c6bba8 100644
+--- a/python/sgl_jax/srt/configs/gemma4.py
++++ b/python/sgl_jax/srt/configs/gemma4.py
+@@ -61,8 +61,10 @@ class Gemma4Config(PretrainedConfig):
+             tc.swa_head_dim = getattr(tc, "head_dim", None)
+             tc.head_dim = getattr(tc, "global_head_dim", tc.swa_head_dim)
+             tc.swa_num_key_value_heads = getattr(tc, "num_key_value_heads", None)
+-            tc.num_key_value_heads = getattr(
+-                tc, "num_global_key_value_heads", tc.swa_num_key_value_heads
++            # E2B/E4B ship "num_global_key_value_heads": null; getattr returns the None
++            # rather than the default, so fall back explicitly.
++            tc.num_key_value_heads = (
++                getattr(tc, "num_global_key_value_heads", None) or tc.swa_num_key_value_heads
+             )
+             tc._gemma4_remapped = True
+ 
+diff --git a/python/sgl_jax/srt/models/gemma4.py b/python/sgl_jax/srt/models/gemma4.py
+index fe648874..bc2e124d 100644
+--- a/python/sgl_jax/srt/models/gemma4.py
++++ b/python/sgl_jax/srt/models/gemma4.py
+@@ -38,6 +38,22 @@ logger = logging.getLogger(__name__)
+ init_fn = nnx.initializers.uniform()
+ 
+ 
++def _first_kv_shared_layer(config) -> int:
++    """First layer that reuses an earlier layer's K/V (E2B/E4B); num_layers when none do."""
++    n = int(getattr(config, "num_kv_shared_layers", 0) or 0)
++    return config.num_hidden_layers - n
++
++
++def _kv_share_source(config, layer_id: int) -> int:
++    """The layer whose K/V a KV-shared layer reads: the last non-shared layer of its type."""
++    first = _first_kv_shared_layer(config)
++    if layer_id < first:
++        return layer_id
++    types = getattr(config, "layer_types", None) or []
++    want = types[layer_id]
++    return max(i for i in range(first) if types[i] == want)
++
++
+ class Gemma4Router(nnx.Module):
+     def __init__(
+         self,
+@@ -146,6 +162,9 @@ class Gemma4Attention(nnx.Module):
+ 
+         self.is_sliding = self.layer_type == "sliding_attention"
+         self.sliding_window = getattr(config, "sliding_window", 0) if self.is_sliding else 0
++        # E2B/E4B: layers from num_hidden_layers - num_kv_shared_layers on compute no K/V of
++        # their own and attend over their source layer's (post-norm, post-RoPE) K/V.
++        self.is_kv_shared = layer_id >= _first_kv_shared_layer(config)
+ 
+         rope_parameters = getattr(config, "rope_parameters", {})
+         rope_params = dict(rope_parameters.get(self.layer_type, {}))
+@@ -273,20 +292,32 @@ class Gemma4Attention(nnx.Module):
+         hidden_states: jax.Array,
+         forward_batch: ForwardBatch,
+         token_to_kv_pool: KVCache,
+-    ) -> tuple[jax.Array, jax.Array]:
++        shared_kv: tuple[jax.Array, jax.Array] | None = None,
++    ):
+         q, _ = self.q_proj(hidden_states)
+-        k, _ = self.k_proj(hidden_states)
+-        if self.v_proj is None:
+-            v = k
+-        else:
+-            v, _ = self.v_proj(hidden_states)
+-
+         q = q.reshape(
+             -1,
+             self.q_head_num,
+             self.head_dim,
+             out_sharding=NamedSharding(self.mesh, P("data", "tensor", None)),
+         )
++        q = self.q_norm(q)
++
++        if self.is_kv_shared:
++            # The source layer's K/V for this pass's tokens. Storing them again in this
++            # layer's own cache slot keeps every layer's history in the pool, so the
++            # attention backend needs no cross-layer reads: same values, more KV memory.
++            k, v = shared_kv
++            q, _ = self.rotary_emb(positions, q, q)
++            attn_output, kv_fused = self.attn(q, k, v, forward_batch, token_to_kv_pool)
++            output, _ = self.o_proj(attn_output)
++            return output, kv_fused, (k, v)
++
++        k, _ = self.k_proj(hidden_states)
++        if self.v_proj is None:
++            v = k
++        else:
++            v, _ = self.v_proj(hidden_states)
+         k = k.reshape(
+             -1,
+             self.kv_head_num,
+@@ -300,7 +331,6 @@ class Gemma4Attention(nnx.Module):
+             out_sharding=NamedSharding(self.mesh, P("data", "tensor", None)),
+         )
+ 
+-        q = self.q_norm(q)
+         k = self.k_norm(k)
+ 
+         q, k = self.rotary_emb(positions, q, k)
+@@ -308,7 +338,7 @@ class Gemma4Attention(nnx.Module):
+ 
+         attn_output, kv_fused = self.attn(q, k, v, forward_batch, token_to_kv_pool)
+         output, _ = self.o_proj(attn_output)
+-        return output, kv_fused
++        return output, kv_fused, (k, v)
+ 
+ 
+ class Gemma4DecoderLayer(nnx.Module):
+@@ -351,13 +381,47 @@ class Gemma4DecoderLayer(nnx.Module):
+             epsilon=rms_norm_eps,
+             add_unit_offset=False,
+         )
++        intermediate_size = config.intermediate_size
++        if getattr(config, "use_double_wide_mlp", False) and layer_id >= _first_kv_shared_layer(
++            config
++        ):
++            intermediate_size *= 2  # E2B/E4B MatFormer: KV-shared layers have a 2x MLP
+         self.mlp = Gemma4MLP(
+             hidden_size=config.hidden_size,
+-            intermediate_size=config.intermediate_size,
++            intermediate_size=intermediate_size,
+             layer_id=layer_id,
+             dtype=dtype,
+             mesh=mesh,
+         )
++        self.ple_dim = int(getattr(config, "hidden_size_per_layer_input", 0) or 0)
++        if self.ple_dim:
++            self.per_layer_input_gate = LinearBase(
++                input_size=config.hidden_size,
++                output_size=self.ple_dim,
++                kernel_axes=(None, None),
++                use_bias=False,
++                params_dtype=dtype,
++                mesh=mesh,
++                scope_name="per_layer_input_gate",
++            )
++            self.per_layer_projection = LinearBase(
++                input_size=self.ple_dim,
++                output_size=config.hidden_size,
++                kernel_axes=(None, None),
++                use_bias=False,
++                params_dtype=dtype,
++                mesh=mesh,
++                scope_name="per_layer_projection",
++            )
++            self.post_per_layer_input_norm = GemmaRMSNorm(
++                config.hidden_size,
++                epsilon=rms_norm_eps,
++                add_unit_offset=False,
++            )
++        else:
++            self.per_layer_input_gate = None
++            self.per_layer_projection = None
++            self.post_per_layer_input_norm = None
+         self.post_feedforward_layernorm = GemmaRMSNorm(
+             config.hidden_size,
+             epsilon=rms_norm_eps,
+@@ -427,6 +491,8 @@ class Gemma4DecoderLayer(nnx.Module):
+         hidden_states: jax.Array,
+         forward_batch: ForwardBatch,
+         token_to_kv_pool: KVCache,
++        per_layer_input: jax.Array | None = None,
++        shared_kv: tuple[jax.Array, jax.Array] | None = None,
+     ):
+         layer_callback_flag = []
+         residual = hidden_states
+@@ -437,11 +503,12 @@ class Gemma4DecoderLayer(nnx.Module):
+         )
+         layer_callback_flag.append(layer_norm_callback_flag)
+ 
+-        hidden_states, kv_fused = self.self_attn(
++        hidden_states, kv_fused, layer_kv = self.self_attn(
+             positions=positions,
+             hidden_states=hidden_states,
+             forward_batch=forward_batch,
+             token_to_kv_pool=token_to_kv_pool,
++            shared_kv=shared_kv,
+         )
+ 
+         attn_callback_flag = precision_tracer.jit_pure_callback_record(
+@@ -482,6 +549,15 @@ class Gemma4DecoderLayer(nnx.Module):
+ 
+         mlp_output = self.post_feedforward_layernorm(hidden_states)
+         outputs = residual + mlp_output
++
++        if per_layer_input is not None:
++            # Per-layer embedding: gate the stream down to ple_dim, multiply by this
++            # layer's slice of the per-layer input, project back, norm, add.
++            gate, _ = self.per_layer_input_gate(outputs)
++            gate = jax.nn.gelu(gate, approximate=True) * per_layer_input
++            ple_out, _ = self.per_layer_projection(gate)
++            outputs = outputs + self.post_per_layer_input_norm(ple_out)
++
+         outputs = outputs * self.layer_scalar.value
+ 
+         mlp_callback_flag = precision_tracer.jit_pure_callback_record(
+@@ -489,7 +565,7 @@ class Gemma4DecoderLayer(nnx.Module):
+         )
+         layer_callback_flag.append(mlp_callback_flag)
+ 
+-        return outputs, kv_fused, layer_callback_flag, expert_ids
++        return outputs, kv_fused, layer_callback_flag, expert_ids, layer_kv
+ 
+ 
+ class Gemma4Model(nnx.Module):
+@@ -532,6 +608,53 @@ class Gemma4Model(nnx.Module):
+         )
+         self.hidden_size = config.hidden_size
+         self.layers_to_capture = []
++        self.mesh = mesh
++        self.num_layers = config.num_hidden_layers
++        self.first_kv_shared = _first_kv_shared_layer(config)
++        self.kv_share_source = [_kv_share_source(config, i) for i in range(self.num_layers)]
++
++        # Per-layer embeddings (E2B/E4B): one ple_dim slice per layer, from a token table
++        # and from a projection of the main embedding.
++        self.ple_dim = int(getattr(config, "hidden_size_per_layer_input", 0) or 0)
++        if self.ple_dim:
++            self.embed_tokens_per_layer = Embed(
++                num_embeddings=getattr(config, "vocab_size_per_layer_input", config.vocab_size),
++                features=self.num_layers * self.ple_dim,
++                dtype=dtype,
++                kernel_axes=(None, None),
++                param_dtype=dtype,
++                mesh=mesh,
++            )
++            self.per_layer_model_projection = LinearBase(
++                input_size=config.hidden_size,
++                output_size=self.num_layers * self.ple_dim,
++                kernel_axes=(None, None),
++                use_bias=False,
++                params_dtype=dtype,
++                mesh=mesh,
++                scope_name="per_layer_model_projection",
++            )
++            self.per_layer_projection_norm = GemmaRMSNorm(
++                self.ple_dim,
++                epsilon=getattr(config, "rms_norm_eps", 1e-6),
++                add_unit_offset=False,
++            )
++        else:
++            self.embed_tokens_per_layer = None
++            self.per_layer_model_projection = None
++            self.per_layer_projection_norm = None
++
++    def _per_layer_inputs(self, input_ids: jax.Array, inputs_embeds: jax.Array) -> jax.Array:
++        """[tokens, num_layers, ple_dim], as Gemma4TextModel.get/project_per_layer_inputs."""
++        shape = NamedSharding(self.mesh, P("data", None, None))
++        tok = self.embed_tokens_per_layer(input_ids)
++        tok = tok * jnp.asarray(self.ple_dim**0.5, dtype=tok.dtype)
++        tok = tok.reshape(-1, self.num_layers, self.ple_dim, out_sharding=shape)
++        proj, _ = self.per_layer_model_projection(inputs_embeds)
++        proj = proj * jnp.asarray(self.hidden_size**-0.5, dtype=proj.dtype)
++        proj = proj.reshape(-1, self.num_layers, self.ple_dim, out_sharding=shape)
++        proj = self.per_layer_projection_norm(proj)
++        return (proj + tok) * jnp.asarray(2.0**-0.5, dtype=proj.dtype)
+ 
+     def __call__(
+         self,
+@@ -547,19 +670,33 @@ class Gemma4Model(nnx.Module):
+             hidden_states = self.embed_tokens(forward_batch.input_ids)
+             hidden_states *= jnp.array([self.hidden_size**0.5], dtype=hidden_states.dtype)
+ 
++        per_layer_inputs = None
++        if self.ple_dim:
++            per_layer_inputs = self._per_layer_inputs(forward_batch.input_ids, hidden_states)
++
+         layers_kv_fused = []
+         layers_callback_flag = []
+         layers_topk_ids = []
+         aux_hidden_states = []
++        pass_kv = {}  # this pass's K/V of each source layer, for the KV-shared layers
+         for layer_id, layer in enumerate(self.layers):
+             if layer_id in self.layers_to_capture:
+                 aux_hidden_states.append(hidden_states)
+-            hidden_states, kv_fused, callback_flag, topk_ids = layer(
++            shared_kv = None
++            if layer_id >= self.first_kv_shared:
++                shared_kv = pass_kv[self.kv_share_source[layer_id]]
++            hidden_states, kv_fused, callback_flag, topk_ids, layer_kv = layer(
+                 forward_batch.positions,
+                 hidden_states,
+                 forward_batch,
+                 token_to_kv_pool,
++                per_layer_input=(
++                    per_layer_inputs[:, layer_id, :] if per_layer_inputs is not None else None
++                ),
++                shared_kv=shared_kv,
+             )
++            if layer_id < self.first_kv_shared:
++                pass_kv[layer_id] = layer_kv
+             layers_kv_fused.append(kv_fused)
+             layers_callback_flag.extend(callback_flag)
+             layers_topk_ids.append(topk_ids)
+@@ -680,6 +817,27 @@ class Gemma4ForCausalLM(nnx.Module):
+         if hasattr(self, "lm_head"):
+             mappings["lm_head.weight"] = self.lm_head.weight_mapping("lm_head.embedding")
+ 
++        if getattr(self.config, "hidden_size_per_layer_input", 0):
++            mappings.update(
++                {
++                    "model.embed_tokens_per_layer.weight": WeightSpec(
++                        target_path="model.embed_tokens_per_layer.embedding",
++                        sharding=(None, None),
++                        transpose=False,
++                    ),
++                    "model.per_layer_model_projection.weight": WeightSpec(
++                        target_path="model.per_layer_model_projection.weight",
++                        sharding=(None, None),
++                        transpose=True,
++                    ),
++                    "model.per_layer_projection_norm.weight": WeightSpec(
++                        target_path="model.per_layer_projection_norm.weight",
++                        sharding=(None,),
++                        transpose=False,
++                    ),
++                }
++            )
++
+         num_layers = self.config.num_hidden_layers
+         for layer_idx in range(num_layers):
+             layer_mappings = self._create_layer_mappings(layer_idx)
+@@ -777,6 +935,19 @@ class Gemma4ForCausalLM(nnx.Module):
+             ),
+         }
+ 
++        if getattr(self.config, "hidden_size_per_layer_input", 0):
++            for name in ("per_layer_input_gate", "per_layer_projection"):
++                mappings[f"{prefix}.{name}.weight"] = WeightSpec(
++                    target_path=f"{target_prefix}.{name}.weight",
++                    sharding=(None, None),
++                    transpose=True,
++                )
++            mappings[f"{prefix}.post_per_layer_input_norm.weight"] = WeightSpec(
++                target_path=f"{target_prefix}.post_per_layer_input_norm.weight",
++                sharding=(None,),
++                transpose=False,
++            )
++
+         if not use_k_eq_v:
+             mappings[f"{prefix}.self_attn.v_proj.weight"] = WeightSpec(
+                 target_path=f"{target_prefix}.self_attn.v_proj.weight",

@@ -1,0 +1,37 @@
+One request at a time (six prompts, 256 tokens, greedy, thinking off, 3 repeats)
+arm            e2e  decode  ttft ms 4 at once  x vllm repeat
+sglang       159.9   161.7     20.2     631.5   1.111 6/6
+vllm         143.9   145.1     15.4     477.2   1.000 6/6
+vllm-text    134.2   135.2     16.2     449.8   0.932 6/6
+jax-bf16     134.3   131.7     11.3     150.1   0.933 6/6
+jaxrust      145.2   145.5      9.4     145.4   1.009 6/6
+jax          104.1       -     15.9     122.1   0.723 6/6
+greedy replies identical to jax-bf16: 0/6
+greedy replies identical to jaxrust: 0/6
+greedy replies identical to vllm: 0/6
+
+Many requests at once: output tok/s (sweep.py, 5 repeats, unique prompts), vllm = ladder `vllm` arm
+in512-out128:   c   sglang     vllm  x vllm sgl ttft ms sgl spread %
+               1    154.2    140.6   1.096        58.8         49.5
+               2    117.4    257.4   0.456        88.4        205.2
+               4    552.0    440.2   1.254       140.3         81.2
+               8    915.6    682.2   1.342       217.8        173.7
+              16   1663.0    937.9   1.773       351.9        133.3
+              32   2358.4   1156.8   2.039       621.3         98.4
+              64   2758.9   1288.4   2.141      1135.0        117.6
+in128-out512:   c   sglang     vllm  x vllm sgl ttft ms sgl spread %
+               1    160.3    144.5   1.109        40.5         81.8
+               2    237.2    270.2   0.878        52.5         61.2
+               4    380.4    476.4   0.799        65.0         73.7
+               8    943.1    778.4   1.212       119.9         65.1
+              16   1671.9   1112.8   1.502      1227.5        127.9
+              32   2550.2   1462.5   1.744      1348.8         52.6
+              64   4249.4   1689.1   2.516       456.0         60.3
+
+GSM8K (1,319, 2,048 tokens), one request at a time, thinking off
+sglang: 1206/1319 = 0.9143
+sglang - vllm      (0.9007): +0.0136 [+0.0023, +0.0258] differ 66 of 1319
+sglang - vllm-text (0.8992): +0.0152 [+0.0023, +0.0273] differ 70 of 1319
+sglang - jax-bf16  (0.9128): +0.0015 [-0.0091, +0.0121] differ 50 of 1319
+sglang - jaxrust   (0.9113): +0.0030 [-0.0076, +0.0144] differ 58 of 1319
+sglang - jax       (0.8969): +0.0174 [+0.0045, +0.0303] differ 77 of 1319
