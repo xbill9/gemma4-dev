@@ -1,0 +1,14 @@
+Porting Gemma 4 E2B to SGLang-JAX on One Cloud TPU v5e
+
+SGLang-JAX serves the Gemma 4 31B and 26B A4B on TPU and fails to load E2B. A two-file patch adds per-layer embeddings, shared K/V and the double-wide MLP; on one flex-start v5e-1 it then serves 159.9 tokens per second for one request and 4,249.4 at 64, 2.52x vLLM, with GSM8K level with the bf16 JAX engine.
+
+What is in it:
+
+- 🟢 A two-file patch, 175 lines added and 14 removed, makes SGLang-JAX load and serve E2B.
+- 🟢 159.9 tokens per second for one request, the fastest of six engines measured on this chip, and 1.19x the JAX engine it was ported from.
+- 🟢 4,249.4 tokens per second at 64 requests of 128 in / 512 out, 2.52x vLLM; 2,759 on 512 / 128, 2.14x.
+- 🟢 GSM8K 0.9143, level with the bf16 JAX engine and the Rust model.
+
+dev.to (Google Developer Experts): https://dev.to/gde/porting-gemma-4-e2b-to-sglang-jax-on-one-cloud-tpu-v5e-5e9l
+Medium: https://medium.com/@xbill999/porting-gemma-4-e2b-to-sglang-jax-on-one-cloud-tpu-v5e-94e9b4594b11
+Substack: https://xbill9.substack.com/p/porting-gemma-4-e2b-to-sglang-jax
