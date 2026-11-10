@@ -32,7 +32,7 @@ else
 fi
 
 for a in vllm vllm-d1 vllm-d2 vllm-d3 vllm-d4 llama llama-d1 llama-d2 llama-d3 llama-d4 \
-         sglang sglang-d1 sglang-d2 sglang-d3 sglang-d4; do
+         sglang sglang-d1; do  # sglang-d2..d4 not swept: its drafter flattens at ~30 tok/s on the T4 (2026-11-06)
   step sweep $a 2026-11-06-concurrency-t4
 done
 [ -x /opt1/mistralrs-v0.9.5/bin/mistralrs ] && step sweep mistralrs 2026-11-06-concurrency-t4
