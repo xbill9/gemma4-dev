@@ -37,9 +37,17 @@ for a in vllm vllm-d1 vllm-d2 vllm-d3 vllm-d4 llama llama-d1 llama-d2 llama-d3 l
 done
 [ -x /opt1/mistralrs-v0.9.5/bin/mistralrs ] && step sweep mistralrs 2026-11-06-concurrency-t4
 
-for a in vllm llama pytorch vllm-d3 llama-d1 sglang sglang-d4; do
+for a in vllm llama pytorch vllm-d3 llama-d1; do
   step accuracy $a 2026-11-06-accuracy-t4
 done
+# SGLang on the W4A16 int4 checkpoint (2026-11-10, gpu-sglang-t4-2b-q4w4a16emb4) replaces the bf16 sglang and
+# sglang-d4 arms; its drafter is slower than none on the T4, so no drafter arm. t4chain.py there sees its engines.py.
+S4=$G/gpu-sglang-t4-2b-q4w4a16emb4/benchmarks/runs/2026-11-10-int4-t4
+if ! grep -q '"rc": 0' $S4/accuracy/sglang4/status.json 2>/dev/null; then
+  say "START accuracy sglang4 -> $S4/accuracy/sglang4"
+  (cd $S4 && python3 t4chain.py accuracy sglang4 $S4/accuracy/sglang4 > /dev/null 2>&1)
+  say "END accuracy sglang4 rc=$?"
+fi
 [ -x /opt1/mistralrs-v0.9.5/bin/mistralrs ] && step accuracy mistralrs 2026-11-06-accuracy-t4
 L=$G/gpu-litertlm-t4-2b-int248/benchmarks/runs/2026-11-06-accuracy-t4
 if ! grep -q DONE $L/driver.log 2>/dev/null; then say "START accuracy litert"; bash $L/run.sh; say "END accuracy litert rc=$?"; fi
