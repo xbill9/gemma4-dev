@@ -1,6 +1,6 @@
 --- a/sglang/srt/models/gemma4_causal.py
 +++ b/sglang/srt/models/gemma4_causal.py
-@@ -88,6 +88,66 @@
+@@ -88,6 +88,68 @@
  Gemma4TextScaledWordEmbedding = Gemma3TextScaledWordEmbedding
  
  
@@ -51,7 +51,9 @@
 +    def weight(self):
 +        # Dense table for callers that need one (a drafter's shared embedding); built once on request.
 +        if self._dense is None:
-+            dt = torch.get_default_dtype() if torch.get_default_dtype() != torch.float32 else torch.bfloat16
++            # gpu-sglang-t4-2b: the model dtype captured at build time; the default dtype is float32 by
++            # now, and a bf16 table beside float16 hidden states gives the drafter float32 activations.
++            dt = self.out_dtype
 +            self._dense = torch.cat(
 +                [self._rows(self.weight_packed[i:i + 8192], self.weight_scale[i:i + 8192], dt)
 +                 for i in range(0, self.num_embeddings, 8192)])
@@ -67,7 +69,7 @@
  def load_tied_lm_head(
      loaded_weight, *, params_dict, loaded_params, head_param_name="lm_head.weight"
  ):
-@@ -884,12 +944,19 @@
+@@ -884,12 +946,19 @@
                  )
  
          if self.pp_group.is_first_rank:
@@ -93,7 +95,7 @@
          else:
              self.embed_tokens = PPMissingLayer()
  
-@@ -898,12 +965,19 @@
+@@ -898,12 +967,19 @@
              and self.hidden_size_per_layer_input
              and self.hidden_size_per_layer_input > 0
          ):
@@ -119,7 +121,7 @@
  
              self.per_layer_model_projection = ReplicatedLinear(
                  self.hidden_size,
-@@ -1486,7 +1560,10 @@
+@@ -1486,7 +1562,10 @@
          embed = self._shard_weight(
              self.model.embed_tokens.weight, draft_embedding=draft_embedding
          )

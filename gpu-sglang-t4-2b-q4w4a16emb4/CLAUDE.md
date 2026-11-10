@@ -9,11 +9,15 @@ same values as 16-bit (10.00 GB) because SGLang's own Marlin is empty below sm_8
   `marlin-sm75-via-vllm.diff`. The last makes SGLang's `gptq_marlin_gemm` and `gptq_marlin_repack` call
   vLLM 0.33's compiled `torch.ops._C.marlin_gemm` / `gptq_marlin_repack` when compute capability < 8 (no
   act-order there), and lowers the two sm_80 gates (`query_marlin_supported_quant_types`,
-  `CompressedTensorsWNA16.get_min_capability`) to 75. **It needs vLLM installed beside SGLang**, as it is in
+  `CompressedTensorsWNA16.get_min_capability`) to 75. It also turns Marlin's atomic-add reduction off unless
+  `SGLANG_MARLIN_USE_ATOMIC_ADD=1`, as vLLM does: SGLang 0.5.23 hard-codes it on (`if not True:`), which
+  fires only for float16, so only here, and made greedy text vary between repeats (3 of 6 prompts).
+  **It needs vLLM installed beside SGLang**, as it is in
   `/opt1/pyuser-engines`. Originals of the four patched files are in `~/sglang-orig-2026-11-10/` on the host.
-- **This rig's `int4-embeddings.diff` differs from the 3050's in one place**: unpacked rows take the dtype
-  the model is built in instead of a fixed bf16. Turing's Marlin takes only fp16 (or int8) activations, and
-  SGLang builds the model in float16 below sm_80.
+- **This rig's `int4-embeddings.diff` differs from the 3050's in two lines**: unpacked rows, and the dense
+  table the drafter reads through `.weight`, take the dtype the model is built in instead of bf16. Turing's
+  Marlin takes only fp16 (or int8) activations, SGLang builds the model in float16 below sm_80, and a bf16
+  table beside float16 hidden states gave the drafter float32 activations.
 - `kernel_check.py`: SGLang's repack + scale permutation + GEMM on this card against fp16 matmul on the
   dequantized weights (relative error 0.7–2.0e-3 at E2B's shapes, 1–256 rows, 2026-11-10).
 - **FlashInfer JIT on sm_75** needs `CUDA_HOME=/opt1/cuda-13.4` and `CPATH=/opt1/cuda-extra-include`;

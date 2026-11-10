@@ -1,6 +1,5 @@
-diff -ru a/sglang/kernels/ops/gemm/gptq_marlin.py b/sglang/kernels/ops/gemm/gptq_marlin.py
---- a/sglang/kernels/ops/gemm/gptq_marlin.py	2026-11-05 11:42:55.756870565 -0500
-+++ b/sglang/kernels/ops/gemm/gptq_marlin.py	2026-11-10 10:53:10.167886425 -0500
+--- a/sglang/kernels/ops/gemm/gptq_marlin.py
++++ b/sglang/kernels/ops/gemm/gptq_marlin.py
 @@ -15,6 +15,16 @@
  _MAX_THREAD_N = 256
  
@@ -35,9 +34,8 @@ diff -ru a/sglang/kernels/ops/gemm/gptq_marlin.py b/sglang/kernels/ops/gemm/gptq
      # Allocate output if not provided
      if c is None:
          c = torch.empty((size_m, size_n), dtype=a.dtype, device=device)
-diff -ru a/sglang/kernels/ops/quantization/gptq_marlin_repack.py b/sglang/kernels/ops/quantization/gptq_marlin_repack.py
---- a/sglang/kernels/ops/quantization/gptq_marlin_repack.py	2026-11-05 11:42:55.892099554 -0500
-+++ b/sglang/kernels/ops/quantization/gptq_marlin_repack.py	2026-11-10 10:53:10.167989127 -0500
+--- a/sglang/kernels/ops/quantization/gptq_marlin_repack.py
++++ b/sglang/kernels/ops/quantization/gptq_marlin_repack.py
 @@ -14,6 +14,16 @@
  _TILE_SIZE = 16
  
@@ -68,9 +66,8 @@ diff -ru a/sglang/kernels/ops/quantization/gptq_marlin_repack.py b/sglang/kernel
      pack_factor = 32 // num_bits
  
      # Allocate output tensor
-diff -ru a/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py b/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py
---- a/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py	2026-11-05 11:42:56.892306483 -0500
-+++ b/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py	2026-11-10 10:53:10.168235406 -0500
+--- a/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py
++++ b/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py
 @@ -92,8 +92,8 @@
  
      @classmethod
@@ -82,10 +79,17 @@ diff -ru a/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_
  
      def create_weights(self, layer: torch.nn.Module, output_size: int,
                         input_size: int, output_partition_sizes: list[int],
-diff -ru a/sglang/srt/layers/quantization/marlin_utils.py b/sglang/srt/layers/quantization/marlin_utils.py
---- a/sglang/srt/layers/quantization/marlin_utils.py	2026-11-05 11:42:56.873641319 -0500
-+++ b/sglang/srt/layers/quantization/marlin_utils.py	2026-11-10 10:53:10.168147025 -0500
-@@ -75,7 +75,7 @@
+--- a/sglang/srt/layers/quantization/marlin_utils.py
++++ b/sglang/srt/layers/quantization/marlin_utils.py
+@@ -5,6 +5,7 @@
+ from __future__ import annotations
+ 
+ import logging
++import os
+ from dataclasses import dataclass
+ from typing import TYPE_CHECKING, Optional
+ 
+@@ -75,7 +76,7 @@
          capability = major * 10 + minor if major is not None else None
          device_capability = -1 if capability is None else capability
  
@@ -94,3 +98,15 @@ diff -ru a/sglang/srt/layers/quantization/marlin_utils.py b/sglang/srt/layers/qu
          return []
  
      # - has_zp is True: return quant_types that has zero points
+@@ -446,7 +447,10 @@
+     # disable atomicAdd reduce by default,
+     # one can enable it with VLLM_MARLIN_USE_ATOMIC_ADD=1
+     # TODO: Need to add sglang's MARLIN_USE_ATOMIC_ADD: bool = False
+-    if not True:
++    # gpu-sglang-t4-2b: off unless asked, as in vLLM. With `if not True` it was always on, which fires for
++    # float16 (below sm_90 bf16 is excluded) and sums partial results in a varying order: greedy text on
++    # the T4 changed between repeats of one request.
++    if os.environ.get("SGLANG_MARLIN_USE_ATOMIC_ADD", "0") != "1":
+         maybe_warn_marlin_atomic_add_env()
+         return False
+ 
