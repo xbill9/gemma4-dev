@@ -1,0 +1,133 @@
+--- a/sglang/srt/models/gemma4_causal.py
++++ b/sglang/srt/models/gemma4_causal.py
+@@ -88,6 +88,66 @@
+ Gemma4TextScaledWordEmbedding = Gemma3TextScaledWordEmbedding
+ 
+ 
++def _int4_embedding_target(quant_config, name):
++    """True when a compressed-tensors config stores the table `name` as pack-quantized int4, group 32."""
++    targets = getattr(quant_config, "target_scheme_map", None) or {}
++    for target, scheme in targets.items():
++        if not target.startswith("re:") or re.match(target[3:], name) is None:
++            continue
++        w = (scheme or {}).get("weights")
++        return w is not None and w.num_bits == 4 and w.group_size == 32 and w.symmetric
++    return False
++
++
++class Gemma4Int4ScaledEmbedding(nn.Module):
++    """A compressed-tensors pack-quantized int4 table (group 32, symmetric) kept packed on the device.
++
++    Only the gathered rows are unpacked: nibble i of int32 word j holds q + 8 for column 8j + i, and
++    a row is q * weight_scale per 32 columns, then times embed_scale, as Gemma3TextScaledWordEmbedding.
++    """
++
++    def __init__(self, num_embeddings, embedding_dim, embed_scale=1.0):
++        super().__init__()
++        self.num_embeddings = num_embeddings
++        self.embedding_dim = embedding_dim
++        self.embed_scale = embed_scale
++        self.weight_packed = nn.Parameter(
++            torch.empty(num_embeddings, embedding_dim // 8, dtype=torch.int32), requires_grad=False
++        )
++        self.weight_scale = nn.Parameter(
++            torch.empty(num_embeddings, embedding_dim // 32, dtype=torch.float16), requires_grad=False
++        )
++        self.weight_shape = nn.Parameter(torch.empty(2, dtype=torch.int64), requires_grad=False)
++        self.register_buffer("shifts", torch.arange(0, 32, 4, dtype=torch.int32), persistent=False)
++        self._dense = None
++        # gpu-sglang-t4-2b: rows come out in the dtype the model is built in (float16 below sm_80, where
++        # Marlin takes only fp16 activations), not a fixed bf16.
++        d = torch.get_default_dtype()
++        self.out_dtype = d if d in (torch.float16, torch.bfloat16) else torch.bfloat16
++
++    def _rows(self, packed, scale, dtype):
++        q = ((packed.unsqueeze(-1) >> self.shifts) & 0xF) - 8
++        q = q.reshape(*packed.shape[:-1], self.embedding_dim // 32, 32).to(torch.float32)
++        w = q * scale.to(torch.float32).unsqueeze(-1)
++        return w.reshape(*packed.shape[:-1], self.embedding_dim).to(dtype)
++
++    @property
++    def weight(self):
++        # Dense table for callers that need one (a drafter's shared embedding); built once on request.
++        if self._dense is None:
++            dt = torch.get_default_dtype() if torch.get_default_dtype() != torch.float32 else torch.bfloat16
++            self._dense = torch.cat(
++                [self._rows(self.weight_packed[i:i + 8192], self.weight_scale[i:i + 8192], dt)
++                 for i in range(0, self.num_embeddings, 8192)])
++        return self._dense
++
++    def forward(self, input_ids):
++        dt = self.out_dtype
++        return self._rows(self.weight_packed[input_ids], self.weight_scale[input_ids], dt) * self.embed_scale
++
++    out_dtype = torch.bfloat16
++
++
+ def load_tied_lm_head(
+     loaded_weight, *, params_dict, loaded_params, head_param_name="lm_head.weight"
+ ):
+@@ -884,12 +944,19 @@
+                 )
+ 
+         if self.pp_group.is_first_rank:
+-            self.embed_tokens = Gemma4TextScaledWordEmbedding(
+-                config.vocab_size,
+-                config.hidden_size,
+-                self.padding_idx,
+-                embed_scale=self.config.hidden_size**0.5,  # embedded normalizer
+-            )
++            if _int4_embedding_target(quant_config, add_prefix("embed_tokens", prefix)):
++                self.embed_tokens = Gemma4Int4ScaledEmbedding(
++                    config.vocab_size,
++                    config.hidden_size,
++                    embed_scale=self.config.hidden_size**0.5,
++                )
++            else:
++                self.embed_tokens = Gemma4TextScaledWordEmbedding(
++                    config.vocab_size,
++                    config.hidden_size,
++                    self.padding_idx,
++                    embed_scale=self.config.hidden_size**0.5,  # embedded normalizer
++                )
+         else:
+             self.embed_tokens = PPMissingLayer()
+ 
+@@ -898,12 +965,19 @@
+             and self.hidden_size_per_layer_input
+             and self.hidden_size_per_layer_input > 0
+         ):
+-            self.embed_tokens_per_layer = Gemma4TextScaledWordEmbedding(
+-                self.vocab_size_per_layer_input,
+-                config.num_hidden_layers * self.hidden_size_per_layer_input,
+-                self.padding_idx,
+-                embed_scale=self.hidden_size_per_layer_input**0.5,
+-            )
++            if _int4_embedding_target(quant_config, add_prefix("embed_tokens_per_layer", prefix)):
++                self.embed_tokens_per_layer = Gemma4Int4ScaledEmbedding(
++                    self.vocab_size_per_layer_input,
++                    config.num_hidden_layers * self.hidden_size_per_layer_input,
++                    embed_scale=self.hidden_size_per_layer_input**0.5,
++                )
++            else:
++                self.embed_tokens_per_layer = Gemma4TextScaledWordEmbedding(
++                    self.vocab_size_per_layer_input,
++                    config.num_hidden_layers * self.hidden_size_per_layer_input,
++                    self.padding_idx,
++                    embed_scale=self.hidden_size_per_layer_input**0.5,
++                )
+ 
+             self.per_layer_model_projection = ReplicatedLinear(
+                 self.hidden_size,
+@@ -1486,7 +1560,10 @@
+         embed = self._shard_weight(
+             self.model.embed_tokens.weight, draft_embedding=draft_embedding
+         )
+-        head = self._shard_weight(self.lm_head.weight, draft_embedding=draft_embedding)
++        # An int4 lm_head (compressed-tensors) has no dense weight; the Gemma 4 assistant keeps its own head.
++        head = getattr(self.lm_head, "weight", None)
++        if head is not None:
++            head = self._shard_weight(head, draft_embedding=draft_embedding)
+         return embed, head
+ 
+     def get_embed_and_head_for_draft(self, draft_embedding):

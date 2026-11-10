@@ -1,0 +1,28 @@
+--- a/sglang/kernels/ops/attention/decode_attention.py
++++ b/sglang/kernels/ops/attention/decode_attention.py
+@@ -853,6 +853,12 @@
+         extra_kargs = {"waves_per_eu": 1, "matrix_instr_nonkdim": 16, "kpack": 2}
+         num_stages = 1
+ 
++    # gpu-sglang-t4-2b: Turing shared-memory clamp. sm_75 allows 65,536 B per block and this kernel
++    # asks 98,304 at Gemma 4's 512-wide full-attention heads; the same move as the MI3xx case above.
++    if not _is_hip and Lk >= 512 and torch.cuda.get_device_capability(q.device)[0] < 8:
++        BLOCK = 16
++        num_stages = 1
++
+     if tune_mla:
+         # num_warps reorders the fp32 accumulation, so whoever declined the batch-wide
+         # count gets a batch-independent geometry too
+--- a/sglang/kernels/ops/attention/extend_attention.py
++++ b/sglang/kernels/ops/attention/extend_attention.py
+@@ -136,6 +136,10 @@
+         else:
+             # Older architectures
+             BLOCK_M, BLOCK_N = (64, 64) if Lq <= 128 else (32, 32)
++            # gpu-sglang-t4-2b: Turing shared-memory clamp. (32, 32) asks 131,072 B at Gemma 4's
++            # 512-wide full-attention heads; sm_75 allows 65,536 per block.
++            if Lq >= 512:
++                BLOCK_M, BLOCK_N = (16, 16)
+ 
+         num_warps = 4 if Lq <= 64 else 8
+ 
