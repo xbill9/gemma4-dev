@@ -1,0 +1,96 @@
+diff -ru a/sglang/kernels/ops/gemm/gptq_marlin.py b/sglang/kernels/ops/gemm/gptq_marlin.py
+--- a/sglang/kernels/ops/gemm/gptq_marlin.py	2026-11-05 11:42:55.756870565 -0500
++++ b/sglang/kernels/ops/gemm/gptq_marlin.py	2026-11-10 10:53:10.167886425 -0500
+@@ -15,6 +15,16 @@
+ _MAX_THREAD_N = 256
+ 
+ 
++# gpu-sglang-t4-2b: below sm_80 SGLang's JIT Marlin compiles to empty stubs (every body sits under
++# `__CUDA_ARCH__ < 800`). vLLM's compiled Marlin runs on sm_75, so on those cards these wrappers call
++# vLLM's ops instead. Same weight layout: SGLang's Marlin and its Python scale permutation came from vLLM.
++def _vllm_marlin_ops(device: torch.device):
++    if torch.cuda.get_device_capability(device)[0] >= 8:
++        return None
++    import vllm._C_stable_libtorch  # noqa: F401  registers torch.ops._C.*
++    return torch.ops._C
++
++
+ @cache_once
+ def _jit_gptq_marlin_module(dtype: torch.dtype) -> Module:
+     args = make_cpp_args(dtype)
+@@ -54,6 +64,16 @@
+ ) -> torch.Tensor:
+     device = a.device
+ 
++    ops = _vllm_marlin_ops(device)
++    if ops is not None:
++        if g_idx is not None and g_idx.numel() > 0:
++            raise NotImplementedError("act-order Marlin below sm_80 (vLLM's marlin_gemm takes no g_idx)")
++        if size_m == 0:
++            return c if c is not None else torch.empty((0, size_n), dtype=a.dtype, device=device)
++        return ops.marlin_gemm(a, c, b_q_weight, None, b_scales, None, global_scale, b_zeros, workspace,
++                               b_q_type.id, size_m, size_n, size_k, use_atomic_add, use_fp32_reduce,
++                               is_zp_float)
++
+     # Allocate output if not provided
+     if c is None:
+         c = torch.empty((size_m, size_n), dtype=a.dtype, device=device)
+diff -ru a/sglang/kernels/ops/quantization/gptq_marlin_repack.py b/sglang/kernels/ops/quantization/gptq_marlin_repack.py
+--- a/sglang/kernels/ops/quantization/gptq_marlin_repack.py	2026-11-05 11:42:55.892099554 -0500
++++ b/sglang/kernels/ops/quantization/gptq_marlin_repack.py	2026-11-10 10:53:10.167989127 -0500
+@@ -14,6 +14,16 @@
+ _TILE_SIZE = 16
+ 
+ 
++# gpu-sglang-t4-2b: below sm_80 SGLang's JIT Marlin compiles to empty stubs (every body sits under
++# `__CUDA_ARCH__ < 800`). vLLM's compiled Marlin runs on sm_75, so on those cards these wrappers call
++# vLLM's ops instead. Same weight layout: SGLang's Marlin and its Python scale permutation came from vLLM.
++def _vllm_marlin_ops(device: torch.device):
++    if torch.cuda.get_device_capability(device)[0] >= 8:
++        return None
++    import vllm._C_stable_libtorch  # noqa: F401  registers torch.ops._C.*
++    return torch.ops._C
++
++
+ @cache_once
+ def _jit_gptq_marlin_repack_module() -> Module:
+     return load_jit(
+@@ -31,6 +41,12 @@
+     size_n: int,
+     num_bits: int,
+ ) -> torch.Tensor:
++    ops = _vllm_marlin_ops(b_q_weight.device)
++    if ops is not None:
++        if perm is not None and perm.numel() > 0:
++            raise NotImplementedError("act-order Marlin repack below sm_80")
++        return ops.gptq_marlin_repack(b_q_weight, size_k, size_n, num_bits, False)
++
+     pack_factor = 32 // num_bits
+ 
+     # Allocate output tensor
+diff -ru a/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py b/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py
+--- a/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py	2026-11-05 11:42:56.892306483 -0500
++++ b/sglang/srt/layers/quantization/compressed_tensors/schemes/compressed_tensors_wNa16.py	2026-11-10 10:53:10.168235406 -0500
+@@ -92,8 +92,8 @@
+ 
+     @classmethod
+     def get_min_capability(cls) -> int:
+-        # ampere and up
+-        return 80
++        # gpu-sglang-t4-2b: turing and up, through vLLM's Marlin below sm_80
++        return 75
+ 
+     def create_weights(self, layer: torch.nn.Module, output_size: int,
+                        input_size: int, output_partition_sizes: list[int],
+diff -ru a/sglang/srt/layers/quantization/marlin_utils.py b/sglang/srt/layers/quantization/marlin_utils.py
+--- a/sglang/srt/layers/quantization/marlin_utils.py	2026-11-05 11:42:56.873641319 -0500
++++ b/sglang/srt/layers/quantization/marlin_utils.py	2026-11-10 10:53:10.168147025 -0500
+@@ -75,7 +75,7 @@
+         capability = major * 10 + minor if major is not None else None
+         device_capability = -1 if capability is None else capability
+ 
+-    if device_capability < 80:
++    if device_capability < 75:  # gpu-sglang-t4-2b: sm_75 through vLLM's Marlin
+         return []
+ 
+     # - has_zp is True: return quant_types that has zero points
