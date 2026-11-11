@@ -38,14 +38,17 @@ fi
 # 3. mistral.rs build (CPU only; nothing on the GPU meanwhile)
 if [ ! -x /opt1/mistralrs-v0.9.5/bin/mistralrs ]; then
   log "mistral.rs build start; mmproj present=$(test -f /opt1/models/gemma-4-E2B-it-mmproj/gemma-4-E2B-it-mmproj.gguf && echo y || echo n); src present=$(test -d /opt1/mistral.rs && echo y || echo n); cargo=$(sudo -u $U -i bash -c 'command -v cargo || ls ~/.cargo/bin/cargo' 2>/dev/null)"
-  sudo -u $U -i bash -c '
-    set -x
-    command -v cargo >/dev/null || [ -x ~/.cargo/bin/cargo ] || curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-    export PATH=$HOME/.cargo/bin:/opt1/cuda-13.4/bin:$PATH CUDA_HOME=/opt1/cuda-13.4 CUDA_PATH=/opt1/cuda-13.4 CPATH=/opt1/cuda-extra-include CARGO_BUILD_JOBS=2
-    test -d /opt1/mistral.rs || git clone --depth 50 --branch v0.9.5 https://github.com/EricLBuehler/mistral.rs.git /opt1/mistral.rs
-    cd /opt1/mistral.rs && ls && grep -m1 "^version" Cargo.toml; (git log -1 --format=%h || true)
-    CUDA_COMPUTE_CAP=75 cargo install --locked --path mistralrs-cli --features cuda --root /opt1/mistralrs-v0.9.5
-  ' > /opt1/mistralrs-build.log 2>&1
+  # a file, not bash -c: sudo -i joins a multi-line command into one line
+  cat > /usr/local/bin/t4-mrs-build.sh <<'BEOF'
+set -x
+command -v cargo >/dev/null || [ -x ~/.cargo/bin/cargo ] || curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+export PATH=$HOME/.cargo/bin:/opt1/cuda-13.4/bin:$PATH CUDA_HOME=/opt1/cuda-13.4 CUDA_PATH=/opt1/cuda-13.4 CPATH=/opt1/cuda-extra-include CARGO_BUILD_JOBS=2
+test -d /opt1/mistral.rs || git clone --depth 50 --branch v0.9.5 https://github.com/EricLBuehler/mistral.rs.git /opt1/mistral.rs
+cd /opt1/mistral.rs && ls && grep -m1 "^version" Cargo.toml; (git log -1 --format=%h || true)
+CUDA_COMPUTE_CAP=75 cargo install --locked --path mistralrs-cli --features cuda --root /opt1/mistralrs-v0.9.5
+BEOF
+  chmod +x /usr/local/bin/t4-mrs-build.sh
+  sudo -u $U -i bash /usr/local/bin/t4-mrs-build.sh > /opt1/mistralrs-build.log 2>&1
   log "mistral.rs build rc=$? binary=$(test -x /opt1/mistralrs-v0.9.5/bin/mistralrs && echo y || echo n)"
   up
 fi
