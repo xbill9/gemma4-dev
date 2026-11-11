@@ -29,6 +29,18 @@ log "start; nvidia-smi ok=$(nvidia-smi >/dev/null 2>&1 && echo y); swap=$(awk 'N
 # 1. SGLang int4 sweep support (same edit as the committed t4chain.py)
 sed -i 's|"sglang": engines.SRIG, "mistralrs"|"sglang": engines.SRIG, "sglang4": engines.SRIG4, "mistralrs"|' $S4/t4chain.py
 log "t4chain sglang4 sweep: $(grep -c sglang4 $S4/t4chain.py)"
+# 1b. mistral.rs accuracy with thinking off (2026-11-11: the first T4 run left it at its default, on); keep that
+#     BFCL as the thinking-default diagnostic, as on the 3050
+MA=$G/gpu-mistralrs-t4-2b-q4_0/benchmarks/runs/2026-11-06-accuracy-t4/mistralrs
+if ! grep -q JEV_ENABLE_THINKING $Q/t4chain.py; then
+  sed -i 's|^        tenv = dict(os.environ, PYTHONUSERBASE="")  # the harness scripts are stdlib only$|&\n        if ARM.startswith("mistralrs"):  # mistral.rs v0.9.5 thinks by default on Gemma 4; the 3050/L4 runs set it off\n            tenv["JEV_ENABLE_THINKING"] = "0"|' $Q/t4chain.py
+  if [ -f $MA/bfcl_simple-mistralrs.jsonl ]; then
+    mkdir -p $MA/thinkdefault; mv $MA/bfcl_simple-mistralrs.jsonl $MA/bfcl_simple-mistralrs.log $MA/driver.log $MA/server.log $MA/thinkdefault/ 2>/dev/null
+    rm -f $MA/gsm8k-mistralrs.jsonl $MA/gsm8k-mistralrs.log $MA/status.json
+  fi
+  chown -R $U: $MA $Q/t4chain.py
+fi
+log "t4chain thinking-off lines: $(grep -c JEV_ENABLE_THINKING $Q/t4chain.py)"
 # 2. SGLang int4 load sweep (first: it fits before the 22:00 UTC stop whatever the build does)
 if ! grep -q '"rc": 0' $S4/concurrency/sglang4/status.json 2>/dev/null; then
   log "sglang4 sweep start"

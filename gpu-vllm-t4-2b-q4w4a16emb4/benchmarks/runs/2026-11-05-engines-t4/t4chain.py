@@ -94,6 +94,8 @@ def main():
                 time.sleep(2)
         log(f"{ARM}: ready in {time.time() - t0:.1f} s, gpu {engines.gpu()}")
         tenv = dict(os.environ, PYTHONUSERBASE="")  # the harness scripts are stdlib only
+        if ARM.startswith("mistralrs"):  # mistral.rs v0.9.5 thinks by default on Gemma 4; the 3050/L4 runs set it off
+            tenv["JEV_ENABLE_THINKING"] = "0"
         if JOB == "sweep":
             rig = SWEEP_RIG[ARM.split("-")[0]]
             for shape in ((512, 128), (128, 512)):
