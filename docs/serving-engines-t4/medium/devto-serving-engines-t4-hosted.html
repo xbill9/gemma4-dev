@@ -192,7 +192,7 @@
 serving engines on one Tesla T4: llama.cpp, vLLM, SGLang, mistral.rs, a
 plain PyTorch engine and Google's LiteRT-LM, each serving Gemma 4 E2B on
 Google's QAT 4-bit weights from a Compute Engine VM.</p>
-<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-cover.7b22d2e5.jpg" alt="Six Serving Engines on One Tesla T4: Gemma 4 E2B on a Turing GPU" /></figure>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-cover.7b22d2e5.jpg" alt="Six Serving Engines on One Tesla T4: Gemma 4 E2B on a Turing GPU" /></figure>
 <p><a
 href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
 <p>The T4 is the oldest and cheapest NVIDIA data-center card most clouds
@@ -222,7 +222,7 @@ drafter on long replies (908.6 against 871.8 at 64). mistral.rs holds 4
 requests at a time and stays at about 238.</p>
 <hr />
 <h4 id="what-changes-and-what-stays">What Changes and What Stays</h4>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-1.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-1.png"
 alt="Table: Engine, Version, Weights on the T4, Turing changes" /></p>
 <p>The same for all six: one Tesla T4 (TU104, sm_75, 15,360 MiB, driver
 620.70.06) on a GCE <code>n1-standard-2</code> (2 vCPU, 7.4 GiB RAM),
@@ -306,7 +306,7 @@ vllm-d3              193.0    1.841   194.2      39     408.0   2.11 12187 MiB  
 pytorch              109.8    1.048       -       -     106.1   0.97  3141 MiB    94.3   6/6
 litert-int248         44.6    0.425    79.2    2400      44.7   1.00  1240 MiB    20.6   6/6
 mistralrs            113.5    1.083   112.1      18     273.1   2.41  4579 MiB    46.2   6/6</code></pre>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-2.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-2.png"
 alt="Table: Engine, No drafter, Best drafter, Drafter gain" /></p>
 <p>Every engine repeats its own greedy text on all six prompts.
 mistral.rs reads the prompt fastest (18 ms to the first token) and
@@ -336,10 +336,10 @@ No Drafter</h4>
 128 in / 512 out, at 1 to 64 requests at once, five repeats, a unique
 prompt per request so no prefix cache can hit, output timed from the
 stream. Aggregate output tokens per second, 128 in / 512 out:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-3.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-3.png"
 alt="Table: Requests, vLLM, SGLang 4-bit, llama.cpp, mistral.rs" /></p>
 <p>512 in / 128 out:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-4.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-4.png"
 alt="Table: Requests, vLLM, SGLang 4-bit, llama.cpp, mistral.rs" /></p>
 <p>SGLang is level with vLLM on long replies from 4 requests up and
 gives 0.59 to 0.76x on long prompts. On long prompts llama.cpp reaches
@@ -352,10 +352,10 @@ requests with a fixed 8,192-token cache, sized for the 3050's 8 GB.</p>
 <p>The same sweep with every drafter length, one server per length;
 <code>ladder.py</code> picks each engine's fastest setting at each
 level. 128 in / 512 out:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-5.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-5.png"
 alt="Table: Requests, vLLM, SGLang 4-bit, llama.cpp, mistral.rs" /></p>
 <p>512 in / 128 out:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-6.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-6.png"
 alt="Table: Requests, vLLM, SGLang 4-bit, llama.cpp, mistral.rs" /></p>
 <p>vLLM's best draft length falls from 4 tokens to 1 as requests rise,
 and its 1-token drafter still gives 1.34x at 64 requests on long replies
@@ -372,7 +372,7 @@ one request). Set it from your own traffic.</p>
 questions (2,048-token limit) and the 400 BFCL simple function-calling
 questions (512), one request at a time, greedy, thinking off. Each score
 is paired question by question with the same engine on the L4:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-7.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-7.png"
 alt="Table: Engine, GSM8K, BFCL, GSM8K vs L4, GSM8K hours" /></p>
 <p>Every CUDA engine is level with its L4 run and with T4 llama.cpp on
 both tests, and the drafters change no score. vLLM with its drafter
@@ -406,7 +406,7 @@ drafted step costs more of a target step on the older card (inferred,
 not measured here).</p>
 <hr />
 <h4 id="compare-and-contrast">Compare and Contrast</h4>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/imgdevto-serving-engines-t4-table-8.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/serving-engines-t4/medium/img/devto-serving-engines-t4-table-8.png"
 alt="Table: vLLM, SGLang 4-bit, llama.cpp, mistral.rs, PyTorch, LiteRT-LM" /></p>
 <hr />
 <h4 id="so-which-one">So, Which One?</h4>
