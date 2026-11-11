@@ -1,0 +1,60 @@
+#!/bin/bash
+# --- 2026-11-11 phase 2: fill the T4's last gaps without an SSH session; results go to GCS ---
+# mistral.rs (build, then queue.sh runs its one-request arms, load sweep and accuracy) and the SGLang int4
+# load sweep. Runs only while metadata t4-queue=phase2.
+if [ "$(curl -s -H Metadata-Flavor:Google http://metadata.google.internal/computeMetadata/v1/instance/attributes/t4-queue)" = phase2 ]; then
+cat > /usr/local/bin/t4-phase2.sh <<'EOF'
+#!/bin/bash
+U=xbill_glitnir_com; H=/home/$U; G=$H/gemma4-dev; B=gs://comglitn-gemma4-t4-results
+Q=$G/gpu-vllm-t4-2b-q4w4a16emb4/benchmarks/runs/2026-11-05-engines-t4
+S4=$G/gpu-sglang-t4-2b-q4w4a16emb4/benchmarks/runs/2026-11-10-int4-t4
+L=/var/log/t4-phase2.log
+log() { echo "$(date -Is) $*" >> $L; echo "t4-phase2: $*" > /dev/ttyS0; }
+up() {
+  for p in gpu-vllm-t4-2b-q4w4a16emb4/benchmarks/runs/2026-11-05-engines-t4 \
+           gpu-mistralrs-t4-2b-q4_0/benchmarks/runs \
+           gpu-sglang-t4-2b-q4w4a16emb4/benchmarks/runs/2026-11-10-int4-t4/concurrency \
+           gpu-sglang-t4-2b-q4w4a16emb4/benchmarks/runs/2026-11-10-int4-t4/accuracy \
+           gpu-litertlm-t4-2b-int248/benchmarks/runs/2026-11-06-accuracy-t4; do
+    [ -d $G/$p ] && gcloud storage rsync -r -q -x '.*\.gguf$|.*\.safetensors$' $G/$p $B/$p >> $L.rsync 2>&1
+  done
+  gcloud storage cp -q $Q/queue.log $L $B/phase2/ >/dev/null 2>&1
+  [ -f /opt1/mistralrs-build.log ] && gcloud storage cp -q /opt1/mistralrs-build.log $B/phase2/ >/dev/null 2>&1
+}
+for i in $(seq 60); do nvidia-smi >/dev/null 2>&1 && break; sleep 10; done
+mountpoint -q /opt1 || mount /opt1
+[ -n "$(awk 'NR>1' /proc/swaps)" ] || swapon /opt1/swapfile
+log "start; nvidia-smi ok=$(nvidia-smi >/dev/null 2>&1 && echo y); swap=$(awk 'NR>1{print $1}' /proc/swaps)"
+( while true; do sleep 600; up; done ) & UPL=$!
+# 1. SGLang int4 sweep support (same edit as the committed t4chain.py)
+sed -i 's|"sglang": engines.SRIG, "mistralrs"|"sglang": engines.SRIG, "sglang4": engines.SRIG4, "mistralrs"|' $S4/t4chain.py
+log "t4chain sglang4 sweep: $(grep -c sglang4 $S4/t4chain.py)"
+# 2. mistral.rs build (CPU only; nothing on the GPU meanwhile)
+if [ ! -x /opt1/mistralrs-v0.9.5/bin/mistralrs ]; then
+  log "mistral.rs build start; mmproj present=$(test -f /opt1/models/gemma-4-E2B-it-mmproj/gemma-4-E2B-it-mmproj.gguf && echo y || echo n); src present=$(test -d /opt1/mistral.rs && echo y || echo n); cargo=$(sudo -u $U -i bash -c 'command -v cargo || ls ~/.cargo/bin/cargo' 2>/dev/null)"
+  sudo -u $U -i bash -c '
+    set -x
+    command -v cargo >/dev/null || [ -x ~/.cargo/bin/cargo ] || curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+    export PATH=$HOME/.cargo/bin:/opt1/cuda-13.4/bin:$PATH CUDA_HOME=/opt1/cuda-13.4 CUDA_PATH=/opt1/cuda-13.4 CPATH=/opt1/cuda-extra-include CARGO_BUILD_JOBS=2
+    test -d /opt1/mistral.rs || git clone --depth 50 --branch v0.9.5 https://github.com/EricLBuehler/mistral.rs.git /opt1/mistral.rs
+    cd /opt1/mistral.rs && git log -1 --format=%h && CUDA_COMPUTE_CAP=75 cargo install --locked --path mistralrs-cli --features cuda --root /opt1/mistralrs-v0.9.5
+  ' > /opt1/mistralrs-build.log 2>&1
+  log "mistral.rs build rc=$? binary=$(test -x /opt1/mistralrs-v0.9.5/bin/mistralrs && echo y || echo n)"
+  up
+fi
+# 3. queue.sh: everything done is skipped; with the binary it runs mistral.rs one-request, sweep, accuracy
+sudo -u $U -i bash -c "cd $Q && bash queue.sh >> queue-acc.out 2>&1 < /dev/null"
+log "queue.sh exited: $(tail -1 $Q/queue.log)"; up
+# 4. SGLang int4 load sweep
+if ! grep -q '"rc": 0' $S4/concurrency/sglang4/status.json 2>/dev/null; then
+  log "sglang4 sweep start"
+  sudo -u $U -i bash -c "cd $S4 && python3 t4chain.py sweep sglang4 $S4/concurrency/sglang4 > /dev/null 2>&1"
+  log "sglang4 sweep rc=$?"
+fi
+kill $UPL; up
+log "phase2 done"; up
+EOF
+chmod +x /usr/local/bin/t4-phase2.sh
+setsid nohup /usr/local/bin/t4-phase2.sh > /dev/null 2>&1 < /dev/null &
+fi
+# --- end phase 2 ---

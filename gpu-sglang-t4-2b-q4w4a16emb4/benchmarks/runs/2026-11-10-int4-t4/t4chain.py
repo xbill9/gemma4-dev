@@ -28,7 +28,7 @@ import engines  # noqa: E402
 
 JOB, ARM, OUT = sys.argv[1:4]
 ROOT = engines.ROOT
-SWEEP_RIG = {"vllm": engines.VRIG, "llama": engines.LRIG, "sglang": engines.SRIG, "mistralrs": engines.MRIG}
+SWEEP_RIG = {"vllm": engines.VRIG, "llama": engines.LRIG, "sglang": engines.SRIG, "sglang4": engines.SRIG4, "mistralrs": engines.MRIG}
 JEV = os.path.join(ROOT, "jev-tpu-v5e1")
 
 
