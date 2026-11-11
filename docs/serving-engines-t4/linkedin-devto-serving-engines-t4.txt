@@ -1,0 +1,15 @@
+Six Serving Engines on One Tesla T4: Gemma 4 E2B on a Turing GPU
+
+llama.cpp, vLLM, SGLang, mistral.rs, a plain PyTorch engine and LiteRT-LM serve the same 4-bit Gemma 4 E2B on one 16 GB Tesla T4 on Compute Engine, with the same prompts, load sweep and GSM8K and BFCL questions. GSM8K and BFCL are level on every CUDA engine; vLLM with its drafter leads at every load.
+
+What is in it:
+
+- 🟢 The five CUDA engines score GSM8K 0.8954 to 0.9030 and BFCL 0.9175 to 0.9250 on the T4, each level with its L4 run; drafters change no score.
+- 🟢 vLLM with 3 drafted tokens serves one request at 193.0 tokens per second (1.78x) and finishes GSM8K in 0.41x the time.
+- 🟢 vLLM's 1-token drafter pays at every load, 1.34x at 64 requests on long replies (1,165.5 tokens per second).
+- 🟢 SGLang serves the 4-bit checkpoint through vLLM's Turing Marlin kernels at 2.43x its 16-bit build for one request, and matches vLLM without a drafter on long replies.
+
+dev.to: https://dev.to/gde/six-serving-engines-on-one-tesla-t4-gemma-4-e2b-on-a-turing-gpu-3a6i
+Medium: https://medium.com/@xbill999/six-serving-engines-on-one-tesla-t4-gemma-4-e2b-on-a-turing-gpu-510b509aa8e9
+Substack: https://xbill9.substack.com/p/six-serving-engines-on-one-tesla
+GitHub: https://github.com/xbill9/gemma4-dev
