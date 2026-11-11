@@ -29,7 +29,13 @@ log "start; nvidia-smi ok=$(nvidia-smi >/dev/null 2>&1 && echo y); swap=$(awk 'N
 # 1. SGLang int4 sweep support (same edit as the committed t4chain.py)
 sed -i 's|"sglang": engines.SRIG, "mistralrs"|"sglang": engines.SRIG, "sglang4": engines.SRIG4, "mistralrs"|' $S4/t4chain.py
 log "t4chain sglang4 sweep: $(grep -c sglang4 $S4/t4chain.py)"
-# 2. mistral.rs build (CPU only; nothing on the GPU meanwhile)
+# 2. SGLang int4 load sweep (first: it fits before the 22:00 UTC stop whatever the build does)
+if ! grep -q '"rc": 0' $S4/concurrency/sglang4/status.json 2>/dev/null; then
+  log "sglang4 sweep start"
+  sudo -u $U -i bash -c "cd $S4 && python3 t4chain.py sweep sglang4 $S4/concurrency/sglang4 > /dev/null 2>&1"
+  log "sglang4 sweep rc=$?"
+fi
+# 3. mistral.rs build (CPU only; nothing on the GPU meanwhile)
 if [ ! -x /opt1/mistralrs-v0.9.5/bin/mistralrs ]; then
   log "mistral.rs build start; mmproj present=$(test -f /opt1/models/gemma-4-E2B-it-mmproj/gemma-4-E2B-it-mmproj.gguf && echo y || echo n); src present=$(test -d /opt1/mistral.rs && echo y || echo n); cargo=$(sudo -u $U -i bash -c 'command -v cargo || ls ~/.cargo/bin/cargo' 2>/dev/null)"
   sudo -u $U -i bash -c '
@@ -42,15 +48,9 @@ if [ ! -x /opt1/mistralrs-v0.9.5/bin/mistralrs ]; then
   log "mistral.rs build rc=$? binary=$(test -x /opt1/mistralrs-v0.9.5/bin/mistralrs && echo y || echo n)"
   up
 fi
-# 3. queue.sh: everything done is skipped; with the binary it runs mistral.rs one-request, sweep, accuracy
+# 4. queue.sh: everything done is skipped; with the binary it runs mistral.rs one-request, sweep, accuracy
 sudo -u $U -i bash -c "cd $Q && bash queue.sh >> queue-acc.out 2>&1 < /dev/null"
 log "queue.sh exited: $(tail -1 $Q/queue.log)"; up
-# 4. SGLang int4 load sweep
-if ! grep -q '"rc": 0' $S4/concurrency/sglang4/status.json 2>/dev/null; then
-  log "sglang4 sweep start"
-  sudo -u $U -i bash -c "cd $S4 && python3 t4chain.py sweep sglang4 $S4/concurrency/sglang4 > /dev/null 2>&1"
-  log "sglang4 sweep rc=$?"
-fi
 kill $UPL; up
 log "phase2 done"; up
 EOF
