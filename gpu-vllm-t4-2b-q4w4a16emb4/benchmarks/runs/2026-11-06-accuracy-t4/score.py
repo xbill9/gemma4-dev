@@ -14,6 +14,7 @@ T4 = {  # arm: (T4 path, reference label, reference path)
     "llama": ("gpu-llamacpp-t4-2b-q4_0/benchmarks/runs/2026-11-06-accuracy-t4/llama/{t}-llama", "L4", L4.replace("{a}", "llama")),
     "pytorch": ("gpu-pytorch-t4-2b-q4w4a16/benchmarks/runs/2026-11-06-accuracy-t4/pytorch/{t}-pytorch", "L4", L4.replace("{a}", "pytorch")),
     "sglang4": ("gpu-sglang-t4-2b-q4w4a16emb4/benchmarks/runs/2026-11-10-int4-t4/accuracy/sglang4/{t}-sglang4", "L4", L4.replace("{a}", "sglang")),
+    "mistralrs": ("gpu-mistralrs-t4-2b-q4_0/benchmarks/runs/2026-11-06-accuracy-t4/mistralrs/{t}-mistralrs", "L4", L4.replace("{a}", "mistralrs")),
     "litert": ({"gsm8k": LI + "gsm8k-int248", "bfcl_simple": LI + "bfcl_simple-int248-off"},
                {"gsm8k": "L4", "bfcl_simple": "3050 off"},
                {"gsm8k": L4.replace("{a}", "litert-int248"),
