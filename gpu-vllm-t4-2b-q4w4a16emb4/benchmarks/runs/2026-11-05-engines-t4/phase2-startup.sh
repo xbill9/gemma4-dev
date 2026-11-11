@@ -43,7 +43,8 @@ if [ ! -x /opt1/mistralrs-v0.9.5/bin/mistralrs ]; then
     command -v cargo >/dev/null || [ -x ~/.cargo/bin/cargo ] || curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
     export PATH=$HOME/.cargo/bin:/opt1/cuda-13.4/bin:$PATH CUDA_HOME=/opt1/cuda-13.4 CUDA_PATH=/opt1/cuda-13.4 CPATH=/opt1/cuda-extra-include CARGO_BUILD_JOBS=2
     test -d /opt1/mistral.rs || git clone --depth 50 --branch v0.9.5 https://github.com/EricLBuehler/mistral.rs.git /opt1/mistral.rs
-    cd /opt1/mistral.rs && git log -1 --format=%h && CUDA_COMPUTE_CAP=75 cargo install --locked --path mistralrs-cli --features cuda --root /opt1/mistralrs-v0.9.5
+    cd /opt1/mistral.rs && ls && grep -m1 "^version" Cargo.toml; (git log -1 --format=%h || true)
+    CUDA_COMPUTE_CAP=75 cargo install --locked --path mistralrs-cli --features cuda --root /opt1/mistralrs-v0.9.5
   ' > /opt1/mistralrs-build.log 2>&1
   log "mistral.rs build rc=$? binary=$(test -x /opt1/mistralrs-v0.9.5/bin/mistralrs && echo y || echo n)"
   up
