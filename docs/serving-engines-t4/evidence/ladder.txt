@@ -1,0 +1,66 @@
+
+in128-out512: output tok/s
+arm                   1       2       4       8      16      32      64
+vllm              101.5   187.1   308.9   491.9   657.9   787.3   871.8
+vllm-d1           171.3   309.3   510.7   746.8   948.6  1085.9  1165.5
+vllm-d2           224.6   365.5   531.2   686.9   832.5   849.2   936.9
+vllm-d3           262.6   423.0   609.7   785.8   899.2   966.0  1001.1
+vllm-d4           275.6   416.3   541.3   677.0   717.9   790.6   826.8
+llama              86.9   153.1   196.3   240.2   347.7   388.8   381.3
+llama-d1          134.2   177.3   221.9   323.6   370.4   394.0   382.1
+llama-d2          149.2   199.6   289.3   358.7   403.5   427.2   433.5
+llama-d3          156.5   195.0   311.7   377.2   422.5   435.6   441.2
+llama-d4          169.6   244.7   319.0   370.1   417.5   459.7   462.5
+sglang4            88.2   169.6   305.5   479.3   663.6   815.8   908.6
+sglang-bf16        39.7    80.1   151.9   264.6   427.9   590.0   798.0
+sglang-bf16-d1     28.5    38.5    41.8    42.7    43.6    44.9    45.4
+mistralrs          96.9   168.8   237.7   238.6   238.0   236.9   237.3
+
+in128-out512: each engine's fastest arm per level (sglang = int4 build)
+level                    vllm               sglang4                 llama             mistralrs
+    1         275.6 (vllm-d4)        88.2 (sglang4)      169.6 (llama-d4)      96.9 (mistralrs)
+    2         423.0 (vllm-d3)       169.6 (sglang4)      244.7 (llama-d4)     168.8 (mistralrs)
+    4         609.7 (vllm-d3)       305.5 (sglang4)      319.0 (llama-d4)     237.7 (mistralrs)
+    8         785.8 (vllm-d3)       479.3 (sglang4)      377.2 (llama-d3)     238.6 (mistralrs)
+   16         948.6 (vllm-d1)       663.6 (sglang4)      422.5 (llama-d3)     238.0 (mistralrs)
+   32        1085.9 (vllm-d1)       815.8 (sglang4)      459.7 (llama-d4)     236.9 (mistralrs)
+   64        1165.5 (vllm-d1)       908.6 (sglang4)      462.5 (llama-d4)     237.3 (mistralrs)
+
+in128-out512: time per output token, ms (median), no drafter
+vllm               10.7    11.6    14.0    17.5    26.0    43.5    78.6
+sglang4            11.2    11.4    12.3    15.2    21.1    33.3    58.7
+llama              10.0    11.7    17.8    28.1    35.5    62.1   131.6
+mistralrs          10.3    11.7    16.6    16.6    16.7    16.8    16.8
+
+in512-out128: output tok/s
+arm                   1       2       4       8      16      32      64
+vllm               85.4   134.8   181.8   236.5   265.5   285.6   295.3
+vllm-d1           123.1   182.0   238.6   285.0   309.1   323.1   328.9
+vllm-d2           141.6   187.5   230.5   260.0   276.0   282.8   289.9
+vllm-d3           153.2   198.5   249.6   277.4   287.3   296.5   296.0
+vllm-d4           157.8   198.1   231.4   257.4   261.8   272.6   268.1
+llama              91.8   138.7   174.3   204.2   236.8   245.3   281.9
+llama-d1          124.2   149.7   191.0   242.8   246.1   259.0   244.7
+llama-d2          127.2   165.5   225.0   256.0   275.1   267.8   238.8
+llama-d3          127.7   161.0   214.8   253.7   235.9   269.2   247.5
+llama-d4          140.7   184.9   228.0   250.0   258.0   263.3   239.0
+sglang4            65.3    99.0   130.9   152.3   165.7   172.9   175.0
+sglang-bf16        34.7    59.9    91.5   122.0   147.7   163.1   176.6
+sglang-bf16-d1     21.7    27.3    28.7    28.7    29.3    30.1    30.2
+mistralrs          97.2   167.4   224.6   218.9   207.0   195.1   196.7
+
+in512-out128: each engine's fastest arm per level (sglang = int4 build)
+level                    vllm               sglang4                 llama             mistralrs
+    1         157.8 (vllm-d4)        65.3 (sglang4)      140.7 (llama-d4)      97.2 (mistralrs)
+    2         198.5 (vllm-d3)        99.0 (sglang4)      184.9 (llama-d4)     167.4 (mistralrs)
+    4         249.6 (vllm-d3)       130.9 (sglang4)      228.0 (llama-d4)     224.6 (mistralrs)
+    8         285.0 (vllm-d1)       152.3 (sglang4)      256.0 (llama-d2)     218.9 (mistralrs)
+   16         309.1 (vllm-d1)       165.7 (sglang4)      275.1 (llama-d2)     207.0 (mistralrs)
+   32         323.1 (vllm-d1)       172.9 (sglang4)      269.2 (llama-d3)     195.1 (mistralrs)
+   64         328.9 (vllm-d1)       175.0 (sglang4)         281.9 (llama)     196.7 (mistralrs)
+
+in512-out128: time per output token, ms (median), no drafter
+vllm               11.1    12.4    17.4    21.3    33.7    63.2   144.7
+sglang4            10.7    11.1    12.5    16.4    24.1    39.6    72.0
+llama               9.4    11.6    17.2    27.4    35.7    65.5   146.3
+mistralrs           9.8    10.8    15.4    15.9    16.9    17.6    17.5
