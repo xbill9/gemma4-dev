@@ -1,0 +1,105 @@
+ONE REQUEST, tok/s end to end (six prompts, 256 tokens, geometric mean of medians)
+engine                            3050                    T4                    L4                 v5e-1
+vLLM                 121.1 / 230.5 (4)     108.4 / 193.0 (3)     140.4 / 275.3 (4)                 143.9
+SGLang               119.9 / 158.9 (4)       97.8 / 70.7 (4)     136.5 / 189.6 (4)                 159.9
+llama.cpp            108.8 / 147.4 (2)     104.8 / 123.5 (1)     135.7 / 207.7 (2)        no TPU backend
+mistral.rs            118.9 / 85.8 (1)                 113.5     144.6 / 137.6 (1)        no TPU backend
+PyTorch                          118.9                 109.8                 134.7                   6.6
+LiteRT-LM            62.0 / 68.1 (own)     44.6 / 43.7 (own)    98.4 / 112.8 (own)                     -
+JAX (bf16)                           -                     -                     -                 134.3
+Rust over PJRT                       -                     -                     -                 145.2
+(cell = no drafter / best drafter (drafted tokens); v5e-1 SGLang = SGLang-JAX bf16, PyTorch = TorchTPU bf16)
+
+DRAFTER GAIN for one request (best drafter / no drafter)
+  vLLM         3050 1.90x   T4 1.78x   L4 1.96x
+  llama.cpp    3050 1.35x   T4 1.18x   L4 1.53x
+  SGLang       3050 1.33x   T4 0.72x   L4 1.39x
+  mistral.rs   3050 0.72x   T4 drafter fails   L4 0.95x
+  LiteRT-LM    3050 1.10x   T4 0.98x   L4 1.15x
+
+ONE REQUEST, NO DRAFTER: range over the five CUDA engines
+  3050   108.8 to 121.1  max/min 1.113
+  T4     97.8 to 113.5  max/min 1.161
+  L4     134.7 to 144.6  max/min 1.073
+  v5e-1  134.3 to 159.9  max/min 1.191  (vLLM, SGLang-JAX, JAX bf16, Rust over PJRT)
+LiteRT-LM (Google's int2/4/8 file) against llama.cpp, no drafter:
+  3050   0.570
+  T4     0.426
+  L4     0.725
+
+FASTEST ONE REQUEST per platform (any engine, any drafter)
+  3050   vLLM 230.5
+  T4     vLLM 193.0
+  L4     vLLM 275.3
+  v5e-1  SGLang 159.9
+
+SAME ENGINE, OTHER CHIP: one request, no drafter, against the L4
+  vLLM         3050 0.863   T4 0.772
+  SGLang       3050 0.878   T4 0.716
+  llama.cpp    3050 0.802   T4 0.772
+  mistral.rs   3050 0.822   T4 0.785
+  PyTorch      3050 0.883   T4 0.815
+  vLLM         v5e-1 1.025
+with each engine's best drafter, against the L4:
+  vLLM         3050 0.837   T4 0.701
+  llama.cpp    3050 0.710   T4 0.595
+  SGLang       3050 0.838   T4 0.373
+
+64 REQUESTS, 128/512 (in/out), aggregate output tok/s: no drafter / best setting
+engine                                3050                            T4                            L4                         v5e-1
+vLLM         1,651.2 / 1,658.0 (1 drafted)     871.8 / 1,165.5 (vllm-d1)   3,715.7 / 4,516.3 (vllm-d4)      1,689.1 / 1,689.1 (vllm)
+SGLang            1,711.3 / 1,711.0 (none)       908.6 / 908.6 (sglang4)    2,967.1 / 2,967.1 (sglang)4,249.4 / 4,249.4 (SGLang-JAX)
+llama.cpp             633.3 / 633.0 (none)      381.3 / 462.5 (llama-d4)  1,056.3 / 1,170.3 (llama-d2)                             -
+mistral.rs            308.0 / 308.0 (none)     237.3 / 237.3 (mistralrs)1,825.2 / 1,825.2 (mistralrs-card)                             -
+leader at 64 requests (best setting), and leader / runner-up:
+  3050   SGLang 1,711.0   x1.032 vLLM 1,658.0
+  T4     vLLM 1,165.5   x1.283 SGLang 908.6
+  L4     vLLM 4,516.3   x1.522 SGLang 2,967.1
+  v5e-1  SGLang 4,249.4   x2.516 vLLM 1,689.1
+
+64 REQUESTS, 512/128 (in/out), aggregate output tok/s: no drafter / best setting
+engine                                3050                            T4                            L4                         v5e-1
+vLLM                  603.1 / 603.0 (none)       295.3 / 328.9 (vllm-d1)   1,593.7 / 1,710.0 (vllm-d1)      1,288.4 / 1,288.4 (vllm)
+SGLang                544.0 / 544.0 (none)       175.0 / 175.0 (sglang4)    1,373.0 / 1,373.0 (sglang)2,758.9 / 2,758.9 (SGLang-JAX)
+llama.cpp             367.6 / 368.0 (none)         281.9 / 281.9 (llama)         630.8 / 630.8 (llama)                             -
+mistral.rs            258.5 / 259.0 (none)     196.7 / 196.7 (mistralrs)1,132.0 / 1,132.0 (mistralrs-card)                             -
+leader at 64 requests (best setting), and leader / runner-up:
+  3050   vLLM 603.0   x1.108 SGLang 544.0
+  T4     vLLM 328.9   x1.167 llama.cpp 281.9
+  L4     vLLM 1,710.0   x1.245 SGLang 1,373.0
+  v5e-1  SGLang 2,758.9   x2.141 vLLM 1,288.4
+
+vLLM DRAFTER AT 64 REQUESTS (best drafted setting / no drafter)
+  3050   128/512 1.004 = 1.00x (1 drafted)   512/128 1.000 = 1.00x (none)
+  T4     128/512 1.337 = 1.34x (vllm-d1)   512/128 1.114 = 1.11x (vllm-d1)
+  L4     128/512 1.215 = 1.22x (vllm-d4)   512/128 1.073 = 1.07x (vllm-d1)
+
+vLLM UNDER LOAD, OTHER CHIP: 64 requests, no drafter, against the L4
+  3050   128/512 0.444   512/128 0.378
+  T4     128/512 0.235   512/128 0.185
+  v5e-1  128/512 0.455   512/128 0.808
+vLLM scaling, 64 requests / 1 request, 128/512, no drafter:
+  3050   13.76x
+  T4     8.59x
+  L4     26.77x
+  v5e-1  11.69x
+
+GSM8K (1,319) and BFCL simple (400), one request at a time, greedy, thinking off, no drafter
+engine                    3050                T4                L4
+vLLM           0.9014 / 0.9250   0.8999 / 0.9225   0.8969 / 0.9225
+SGLang         0.8992 / 0.9150   0.8954 / 0.9175   0.8954 / 0.9150
+llama.cpp      0.9014 / 0.9225   0.9030 / 0.9250   0.8984 / 0.9250
+mistral.rs     0.9030 / 0.9150   0.8999 / 0.9175   0.9014 / 0.9200
+PyTorch        0.8992 / 0.9225   0.8961 / 0.9225   0.8961 / 0.9225
+five CUDA engines x three GPUs: 15 GSM8K runs 0.8954 to 0.9030 (spread 0.0076); BFCL 0.9150 to 0.9250 (spread 0.0100, 4 questions)
+v5e-1 GSM8K:
+  vLLM (int4)              0.9007
+  vLLM (bf16 tables)       0.8992
+  JAX (W4A16)              0.8969
+  JAX (bf16)               0.9128
+  Rust over PJRT (bf16)    0.9113
+  SGLang-JAX (bf16)        0.9143
+v5e-1 BFCL, vLLM (only engine returning tool calls): 0.9200
+LiteRT-LM, Google's int2/4/8 file, GSM8K: 3050 0.8795, T4 0.8734, L4 0.8908
+  below the lowest CUDA engine on the same card: 3050 -0.0197, T4 -0.0220, L4 -0.0046
+

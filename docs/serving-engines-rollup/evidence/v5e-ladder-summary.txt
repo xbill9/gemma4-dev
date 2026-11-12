@@ -1,0 +1,44 @@
+One request at a time (six prompts, 256 tokens, greedy, thinking off, 3 repeats), then 4 at once
+arm            e2e tok/s  decode TTFT ms 4 at once    x1 repeat start s x vllm
+vllm               143.9   145.1    15.4     477.2  3.32    6/6    2055  1.000
+vllm-text          134.2   135.2    16.2     449.8  3.35    6/6    1860  0.932
+vllm-text-d4   (not run)
+jax                104.1       -    15.9     122.1  1.17    6/6      46  0.723
+jax-bf16           134.3   131.7    11.3     150.1  1.12    6/6      42  0.933
+jaxrust            145.2   145.5     9.4     145.4  1.00    6/6      22  1.009
+torchtpu-bf16        6.6       -   153.6       6.7  1.00    6/6      31  0.046
+torchtpu-rust       13.4    13.4    81.3      13.6  1.02    6/6      45  0.093
+
+in512-out128: output tok/s on one v5e chip (5 repeats, unique prompts)
+arm                  1       2       4       8      16      32      64   peak@c   x c=1
+vllm             140.6   257.4   440.2   682.2   937.9  1156.8  1288.4   1288.4@64  9.16
+vllm-text        131.3   241.7   416.5   652.5   906.8  1125.9  1266.0   1266.0@64  9.64
+vllm-text-d4   (not run)
+  vllm / vllm-text          c1=1.071  c2=1.065  c4=1.057  c8=1.045  c16=1.034  c32=1.027  c64=1.018
+  vllm v5e-1 / L4 vllm      c1=1.059  c2=1.032  c4=0.983  c8=0.924  c16=0.868  c32=0.830  c64=0.808
+
+in128-out512: output tok/s on one v5e chip (5 repeats, unique prompts)
+arm                  1       2       4       8      16      32      64   peak@c   x c=1
+vllm             144.5   270.2   476.4   778.4  1112.8  1462.5  1689.1   1689.1@64 11.69
+vllm-text        134.4   252.1   446.9   737.3  1084.7  1424.9  1660.1   1660.1@64 12.36
+vllm-text-d4   (not run)
+  vllm / vllm-text          c1=1.075  c2=1.072  c4=1.066  c8=1.056  c16=1.026  c32=1.026  c64=1.017
+  vllm v5e-1 / L4 vllm      c1=1.041  c2=0.990  c4=0.906  c8=0.786  c16=0.638  c32=0.522  c64=0.455
+
+gsm8k: one request at a time, thinking off
+arm                n right     acc trunc   wall s x vllm   arm - vllm paired [95%]      differ
+vllm            1319  1188  0.9007     4   3630.2  1.000
+vllm-text       1319  1186  0.8992     4   3947.8  1.087   -0.0015 [-0.0099, +0.0068]     32
+vllm-text-d4   (not run)
+jax             1319  1183  0.8969     5   5182.9  1.428   -0.0038 [-0.0114, +0.0038]     25
+jax-bf16        1319  1204  0.9128     3   3946.3  1.087   +0.0121 [-0.0008, +0.0250]     72
+jaxrust         1319  1202  0.9113     3   3593.7  0.990   +0.0106 [-0.0008, +0.0227]     66
+
+bfcl_simple: one request at a time, thinking off
+arm                n right     acc trunc   wall s x vllm   arm - vllm paired [95%]      differ
+vllm             400   368  0.9200     0     94.8  1.000
+vllm-text        400   368  0.9200     0    101.4  1.070   +0.0000 [+0.0000, +0.0000]      0
+vllm-text-d4   (not run)
+jax            (not run)
+jax-bf16       (not run)
+jaxrust        (not run)

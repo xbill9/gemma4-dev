@@ -1,0 +1,21 @@
+Scope paragraphs, quoted verbatim from each ladder article (docs/<dir>/devto-*.md), with its published URL
+
+== serving-engines-3050
+devto-gde = https://dev.to/gde/six-serving-engines-one-8-gb-gpu-gemma-4-e2b-on-an-rtx-3050-ad7
+Scope: one RTX 3050 OEM (8 GB) in one desktop, Gemma 4 E2B on Google's QAT Q4_0 grid, one engine at a time, greedy decoding. One-request speed is six prompts of 256 tokens, three repeats; load is two synthetic shapes at 1 to 64 requests, five repeats each; accuracy is one pass of GSM8K (1,319) and BFCL simple (400). The engines ran on 2026-10-14 to 2026-11-04 and some on different llama.cpp or engine builds; same-day reference runs agree within 1%, and wall times from different days are indicative.
+
+== serving-engines-t4
+devto = https://dev.to/gde/six-serving-engines-on-one-tesla-t4-gemma-4-e2b-on-a-turing-gpu-3a6i
+Scope: one Tesla T4 on one GCE `n1-standard-2` in `us-west2-b`, Gemma 4 E2B on Google's QAT Q4_0 grid, one engine at a time, greedy decoding. One-request speed is six prompts of 256 tokens, three repeats; load is two synthetic shapes at 1 to 64 requests, five repeats each; accuracy is one pass of GSM8K (1,319) and BFCL simple (400). The runs span 2026-11-05 to 2026-11-11 with the same engine builds throughout; the SGLang 4-bit arms ran on 2026-11-10 beside a same-day vLLM run (108.8 against 108.4 tokens per second). The L4 comparison uses the 2026-11-05 G6 runs with the same builds and prompts on a different host.
+
+== serving-engines-g6
+devto-aws = https://dev.to/aws-builders/six-serving-engines-on-one-ec2-g6-gemma-4-e2b-on-an-nvidia-l4-3ff3
+Scope: one g6.4xlarge on-demand in us-east-1d, one NVIDIA L4, the Deep Learning AMI with driver 595.112.07, Gemma 4 E2B on Google's QAT Q4_0 grid, one engine at a time, greedy decoding. One-request speed is six prompts of 256 tokens, three repeats; load is two synthetic shapes at 1 to 64 requests, five repeats each; accuracy is one pass of GSM8K (1,319) and BFCL simple (400). The one-request runs were on 2026-11-05 and the sweeps and accuracy on 2026-11-06, on the same instance; costs are arithmetic from the on-demand price.
+
+== serving-engines-v5e1
+devto-gde = https://dev.to/gde/six-serving-engines-on-one-cloud-tpu-v5e-chip-gemma-4-e2b-22hn
+Scope: four flex-start `v5litepod-1` VMs in `us-west4-a`, one engine at a time on each, Gemma 4 E2B, greedy decoding, thinking off. vLLM serves the int4 build and SGLang-JAX and the JAX engines bf16, so the load comparison is engine and weights together; no bf16 vLLM sweep was run. The JAX servers ran at a 4,096-token context and vLLM and SGLang-JAX at 16,384. SGLang-JAX ran on 2026-11-09 on jax 0.11.1, the others on 2026-11-06 and 07 on jax 0.12.0.1. One-request speed is six prompts of 256 tokens, three repeats; load is two synthetic shapes at 1 to 64 requests, five repeats each; accuracy is one pass of GSM8K (1,319) and, for vLLM, BFCL simple (400). TPU memory in use and cost were not measured.
+
+== sglangjax-e2b-v5e1
+devto-gde = https://dev.to/gde/porting-gemma-4-e2b-to-sglang-jax-on-one-cloud-tpu-v5e-5e9l
+Scope: one flex-start `v5litepod-1` in `us-west4-a`, sglang-jax `b3e3e16b2` with the patch (sha256 `d6ac1d7a2f8f6e55…`), jax 0.11.1, `google/gemma-4-E2B-it` bf16 at a 16,384-token context, greedy decoding, thinking off, on 2026-11-09. The other engines ran on 2026-11-06 and 07 on other v5e-1 VMs on jax 0.12.0.1, vLLM on the int4 build, so the throughput comparison is engine and weights together. One-request speed is six prompts of 256 tokens, three repeats; load is two synthetic shapes at 1 to 64 requests, five repeats each; accuracy is one pass of GSM8K. The start-up time in the run came with a compile cache already on the VM.
