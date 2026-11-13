@@ -15,7 +15,10 @@ own counts: requests, retries, tokens and points (usage.cost).
 import argparse
 import http.server
 import json
+import sys
 import threading
+import time
+import urllib.request
 
 import tokenlab
 
@@ -265,6 +268,8 @@ async function submit() {
                  chat_template_kwargs: { enable_thinking: $("think").checked } };
   if (+$("temp").value >= 0) body.temperature = +$("temp").value;
   if (+$("topp").value < 1) body.top_p = +$("topp").value;
+  answer.textContent = "waiting for Token Lab…";
+  const tick = setInterval(() => { if (ttft === null) answer.textContent = `waiting for Token Lab… ${((performance.now() - t0) / 1000).toFixed(0)} s (queued; replies start after 1–20 s)`; }, 1000);
   const t0 = performance.now(); let ttft = null, reply = "", reasoning = "", usage = null, finish = null, retries = 0, sawDone = false;
   try {
     const r = await fetch("/v1/chat/completions", {
@@ -288,7 +293,7 @@ async function submit() {
         const c = (j.choices || [])[0] || {};
         const d = c.delta || {};
         const rc = d.reasoning_content || d.reasoning;
-        if ((rc || d.content) && ttft === null) ttft = (performance.now() - t0) / 1000;
+        if ((rc || d.content) && ttft === null) { ttft = (performance.now() - t0) / 1000; answer.textContent = ""; }
         if (rc) { reasoning += rc; think.hidden = false; thinkBody.textContent = reasoning; }
         if (d.content) { reply += d.content; answer.innerHTML = render(reply); }
         if (c.finish_reason) finish = c.finish_reason;
@@ -299,6 +304,8 @@ async function submit() {
     if (err.name === "AbortError") { finish = "stopped"; sawDone = true; }
     else answer.innerHTML = render(reply + `\n\n**Error:** ${err.message}`);
   }
+  clearInterval(tick);
+  if (ttft === null && answer.textContent.startsWith("waiting for Token Lab")) answer.textContent = "";
   bubble.classList.remove("cursor");
   // Token Lab's FAQ: a stream that ends without [DONE] was cut off; send it again.
   if (!sawDone && !finish) answer.innerHTML = render(reply + "\n\n**Stream ended early** (no [DONE]); send the message again.");
@@ -380,11 +387,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
     cfg = {}
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        route = self.path.split("?", 1)[0]
+        if route in ("/", "/index.html"):
             self._send(200, PAGE.encode(), "text/html; charset=utf-8")
-        elif self.path == "/ui/status":
+        elif route == "/ui/status":
             self._json(self._status())
-        elif self.path == "/ui/info":
+        elif route == "/ui/info":
             self._json(self._info())
         elif self.path.startswith("/v1/"):
             self._forward(None)
@@ -426,12 +434,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(code, json.dumps(obj).encode(), "application/json")
 
     def _forward(self, body):
+        t0 = time.time()
         retries = []
         path = self.path[len("/v1"):]
         try:
             resp = tokenlab.open_api(self.cfg, path, body, on_retry=lambda *a: retries.append(a))
         except (OSError, RuntimeError) as e:
             Session.add(failed=1, requests=1 if body else 0)
+            log(f"{self.command} {self.path} -> unreachable: {e}")
             self._json({"error": {"message": f"Token Lab unreachable: {e}"}}, 502)
             return
         # HTTP/1.0 response with no Content-Length: the body ends when the connection
@@ -452,6 +462,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             pass
         finally:
             resp.close()
+        log(f"{self.command} {self.path} -> {resp.status} retries={len(retries)} {time.time() - t0:.1f}s")
         if body is not None:
             u = usage_from_sse(tail) if b"data:" in tail else _json_usage(tail)
             u = u or {}
@@ -463,6 +474,19 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         pass
+
+
+def log(msg):
+    print(time.strftime("%H:%M:%S ") + msg, flush=True)
+
+
+def already_running(port):
+    """True when a chat page already answers on this port (a second `make ui`)."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/ui/status", timeout=3) as r:
+            return r.status == 200
+    except OSError:
+        return False
 
 
 def _json_usage(raw: bytes):
@@ -480,7 +504,13 @@ def main():
     if not cfg.get("TOKENLAB_API_KEY"):
         raise SystemExit("TOKENLAB_API_KEY is not set: put it in this rig's .env (mode 0600) or the environment")
     Handler.cfg = cfg
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
+    try:
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
+    except OSError as e:
+        if already_running(a.port):
+            print(f"Chat UI is already running: open http://localhost:{a.port}", flush=True)
+            return
+        sys.exit(f"port {a.port} is taken by something else ({e}); try --port {a.port + 1}")
     print(f"Chat UI on http://localhost:{a.port} -> {cfg['TOKENLAB_BASE_URL']} ({cfg['MODEL_NAME']})", flush=True)
     server.serve_forever()
 
