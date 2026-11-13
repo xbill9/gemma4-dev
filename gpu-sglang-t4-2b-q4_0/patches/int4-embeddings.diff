@@ -1,6 +1,6 @@
---- a/sglang/srt/models/gemma4_causal.py	2026-11-04 12:31:52.794325387 -0500
-+++ b/sglang/srt/models/gemma4_causal.py	2026-11-04 12:36:53.738660089 -0500
-@@ -88,6 +88,62 @@
+--- a/sglang/srt/models/gemma4_causal.py
++++ b/sglang/srt/models/gemma4_causal.py
+@@ -88,6 +88,66 @@
  Gemma4TextScaledWordEmbedding = Gemma3TextScaledWordEmbedding
  
  
@@ -36,6 +36,10 @@
 +        self.weight_shape = nn.Parameter(torch.empty(2, dtype=torch.int64), requires_grad=False)
 +        self.register_buffer("shifts", torch.arange(0, 32, 4, dtype=torch.int32), persistent=False)
 +        self._dense = None
++        # gpu-sglang-t4-2b: rows come out in the dtype the model is built in (float16 below sm_80, where
++        # Marlin takes only fp16 activations), not a fixed bf16.
++        d = torch.get_default_dtype()
++        self.out_dtype = d if d in (torch.float16, torch.bfloat16) else torch.bfloat16
 +
 +    def _rows(self, packed, scale, dtype):
 +        q = ((packed.unsqueeze(-1) >> self.shifts) & 0xF) - 8
@@ -63,7 +67,7 @@
  def load_tied_lm_head(
      loaded_weight, *, params_dict, loaded_params, head_param_name="lm_head.weight"
  ):
-@@ -884,12 +940,19 @@
+@@ -884,12 +944,19 @@
                  )
  
          if self.pp_group.is_first_rank:
@@ -89,7 +93,7 @@
          else:
              self.embed_tokens = PPMissingLayer()
  
-@@ -898,12 +961,19 @@
+@@ -898,12 +965,19 @@
              and self.hidden_size_per_layer_input
              and self.hidden_size_per_layer_input > 0
          ):
@@ -115,7 +119,7 @@
  
              self.per_layer_model_projection = ReplicatedLinear(
                  self.hidden_size,
-@@ -1486,7 +1556,10 @@
+@@ -1486,7 +1560,10 @@
          embed = self._shard_weight(
              self.model.embed_tokens.weight, draft_embedding=draft_embedding
          )
