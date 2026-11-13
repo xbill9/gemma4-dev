@@ -38,6 +38,13 @@ Gemma 4 31B (`Gemma-4-31B-IT`) through **AMD Token Lab**, a hosted OpenAI-compat
 - `ask.py` — terminal client in the style of `~/bin/ask-1650ti` / `ask-t4`: REPL with
   history, one-shot, pipe stdin as material, `-T` thinking, `-I` image, `-r` raw JSON.
   `make bin` links it as `~/bin/ask-tokenlab`.
+- `tokenlab_agent/` — a small ADK sample agent (google-adk 2.13.0) whose model is this
+  endpoint through LiteLLM (`openai/Gemma-4-31B-IT`, `api_base` = Token Lab, `num_retries` for
+  429s, thinking off). Two tools: `list_tokenlab_models` and `count_and_range`, which does
+  counting/filtering/min/max in code so the model quotes an exact figure (the monorepo's
+  arithmetic rule). `make agent` (`adk run`), `make agent-web` (`adk web` on :8767),
+  `make agent-once Q='...'` (`run_agent.py`, prints each tool call with timings). Needs
+  `requirements.txt`; the rest of the rig is standard library.
 - `benchmarks/runs/2026-11-13-first-light-tokenlab/` — `probe.py` and its `probe.jsonl`.
 
 ## Stream format
@@ -48,5 +55,5 @@ SSE with extras an over-strict parser trips on: `: ping` comment lines while que
 
 ## Commands
 
-`make ui`, `make ask`, `make models`, `make query`, `make probe`, `make test` (offline
+`make ui`, `make ask`, `make agent`, `make models`, `make query`, `make probe`, `make test` (offline
 `unittest`, nothing touches the network), `make lint`.

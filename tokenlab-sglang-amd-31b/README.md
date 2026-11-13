@@ -47,3 +47,27 @@ before the reply starts, as Token Lab's FAQ asks. The side panel has max tokens,
 thinking and a system prompt; the last reply's first-token time, decode rate, tokens and points; the
 model card from `/v1/models`; and this session's totals. Attach an image with 🖼. A stream that ends
 without `[DONE]` is flagged so you can send it again.
+
+#### A sample ADK agent
+
+`tokenlab_agent/` is a small [ADK](https://google.github.io/adk-docs/) agent whose model is Gemma 4 31B
+on Token Lab, reached through LiteLLM's OpenAI provider:
+
+```python
+LiteLlm(model="openai/Gemma-4-31B-IT", api_base="https://api.tokenlab.amd.com/v1",
+        api_key=TOKENLAB_API_KEY, num_retries=30,
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}})
+```
+
+It has two tools: `list_tokenlab_models` (what Token Lab serves now) and `count_and_range`, which does
+counting and filtering in code so the model quotes an exact result.
+
+```bash
+pip install -r requirements.txt     # google-adk, litellm
+make agent                          # adk run, in the terminal
+make agent-web                      # adk web on http://localhost:8767
+make agent-once Q='"How many of 0, 2, 3, 20, 21, 22, 23, 10, 11, 12, 13 are 10 or more?"'
+```
+
+On 2026-11-13 that question took 14.4 s: Gemma called `count_and_range` with `at_least=10`, the tool
+returned 8, and the answer quoted 8 with the filter `10 <= x`.

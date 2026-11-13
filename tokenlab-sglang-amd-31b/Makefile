@@ -5,7 +5,7 @@ PYTHON ?= python3
 UI_PORT ?= $(shell sed -n 's/^UI_PORT=//p' tpu.env)
 BIN ?= $(HOME)/bin
 
-.PHONY: help ui ask models query probe bin test lint clean install
+.PHONY: help ui ask models query probe bin agent agent-web agent-once test lint clean install
 
 help:
 	@echo "  make ui       - chat page on http://localhost:$(UI_PORT) (key stays in the local proxy)"
@@ -14,6 +14,9 @@ help:
 	@echo "  make models   - the model card Token Lab lists for MODEL_NAME"
 	@echo "  make query    - one non-streamed chat completion"
 	@echo "  make probe    - first-light timing probe (3 requests) into today's benchmarks run"
+	@echo "  make agent    - ADK agent (tokenlab_agent) in the terminal: adk run"
+	@echo "  make agent-web - ADK dev UI in the browser: adk web"
+	@echo "  make agent-once Q='...' - one agent turn, printing tool calls and timings"
 	@echo "  make test     - offline unit tests"
 	@echo "  make lint     - ruff"
 
@@ -37,13 +40,22 @@ query:
 probe:
 	cd benchmarks/runs/2026-11-13-first-light-tokenlab && $(PYTHON) probe.py --n 3
 
+agent:
+	adk run tokenlab_agent
+
+agent-web:
+	adk web --port 8767
+
+agent-once:
+	$(PYTHON) run_agent.py $(Q)
+
 test:
 	$(PYTHON) -m unittest discover -s tests -v
 
 lint:
-	ruff check tokenlab.py chat_ui.py ask.py tests benchmarks/runs/*/probe.py
+	ruff check tokenlab.py chat_ui.py ask.py run_agent.py tokenlab_agent tests benchmarks/runs/*/probe.py
 
 install:
 
 clean:
-	rm -rf __pycache__ tests/__pycache__ .ruff_cache
+	rm -rf __pycache__ tests/__pycache__ tokenlab_agent/__pycache__ .ruff_cache
