@@ -1,0 +1,15 @@
+Six Serving Engines on Four Accelerators: Gemma 4 E2B on an RTX 3050, a T4, an L4 and a TPU v5e
+
+The same Gemma 4 E2B, prompts, load sweep and GSM8K and BFCL questions through the same serving engines on an 8 GB RTX 3050, a Tesla T4, an NVIDIA L4 and one TPU v5e chip. Answers hold on every chip; vLLM with its drafter leads on all three GPUs, and SGLang-JAX leads on the TPU.
+
+What is in it:
+
+- 🟢 Five CUDA engines on three GPUs give 15 GSM8K scores between 0.8954 and 0.9030 and BFCL between 0.9150 and 0.9250; drafters change no score.
+- 🟢 vLLM with its drafter is the fastest engine for one request on every GPU: 230.5, 193.0 and 275.3 tokens per second on the 3050, T4 and L4.
+- 🟢 vLLM leads at 64 requests on the T4 and L4 at both shapes, and its drafter still pays there (1.34x and 1.22x on long replies).
+- 🟢 On one TPU v5e chip SGLang-JAX with an E2B patch is the fastest engine, 2.52x vLLM at 64 long replies.
+
+dev.to: https://dev.to/gde/six-serving-engines-on-four-accelerators-gemma-4-e2b-on-an-rtx-3050-a-t4-an-l4-and-a-tpu-v5e-1a0e
+Medium: https://medium.com/@xbill999/six-serving-engines-on-four-accelerators-gemma-4-e2b-on-an-rtx-3050-a-t4-an-l4-and-a-tpu-v5e-168f64d248dc
+Substack: https://xbill9.substack.com/p/six-serving-engines-on-four-accelerators
+GitHub: https://github.com/xbill9/gemma4-dev
