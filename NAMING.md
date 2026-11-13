@@ -64,8 +64,9 @@ not which cloud it sits in.
 | `gpu` | A general-purpose GPU attached to a VM, any cloud | varies (GCE, EC2) |
 | `cloudrun` | A general-purpose GPU attached to cloudrun |  Cloud Run |
 | `local` | A machine you physically own and are sitting at — no API to call, nothing to create, nothing to release | nothing; the hardware is already there |
+| `tokenlab` | AMD Token Lab (`api.tokenlab.amd.com`), a hosted OpenAI-compatible API: someone else's server, reached with an API key. Nothing to create or release, and the GPU behind it is not disclosed | nothing; a key from `notebooks.amd.com/tokenlab` (30-day access period, points budget) |
 
-These six are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
+These seven are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
 slot or recorded in the rig's `tpu.env`. Add a platform value only for a genuinely different execution target.
 
 **`tpu`, `gce` and `gke` can name the same silicon, and that is the point.** `tpu-vllm-v6e1-2b`,
@@ -280,6 +281,10 @@ differs. The architecture is a real fact; it belongs in `@HARDWARE.md`, which ow
 part natively supports. The name slot carries the part.
 
 For `gce` use `cpu`.
+
+**A hosted API that does not name its hardware takes the vendor, `amd`** (added 2026-11-13 for
+`tokenlab-sglang-amd-31b`). Token Lab says only "served on AMD Instinct and Radeon", so a part name
+would be a guess and slot 3 records what is known. If Token Lab later names the part, rename.
 
 **A `local` rig with no accelerator names its CPU part** (added 2026-09-29), the way a local GPU
 rig names its card: `i71360p`, lowercase, the vendor's model number with its punctuation and
@@ -543,6 +548,7 @@ Three things that trip people up:
 | `~/gemma4-dev/gpu-vllm-mi300x-2b-fp8emb4` | DigitalOcean GPU droplet (via AMD Developer Cloud) | vLLM in Docker | mi300x | `xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text-emb4` | `fp8emb4` — fp8 W8A8 from the QAT weights with int4 vocabulary tables, text only. Added 2026-10-07, forked from `gpu-vllm-mi300x-2b-q4w4a16` for the E2B data-type sweep; slot 5 is the only slot that differs. Nothing measured |
 | `~/gemma4-dev/gpu-vllm-mi300x-31b-q4w4a16` | DigitalOcean GPU droplet (via AMD Developer Cloud) | vLLM in Docker | mi300x | `xbill9/gemma-4-31B-it-qat-q4_0-w4a16-ct-text` | `q4w4a16` — added 2026-10-02 |
 | `~/gemma4-dev/gpu-vllm-mi300x-31b` | DigitalOcean GPU droplet (via AMD Developer Cloud) | vLLM in Docker | mi300x | `gemma-4-31B-it` | — — added 2026-10-02. Bare four slots: reference bf16 weights, served text-only, which is a runtime setting (`LIMIT_MM_PER_PROMPT`) and so not an encoding |
+| `~/gemma4-dev/tokenlab-sglang-amd-31b` | **AMD Token Lab** (hosted API, slot 1 `tokenlab`) | SGLang router, read from the model's `/v1/models` description and the `matched_stop` field in its replies | `amd` — not disclosed ("AMD Instinct and Radeon") | `Gemma-4-31B-IT` | — — added 2026-11-13, **the first rig on someone else's server**. Asked for as a vLLM rig; slot 2 is `sglang` because that is what the endpoint reports. No MCP server and nothing to provision: `tpu.env`, the key in `.env`, `chat_ui.py` (the v5e-1 vLLM chat page with the key held in the local proxy) and `ask.py`. **Not an A/B twin of `gpu-vllm-mi300x-31b`**: different runtime, undisclosed hardware, shared with every other Token Lab user (a per-model limit of 128 requests at once), so its timings include other people's load |
 | `~/gemma4-dev/tpu-jax-inf2-2b` | Inferentia (slot `tpu`) | pure JAX (`jax-neuronx`) | inf2 | `gemma-4-E2B-it` | — — added 2026-08-28. Slot 3 is unaffected by the EC2 rule: `inf2` is both the part name and the instance family, so both readings agree |
 | `~/gemma4-dev/tpu-pytorch-trn1-2b` | Trainium (slot `tpu`) | PyTorch (`torch_neuronx`-traced image) | trn1 | `gemma-4-E2B-it` | — — added 2026-10-05, forked from `tpu-pytorch-inf2-2b`, **the first `trn1` value in slot 3**, which this file reserved for it ("Later parts take `inf3`, `trn1`"). Slot 1 stays `tpu` under the Inferentia rule: Neuron is the control plane for both parts. **Slot 3 is the only slot that differs from `tpu-pytorch-inf2-2b`**, and the pair serves the same image: the inf2-compiled `xbill9/gemma4-optb:slim` loads and serves on trn1 unchanged, because both chips carry two NeuronCore-v2 cores and 32 GiB. `trn1` is both the part and the instance family, so the EC2 rule and the part rule agree, as for `inf2` |
 | `~/gemma4-dev/tpu-pytorch-trn1-2b-fp8` | Trainium (slot `tpu`) | PyTorch (`torch_neuronx`, native engine by hand) | trn1 | `xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text` | `fp8` — added 2026-10-05, forked from `tpu-pytorch-trn1-2b` with the engine payload of `tpu-pytorch-inf2-2b-fp8`. **Slot 5 is the only slot that differs from `tpu-pytorch-trn1-2b`, and slot 3 the only one that differs from `tpu-pytorch-inf2-2b-fp8`.** No tool deploys the checkpoint: the tools launch the dense E2B image, and the checkpoint runs through `torch_generate.py` by hand. Nothing measured |
