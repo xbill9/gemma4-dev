@@ -1,0 +1,29 @@
+Source: https://notebooks.amd.com/tokenlab read in Chrome 2026-11-13 (signed in). Key redacted.
+
+Header: "TOKEN LAB · BETA" / "Build with open models on AMD GPUs"
+"An OpenAI-compatible API for leading open models, served on AMD Instinct and Radeon. Get your key, point your SDK at Token Lab, and start building."
+Steps: 1 Get your key  2 Copy the base URL  3 Call a model from the catalog
+BASE URL https://api.tokenlab.amd.com/v1
+WORKS FROM: curl, the OpenAI and Anthropic SDKs, LangChain, and code running in your AMD AI Notebooks.
+Sign-in button: "AMD AI Developer Program (Global) Login" (also a China login)
+
+Dashboard at 11:33 local, after 23 requests from this rig:
+POINTS REMAINING 9.99966500 of 10 points · 0.00033500 used
+API REQUESTS 23 in the last 30 days
+ACCESS PERIOD 29 days left · ends Dec 13, 2026
+RATE LIMIT 20 requests per minute
+STATUS Active
+Buttons: Regenerate key, Revoke, Extend by 15 days, Request more points
+Points history: Nov 13, 2026  Starting points  10.00  applied
+
+Model catalog: 10 of 10 models, all marked Free.
+Gemma-4-31B-IT  Google  Free  VLM (Vision)  Input: 0.035 pts / 1M tokens  Output: 0.07 pts / 1M tokens
+"Points show relative usage per model, not a charge: larger models use more points per token."
+
+FAQ:
+- Points: "Each model uses points per million tokens at its own rate ... Your key has a points budget for its 30-day access period. Points don't reset daily."
+- 5xx / cut-off stream: send again after a few seconds; Retry-After may be present; SDKs retry 5xx (max_retries 2) but not a stream that already started. A finished OpenAI-style stream ends with data: [DONE].
+- Out of points: HTTP 429; access period ended: HTTP 403. "Request more points" through the AMD AI Developer Program. "Extending your access (not your points) by 15 days can be requested once, in the last 5 days of your 30-day access period".
+- Rate limits: "Up to the limit shown above, in requests per minute, per key. Over the limit you get HTTP 429 with a Retry-After header."
+- Lost key: "Regenerate key. The old key stops working immediately and your points and access period carry over."
+- Notebooks: "Yes. Calls from AMD AI Notebooks go to the same base URL. Keep your key out of notebooks you share."
