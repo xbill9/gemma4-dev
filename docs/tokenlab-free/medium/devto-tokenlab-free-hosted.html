@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Can't Beat Free: Gemma 4 31B on AMD Token Lab, with a Local Chat Page and an ADK Agent</title>
+  <meta name="description" content="AMD Token Lab is a free OpenAI-compatible API on AMD GPUs that comes with the AMD AI Developer Program. How to sign up, a local chat page that keeps the key off the browser, a terminal client, and a small ADK agent that calls Gemma 4 31B through it." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to calling Gemma 4 31B on
+AMD GPUs through AMD Token Lab, a free API that comes with membership of
+the AMD AI Developer Program. A local chat page, a terminal client and a
+small ADK agent are built on top of it, all from the same rig.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/tokenlab-free/medium/img/devto-cover.aff96a99.jpg" alt="Can&#x27;t Beat Free: Gemma 4 31B on AMD Token Lab, with a Local Chat Page and an ADK Agent" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/tokenlab-sglang-amd-31b">https://github.com/xbill9/gemma4-dev/tree/main/tokenlab-sglang-amd-31b</a></p>
+<p>The question is simple: what can you build on an API that costs
+nothing? Token Lab gives every program member a key, a 30-day access
+period and a points budget, with no credit card and no credit request.
+Every figure below comes from requests sent to it on 2026-11-13.</p>
+<hr />
+<h4 id="what-is-amd-token-lab">What Is AMD Token Lab?</h4>
+<p>Token Lab describes itself as an OpenAI-compatible API "for leading
+open models, served on AMD Instinct and Radeon". The base URL is
+<code>https://api.tokenlab.amd.com/v1</code>, and it works from curl,
+the OpenAI and Anthropic SDKs, LangChain, and AMD AI Notebooks.</p>
+<p>It is one of the member perks of the AMD AI Developer Program. The
+program's Cloud Credits page offers three options: AMD Instinct
+Developer Cloud, Fireworks AI, and Token Lab. Token Lab is the only one
+marked "No credit request needed".</p>
+<p>The catalog held 10 models, every one marked Free: Gemma 4 31B,
+DeepSeek V4 Flash and V4.1 Flash, Qwen3.8 27B, three MiniCPM models, and
+three decision models. Gemma-4-31B-IT reads text and images and has a
+262,144-token context.</p>
+<p>What a new key came with:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/tokenlab-free/medium/img/devto-tokenlab-free-table-1.png"
+alt="Table: Allowance, Value" /></p>
+<p>Token Lab says points measure relative usage per model, with larger
+models using more points per token. Running everything in this article,
+23 requests used 0.000335 of the 10 points.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An email address for an AMD account</li>
+<li>Python 3 with <code>pip</code></li>
+<li>For the agent: <code>google-adk</code> and <code>litellm</code>
+(<code>pip install google-adk litellm</code>)</li>
+<li>A clone of <code>gemma4-dev</code>, or just the
+<code>tokenlab-sglang-amd-31b</code> directory</li>
+</ul>
+<hr />
+<h4 id="step-1--join-the-amd-ai-developer-program">Step 1 — Join the AMD
+AI Developer Program</h4>
+<p>The program's home page says it plainly: "The program is free to join
+and helps you build, optimize, and scale AI on AMD hardware."</p>
+<p>Go to <a
+href="https://developer.amd.com">https://developer.amd.com</a> and
+choose <strong>Join the Program</strong>. New to AMD, the steps the page
+lists are:</p>
+<ol type="1">
+<li>Complete the AMD AI Developer Program sign-up form</li>
+<li>Verify your email address</li>
+<li>Access AI Academy</li>
+</ol>
+<p>With an existing AMD account, log in and open the join form
+instead.</p>
+<p>Membership also lists a one-month DeepLearning.AI membership, early
+event registration, a private Discord with AMD engineers, and a monthly
+sweepstakes for a Radeon GPU or a Ryzen AI PC.</p>
+<hr />
+<h4 id="step-2--get-a-token-lab-key">Step 2 — Get a Token Lab Key</h4>
+<p>Open <a
+href="https://notebooks.amd.com/tokenlab">https://notebooks.amd.com/tokenlab</a>
+and sign in with <strong>AMD AI Developer Program (Global)
+Login</strong>. The page has three steps: get your key, copy the base
+URL, call a model from the catalog.</p>
+<p>The dashboard shows points remaining, requests in the last 30 days,
+days left, the rate limit and the key's status, with buttons to
+regenerate or revoke the key. Regenerating keeps your points and your
+access period.</p>
+<p>Put the key in the rig's <code>.env</code>, readable only by you and
+never committed:</p>
+<pre class="bash"><code>cd tokenlab-sglang-amd-31b
+umask 077; echo &#39;TOKENLAB_API_KEY=tl-...&#39; &gt; .env</code></pre>
+<p>The base URL and the model name live in the committed
+<code>tpu.env</code>:</p>
+<pre class="bash"><code>TOKENLAB_BASE_URL=https://api.tokenlab.amd.com/v1
+MODEL_NAME=Gemma-4-31B-IT</code></pre>
+<hr />
+<h4 id="step-3--the-first-call">Step 3 — The First Call</h4>
+<p><code>make query</code> sends one chat completion and prints the raw
+reply:</p>
+<pre class="bash"><code>$ make query
+{
+  &quot;model&quot;: &quot;Gemma-4-31B-IT&quot;,
+  &quot;choices&quot;: [
+    {
+      &quot;message&quot;: {
+        &quot;role&quot;: &quot;assistant&quot;,
+        &quot;content&quot;: &quot;The capital of Australia is Canberra.&quot;
+      },
+      &quot;finish_reason&quot;: &quot;stop&quot;,
+      &quot;matched_stop&quot;: 106
+    }
+  ],
+  &quot;usage&quot;: {
+    &quot;prompt_tokens&quot;: 20,
+    &quot;completion_tokens&quot;: 8,
+    &quot;cost&quot;: 1.1228e-06
+  }
+}</code></pre>
+<p>Every reply carries a <code>cost</code> field in points, so a client
+can keep its own running total.</p>
+<hr />
+<h4 id="step-4--what-is-behind-the-endpoint">Step 4 — What Is Behind the
+Endpoint</h4>
+<p><code>make models</code> prints the model card Token Lab
+publishes:</p>
+<pre class="json"><code>{
+  &quot;id&quot;: &quot;Gemma-4-31B-IT&quot;,
+  &quot;name&quot;: &quot;Gemma 4 31B&quot;,
+  &quot;description&quot;: &quot;Dynamic sglang-router service managed by Model Ops&quot;,
+  &quot;context_length&quot;: 262144,
+  &quot;supported_parameters&quot;: [&quot;temperature&quot;, &quot;max_tokens&quot;, &quot;top_p&quot;, &quot;stream&quot;,
+    &quot;response_format&quot;, &quot;tools&quot;, &quot;tool_choice&quot;, &quot;reasoning_effort&quot;],
+  &quot;architecture&quot;: {&quot;input_modalities&quot;: [&quot;text&quot;, &quot;image&quot;], &quot;output_modalities&quot;: [&quot;text&quot;]}
+}</code></pre>
+<p>Gemma 4 31B runs on SGLang: the card says "sglang-router", and
+replies carry SGLang's <code>matched_stop</code> field. Three MiniCPM
+models in the same catalog are "vllm-router" services. Token Lab names
+the hardware only as AMD Instinct and Radeon.</p>
+<p>Tool calling and JSON output are both in the supported parameters,
+which is what the agent in Step 7 needs.</p>
+<hr />
+<h4 id="step-5--a-local-chat-page">Step 5 — A Local Chat Page</h4>
+<p><code>chat_ui.py</code> is the chat page from this repo's TPU v5e
+vLLM rig, pointed at Token Lab. It is standard-library Python: it serves
+one page on <code>127.0.0.1</code> and forwards <code>/v1/*</code> to
+Token Lab with the key attached, so the key stays on your machine and
+never reaches the browser.</p>
+<pre class="bash"><code>$ make ui
+Chat UI on http://localhost:8766 -&gt; https://api.tokenlab.amd.com/v1 (Gemma-4-31B-IT)</code></pre>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/tokenlab-free/chat-page.6d02da62.jpg"
+alt="The local chat page answering through Token Lab, with the last reply&#39;s timings and points in the side panel" /></p>
+<p>The side panel has max tokens, temperature, top-p, a thinking switch
+and a system prompt; the last reply's first-token time, decode rate,
+tokens and points; the model card; and the session's totals. That reply
+took 4.96 s to its first token, decoded at 9.5 tokens per second, and
+used 0.00000942 points.</p>
+<p>The 🖼 button attaches an image, sent as a data URL in the OpenAI
+image format. Thinking turns on Gemma's reasoning with
+<code>chat_template_kwargs.enable_thinking</code>, and the reasoning
+streams into a collapsible section above the answer.</p>
+<hr />
+<h4 id="step-6--from-the-terminal">Step 6 — From the Terminal</h4>
+<p><code>ask.py</code> follows the <code>ask</code> clients of this
+repo's GTX 1650 Ti rigs: one question and exit, a pipe, or a
+conversation with memory.</p>
+<pre class="bash"><code>$ make bin        # links ~/bin/ask-tokenlab
+$ echo &quot;Canberra is the capital of Australia.&quot; | ask-tokenlab translate to French
+**Canberra est la capitale de l&#39;Australie.**</code></pre>
+<p>Piped input becomes the material and the arguments become the
+instruction. <code>-T</code> turns thinking on,
+<code>-I photo.jpg</code> attaches an image, <code>-r</code> prints the
+raw JSON, and no arguments opens a conversation where <code>!</code>
+clears the history.</p>
+<hr />
+<h4 id="step-7--a-sample-adk-agent">Step 7 — A Sample ADK Agent</h4>
+<p><code>tokenlab_agent/</code> is a small agent for Google's Agent
+Development Kit. ADK reaches Token Lab through LiteLLM's OpenAI
+provider, so the whole connection is one model object:</p>
+<pre class="python"><code>model = LiteLlm(
+    model=&quot;openai/Gemma-4-31B-IT&quot;,
+    api_base=&quot;https://api.tokenlab.amd.com/v1&quot;,
+    api_key=TOKENLAB_API_KEY,
+    num_retries=30,
+    timeout=600,
+    extra_body={&quot;chat_template_kwargs&quot;: {&quot;enable_thinking&quot;: False}},
+)</code></pre>
+<p>The agent has two tools. <code>list_tokenlab_models</code> returns
+what Token Lab serves right now. <code>count_and_range</code> counts,
+filters and finds the minimum and maximum in code, so the model quotes
+an exact figure and states the filter it used:</p>
+<pre class="python"><code>def count_and_range(numbers: list[float], at_least: Optional[float] = None,
+                    below: Optional[float] = None) -&gt; dict:
+    &quot;&quot;&quot;Count the numbers that satisfy at_least &lt;= x &lt; below, and give their min, max and sum.&quot;&quot;&quot;</code></pre>
+<p><code>run_agent.py</code> runs one turn and prints every tool call
+with its time:</p>
+<pre class="bash"><code>$ python3 run_agent.py
+   8.1s call   count_and_range({&quot;at_least&quot;: 10, &quot;numbers&quot;: [0, 2, 3, 20, 21, 22, 23, 10, 11, 12, 13]})
+   8.1s result {&quot;filter&quot;: &quot;10 &lt;= x&quot;, &quot;total_values&quot;: 11, &quot;count&quot;: 8, &quot;min&quot;: 10, &quot;max&quot;: 23, &quot;sum&quot;: 132}
+  12.3s answer There are 8 values that are 10 or more, using the filter &quot;10 &lt;= x&quot;.</code></pre>
+<p>Gemma read "10 or more" as <code>at_least: 10</code>, the tool
+returned 8, and the answer quoted the tool's count and filter. The
+second tool:</p>
+<pre class="bash"><code>$ python3 run_agent.py &quot;Which models on Token Lab are served by vLLM, and which by SGLang? Short list.&quot;
+  25.7s call   list_tokenlab_models({})
+  38.4s result {&quot;models&quot;: [{&quot;id&quot;: &quot;Clef&quot;, &quot;service&quot;: &quot;Dynamic aux-router service managed by Model Ops&quot;, ...
+  48.9s answer **vLLM:**
+* MiniCPM5-2B
+* MiniCPM-V-4.7-1B
+* MiniCPM-V-4.7-35B-A3B
+**SGLang:**
+* DeepSeek-V4.1-Flash
+* DeepSeek-V4-Flash
+* Gemma-4-31B-IT
+* Qwen3.8-27B</code></pre>
+<p>The same agent runs in ADK's own tools: <code>make agent</code> for
+<code>adk run</code> in the terminal and <code>make agent-web</code> for
+<code>adk web</code> on port 8767.</p>
+<hr />
+<h4 id="step-8--how-fast-is-free">Step 8 — How Fast Is Free?</h4>
+<p>One streamed request at a time, temperature 0, from a laptop:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/tokenlab-free/medium/img/devto-tokenlab-free-table-2.png"
+alt="Table: Thinking, Completion tokens, First token, Total, Decode" /></p>
+<p>Decode speed ranged from 2.0 to 9.5 tokens per second over the day
+for one request, and the first token arrived after 1.2 to 5.0 s. In the
+timed runs the reply headers arrived within half a second, and the
+stream carried keep-alive pings until the first token.</p>
+<p>The endpoint is shared by every Token Lab user. Gemma 4 31B has a
+limit of 128 requests at once across all of them, and a request over it
+gets HTTP 429 with <code>Retry-After: 1</code>. These numbers describe
+Token Lab's load on the day, and say nothing about the speed of the GPUs
+behind it.</p>
+<hr />
+<h4 id="mag_right-tip-retry-before-the-stream-starts">🔎 Tip: Retry
+Before the Stream Starts</h4>
+<p>Token Lab answers 429 when the model is at its shared limit or your
+key is over 20 requests a minute, and 502, 503 or 504 when a backend
+restarts. Its FAQ asks clients to wait a few seconds and send the
+request again, honouring <code>Retry-After</code>.</p>
+<p><code>tokenlab.py</code> does that for the chat page and the terminal
+client, before the reply starts, and the agent gets it from LiteLLM's
+<code>num_retries</code>. A stream that breaks after it started has no
+status code to retry on: a complete stream ends with
+<code>data: [DONE]</code>, and the chat page flags a reply that ends
+without it.</p>
+<p>The stream also carries lines a strict parser trips on:
+<code>: ping</code> while queued, <code>id: N</code> after each event,
+and <code>event: done</code> before <code>[DONE]</code>. Read only the
+<code>data:</code> lines.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p>The three options on the program's Cloud Credits page:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/tokenlab-free/medium/img/devto-tokenlab-free-table-3.png"
+alt="Table: Token Lab, AMD Instinct Developer Cloud, Fireworks AI" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>Start with Token Lab. It costs nothing and needs no request and no
+setup beyond a key. It is the place to try Gemma 4 31B against the other
+models in the catalog, to build a prototype, and to wire up an
+agent.</p>
+<p>When a prototype needs speed you can rely on, a model outside the
+catalog, or a server of its own, request the AMD Instinct Developer
+Cloud credit and serve the model yourself; this repo's
+<code>gpu-vllm-mi300x-31b</code> rig serves the same model on vLLM.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find what can be built on AMD Token
+Lab, the free API that comes with the AMD AI Developer Program. The key
+to the solution was one small client module that holds the key, retries
+what Token Lab asks to be retried, and serves a chat page, a terminal
+client and an ADK agent. The results were:</p>
+<ul>
+<li>🟢 Joining the program is free, and Token Lab needs no credit
+request: a key comes with 10 points, 30 days and 20 requests per
+minute.</li>
+<li>🟢 Gemma 4 31B answers text and images, with thinking, tools and a
+262,144-token context, on the OpenAI API.</li>
+<li>🟢 Everything in this article used 0.000335 of the 10 points over 23
+requests.</li>
+<li>🟢 The local chat page keeps the key on your machine and shows each
+reply's timings and points.</li>
+<li>🟢 An ADK agent reaches Token Lab with one <code>LiteLlm</code>
+object and calls tools: it answered a counting question from a tool's
+exact result.</li>
+<li>⚠️ The endpoint is shared: one request decoded at 2.0 to 9.5 tokens
+per second, and the first token took up to 5 s.</li>
+<li>⚠️ Gemma 4 31B runs on SGLang behind Token Lab, and the GPU model is
+not published.</li>
+<li>❌ A request over the shared 128-request limit gets 429 and must be
+sent again; a stream cut off mid-reply cannot be retried
+automatically.</li>
+</ul>
+<p>Scope: one laptop calling <code>api.tokenlab.amd.com</code> on
+2026-11-13, one request at a time, Gemma-4-31B-IT, temperature 0 for the
+timing table. Times include the network and other users' load on a
+shared service, so they change hour to hour. Concurrency, long prompts
+and answer accuracy were not measured. The agent used google-adk 2.13.0
+and litellm 1.106.4.</p>
+<p>The strategy for building on AMD Token Lab was validated with an
+incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/tokenlab-sglang-amd-31b">tokenlab-sglang-amd-31b
+on GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/tokenlab-free/evidence">Evidence
+for this article</a></li>
+<li><a href="https://developer.amd.com">AMD AI Developer
+Program</a></li>
+<li><a href="https://notebooks.amd.com/tokenlab">AMD Token Lab</a></li>
+<li><a href="https://google.github.io/adk-docs/">Google Agent
+Development Kit</a></li>
+<li><a href="https://github.com/BerriAI/litellm">LiteLLM</a></li>
+<li><a href="https://github.com/sgl-project/sglang">SGLang</a></li>
+<li><a href="https://huggingface.co/google/gemma-4-31B-it">Gemma 4 31B
+on Hugging Face</a></li>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
