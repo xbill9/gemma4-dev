@@ -41,7 +41,9 @@ Every model got:
 - eight requests at a time, a 180 s limit per request, up to eight retries
 - the same start time: all seven began at 09:11:16 on 2026-11-14
 
-One setting differs: thinking. No thinking level is accepted by all seven models, so each ran at the lowest level it accepts. Step 2 shows what that means for each.
+- thinking off
+
+Step 2 shows the setting that turns thinking off for each model, and which models think anyway.
 
 ---
 
@@ -68,9 +70,9 @@ The reply ends `Answer: 18`.
 
 ---
 
-#### Step 2 — The Thinking Setting Each Model Accepts
+#### Step 2 — Turning Thinking Off
 
-`levels.sh` sends that question to every model at each thinking level:
+The OpenAI endpoint turns thinking off with `reasoning_effort`, and the models disagree on the spelling. `levels.sh` sends the question to every model with each value:
 
 ```
 gemma-4-31b-it         minimal  thinking 0  finish stop   Answer: 18
@@ -90,14 +92,14 @@ gemini-4-argon         minimal  rejected
 gemini-4-argon         none     thinking 0  finish stop   Answer: 18
 ```
 
-Gemma 4 and Flash-Lite go down to `minimal`; the Gemini 4 models and 3.8 Flash go down to `none`. At that level five models think zero tokens. Hydrogen and 3.8 Flash still think, and a thinking budget of 0 on the native API leaves them thinking too (`budget0.sh`):
+Thinking off is `minimal` for Gemma 4 and Flash-Lite and `none` for 3.8 Flash and the Gemini 4 models; each rejects the other spelling. With thinking off, Hydrogen and 3.8 Flash still think. The native API's own counter, `thoughtsTokenCount`, shows the same with `thinkingBudget: 0` (`budget0.sh`):
 
 ```
 gemini-3.8-flash       thinkingBudget=0  ok  prompt 40  answer 79  thinking 74
 gemini-4-hydrogen      thinkingBudget=0  ok  prompt 70  answer 70  thinking 108
 ```
 
-So for Hydrogen and 3.8 Flash, thinking is part of the model as served, and it shows up in their scores and in their cost.
+Across the full run, with thinking off, Hydrogen thought on 1,319 of 1,319 GSM8K problems, 3.8 Flash on 1,293, Carbon on 268, Argon on 66, and Gemma 4 and Flash-Lite on none. Those tokens are billed as output. If you run Hydrogen or 3.8 Flash with thinking off, you are paying for thinking.
 
 ---
 
@@ -121,7 +123,7 @@ gemini-api-google-carbon4
 gemini-api-google-argon4
 ```
 
-Each `tpu.env` names the model and its lowest thinking level, and the seven `run.sh` files are identical:
+Each `tpu.env` names the model and the value that turns its thinking off, and the seven `run.sh` files are identical:
 
 ```
 MODEL_NAME=gemini-4-hydrogen
@@ -166,15 +168,15 @@ Three Gemma 4 requests hit the free tier's rate limit (HTTP 429) after every ret
 
 `derived.py` builds the table from the saved replies. The cost is the token counts the API returned times the list price.
 
-| Model | Thinking sent | GSM8K | BFCL simple | Thinking per GSM8K problem | Cost, both tasks |
-| :--- | :--- | ---: | ---: | ---: | ---: |
-| Gemma 4 31B | minimal | 0.9735 | 🥇 0.9675 | 0 | 🥇 free tier |
-| Gemma 4 26B | minimal | 0.9742 | 0.9575 | 0 | 🥇 free tier |
-| Gemini 3.5 Flash-Lite | minimal | 0.9629 | 0.9350 | 0 | $0.92 |
-| Gemini 3.8 Flash | none | 0.9788 | 0.9400 | 152.2 | $1.81 |
-| Gemini 4 Hydrogen | none | 🥈 0.9803 | 0.9550 | 248.7 | $5.02 |
-| Gemini 4 Carbon | none | 🥈 0.9803 | 0.9600 | 29.6 | $4.02 |
-| Gemini 4 Argon | none | 🥇 0.9841 | 🥇 0.9675 | 4.8 | $3.46 |
+| Model | GSM8K | BFCL simple | GSM8K problems with thinking, thinking off | Cost, both tasks |
+| :--- | ---: | ---: | ---: | ---: |
+| Gemma 4 31B | 0.9735 | 🥇 0.9675 | 0 | 🥇 free tier |
+| Gemma 4 26B | 0.9742 | 0.9575 | 0 | 🥇 free tier |
+| Gemini 3.5 Flash-Lite | 0.9629 | 0.9350 | 0 | $0.92 |
+| Gemini 3.8 Flash | 0.9788 | 0.9400 | 1,293 | $1.81 |
+| Gemini 4 Hydrogen | 🥈 0.9803 | 0.9550 | 1,319 | $5.02 |
+| Gemini 4 Carbon | 🥈 0.9803 | 0.9600 | 268 | $4.02 |
+| Gemini 4 Argon | 🥇 0.9841 | 🥇 0.9675 | 66 | $3.46 |
 
 Against Gemma 4 31B on the same questions, counting the questions each got right that the other missed:
 
@@ -193,7 +195,7 @@ Ahead and behind mean the 95% range of the difference, from 2,000 resamples of t
 
 #### Step 7 — Where the Money Goes
 
-By list price Hydrogen is the cheapest Gemini 4 model, $7.50 per million output tokens against $10 for Carbon and Argon. It cost the most because it thought on all 1,319 GSM8K problems, which made thinking 55% of its GSM8K bill, against 11% for Carbon and 2% for Argon. Argon thought on 66 problems and scored the highest.
+By list price Hydrogen is the cheapest Gemini 4 model, $7.50 per million output tokens against $10 for Carbon and Argon. It cost the most because, with thinking off, it thought on all 1,319 GSM8K problems, 248.7 thinking tokens each on average, which made thinking 55% of its GSM8K bill, against 11% for Carbon and 2% for Argon. Argon thought on 66 problems and scored the highest.
 
 The Gemini 4 models also count more input tokens for the same text: the GSM8K prompts are 160,432 tokens to Hydrogen, Carbon and Argon and 120,902 to Gemma 4 31B, Flash-Lite and 3.8 Flash.
 
@@ -223,7 +225,7 @@ Hydrogen writes about 147.8 tokens per second per request, thinking included, ag
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | GSM8K against Gemma 4 31B | — | behind | level | ahead | ahead | 🥇 ahead |
 | BFCL against Gemma 4 31B | 🥇 | behind | behind | level | level | 🥇 level |
-| Thinking at lowest level | none | none | most problems | every problem | some problems | rare |
+| Thinks with thinking off | no | no | most problems | every problem | some problems | rare |
 | Cost, both tasks | 🥇 free tier | $0.92 | $1.81 | $5.02 | $4.02 | $3.46 |
 | GSM8K median per request | 8.96 s | 🥇 1.10 s | 3.79 s | 🥈 2.84 s | 7.34 s | 7.63 s |
 | Weights you can download | 🥇 yes | no | no | no | no | no |
@@ -244,19 +246,19 @@ Gemini 3.5 Flash-Lite is the cheapest paid model here, and it was behind Gemma 4
 
 #### Summary
 
-The goal of this article was to compare the new Gemini 4 models with Gemma 4 on equal terms. The key to the solution was running all seven models through one Gemini API endpoint, started together, with the same questions, scoring script and settings, and the thinking level set to the lowest each model accepts. The results were:
+The goal of this article was to compare the new Gemini 4 models with Gemma 4 on equal terms. The key to the solution was running all seven models through one Gemini API endpoint, started together, with the same questions, scoring script and settings, with thinking off. The results were:
 
 - 🟢 Gemini 4 Argon scored highest: 0.9841 on GSM8K and 0.9675 on BFCL simple, for $3.46.
 - 🟢 Gemma 4 31B tied Argon on BFCL at 0.9675 and scored 0.9735 on GSM8K, on the free tier.
 - 🟢 Hydrogen, Carbon and Argon were ahead of Gemma 4 31B on GSM8K; on BFCL all three were level with it.
 - 🟢 Gemma 4 26B was level with the 31B on both tests.
 - 🟢 Hydrogen was the fastest Gemini 4 model, 2.84 s per GSM8K problem against 7.34 s for Carbon and 7.63 s for Argon.
-- ⚠️ Hydrogen has the lowest Gemini 4 list price and cost the most, $5.02, because it thinks on every problem and a thinking budget of 0 leaves it thinking.
+- ⚠️ Hydrogen has the lowest Gemini 4 list price and cost the most, $5.02, because with thinking off it still thinks on every problem, and thinking is billed as output.
 - ⚠️ Thinking tokens are missing from `completion_tokens` on the OpenAI-compatible endpoint.
 - ⚠️ Carbon and Argon have no free tier and double in price on 2026-12-01.
 - ❌ Gemini 3.5 Flash-Lite and 3.8 Flash were behind Gemma 4 31B on BFCL.
 
-Scope: one laptop in the US calling the Gemini API on 2026-11-14, one run per model, all seven started together. Thinking was the lowest level each model accepts: zero thinking for five models, some for Hydrogen and 3.8 Flash. Three Gemma 4 requests that hit the free tier's rate limit were sent again with the same settings. Costs are token counts times list prices. Run times are from one run with all seven sharing one connection, and will move with load on the service. Google does not say what hardware or engine serves any of these models.
+Scope: one laptop in the US calling the Gemini API on 2026-11-14, one run per model, all seven started together. Thinking was off for every model; Hydrogen and 3.8 Flash thought anyway on nearly every problem, Carbon and Argon on some. Three Gemma 4 requests that hit the free tier's rate limit were sent again with the same settings. Costs are token counts times list prices. Run times are from one run with all seven sharing one connection, and will move with load on the service. Google does not say what hardware or engine serves any of these models.
 
 The strategy for comparing Gemini and Gemma 4 on equal terms was validated with an incremental step by step approach.
 

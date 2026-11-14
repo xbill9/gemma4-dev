@@ -14,7 +14,7 @@ https://github.com/xbill9/gemma4-dev
 
 #### The New Gemini Models in One Table
 
-Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-Lite, 3.8 Flash and Gemma 4. On 2026-11-14 all seven ran through the same Gemini API endpoint, started together, with the same GSM8K (1,319 math word problems) and BFCL simple (400 function calls) questions and scoring, each at the lowest thinking level it accepts:
+Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-Lite, 3.8 Flash and Gemma 4. On 2026-11-14 all seven ran through the same Gemini API endpoint, started together, with the same GSM8K (1,319 math word problems) and BFCL simple (400 function calls) questions and scoring, with thinking off:
 
 | Model | GSM8K | BFCL simple | Cost, both tasks | Output price, per 1M tokens | GSM8K median per request |
 | :--- | ---: | ---: | ---: | ---: | ---: |
@@ -26,7 +26,7 @@ Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-
 | Gemini 4 Carbon | 0.9803 | 0.9600 | $4.02 | $10.00 | 7.34 s |
 | Gemini 4 Argon | 🥇 0.9841 | 🥇 0.9675 | $3.46 | $10.00 | 7.63 s |
 
-Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill: Hydrogen has the lowest Gemini 4 price but thinks on every problem, so it cost the most. It is also the fastest Gemini 4 model, about 2.7 times quicker per problem than Argon. The times come from all seven sharing one connection at once. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4*.
+Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill: Hydrogen has the lowest Gemini 4 price, but with thinking off it still thinks on every problem, so it cost the most. It is also the fastest Gemini 4 model, about 2.7 times quicker per problem than Argon. The times come from all seven sharing one connection at once. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4*.
 
 ---
 
