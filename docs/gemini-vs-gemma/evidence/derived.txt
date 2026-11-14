@@ -1,0 +1,41 @@
+== one table: same endpoint, same settings, lowest thinking level each model accepts
+  gemma-4-31b-it         minimal  GSM8K 1,284 of 1,319 0.9735 [0.9644, 0.9818]  BFCL 387 of 400 0.9675 [0.9475, 0.9850]  thinking per GSM8K problem 0.0  both tasks cost free tier
+  gemma-4-26b-a4b-it     minimal  GSM8K 1,285 of 1,319 0.9742 [0.9651, 0.9826]  BFCL 383 of 400 0.9575 [0.9350, 0.9750]  thinking per GSM8K problem 0.0  both tasks cost free tier
+  gemini-3.5-flash-lite  minimal  GSM8K 1,270 of 1,319 0.9629 [0.9522, 0.9735]  BFCL 374 of 400 0.9350 [0.9100, 0.9600]  thinking per GSM8K problem 0.0  both tasks cost $0.92
+  gemini-3.8-flash       none     GSM8K 1,291 of 1,319 0.9788 [0.9712, 0.9864]  BFCL 376 of 400 0.9400 [0.9175, 0.9625]  thinking per GSM8K problem 152.2  both tasks cost $1.81
+  gemini-4-hydrogen      none     GSM8K 1,293 of 1,319 0.9803 [0.9727, 0.9879]  BFCL 382 of 400 0.9550 [0.9325, 0.9750]  thinking per GSM8K problem 248.7  both tasks cost $5.02
+  gemini-4-carbon        none     GSM8K 1,293 of 1,319 0.9803 [0.9719, 0.9879]  BFCL 384 of 400 0.9600 [0.9400, 0.9775]  thinking per GSM8K problem 29.6  both tasks cost $4.02
+  gemini-4-argon         none     GSM8K 1,298 of 1,319 0.9841 [0.9765, 0.9909]  BFCL 387 of 400 0.9675 [0.9500, 0.9850]  thinking per GSM8K problem 4.8  both tasks cost $3.46
+
+== details per task
+  gsm8k        gemma-4-31b-it         errors 0  cut 0  in 120,902  answer 357,807  thinking 0  problems with thinking 0 of 1,319  cost free tier
+  gsm8k        gemma-4-26b-a4b-it     errors 0  cut 1  in 120,902  answer 425,879  thinking 0  problems with thinking 0 of 1,319  cost free tier
+  gsm8k        gemini-3.5-flash-lite  errors 0  cut 1  in 120,902  answer 334,155  thinking 0  problems with thinking 0 of 1,319  cost $0.87  thinking share 0%
+  gsm8k        gemini-3.8-flash       errors 0  cut 4  in 120,902  answer 218,593  thinking 200,743  problems with thinking 1293 of 1,319  cost $1.66  thinking share 45%
+  gsm8k        gemini-4-hydrogen      errors 0  cut 0  in 160,432  answer 241,399  thinking 328,013  problems with thinking 1319 of 1,319  cost $4.51  thinking share 55%
+  gsm8k        gemini-4-carbon        errors 0  cut 8  in 160,432  answer 299,265  thinking 38,999  problems with thinking 268 of 1,319  cost $3.70  thinking share 11%
+  gsm8k        gemini-4-argon         errors 0  cut 0  in 160,432  answer 276,874  thinking 6,289  problems with thinking 66 of 1,319  cost $3.15  thinking share 2%
+
+  bfcl_simple  gemma-4-31b-it         errors 0  cut 0  in 62,007  answer 13,361  thinking 0  problems with thinking 0 of 400  cost free tier
+  bfcl_simple  gemma-4-26b-a4b-it     errors 0  cut 0  in 62,007  answer 13,324  thinking 0  problems with thinking 0 of 400  cost free tier
+  bfcl_simple  gemini-3.5-flash-lite  errors 0  cut 0  in 62,007  answer 13,357  thinking 0  problems with thinking 0 of 400  cost $0.05  thinking share 0%
+  bfcl_simple  gemini-3.8-flash       errors 0  cut 2  in 62,007  answer 13,472  thinking 12,360  problems with thinking 113 of 400  cost $0.14  thinking share 32%
+  bfcl_simple  gemini-4-hydrogen      errors 0  cut 0  in 77,428  answer 16,000  thinking 35,898  problems with thinking 400 of 400  cost $0.51  thinking share 53%
+  bfcl_simple  gemini-4-carbon        errors 0  cut 0  in 77,441  answer 15,810  thinking 0  problems with thinking 0 of 400  cost $0.31  thinking share 0%
+  bfcl_simple  gemini-4-argon         errors 0  cut 0  in 77,441  answer 15,643  thinking 0  problems with thinking 0 of 400  cost $0.31  thinking share 0%
+
+== each model against Gemma 4 31B, same problems (difference, 95% range, +right where 31B wrong / -)
+  gsm8k        gemma-4-26b-a4b-it     +0.0008 [-0.0061, +0.0076] level  +10 / -9 of 1,319
+  gsm8k        gemini-3.5-flash-lite  -0.0106 [-0.0174, -0.0030] behind +6 / -20 of 1,319
+  gsm8k        gemini-3.8-flash       +0.0053 [+0.0000, +0.0106] level  +10 / -3 of 1,319
+  gsm8k        gemini-4-hydrogen      +0.0068 [+0.0015, +0.0129] ahead  +11 / -2 of 1,319
+  gsm8k        gemini-4-carbon        +0.0068 [+0.0008, +0.0136] ahead  +14 / -5 of 1,319
+  gsm8k        gemini-4-argon         +0.0106 [+0.0038, +0.0174] ahead  +17 / -3 of 1,319
+
+  bfcl_simple  gemma-4-26b-a4b-it     -0.0100 [-0.0275, +0.0100] level  +5 / -9 of 400
+  bfcl_simple  gemini-3.5-flash-lite  -0.0325 [-0.0575, -0.0100] behind +5 / -18 of 400
+  bfcl_simple  gemini-3.8-flash       -0.0275 [-0.0475, -0.0100] behind +2 / -13 of 400
+  bfcl_simple  gemini-4-hydrogen      -0.0125 [-0.0325, +0.0075] level  +5 / -10 of 400
+  bfcl_simple  gemini-4-carbon        -0.0075 [-0.0250, +0.0100] level  +5 / -8 of 400
+  bfcl_simple  gemini-4-argon         +0.0000 [-0.0175, +0.0175] level  +7 / -7 of 400
+

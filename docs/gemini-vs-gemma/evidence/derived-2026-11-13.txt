@@ -1,0 +1,95 @@
+== gsm8k: right / n, accuracy [95% range]
+  Gemma 4 E2B              thinking off  1189/1319  0.9014 [0.8855, 0.9166]  cut 3  out tokens 528,961
+  Gemma 4 E4B              thinking off  1228/1319  0.9310 [0.9174, 0.9439]  cut 0  out tokens 448,566
+  Gemma 4 12B              thinking off  1270/1319  0.9629 [0.9522, 0.9727]  cut 2  out tokens 421,012
+  Gemma 4 26B              thinking off  1269/1319  0.9621 [0.9522, 0.9719]  cut 1  out tokens 425,029
+  Gemma 4 31B              thinking off  1284/1319  0.9735 [0.9644, 0.9818]  cut 0  out tokens 338,174
+  gemini-3.5-flash-lite    minimal      1275/1319  0.9666 [0.9568, 0.9757]  errors 0  cut 0  in 120,902  visible out 330,779  thinking 0  cost $0.86  per 1,000 right $0.677  wall 181.4 s
+  gemini-3.5-flash-lite    low          1278/1319  0.9689 [0.9591, 0.9780]  errors 0  cut 2  in 120,902  visible out 242,023  thinking 216,810  cost $1.18  per 1,000 right $0.926  wall 222.8 s
+  gemini-3.8-flash         none         1289/1319  0.9773 [0.9689, 0.9848]  errors 0  cut 6  in 120,902  visible out 217,102  thinking 208,797  cost $1.69  per 1,000 right $1.309  wall 1157.8 s
+                                        at the 2027-01-01 price: cost $3.38  per 1,000 right $2.619
+  gemini-3.8-flash         low          1291/1319  0.9788 [0.9712, 0.9864]  errors 0  cut 4  in 120,902  visible out 218,403  thinking 203,733  cost $1.67  per 1,000 right $1.296  wall 615.4 s
+                                        at the 2027-01-01 price: cost $3.35  per 1,000 right $2.593
+  gemini-4-hydrogen        none         1292/1319  0.9795 [0.9719, 0.9871]  errors 0  cut 0  in 160,432  visible out 241,053  thinking 329,255  cost $4.52  per 1,000 right $3.497  wall 389.0 s
+  gemini-4-hydrogen        low          1294/1319  0.9810 [0.9735, 0.9886]  errors 0  cut 0  in 160,432  visible out 241,490  thinking 324,779  cost $4.49  per 1,000 right $3.468  wall 383.7 s
+  gemini-4-carbon          none         1292/1319  0.9795 [0.9712, 0.9871]  errors 0  cut 8  in 160,432  visible out 298,888  thinking 40,385  cost $3.71  per 1,000 right $2.874  wall 2133.5 s
+                                        at the 2026-12-01 price: cost $7.43  per 1,000 right $5.749
+  gemini-4-carbon          low          NOT RUN
+  gemini-4-argon           none         1294/1319  0.9810 [0.9735, 0.9886]  errors 0  cut 1  in 160,432  visible out 278,367  thinking 6,237  cost $3.17  per 1,000 right $2.447  wall 1330.7 s
+                                        at the 2026-12-01 price: cost $6.33  per 1,000 right $4.895
+  gemini-4-argon           low          1300/1319  0.9856 [0.9788, 0.9924]  errors 0  cut 0  in 160,432  visible out 278,366  thinking 6,639  cost $3.17  per 1,000 right $2.439  wall 1369.2 s
+                                        at the 2026-12-01 price: cost $6.34  per 1,000 right $4.878
+  paired against Gemma 4 31B on the same gsm8k items: difference [95% range]  (+Gemini right where 31B wrong / -)
+    flashlite35  minimal  -0.0068 [-0.0136, +0.0000] includes zero +6 / -15 of 1319
+    flashlite35  low      -0.0045 [-0.0106, +0.0015] includes zero +5 / -11 of 1319
+    flash38      none     +0.0038 [-0.0015, +0.0099] includes zero +10 / -5 of 1319
+    flash38      low      +0.0053 [+0.0000, +0.0106] includes zero +10 / -3 of 1319
+    hydrogen4    none     +0.0061 [+0.0008, +0.0121] above zero    +12 / -4 of 1319
+    hydrogen4    low      +0.0076 [+0.0023, +0.0136] above zero    +13 / -3 of 1319
+    carbon4      none     +0.0061 [+0.0000, +0.0129] includes zero +14 / -6 of 1319
+    argon4       none     +0.0076 [+0.0008, +0.0144] above zero    +16 / -6 of 1319
+    argon4       low      +0.0121 [+0.0061, +0.0190] above zero    +18 / -2 of 1319
+
+== bfcl_simple: right / n, accuracy [95% range]
+  Gemma 4 E2B              thinking off  369/400  0.9225 [0.8950, 0.9475]  cut 0  out tokens 12,792
+  Gemma 4 E4B              thinking off  365/400  0.9125 [0.8825, 0.9375]  cut 0  out tokens 12,996
+  Gemma 4 12B              thinking off  379/400  0.9475 [0.9250, 0.9675]  cut 0  out tokens 12,932
+  Gemma 4 26B              thinking off  378/400  0.9450 [0.9200, 0.9675]  cut 0  out tokens 12,887
+  Gemma 4 31B              thinking off  383/400  0.9575 [0.9350, 0.9775]  cut 0  out tokens 12,972
+  gemini-3.5-flash-lite    minimal      379/400  0.9475 [0.9250, 0.9675]  errors 0  cut 0  in 62,007  visible out 13,399  thinking 0  cost $0.05  per 1,000 right $0.137  wall 33.1 s
+  gemini-3.5-flash-lite    low          374/400  0.9350 [0.9100, 0.9575]  errors 0  cut 0  in 62,007  visible out 13,381  thinking 3,585  cost $0.06  per 1,000 right $0.163  wall 34.9 s
+  gemini-3.8-flash         none         374/400  0.9350 [0.9100, 0.9575]  errors 0  cut 2  in 62,007  visible out 13,502  thinking 14,599  cost $0.15  per 1,000 right $0.406  wall 107.4 s
+                                        at the 2027-01-01 price: cost $0.30  per 1,000 right $0.812
+  gemini-3.8-flash         low          375/400  0.9375 [0.9125, 0.9600]  errors 0  cut 3  in 62,007  visible out 13,476  thinking 13,246  cost $0.15  per 1,000 right $0.391  wall 103.1 s
+                                        at the 2027-01-01 price: cost $0.29  per 1,000 right $0.782
+  gemini-4-hydrogen        none         387/400  0.9675 [0.9475, 0.9825]  errors 0  cut 0  in 77,428  visible out 15,891  thinking 35,530  cost $0.50  per 1,000 right $1.297  wall 91.5 s
+  gemini-4-hydrogen        low          384/400  0.9600 [0.9400, 0.9775]  errors 0  cut 0  in 77,428  visible out 15,823  thinking 36,079  cost $0.51  per 1,000 right $1.316  wall 82.4 s
+  gemini-4-carbon          none         382/400  0.9550 [0.9325, 0.9750]  errors 0  cut 0  in 77,552  visible out 15,799  thinking 0  cost $0.31  per 1,000 right $0.820  wall 915.2 s
+                                        at the 2026-12-01 price: cost $0.63  per 1,000 right $1.639
+  gemini-4-carbon          low          379/400  0.9475 [0.9250, 0.9675]  errors 0  cut 0  in 77,552  visible out 15,807  thinking 0  cost $0.31  per 1,000 right $0.826  wall 311.8 s
+                                        at the 2026-12-01 price: cost $0.63  per 1,000 right $1.653
+  gemini-4-argon           none         387/400  0.9675 [0.9500, 0.9850]  errors 0  cut 0  in 77,441  visible out 15,628  thinking 0  cost $0.31  per 1,000 right $0.804  wall 368.6 s
+                                        at the 2026-12-01 price: cost $0.62  per 1,000 right $1.608
+  gemini-4-argon           low          387/400  0.9675 [0.9475, 0.9850]  errors 0  cut 0  in 77,441  visible out 15,734  thinking 0  cost $0.31  per 1,000 right $0.807  wall 362.6 s
+                                        at the 2026-12-01 price: cost $0.62  per 1,000 right $1.614
+  paired against Gemma 4 31B on the same bfcl_simple items: difference [95% range]  (+Gemini right where 31B wrong / -)
+    flashlite35  minimal  -0.0100 [-0.0350, +0.0150] includes zero +10 / -14 of 400
+    flashlite35  low      -0.0225 [-0.0500, +0.0000] includes zero +8 / -17 of 400
+    flash38      none     -0.0225 [-0.0450, -0.0025] below zero    +5 / -14 of 400
+    flash38      low      -0.0200 [-0.0450, +0.0025] includes zero +7 / -15 of 400
+    hydrogen4    none     +0.0100 [-0.0100, +0.0300] includes zero +11 / -7 of 400
+    hydrogen4    low      +0.0025 [-0.0175, +0.0225] includes zero +9 / -8 of 400
+    carbon4      none     -0.0025 [-0.0225, +0.0150] includes zero +6 / -7 of 400
+    carbon4      low      -0.0100 [-0.0300, +0.0100] includes zero +6 / -10 of 400
+    argon4       none     +0.0100 [-0.0075, +0.0275] includes zero +9 / -5 of 400
+    argon4       low      +0.0100 [-0.0100, +0.0300] includes zero +10 / -6 of 400
+
+== thinking tokens per GSM8K item, lowest level vs low
+  gemini-3.5-flash-lite    minimal  thinking per item     0.0  visible per item  250.8  items with any thinking 0 of 1,319
+  gemini-3.5-flash-lite    low      thinking per item   164.4  visible per item  183.5  items with any thinking 1312 of 1,319
+  gemini-3.8-flash         none     thinking per item   158.3  visible per item  164.6  items with any thinking 1294 of 1,319
+  gemini-3.8-flash         low      thinking per item   154.5  visible per item  165.6  items with any thinking 1292 of 1,319
+  gemini-4-hydrogen        none     thinking per item   249.6  visible per item  182.8  items with any thinking 1319 of 1,319
+  gemini-4-hydrogen        low      thinking per item   246.2  visible per item  183.1  items with any thinking 1319 of 1,319
+  gemini-4-carbon          none     thinking per item    30.6  visible per item  226.6  items with any thinking 275 of 1,319
+  gemini-4-argon           none     thinking per item     4.7  visible per item  211.0  items with any thinking 46 of 1,319
+  gemini-4-argon           low      thinking per item     5.0  visible per item  211.0  items with any thinking 56 of 1,319
+
+== GSM8K run cost split by token kind, at today's list price (arithmetic)
+  model                    arm         input   answer  thinking    total  without thinking  thinking share
+  gemini-3.5-flash-lite    minimal  $   0.04 $   0.83 $    0.00 $   0.86 $            0.86             0%
+  gemini-3.5-flash-lite    low      $   0.04 $   0.61 $    0.54 $   1.18 $            0.64            46%
+  gemini-3.8-flash         none     $   0.09 $   0.81 $    0.78 $   1.69 $            0.90            46%
+  gemini-3.8-flash         low      $   0.09 $   0.82 $    0.76 $   1.67 $            0.91            46%
+  gemini-4-hydrogen        none     $   0.24 $   1.81 $    2.47 $   4.52 $            2.05            55%
+  gemini-4-hydrogen        low      $   0.24 $   1.81 $    2.44 $   4.49 $            2.05            54%
+  gemini-4-carbon          none     $   0.32 $   2.99 $    0.40 $   3.71 $            3.31            11%
+  gemini-4-argon           none     $   0.32 $   2.78 $    0.06 $   3.17 $            3.10             2%
+  gemini-4-argon           low      $   0.32 $   2.78 $    0.07 $   3.17 $            3.10             2%
+
+== prompt tokens for the same GSM8K prompts (tokenizer difference)
+  gemini-3.5-flash-lite    120,902
+  gemini-3.8-flash         120,902
+  gemini-4-hydrogen        160,432
+  gemini-4-carbon          160,432
+  gemini-4-argon           160,432

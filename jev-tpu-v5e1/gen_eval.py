@@ -49,6 +49,8 @@ CHAT_URL = os.environ.get("JEV_CHAT_URL")
 API_KEY_FILE = os.environ.get("JEV_API_KEY_FILE")
 REASONING_EFFORT = os.environ.get("JEV_REASONING_EFFORT")
 RETRIES = int(os.environ.get("JEV_RETRIES", "0"))
+# JEV_TIMEOUT_S: seconds one request may wait before it counts as a network error (default 900).
+TIMEOUT_S = float(os.environ.get("JEV_TIMEOUT_S", "900"))
 RETRY_CODES = {429, 500, 502, 503, 504}
 TYPES = {"dict": "object", "float": "number", "tuple": "array", "any": None}
 
@@ -191,7 +193,8 @@ def bfcl_check(calls, record):
 # ---------- running ----------
 
 
-def post(upstream, body, timeout=900):
+def post(upstream, body, timeout=None):
+    timeout = timeout or TIMEOUT_S
     url = CHAT_URL or upstream.rstrip("/") + "/v1/chat/completions"
     headers = {"Content-Type": "application/json"}
     if API_KEY_FILE:

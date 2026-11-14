@@ -3,13 +3,13 @@
 # Gemma rigs' method: GSM8K (1,319, up to 2048 tokens) and BFCL simple (400) via
 # jev-tpu-v5e1/gen_eval.py, temperature 0, scored in code. Two arms: reasoning_effort=minimal (the
 # lowest level this model accepts) and low. Concurrency 8, failed requests retried up to 8 times
-# (HTTP 429/5xx and network errors). Thinking tokens are recorded per row as reasoning_tokens.
+# (HTTP 429/5xx, network errors and requests over 180 s). Thinking tokens are recorded per row as reasoning_tokens.
 set -u
 cd "$(dirname "$0")"; HERE=$PWD
 RIG=$(cd ../../.. && pwd)
 set -a; . "$RIG/tpu.env"; set +a
 J=$(cd "$RIG/../jev-tpu-v5e1" && pwd)
-export JEV_CHAT_URL=$GEMINI_OPENAI_URL JEV_API_KEY_FILE=$GEMINI_API_KEY_FILE JEV_RETRIES=8 JEV_GEN_MAX_TOKENS=2048
+export JEV_CHAT_URL=$GEMINI_OPENAI_URL JEV_API_KEY_FILE=$GEMINI_API_KEY_FILE JEV_RETRIES=8 JEV_TIMEOUT_S=180 JEV_GEN_MAX_TOKENS=2048
 LOG=$HERE/driver.log
 state() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
 state "BEGIN $MODEL_NAME"
