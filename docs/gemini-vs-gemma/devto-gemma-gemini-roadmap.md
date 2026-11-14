@@ -117,7 +117,7 @@ Pick by the axis that matters most, then check the others.
 
 **By speed.** On a hosted API, Flash-Lite answered a GSM8K problem in 1.10 s and Hydrogen in 2.84 s; Gemma 4 on the Gemini API took 8 to 9 s. For one user, a local card with a drafter (230.5 tok/s on the 3050) or an MI300X (340.4). For many users, the MI300X or four TPU v5e chips. Cloud Run as deployed here stops at 189.53 tok/s per instance.
 
-**By accuracy.** Gemini 4 Argon leads GSM8K at 0.9841, and Argon and Gemma 4 31B lead BFCL at 0.9675. Where a model runs did not change its score: Gemma 4 31B answered 1,284 of 1,319 GSM8K problems through the Gemini API and 1,284 on an RTX 3050 with llama.cpp, differing on 8 problems. Model size matters more than where it runs: E2B scored 0.8954 to 0.9030 on GSM8K across six engines on the RTX 3050, the L4 and TPU v5e, and the 31B 0.9735.
+**By accuracy.** Gemini 4 Argon leads GSM8K at 0.9841, and Argon and Gemma 4 31B lead BFCL at 0.9675, on short problems with thinking at its lowest setting. For hard, multi-step work Google calls Carbon "our strongest frontier model"; that case was not measured here. Where a model runs did not change its score: Gemma 4 31B answered 1,284 of 1,319 GSM8K problems through the Gemini API and 1,284 on an RTX 3050 with llama.cpp, differing on 8 problems. Model size matters more than where it runs: E2B scored 0.8954 to 0.9030 on GSM8K across six engines on the RTX 3050, the L4 and TPU v5e, and the 31B 0.9735.
 
 **By ease of use.** A hosted API needs a key. A local card needs a driver and an engine, and llama.cpp is ready in seconds. Cloud Run needs a container and a deploy and then scales on its own. A rented accelerator needs capacity, a 12.6 to 14.1 minute engine start on TPU, and someone to turn it off.
 

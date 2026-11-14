@@ -266,7 +266,9 @@ Compare models by cost per answer, measured on your own prompts.
 
 #### So, Which One?
 
-For the best scores today, Gemini 4 Argon: highest on GSM8K, tied for highest on BFCL, and the cheapest of the three Gemini 4 models per run because it rarely thinks.
+For the best scores on short math problems and single function calls with thinking at its lowest setting, Gemini 4 Argon: highest on GSM8K, tied for highest on BFCL, and the cheapest of the three Gemini 4 models per run because it rarely thinks.
+
+For hard, multi-step work, Google points to Carbon. Its Hydrogen page calls Carbon "our strongest frontier model", one that "spends more thinking tokens per turn to test hypotheses and verify edge cases on hard architecture, debugging, science, and security audits", and suggests pairing the two: Carbon plans and resolves hard roadblocks, Hydrogen does the code edits, subagent tasks and test runs. This run held Carbon to its lowest thinking setting, where it thought on 268 of 1,319 GSM8K problems, so that case is untested here. Five of its GSM8K answers were cut at the 2,048-token limit; with a 16,384-token limit 3 of them came back right, which still leaves it below Argon.
 
 Gemini 4 Hydrogen fits four cases:
 
@@ -299,7 +301,7 @@ The goal of this article was to compare the new Gemini 4 models with Gemma 4 on 
 - ⚠️ Carbon and Argon have no free tier and double in price on 2026-12-01.
 - ❌ Gemini 3.5 Flash-Lite and 3.8 Flash were behind Gemma 4 31B on BFCL.
 
-Scope: one laptop in the US calling the Gemini API on 2026-11-14, one run per model, all seven started together. Thinking was set as low as each model accepts: `minimal` for Gemma 4 and Flash-Lite, `none` for the rest, which matched `low` on a 100-problem sample. The native thinking controls were tried on one question. The scores for 3.8 Flash and Carbon include the 11 answers cut by thinking at the 2,048 and 512 token limits. Three Gemma 4 requests that hit the free tier's rate limit were sent again with the same settings. Costs are token counts times list prices. Run times are from one run with all seven sharing one connection, and will move with load on the service. Google does not say what hardware or engine serves any of these models.
+Scope: one laptop in the US calling the Gemini API on 2026-11-14, one run per model, all seven started together. Thinking was set as low as each model accepts: `minimal` for Gemma 4 and Flash-Lite, `none` for the rest, which matched `low` on a 100-problem sample. The native thinking controls were tried on one question. The scores for 3.8 Flash and Carbon include the 11 answers cut by thinking at the 2,048 and 512 token limits. Three Gemma 4 requests that hit the free tier's rate limit were sent again with the same settings. Costs are token counts times list prices. Run times are from one run with all seven sharing one connection, and will move with load on the service. Hard multi-step tasks and higher thinking levels were not measured, which is the work Google positions Carbon for. Google does not say what hardware or engine serves any of these models.
 
 The strategy for comparing Gemini and Gemma 4 on equal terms was validated with an incremental step by step approach.
 
