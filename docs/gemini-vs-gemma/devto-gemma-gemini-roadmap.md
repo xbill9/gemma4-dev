@@ -14,7 +14,7 @@ https://github.com/xbill9/gemma4-dev
 
 #### The New Gemini Models in One Table
 
-Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-Lite, 3.8 Flash and Gemma 4. On 2026-11-14 all seven ran through the same Gemini API endpoint, started together, with the same GSM8K (1,319 math word problems) and BFCL simple (400 function calls) questions and scoring, with thinking off:
+Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-Lite, 3.8 Flash and Gemma 4. On 2026-11-14 all seven ran through the same Gemini API endpoint, started together, with the same GSM8K (1,319 math word problems) and BFCL simple (400 function calls) questions and scoring, with thinking set as low as each model accepts:
 
 | Model | GSM8K | BFCL simple | Cost, both tasks | Output price, per 1M tokens | GSM8K median per request |
 | :--- | ---: | ---: | ---: | ---: | ---: |
@@ -26,7 +26,7 @@ Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-
 | Gemini 4 Carbon | 0.9803 | 0.9600 | $4.02 | $10.00 | 7.34 s |
 | Gemini 4 Argon | 🥇 0.9841 | 🥇 0.9675 | $3.46 | $10.00 | 7.63 s |
 
-Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill: Hydrogen has the lowest Gemini 4 price, but with thinking off it still thinks on every problem, so it cost the most. It is also the fastest Gemini 4 model, about 2.7 times quicker per problem than Argon. The times come from all seven sharing one connection at once. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4*.
+Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill. On Hydrogen and 3.8 Flash it cannot be turned off: Hydrogen has the lowest Gemini 4 price, thought on every problem at its lowest setting, and cost the most. It is also the fastest Gemini 4 model, about 2.7 times quicker per problem than Argon. The times come from all seven sharing one connection at once. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *You Cannot Turn Off Thinking on Gemini 4 Hydrogen*.
 
 ---
 
@@ -113,7 +113,7 @@ Pick by the axis that matters most, then check the others.
 | 10–64 | A batching engine on your own card (vLLM, SGLang), a TPU v5e-1, or an L4 |
 | Hundreds | TPU v5e-4 as four engines, or an MI300X |
 
-**By cost.** Free first: your own card, Token Lab, and the Gemini free tier, which carries Gemma 4 26B and 31B, Flash-Lite, 3.8 Flash and Hydrogen. For paid use with light or uneven traffic, pay per token: both tests cost $0.92 on Flash-Lite and $3.46 on Argon. A rented machine wins only when it is kept busy, which brings TPU v5e to $0.089 and MI300X to $0.054 per million output tokens.
+**By cost.** Free first: your own card, Token Lab, and the Gemini free tier, which carries Gemma 4 26B and 31B, Flash-Lite, 3.8 Flash and Hydrogen. For paid use with light or uneven traffic, pay per token: both tests cost $0.92 on Flash-Lite and $3.46 on Argon. Hydrogen and 3.8 Flash always think, and you pay for it. A rented machine wins only when it is kept busy, which brings TPU v5e to $0.089 and MI300X to $0.054 per million output tokens.
 
 **By speed.** On a hosted API, Flash-Lite answered a GSM8K problem in 1.10 s and Hydrogen in 2.84 s; Gemma 4 on the Gemini API took 8 to 9 s. For one user, a local card with a drafter (230.5 tok/s on the 3050) or an MI300X (340.4). For many users, the MI300X or four TPU v5e chips. Cloud Run as deployed here stops at 189.53 tok/s per instance.
 
