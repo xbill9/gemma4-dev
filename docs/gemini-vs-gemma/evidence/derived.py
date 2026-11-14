@@ -117,6 +117,19 @@ def main():
               f"  whole task {w:,} s  {statistics.median(tps):.1f} tok/s  ({len(rows):,} requests)")
         p("")
 
+    p("== cost per run at 2026-12-01 prices (Carbon and Argon $4.00 / $20.00 per 1M, pricing-2026-11-14.txt); arithmetic")
+    dec = {"carbon4": (4.00, 20.00), "argon4": (4.00, 20.00)}
+    now = {}
+    for slot, mid, eff, pin, pout in MODELS:
+        if pin is None:
+            continue
+        pi, po = dec.get(slot, (pin, pout))
+        tot = sum(cost(tokens(data[(slot, t)]), pi, po) for t in TASKS)
+        now[slot] = sum(cost(tokens(data[(slot, t)]), pin, pout) for t in TASKS)
+        p(f"  {mid:22s} both tasks ${tot:.2f}")
+    p(f"  Hydrogen against Argon at today's prices: {now['hydrogen4'] / now['argon4'] - 1:+.0%}")
+    p("")
+
     p("== each model against Gemma 4 31B, same problems (difference, 95% range, +right where 31B wrong / -)")
     for t in TASKS:
         ref = data[("31b", t)]

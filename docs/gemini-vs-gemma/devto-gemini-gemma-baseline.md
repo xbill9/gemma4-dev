@@ -241,15 +241,32 @@ Hydrogen writes about 147.8 tokens per second per request, thinking included, ag
 
 ---
 
+#### What the API Makes Easy to Miss
+
+Google documents both facts behind Hydrogen's bill. The thinking page lists its levels as `low`, `medium`, `high` and `xhigh`, with `high` the default and no off. The pricing page says output prices include thinking tokens. Three things in the API still make the bill easy to misread:
+
+- **Off settings are accepted and change nothing.** `reasoning_effort: "none"` on the OpenAI endpoint and `thinkingBudget: 0` on the native API return no error, and Hydrogen keeps thinking: 108 to 134 thinking tokens on the test question.
+- **`completion_tokens` leaves thinking out.** A client that reads it sees the visible answer only; on Hydrogen thinking was 55% of the GSM8K bill.
+- **The per-token price invites the wrong comparison.** $7.50 against $10 per million output tokens puts Hydrogen below Carbon and Argon; per run it cost 45% more than Argon, $5.02 against $3.46.
+
+Compare models by cost per answer, measured on your own prompts.
+
+---
+
 #### So, Which One?
 
-For the best scores, Gemini 4 Argon: highest on GSM8K, tied for highest on BFCL, and the cheapest of the three Gemini 4 models per run because it rarely thinks. Its price doubles on 2026-12-01.
+For the best scores today, Gemini 4 Argon: highest on GSM8K, tied for highest on BFCL, and the cheapest of the three Gemini 4 models per run because it rarely thinks.
 
-For speed among the Gemini 4 models, Hydrogen: 2.84 s per GSM8K problem, level with Carbon and Argon on BFCL and ahead of Gemma 4 31B on GSM8K. Budget for its thinking: it cannot be turned off, and it made Hydrogen the most expensive model per run.
+Gemini 4 Hydrogen fits four cases:
+
+- **On the free tier.** Hydrogen has one and Carbon and Argon do not. On free quota its thinking costs nothing, and it is the fastest Gemini 4 model, at 0.9803 on GSM8K like Carbon.
+- **When response time matters more than cost.** 2.84 s per GSM8K problem against 7.34 s for Carbon and 7.63 s for Argon; 620.8 s for the whole set against 1,759.2 s for Argon.
+- **From 2026-12-01.** Carbon and Argon go to $4 / $20. At those prices this run costs $6.93 on Argon and $8.03 on Carbon against $5.02 on Hydrogen, which makes Hydrogen the cheapest Gemini 4 model per run. That is arithmetic from list prices.
+- **On hard coding and agent work.** Google's thinking page recommends Hydrogen's default `high` level "for most tasks, including complex coding, agentic execution, tool calling". This run measured short math problems and single function calls, so that case is untested here.
+
+For high-volume simple work on a paid tier, Gemini 3.5 Flash-Lite: $0.92 for both tests, no thinking, 1.10 s per problem, at the cost of being behind Gemma 4 31B on both tests.
 
 For tool calling at no cost, Gemma 4 31B: tied with Argon on BFCL, 0.0106 behind it on GSM8K, free on the Gemini API, and the same weights run on your own hardware.
-
-Gemini 3.5 Flash-Lite is the cheapest paid model here, and it was behind Gemma 4 31B on both tests.
 
 ---
 
@@ -264,6 +281,8 @@ The goal of this article was to compare the new Gemini 4 models with Gemma 4 on 
 - 🟢 Hydrogen was the fastest Gemini 4 model, 2.84 s per GSM8K problem against 7.34 s for Carbon and 7.63 s for Argon.
 - ⚠️ Hydrogen has the lowest Gemini 4 price per token and cost the most per run, $5.02: thinking was 55% of its GSM8K bill.
 - ⚠️ Thinking cannot be turned off on Gemini 4 Hydrogen or 3.8 Flash: no level, budget or flag stops it, and it is billed as output.
+- ⚠️ The API accepts `none` and a thinking budget of 0 on Hydrogen without an error, and they leave it thinking.
+- 🟢 From 2026-12-01 Hydrogen becomes the cheapest Gemini 4 model per run, $5.02 against $6.93 for Argon, by arithmetic from list prices.
 - ⚠️ Thinking tokens are missing from `completion_tokens` on the OpenAI-compatible endpoint.
 - ⚠️ Carbon and Argon have no free tier and double in price on 2026-12-01.
 - ❌ Gemini 3.5 Flash-Lite and 3.8 Flash were behind Gemma 4 31B on BFCL.

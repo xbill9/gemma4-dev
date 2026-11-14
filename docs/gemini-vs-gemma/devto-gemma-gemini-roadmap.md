@@ -113,7 +113,7 @@ Pick by the axis that matters most, then check the others.
 | 10–64 | A batching engine on your own card (vLLM, SGLang), a TPU v5e-1, or an L4 |
 | Hundreds | TPU v5e-4 as four engines, or an MI300X |
 
-**By cost.** Free first: your own card, Token Lab, and the Gemini free tier, which carries Gemma 4 26B and 31B, Flash-Lite, 3.8 Flash and Hydrogen. For paid use with light or uneven traffic, pay per token: both tests cost $0.92 on Flash-Lite and $3.46 on Argon. Hydrogen and 3.8 Flash always think, and you pay for it. A rented machine wins only when it is kept busy, which brings TPU v5e to $0.089 and MI300X to $0.054 per million output tokens.
+**By cost.** Free first: your own card, Token Lab, and the Gemini free tier, which carries Gemma 4 26B and 31B, Flash-Lite, 3.8 Flash and Hydrogen. For paid use with light or uneven traffic, pay per token: both tests cost $0.92 on Flash-Lite and $3.46 on Argon. Hydrogen and 3.8 Flash always think, and you pay for it; the API accepts `none` and a thinking budget of 0 on them and keeps thinking. Compare models by cost per answer. From 2026-12-01, when Carbon and Argon go to $4 / $20, this run costs $6.93 on Argon and $5.02 on Hydrogen, by arithmetic from list prices. A rented machine wins only when it is kept busy, which brings TPU v5e to $0.089 and MI300X to $0.054 per million output tokens.
 
 **By speed.** On a hosted API, Flash-Lite answered a GSM8K problem in 1.10 s and Hydrogen in 2.84 s; Gemma 4 on the Gemini API took 8 to 9 s. For one user, a local card with a drafter (230.5 tok/s on the 3050) or an MI300X (340.4). For many users, the MI300X or four TPU v5e chips. Cloud Run as deployed here stops at 189.53 tok/s per instance.
 
