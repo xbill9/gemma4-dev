@@ -1,5 +1,5 @@
 ---
-title: "Gemini 4 or Gemma 4? Which Model Should You Use Through the Gemini API? It Depends."
+title: "Gemini 4 or Gemma 4? It Depends."
 published: false
 description: "Seven models through one Gemini API endpoint, started together with identical settings: Gemma 4 26B and 31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and Gemini 4 Hydrogen, Carbon and Argon, scored on GSM8K and BFCL. Hydrogen has the lowest Gemini 4 price per token and cost the most per run, because its thinking cannot be turned off."
 tags: gemini, gemma, benchmark, ai
