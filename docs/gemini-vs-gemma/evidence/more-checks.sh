@@ -1,0 +1,12 @@
+#!/bin/bash
+# Cross-checks: what the OpenAI endpoint reports in usage, whether Hydrogen and 3.8 Flash think on trivial
+# prompts at reasoning_effort none, and Hydrogen on the Interactions API at thinking_level low and minimal.
+K=$(cat ~/gemini.key); U=https://generativelanguage.googleapis.com/v1beta
+echo "== usage object, OpenAI endpoint, gemini-4-hydrogen, reasoning_effort none"
+curl -sS -m 120 $U/openai/chat/completions -H "Authorization: Bearer $K" -H 'Content-Type: application/json' -d '{"model":"gemini-4-hydrogen","temperature":0,"max_tokens":2048,"reasoning_effort":"none","messages":[{"role":"user","content":"Janet has 16 eggs, eats 3, bakes with 4, sells the rest at $2. How much does she make? End with Answer: <number>"}]}' | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin).get('usage')))"
+echo "== trivial prompts, reasoning_effort none"
+for m in gemini-4-hydrogen gemini-3.8-flash; do for q in "Say hi." "What is the capital of France? One word." "Reply with the single word OK."; do curl -sS -m 120 $U/openai/chat/completions -H "Authorization: Bearer $K" -H 'Content-Type: application/json' -d "{\"model\":\"$m\",\"temperature\":0,\"max_tokens\":2048,\"reasoning_effort\":\"none\",\"messages\":[{\"role\":\"user\",\"content\":\"$q\"}]}" | python3 -c "import json,sys; u=json.load(sys.stdin)['usage']; print('$m | $q | prompt',u['prompt_tokens'],'completion',u['completion_tokens'],'total',u['total_tokens'],'thinking',u['total_tokens']-u['prompt_tokens']-u['completion_tokens'])"; done; done
+echo "== Interactions API, gemini-4-hydrogen, thinking_level low"
+curl -sS -m 120 $U/interactions -H "x-goog-api-key: $K" -H 'Content-Type: application/json' -d '{"model":"gemini-4-hydrogen","input":"Janet has 16 eggs, eats 3, bakes with 4, sells the rest at $2. How much does she make? End with Answer: <number>","generation_config":{"thinking_level":"low","temperature":0}}' | python3 -c "import json,sys; r=json.load(sys.stdin); u=r.get('usage',r); print({k:u.get(k) for k in ('total_input_tokens','total_output_tokens','total_thought_tokens','total_tokens')} if 'total_tokens' in u else str(u)[:300])"
+echo "== Interactions API, gemini-4-hydrogen, thinking_level minimal"
+curl -sS -m 120 $U/interactions -H "x-goog-api-key: $K" -H 'Content-Type: application/json' -d '{"model":"gemini-4-hydrogen","input":"Say hi.","generation_config":{"thinking_level":"minimal"}}' | python3 -c "import json,sys; r=json.load(sys.stdin); print(json.dumps(r.get('error', r.get('usage')))[:300])"

@@ -1,0 +1,1304 @@
+# ai.google.dev/gemini-api/docs/openai.md.txt, fetched 2026-11-14
+> ## AI Agent Context
+> Get the complete documentation index at: https://aistudio.google.com/llms.txt
+> Use this file to discover all available pages.
+> For the full documentation in a single file, fetch: https://aistudio.google.com/llms-full.txt
+
+# OpenAI compatibility
+
+Gemini models are accessible using the OpenAI libraries (Python and TypeScript /
+Javascript) along with the REST API, by updating three lines of code
+and using your [Gemini API key](https://aistudio.google.com/apikey). If you
+aren't already using the OpenAI libraries, we recommend that you call the
+[Gemini API directly](/docs/get-started).
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  response = client.chat.completions.create(
+      model="gemini-4-hydrogen",
+      messages=[
+          {   "role": "system",
+              "content": "You are a helpful assistant."
+          },
+          {
+              "role": "user",
+              "content": "Explain to me how AI works"
+          }
+      ]
+  )
+  
+  print(response.choices[0].message)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+      apiKey: "GEMINI_API_KEY",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  });
+  
+  const response = await openai.chat.completions.create({
+      model: "gemini-4-hydrogen",
+      messages: [
+          {   role: "system",
+              content: "You are a helpful assistant."
+          },
+          {
+              role: "user",
+              content: "Explain to me how AI works",
+          },
+      ],
+  });
+  
+  console.log(response.choices[0].message);
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $GEMINI_API_KEY" \
+    -d '{
+      "model": "gemini-4-hydrogen",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Explain to me how AI works"
+        }
+      ]
+    }'
+  ```
+
+  What changed? Just three lines!
+
+  *   **`api_key="GEMINI_API_KEY"`**: Replace "`GEMINI_API_KEY`" with your actual Gemini
+      API key, which you can get in [Google AI Studio](https://aistudio.google.com).
+
+  *   **`base_url="https://generativelanguage.googleapis.com/v1beta/openai/"`:** This
+      tells the OpenAI library to send requests to the Gemini API endpoint instead of
+      the default URL.
+
+  *   **`model="gemini-4-hydrogen"`**: Choose a compatible Gemini model
+
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Thinking  {% id="thinking" %}
+
+Gemini models are trained to think through complex problems, leading
+to significantly improved reasoning. The Gemini API comes with [thinking
+parameters](/docs/thinking) which give fine grain
+control over how much the model will think.
+
+Different Gemini models have different reasoning configurations, you can see how
+they map to OpenAI's reasoning efforts as follows:
+
+| reasoning_effort (OpenAI) | thinking_level (Gemini 4) | thinking_level (Gemini 3.1 Flash-Lite) | thinking_level (Gemini 3 Flash) | thinking_budget (Gemini 2.5) |
+| :--- | :--- | :--- | :--- | :--- |
+| `minimal` | `low` | `minimal` | `minimal` | `1,024` |
+| `low` | `low` | `low` | `low` | `1,024` |
+| `medium` | `medium` | `medium` | `medium` | `8,192` |
+| `high` | `high` | `high` | `high` | `24,576` |
+| `xhigh` | `xhigh` (`gemini-4-hydrogen` only) | Not supported | Not supported | Not supported |
+
+If no `reasoning_effort` is specified, Gemini uses the model's
+default [level or budget](/docs/thinking#thinking-levels).
+
+If you want to disable thinking, you can set `reasoning_effort` to `"none"` for
+2.5 models. Reasoning cannot be turned off for Gemini 2.5 Pro, Gemini 3, or Gemini 4 models.
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  response = client.chat.completions.create(
+      model="gemini-4-hydrogen",
+      reasoning_effort="low",
+      messages=[
+          {   "role": "system",
+              "content": "You are a helpful assistant."
+          },
+          {
+              "role": "user",
+              "content": "Explain to me how AI works"
+          }
+      ]
+  )
+  
+  print(response.choices[0].message)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+      apiKey: "GEMINI_API_KEY",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  });
+  
+  const response = await openai.chat.completions.create({
+      model: "gemini-4-hydrogen",
+      reasoning_effort: "low",
+      messages: [
+          {   role: "system",
+              content: "You are a helpful assistant."
+          },
+          {
+              role: "user",
+              content: "Explain to me how AI works",
+          },
+      ],
+  });
+  
+  console.log(response.choices[0].message);
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $GEMINI_API_KEY" \
+    -d '{
+      "model": "gemini-4-hydrogen",
+      "reasoning_effort": "low",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Explain to me how AI works"
+        }
+      ]
+    }'
+  ```
+
+  Gemini thinking models also produce [thought summaries](/docs/thinking#summaries).
+    You can use the [`extra_body`](/docs/openai#extra-body) field to include Gemini fields
+    in your request.
+
+  Note that `reasoning_effort` and `thinking_level`/`thinking_budget` overlap
+    functionality, so they can't be used at the same time.
+
+  {% /tab %}
+
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  response = client.chat.completions.create(
+      model="gemini-4-hydrogen",
+      messages=[{"role": "user", "content": "Explain to me how AI works"}],
+      extra_body={
+        'extra_body': {
+          "google": {
+            "thinking_config": {
+              "thinking_level": "high",
+              "include_thoughts": True
+            }
+          }
+        }
+      }
+  )
+  
+  print(response.choices[0].message)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+      apiKey: "GEMINI_API_KEY",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  });
+  
+  const response = await openai.chat.completions.create({
+      model: "gemini-4-hydrogen",
+      messages: [{role: "user", content: "Explain to me how AI works",}],
+      extra_body: {
+        "google": {
+          "thinking_config": {
+            "thinking_level": "high",
+            "include_thoughts": true
+          }
+        }
+      }
+  });
+  
+  console.log(response.choices[0].message);
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```shell
+  curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer GEMINI_API_KEY" \
+    -d '{
+        "model": "gemini-4-hydrogen",
+          "messages": [{"role": "user", "content": "Explain to me how AI works"}],
+          "extra_body": {
+            "google": {
+              "thinking_config": {
+                "thinking_level": "high",
+                "include_thoughts": true
+              }
+            }
+          }
+        }'
+  ```
+
+  Gemini 3 supports OpenAI compatibility for thought signatures in chat completion
+    APIs. You can find the full example on the [thought signatures](/docs/thought-signatures?generate-content=true#openai) page.
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Streaming  {% id="streaming" %}
+
+The Gemini API supports [streaming responses](/docs/text-generation#streaming-responses).
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  response = client.chat.completions.create(
+    model="gemini-4-hydrogen",
+    messages=[
+      {
+          "role": "system",
+          "content": "You are a helpful assistant."
+      },
+      {   "role": "user",
+          "content": "Hello!"
+      }
+    ],
+    stream=True
+  )
+  
+  for chunk in response:
+      print(chunk.choices[0].delta)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+      apiKey: "GEMINI_API_KEY",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  });
+  
+  async function main() {
+    const completion = await openai.chat.completions.create({
+      model: "gemini-4-hydrogen",
+      messages: [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant."
+        },
+        {
+            "role": "user",
+            "content": "Hello!"
+        }
+      ],
+      stream: true,
+    });
+  
+    for await (const chunk of completion) {
+      console.log(chunk.choices[0].delta.content);
+    }
+  }
+  
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer GEMINI_API_KEY" \
+    -d '{
+        "model": "gemini-4-hydrogen",
+        "messages": [
+            {"role": "user", "content": "Explain to me how AI works"}
+        ],
+        "stream": true
+      }'
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Function calling  {% id="function-calling" %}
+
+Function calling makes it easier for you to get structured data outputs from
+generative models and is [supported in the Gemini API](/docs/function-calling).
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  tools = [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "Get the weather in a given location",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and state, e.g. Chicago, IL",
+            },
+            "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+          },
+          "required": ["location"],
+        },
+      }
+    }
+  ]
+  
+  messages = [{"role": "user", "content": "What's the weather like in Chicago today?"}]
+  response = client.chat.completions.create(
+    model="gemini-4-hydrogen",
+    messages=messages,
+    tools=tools,
+    tool_choice="auto"
+  )
+  
+  print(response)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+      apiKey: "GEMINI_API_KEY",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  });
+  
+  async function main() {
+    const messages = [{"role": "user", "content": "What's the weather like in Chicago today?"}];
+    const tools = [
+        {
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "description": "Get the weather in a given location",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "description": "The city and state, e.g. Chicago, IL",
+                },
+                "unit": {"type": "string", "enum": ["celsius", "fahrenheit"]},
+              },
+              "required": ["location"],
+            },
+          }
+        }
+    ];
+  
+    const response = await openai.chat.completions.create({
+      model: "gemini-4-hydrogen",
+      messages: messages,
+      tools: tools,
+      tool_choice: "auto",
+    });
+  
+    console.log(response);
+  }
+  
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer GEMINI_API_KEY" \
+  -d '{
+    "model": "gemini-4-hydrogen",
+    "messages": [
+      {
+        "role": "user",
+        "content": "What'\''s the weather like in Chicago today?"
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "description": "Get the current weather in a given location",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string",
+                "description": "The city and state, e.g. Chicago, IL"
+              },
+              "unit": {
+                "type": "string",
+                "enum": ["celsius", "fahrenheit"]
+              }
+            },
+            "required": ["location"]
+          }
+        }
+      }
+    ],
+    "tool_choice": "auto"
+  }'
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Image understanding  {% id="image-understanding" %}
+
+Gemini models are natively multimodal and provide best in class performance on
+[many common vision tasks](/docs/image-understanding).
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  import base64
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  # Function to encode the image
+  def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+      return base64.b64encode(image_file.read()).decode('utf-8')
+  
+  # Getting the base64 string
+  base64_image = encode_image("Path/to/agi/image.jpeg")
+  
+  response = client.chat.completions.create(
+    model="gemini-4-hydrogen",
+    messages=[
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "What is in this image?",
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url":  f"data:image/jpeg;base64,{base64_image}"
+            },
+          },
+        ],
+      }
+    ],
+  )
+  
+  print(response.choices[0])
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  import fs from 'fs';
+  
+  const openai = new OpenAI({
+    apiKey: "GEMINI_API_KEY",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  });
+  
+  function encodeImage(imagePath = '') {
+    try {
+      const imageBuffer = fs.readFileSync(imagePath);
+      return imageBuffer.toString('base64');
+    } catch (error) {
+      console.error("Error encoding image:", error);
+      return '';
+    }
+  }
+  
+  async function main() {
+    const imagePath = "Path/to/agi/image.jpeg";
+    const base64Image = await encodeImage(imagePath);
+  
+    const messages = [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "What is in this image?",
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": `data:image/jpeg;base64,${base64Image}`
+            },
+          },
+        ],
+      }
+    ];
+  
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gemini-4-hydrogen",
+        messages: messages,
+      });
+  
+      console.log(response.choices[0]);
+    } catch (error) {
+      console.error("Error calling Gemini API:", error);
+    }
+  }
+  
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  bash -c '
+    base64_image=$(base64 -i "Path/to/agi/image.jpeg");
+    curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer GEMINI_API_KEY" \
+      -d "{
+        \"model\": \"gemini-4-hydrogen\",
+        \"messages\": [
+          {
+            \"role\": \"user\",
+            \"content\": [
+              { \"type\": \"text\", \"text\": \"What is in this image?\" },
+              {
+                \"type\": \"image_url\",
+                \"image_url\": { \"url\": \"data:image/jpeg;base64,${base64_image}\" }
+              }
+            ]
+          }
+        ]
+      }"
+  '
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Generate an image  {% id="generate-image" %}
+
+Generate an image using `gemini-2.5-flash-image` or `gemini-3-pro-image-preview`. Supported parameters include `prompt`, `model`, `n`, `size`, and `response_format`. Any other parameters not listed here or in the [`extra_body`](/docs/openai#extra-body) section will be silently ignored by the compatibility layer.
+
+{% callout type="note" %}
+  You can enable **Grounding with Google Search** and configure **safety settings**
+  using the `extra_body` parameter. See the [`extra_body`](/docs/openai#extra-body) section
+  for available parameters. Grounding with Google Search is only available on Gemini 3 and newer models.
+
+{% /callout %}
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  import base64
+  from openai import OpenAI
+  from PIL import Image
+  from io import BytesIO
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+  )
+  
+  response = client.images.generate(
+      model="gemini-2.5-flash-image",
+      prompt="a portrait of a sheepadoodle wearing a cape",
+      response_format='b64_json',
+      n=1,
+  )
+  
+  for image_data in response.data:
+    image = Image.open(BytesIO(base64.b64decode(image_data.b64_json)))
+    image.show()
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+    apiKey: "GEMINI_API_KEY",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  });
+  
+  async function main() {
+    const image = await openai.images.generate(
+      {
+        model: "gemini-2.5-flash-image",
+        prompt: "a portrait of a sheepadoodle wearing a cape",
+        response_format: "b64_json",
+        n: 1,
+      }
+    );
+  
+    console.log(image.data);
+  }
+  
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/openai/images/generations" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer GEMINI_API_KEY" \
+    -d '{
+          "model": "gemini-2.5-flash-image",
+          "prompt": "a portrait of a sheepadoodle wearing a cape",
+          "response_format": "b64_json",
+          "n": 1,
+        }'
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Generate a video  {% id="generate-video" %}
+
+{% callout type="warning" %}
+   Veo 3.1 Preview (`veo-3.1-generate-preview`,
+  `veo-3.1-fast-generate-preview`, and `veo-3.1-lite-generate-preview`) in the
+  Gemini API was [shut down](/docs/deprecations) on **October 22, 2026**. Migrate
+  to [Gemini Omni Flash](/docs/omni) (`gemini-omni-1.2-flash`) using the native
+  Google GenAI SDK ([Interactions API](/docs/interactions-overview)) or the GA
+  models available through the
+  [Gemini Enterprise Agent Platform](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/veo/3-1-generate)
+  to avoid service interruptions. Video generation with `gemini-omni-1.2-flash` is
+  not supported on the OpenAI-compatible `/v1/videos` endpoint. 
+
+{% /callout %}
+
+## Audio understanding  {% id="audio-understanding" %}
+
+Analyze audio input:
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  import base64
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  with open("/path/to/your/audio/file.wav", "rb") as audio_file:
+    base64_audio = base64.b64encode(audio_file.read()).decode('utf-8')
+  
+  response = client.chat.completions.create(
+      model="gemini-4-hydrogen",
+      messages=[
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Transcribe this audio",
+          },
+          {
+                "type": "input_audio",
+                "input_audio": {
+                  "data": base64_audio,
+                  "format": "wav"
+            }
+          }
+        ],
+      }
+    ],
+  )
+  
+  print(response.choices[0].message.content)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import fs from "fs";
+  import OpenAI from "openai";
+  
+  const client = new OpenAI({
+    apiKey: "GEMINI_API_KEY",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  });
+  
+  const audioFile = fs.readFileSync("/path/to/your/audio/file.wav");
+  const base64Audio = audioFile.toString('base64');
+  
+  async function main() {
+    const response = await client.chat.completions.create({
+      model: "gemini-4-hydrogen",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Transcribe this audio",
+            },
+            {
+              type: "input_audio",
+              input_audio: {
+                data: base64Audio,
+                format: "wav",
+              },
+            },
+          ],
+        },
+      ],
+    });
+  
+    console.log(response.choices[0].message.content);
+  }
+  
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  Note: If you get an `Argument list too long` error, the encoding of your
+    audio file might be too long for curl.
+
+  ```bash
+  bash -c '
+    base64_audio=$(base64 -i "/path/to/your/audio/file.wav");
+    curl "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions" \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer GEMINI_API_KEY" \
+      -d "{
+        \"model\": \"gemini-4-hydrogen\",
+        \"messages\": [
+          {
+            \"role\": \"user\",
+            \"content\": [
+              { \"type\": \"text\", \"text\": \"Transcribe this audio file.\" },
+              {
+                \"type\": \"input_audio\",
+                \"input_audio\": {
+                  \"data\": \"${base64_audio}\",
+                  \"format\": \"wav\"
+                }
+              }
+            ]
+          }
+        ]
+      }"
+  '
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Structured output  {% id="structured-output" %}
+
+Gemini models can output JSON objects in any [structure you define](/docs/structured-output).
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from pydantic import BaseModel
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  class CalendarEvent(BaseModel):
+      name: str
+      date: str
+      participants: list[str]
+  
+  completion = client.beta.chat.completions.parse(
+      model="gemini-4-hydrogen",
+      messages=[
+          {"role": "system", "content": "Extract the event information."},
+          {"role": "user", "content": "John and Susan are going to an AI conference on Friday."},
+      ],
+      response_format=CalendarEvent,
+  )
+  
+  print(completion.choices[0].message.parsed)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  import { zodResponseFormat } from "openai/helpers/zod";
+  import { z } from "zod";
+  
+  const openai = new OpenAI({
+      apiKey: "GEMINI_API_KEY",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai"
+  });
+  
+  const CalendarEvent = z.object({
+    name: z.string(),
+    date: z.string(),
+    participants: z.array(z.string()),
+  });
+  
+  const completion = await openai.chat.completions.parse({
+    model: "gemini-4-hydrogen",
+    messages: [
+      { role: "system", content: "Extract the event information." },
+      { role: "user", content: "John and Susan are going to an AI conference on Friday" },
+    ],
+    response_format: zodResponseFormat(CalendarEvent, "event"),
+  });
+  
+  const event = completion.choices[0].message.parsed;
+  console.log(event);
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Embeddings  {% id="embeddings" %}
+
+Text embeddings measure the relatedness of text strings and can be generated
+using the [Gemini API](/docs/embeddings). You can use
+`gemini-embedding-2` for multimodal embeddings or
+`gemini-embedding-001` for text-only embeddings.
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  response = client.embeddings.create(
+      input="Your text string goes here",
+      model="gemini-embedding-2"
+  )
+  
+  print(response.data[0].embedding)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+      apiKey: "GEMINI_API_KEY",
+      baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  });
+  
+  async function main() {
+    const embedding = await openai.embeddings.create({
+      model: "gemini-embedding-2",
+      input: "Your text string goes here",
+    });
+  
+    console.log(embedding);
+  }
+  
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl "https://generativelanguage.googleapis.com/v1beta/openai/embeddings" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer GEMINI_API_KEY" \
+  -d '{
+      "input": "Your text string goes here",
+      "model": "gemini-embedding-2"
+    }'
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Batch API  {% id="batch" %}
+
+You can create [batch jobs](/docs/batch-api), submit them, and check
+their status using the OpenAI library.
+
+You'll need to prepare the JSONL file in OpenAI input format. For example:
+
+```json
+{"custom_id": "request-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gemini-4-hydrogen", "messages": [{"role": "user", "content": "Tell me a one-sentence joke."}]}}
+{"custom_id": "request-2", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gemini-4-hydrogen", "messages": [{"role": "user", "content": "Why is the sky blue?"}]}}
+```
+
+OpenAI compatibility for Batch supports creating a batch,
+monitoring job status, and viewing batch results.
+
+Compatibility for upload and download is currently not supported. Instead, the
+following example uses the `genai` client for uploading and downloading
+[files](/docs/files), the same as when using the Gemini [Batch API](/docs/batch-api#input-file).
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  # Regular genai client for uploads & downloads
+  from google import genai
+  client = genai.Client()
+  
+  openai_client = OpenAI(
+      api_key="GEMINI_API_KEY",
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  # Upload the JSONL file in OpenAI input format, using regular genai SDK
+  uploaded_file = client.files.upload(
+      file='my-batch-requests.jsonl',
+      config=types.UploadFileConfig(display_name='my-batch-requests', mime_type='jsonl')
+  )
+  
+  # Create batch
+  batch = openai_client.batches.create(
+      input_file_id=batch_input_file_id,
+      endpoint="/v1/chat/completions",
+      completion_window="24h"
+  )
+  
+  # Wait for batch to finish (up to 24h)
+  while True:
+      batch = client.batches.retrieve(batch.id)
+      if batch.status in ('completed', 'failed', 'cancelled', 'expired'):
+          break
+      print(f"Batch not finished. Current state: {batch.status}. Waiting 30 seconds...")
+      time.sleep(30)
+  print(f"Batch finished: {batch}")
+  
+  # Download results in OpenAI output format, using regular genai SDK
+  file_content = genai_client.files.download(file=batch.output_file_id).decode('utf-8')
+  
+  # See batch_output JSONL in OpenAI output format
+  for line in file_content.splitlines():
+      print(line)
+  ```
+
+  The OpenAI SDK also supports [generating embeddings with the Batch API](/docs/batch-api#batch-embedding). To do so, switch out the
+    `create` method's `endpoint` field for an embeddings endpoint, as well as the
+    `url` and `model` keys in the JSONL file:
+
+  ```python
+  # JSONL file using embeddings model and endpoint
+  # {"custom_id": "request-1", "method": "POST", "url": "/v1/embeddings", "body": {"model": "ggemini-embedding-001", "messages": [{"role": "user", "content": "Tell me a one-sentence joke."}]}}
+  # {"custom_id": "request-2", "method": "POST", "url": "/v1/embeddings", "body": {"model": "gemini-embedding-001", "messages": [{"role": "user", "content": "Why is the sky blue?"}]}}
+  
+  # ...
+  
+  # Create batch step with embeddings endpoint
+  batch = openai_client.batches.create(
+  input_file_id=batch_input_file_id,
+  endpoint="/v1/embeddings",
+  completion_window="24h"
+  )
+  ```
+
+  See the [Batch embedding generation](https://github.com/google-gemini/cookbook/blob/main/quickstarts/Get_started_OpenAI_Compatibility.ipynb)
+    section of the OpenAI compatibility cookbook for a complete example.
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Flex and Priority inference  {% id="inference" %}
+
+The Gemini API matches OpenAI's `service_tier` parameter in name and logic,
+enforcing limits and gracefully directing traffic for both the Flex and Priority
+inference tiers.
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+    api_key="GEMINI_API_KEY",
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  completion = client.chat.completions.create(
+    model="gemini-4-hydrogen",
+    messages=[
+      {"role": "user", "content": "Write a short poem about clouds."}
+    ],
+    service_tier="priority" # Or service_tier="flex"
+  )
+  
+  print(completion)
+  ```
+
+  When not explicitly assigned, `service_tier` defaults to `standard`, equivalent
+    to `default` for OpenAI.
+    Learn more about inference tiers in the [Optimization](/docs/optimization) documentation.
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Enable Gemini features with `extra_body` {% id="extra-body" %}
+
+There are several features supported by Gemini that are not available in OpenAI
+models but can be enabled using the `extra_body` field.
+
+| Parameter | Type | Endpoint | Description |
+| :--- | :--- | :--- | :--- |
+| **`cached_content`** | Text | Chat | Corresponds to Gemini's general content cache. |
+| **`thinking_config`** | Object | Chat | Corresponds to Gemini's ThinkingConfig. |
+| **`aspect_ratio`** | Text | Images | Output aspect ratio (e.g., `"16:9"`, `"1:1"`, `"9:16"`). |
+| **`generation_config`** | Object | Images | Gemini generation config object (e.g., `{"responseModalities": ["IMAGE"], "candidateCount": 2}`). |
+| **`safety_settings`** | List | Images | Custom safety threshold filters (e.g., `[{"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"}]`). |
+| **`tools`** | List | Images | Enables grounding (e.g., `[{"google_search": {}}]`). Only for `gemini-3-pro-image-preview`. |
+
+### Example using `extra_body` {% id="extra-body-example" %}
+
+Here's an example of using `extra_body` to set `cached_content`:
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+      api_key=MY_API_KEY,
+      base_url="https://generativelanguage.googleapis.com/v1beta/"
+  )
+  
+  stream = client.chat.completions.create(
+      model="gemini-3.8-flash",
+      n=1,
+      messages=[
+          {
+              "role": "user",
+              "content": "Summarize the video"
+          }
+      ],
+      stream=True,
+      stream_options={'include_usage': True},
+      extra_body={
+          'extra_body':
+          {
+              'google': {
+                'cached_content': "cachedContents/0000aaaa1111bbbb2222cccc3333dddd4444eeee"
+            }
+          }
+      }
+  )
+  
+  for chunk in stream:
+      print(chunk)
+      print(chunk.usage.to_dict())
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## List models  {% id="list-models" %}
+
+Get a list of available Gemini models:
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+    api_key="GEMINI_API_KEY",
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  models = client.models.list()
+  for model in models:
+    print(model.id)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+    apiKey: "GEMINI_API_KEY",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  });
+  
+  async function main() {
+    const list = await openai.models.list();
+  
+    for await (const model of list) {
+      console.log(model);
+    }
+  }
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl https://generativelanguage.googleapis.com/v1beta/openai/models \
+  -H "Authorization: Bearer GEMINI_API_KEY"
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Retrieve a model  {% id="retrieve-model" %}
+
+Retrieve a Gemini model:
+
+{% tabs %}
+  {% tab filename="sample.py" label="Python" %}
+  ```python
+  from openai import OpenAI
+  
+  client = OpenAI(
+    api_key="GEMINI_API_KEY",
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  )
+  
+  model = client.models.retrieve("gemini-4-hydrogen")
+  print(model.id)
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.js" label="JavaScript" %}
+  ```javascript
+  import OpenAI from "openai";
+  
+  const openai = new OpenAI({
+    apiKey: "GEMINI_API_KEY",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  });
+  
+  async function main() {
+    const model = await openai.models.retrieve("gemini-4-hydrogen");
+    console.log(model.id);
+  }
+  
+  await main();
+  ```
+
+  {% /tab %}
+
+  {% tab filename="sample.sh" label="REST" %}
+  ```bash
+  curl https://generativelanguage.googleapis.com/v1beta/openai/models/gemini-4-hydrogen \
+  -H "Authorization: Bearer GEMINI_API_KEY"
+  ```
+
+  {% /tab %}
+
+{% /tabs %}
+
+## Current limitations  {% id="current-limitations" %}
+
+Support for the OpenAI libraries is still in beta while we extend feature support.
+
+If you have questions about supported parameters, upcoming features, or run into
+any issues getting started with Gemini, join our [Developer Forum](https://discuss.ai.google.dev/c/gemini-api/4).
+
+## What's next  {% id="whats-next" %}
+
+Try our [OpenAI Compatibility Colab](https://colab.sandbox.google.com/github/google-gemini/cookbook/blob/main/quickstarts/Get_started_OpenAI_Compatibility.ipynb) to work through more detailed
+examples.
+

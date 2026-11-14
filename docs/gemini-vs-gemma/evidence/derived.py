@@ -130,6 +130,30 @@ def main():
     p(f"  Hydrogen against Argon at today's prices: {now['hydrogen4'] / now['argon4'] - 1:+.0%}")
     p("")
 
+    p("== input tokens per GSM8K problem (same prompts)")
+    for slot, mid, *_ in MODELS:
+        g = data[(slot, "gsm8k")]
+        p(f"  {mid:22s} {tokens(g)['prompt_tokens'] / len(g):.1f}")
+    p("")
+
+    p("== answers cut at the token limit after thinking (finish length, thinking > 0): thinking shares the limit with the answer")
+    for t in TASKS:
+        for slot, mid, *_ in MODELS:
+            cut = [r for r in data[(slot, t)].values() if r.get("finish") == "length" and (r.get("reasoning_tokens") or 0) > 0]
+            if cut:
+                p(f"  {t:12s} {mid:22s} {len(cut)} cut, {sum(bool(r.get('right')) for r in cut)} right;"
+                  f" answer/thinking tokens {[(r['completion_tokens'], r['reasoning_tokens']) for r in cut]}")
+    p("")
+
+    p("== Gemma 4 31B on GSM8K: Gemini API against the RTX 3050 llama.cpp Q4 run")
+    loc = load("local-llamacpp-3050oem-31b-q4_0/benchmarks/runs/2026-10-19-accuracy-31b-3050oem/gsm8k-q4x.jsonl")
+    api = data[("31b", "gsm8k")]
+    ids = sorted(set(loc) & set(api))
+    ra, rl = [bool(api[i].get("right")) for i in ids], [bool(loc[i].get("right")) for i in ids]
+    p(f"  API right {sum(ra):,} of {len(ids):,}  local right {sum(rl):,} of {len(ids):,}"
+      f"  right on both {sum(x and y for x, y in zip(ra, rl)):,}  differ on {sum(x != y for x, y in zip(ra, rl))} problems")
+    p("")
+
     p("== each model against Gemma 4 31B, same problems (difference, 95% range, +right where 31B wrong / -)")
     for t in TASKS:
         ref = data[("31b", t)]
