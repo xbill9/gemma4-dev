@@ -26,7 +26,7 @@ Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-
 | Gemini 4 Carbon | 0.9803 | 0.9600 | $4.02 | $10.00 | 7.34 s |
 | Gemini 4 Argon | 🥇 0.9841 | 🥇 0.9675 | $3.46 | $10.00 | 7.63 s |
 
-Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill. On Hydrogen and 3.8 Flash it cannot be turned off: Hydrogen has the lowest Gemini 4 price, thought on every problem at its lowest setting, and cost the most. It is also the fastest Gemini 4 model, about 2.7 times quicker per problem than Argon. The times come from all seven sharing one connection at once. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *You Cannot Turn Off Thinking on Gemini 4 Hydrogen*.
+Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill. On Hydrogen and 3.8 Flash it cannot be turned off: Hydrogen has the lowest Gemini 4 price, thought on every problem at its lowest setting, and cost the most. It is also the fastest Gemini 4 model, about 2.7 times quicker per problem than Argon. The times come from all seven sharing one connection at once. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4*.
 
 ---
 

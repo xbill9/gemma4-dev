@@ -1,7 +1,7 @@
 ---
-title: "You Cannot Turn Off Thinking on Gemini 4 Hydrogen: Seven Models Against Gemma 4, Same Questions"
+title: "Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4: Scores, Cost, Speed and the Thinking You Pay For"
 published: false
-description: "Gemini 4 Hydrogen and 3.8 Flash think on every request whatever you set, and the thinking is billed as output. Seven models through one Gemini API endpoint, started together with identical settings, scored on GSM8K and BFCL: scores, cost and speed."
+description: "Seven models through one Gemini API endpoint, started together with identical settings: Gemma 4 26B and 31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and Gemini 4 Hydrogen, Carbon and Argon, scored on GSM8K and BFCL. Hydrogen has the lowest Gemini 4 price per token and cost the most per run, because its thinking cannot be turned off."
 tags: gemini, gemma, benchmark, ai
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-vs-gemma/devto-cover-baseline.f29f1bde.jpg
 ---
@@ -10,9 +10,9 @@ This article provides a step by step guide to comparing the new Gemini 4 models 
 
 https://github.com/xbill9/gemma4-dev/tree/main/gemini-api-google-hydrogen4
 
-The surprise: on Gemini 4 Hydrogen and Gemini 3.8 Flash, thinking cannot be turned off, and it eats the token budget. Every off setting the API offers still left Hydrogen thinking on all 1,319 GSM8K problems; thinking was 55% of its bill. Hydrogen has the lowest Gemini 4 price and cost the most.
-
 The scores: on 1,319 GSM8K math problems Argon scored 0.9841, Hydrogen and Carbon 0.9803, 3.8 Flash 0.9788, Gemma 4 26B 0.9742, Gemma 4 31B 0.9735 and 3.5 Flash-Lite 0.9629. On 400 BFCL function calls Argon and Gemma 4 31B tied at 0.9675. Gemma 4 ran free; the Gemini runs cost $0.92 to $5.02. Hydrogen answered fastest of the Gemini 4 models, 2.84 s per GSM8K problem against 7.63 s for Argon.
+
+The surprise is in the cost, and it takes the whole picture to see it. Hydrogen is the cheapest Gemini 4 model per token, $7.50 per million output tokens against $10 for Carbon and Argon, and it cost the most per run, $5.02 against $3.46 for Argon. Its thinking eats the token budget: it cannot be turned off, it ran on all 1,319 GSM8K problems, and it was 55% of the GSM8K bill. Price per token, tokens per answer and thinking per answer together set what a model costs.
 
 ---
 
@@ -71,7 +71,7 @@ The reply ends `Answer: 18`.
 
 ---
 
-#### Step 2 — Thinking Cannot Be Turned Off on Hydrogen or 3.8 Flash
+#### Step 2 — Thinking Settings, and the Two Models That Keep Thinking
 
 The OpenAI endpoint sets thinking with `reasoning_effort`. `levels.sh` sends the question to every model with each value:
 
@@ -257,13 +257,13 @@ Gemini 3.5 Flash-Lite is the cheapest paid model here, and it was behind Gemma 4
 
 The goal of this article was to compare the new Gemini 4 models with Gemma 4 on equal terms. The key to the solution was running all seven models through one Gemini API endpoint, started together, with the same questions, scoring script and settings, with thinking set as low as each model accepts. The results were:
 
-- ⚠️ Thinking cannot be turned off on Gemini 4 Hydrogen or 3.8 Flash: no level, budget or flag stops it, and it is billed as output.
 - 🟢 Gemini 4 Argon scored highest: 0.9841 on GSM8K and 0.9675 on BFCL simple, for $3.46.
 - 🟢 Gemma 4 31B tied Argon on BFCL at 0.9675 and scored 0.9735 on GSM8K, on the free tier.
 - 🟢 Hydrogen, Carbon and Argon were ahead of Gemma 4 31B on GSM8K; on BFCL all three were level with it.
 - 🟢 Gemma 4 26B was level with the 31B on both tests.
 - 🟢 Hydrogen was the fastest Gemini 4 model, 2.84 s per GSM8K problem against 7.34 s for Carbon and 7.63 s for Argon.
-- ⚠️ Hydrogen has the lowest Gemini 4 list price and cost the most, $5.02: thinking was 55% of its GSM8K bill.
+- ⚠️ Hydrogen has the lowest Gemini 4 price per token and cost the most per run, $5.02: thinking was 55% of its GSM8K bill.
+- ⚠️ Thinking cannot be turned off on Gemini 4 Hydrogen or 3.8 Flash: no level, budget or flag stops it, and it is billed as output.
 - ⚠️ Thinking tokens are missing from `completion_tokens` on the OpenAI-compatible endpoint.
 - ⚠️ Carbon and Argon have no free tier and double in price on 2026-12-01.
 - ❌ Gemini 3.5 Flash-Lite and 3.8 Flash were behind Gemma 4 31B on BFCL.
