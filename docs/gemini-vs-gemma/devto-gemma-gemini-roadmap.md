@@ -1,5 +1,5 @@
 ---
-title: "Local, Hosted, Cloud Run or Your Own Accelerator? A Roadmap for Gemma 4 and the New Gemini 4 Models"
+title: "Which Model Should You Use? Frontier, Hosted or Local? It Depends."
 published: false
 description: "Measured numbers for every way gemma4-dev runs a model: a desktop GPU, the Gemini API and AMD Token Lab, Cloud Run on an L4, and TPU, EC2 and MI300X machines. Then a roadmap for choosing between them by users, cost, speed, accuracy and ease of use."
 tags: gemma, gemini, googlecloud, ai
