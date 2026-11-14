@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Which Model Should You Use? Frontier, Hosted or Local? It Depends.</title>
+  <meta name="description" content="Measured numbers for every way gemma4-dev runs a model: a desktop GPU, the Gemini API and AMD Token Lab, Cloud Run on an L4, and TPU, EC2 and MI300X machines. Then a roadmap for choosing between them by users, cost, speed, accuracy and ease of use." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a roadmap for choosing where to run a model: on
+your own machine, through a hosted API, on Cloud Run, or on an
+accelerator you rent. Every figure comes from a measured run in
+gemma4-dev, which serves Gemma 4 on more than a hundred hardware and
+engine combinations and now carries five Gemini API models as sibling
+rigs.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-vs-gemma/medium/img/devto-cover-roadmap.0d4945c0.jpg" alt="Which Model Should You Use? Frontier, Hosted or Local? It Depends." /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></p>
+<hr />
+<h4 id="the-new-gemini-models-in-one-table">The New Gemini Models in One
+Table</h4>
+<p>Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to
+3.5 Flash-Lite, 3.8 Flash and Gemma 4. On 2026-11-14 all seven ran
+through the same Gemini API endpoint, started together, with the same
+GSM8K (1,319 math word problems) and BFCL simple (400 function calls)
+questions and scoring, with thinking set as low as each model
+accepts:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-vs-gemma/medium/img/devto-gemma-gemini-roadmap-table-1.png"
+alt="Table: Model, GSM8K, BFCL simple, Cost, both tasks, Output price, per 1M tokens, GSM8K median per request" /></p>
+<p>Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K, with
+the 95% range of the difference above zero, and level with it on BFCL.
+Output prices include thinking tokens, and thinking decides the bill. On
+Hydrogen and 3.8 Flash it cannot be turned off: Hydrogen has the lowest
+Gemini 4 price, thought on every problem at its lowest setting, and cost
+the most. It is also the fastest Gemini 4 model, about 2.7 times quicker
+per problem than Argon. The times come from all seven sharing one
+connection at once. Carbon and Argon double in price on 2026-12-01. The
+method is in the companion article, <em>Gemini 4 Hydrogen, Carbon and
+Argon Against Gemma 4</em>.</p>
+<hr />
+<h4 id="the-options">The Options</h4>
+<p>Four ways to run a model, each measured in this repo:</p>
+<ul>
+<li><strong>Local:</strong> a GPU or CPU you own. Measured on an RTX
+3050 OEM (8 GB desktop card), a GTX 1650 Ti (4 GB laptop card) and an
+Intel i7-10750H laptop CPU.</li>
+<li><strong>Hosted API:</strong> someone else's server, reached with a
+key. Measured on the Gemini API (the five Gemini models) and AMD Token
+Lab (Gemma 4 31B, free with the AMD AI Developer Program).</li>
+<li><strong>Cloud Run:</strong> Google's serverless containers with one
+NVIDIA L4, serving Gemma 4 E2B on vLLM.</li>
+<li><strong>Your own accelerator:</strong> a rented machine you start
+and stop. Measured on a TPU v5e (one chip and four), an EC2 G6 with one
+L4, and an AMD MI300X on DigitalOcean.</li>
+</ul>
+<hr />
+<h4 id="option-1--local">Option 1 — Local</h4>
+<p>The RTX 3050 serves Gemma 4 E2B on six engines. One request at a time
+without a drafter they run from 61.9 tok/s (LiteRT-LM) to 121.1 tok/s
+(vLLM); with Google's speculative-decoding drafter vLLM reaches 230.5
+tok/s. Under load, with 64 requests at once of 128 tokens in and 512
+out, SGLang delivers 1,711.3 tok/s in total and vLLM 1,651.2.</p>
+<p>The same card holds the larger models one request at a time: 12B at
+56.4 tok/s with its drafter, 26B A4B at 40.6 tok/s on code with its
+experts in system RAM, and 31B at 4.0 tok/s with two thirds of it on the
+CPU. Quality rises with size: GSM8K 0.9014 (E2B), 0.9629 (12B), 0.9735
+(31B).</p>
+<p>The 1650 Ti laptop card decodes E2B at 73.75 tok/s for one request
+and peaks at 164 tok/s through its server at 16 requests. The laptop CPU
+decodes 16.71 to 18.86 tok/s.</p>
+<p>Setup: llama.cpp is ready 4 s after start, vLLM 48 s. vLLM's first
+start compiles for about 3.5 minutes. The hardware is already paid for,
+and nothing is billed per hour.</p>
+<hr />
+<h4 id="option-2--hosted-api">Option 2 — Hosted API</h4>
+<p><strong>Gemini API.</strong> A key and an HTTP call. The Gemini
+models and Gemma 4 26B and 31B answer the OpenAI chat format at
+<code>/v1beta/openai/chat/completions</code>. Estimated from the token
+counts returned and list prices, a full 1,319-problem GSM8K run cost
+$0.87 on Flash-Lite, $1.66 on 3.8 Flash, $3.15 on Argon, $3.70 on Carbon
+and $4.51 on Hydrogen. Gemma 4 is on the free tier only, with paid use
+not available, and its free-tier rate limit answered three requests in
+the GSM8K and BFCL runs with HTTP 429 after every retry.</p>
+<p><strong>AMD Token Lab.</strong> Gemma 4 31B on an SGLang router on
+AMD GPUs, free with the AMD AI Developer Program: 10 points for 30 days,
+with Gemma 4 31B at 0.035 points per million input tokens and 0.07 per
+million output. One request at a time decoded at 2.0 to 7.6 tok/s on the
+shared service, with up to 5 s before the first token. The limit is 128
+requests at once across all users; over that, the reply is HTTP 429.</p>
+<hr />
+<h4 id="option-3--cloud-run">Option 3 — Cloud Run</h4>
+<p>One L4 GPU in us-east4 with 8 vCPU and 32 GiB, Gemma 4 E2B on vLLM.
+Output rose with concurrency to 188.46 tok/s at 4 requests and stayed
+there at 8 (189.53), because the service was deployed with
+<code>--concurrency=4</code>; more users means more instances. The same
+L4 on EC2 reached 360.17 tok/s at 8.</p>
+<p>At list price the instance costs $1.4209 an hour, which works out to
+$7.95 per million output tokens at one request and $2.08 at eight. Cloud
+Run scales to zero by default, so an idle service costs nothing and the
+next request waits for a cold GPU start; the startup check waits 180 s
+before its first look. The weights load from Cloud Storage.</p>
+<hr />
+<h4 id="option-4--your-own-accelerator">Option 4 — Your Own
+Accelerator</h4>
+<p><strong>TPU v5e, one chip.</strong> Gemma 4 E2B on vLLM: 143.9 tok/s
+for one request, 1,689.1 tok/s at 64 requests (128 in, 512 out), GSM8K
+0.9007 and BFCL 0.920. Flex-start costs $0.60 per chip-hour, about
+$0.089 per million output tokens at full batching and $1.31 at one
+request. Capacity came within two to five minutes in
+<code>us-west4-a</code>, and the engine took 12.6 to 14.1 minutes to
+start on most rigs, most of it compiling (27.2 on one).</p>
+<p><strong>TPU v5e, four chips.</strong> E2B as four one-chip engines
+reaches 7,788 tok/s at 64 requests and 14,189 at 256. The 12B fits with
+122,624 tokens of context cache, against 9,728 on one chip.</p>
+<p><strong>EC2 G6, one L4.</strong> vLLM at 132.8 to 140.4 tok/s for one
+request and 3,715.7 tok/s at 64; with the drafter, 4,516.3. A spot
+g6.2xlarge measured on an older vLLM cost $0.9412 an hour, $0.73 per
+million output tokens at eight requests.</p>
+<p><strong>AMD MI300X.</strong> 192 GB on one card: E2B at 340.4 tok/s
+for one request and 10,293.6 tok/s at 64 (128 tokens of context). $1.99
+an hour, billed while powered off too: $0.054 per million output tokens
+at 64 clients and $1.624 for a single stream.</p>
+<hr />
+<h4
+id="mag_right-tip-price-per-hour-becomes-price-per-token-only-under-load">🔎
+Tip: Price Per Hour Becomes Price Per Token Only Under Load</h4>
+<p>Every rented option above has two prices per million tokens, one at a
+single request and one at full batching: Cloud Run $7.95 and $2.08, TPU
+v5e $1.31 and $0.089, MI300X $1.624 and $0.054. A machine that serves
+one user at a time costs about what a hosted API charges, or more. A
+per-token API charges the same at any load.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-vs-gemma/medium/img/devto-gemma-gemini-roadmap-table-2.png"
+alt="Table: Local 3050, Gemini API, Token Lab, Cloud Run L4, TPU v5e-1, MI300X" /></p>
+<hr />
+<h4 id="the-roadmap">The Roadmap</h4>
+<p>Pick by the axis that matters most, then check the others.</p>
+<p><strong>By number of users.</strong></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-vs-gemma/medium/img/devto-gemma-gemini-roadmap-table-3.png"
+alt="Table: Users at once, Start with" /></p>
+<p><strong>By cost.</strong> Free first: your own card, Token Lab, and
+the Gemini free tier, which carries Gemma 4 26B and 31B, Flash-Lite, 3.8
+Flash and Hydrogen. For paid use with light or uneven traffic, pay per
+token: both tests cost $0.92 on Flash-Lite and $3.46 on Argon. Hydrogen
+thought on every request and 3.8 Flash on most; Google's docs say
+reasoning cannot be turned off on Gemini 3 or Gemini 4 models, and the
+API runs <code>none</code> as <code>low</code>. Compare models by cost
+per answer. From 2026-12-01, when Carbon and Argon go to $4 / $20, this
+run costs $6.93 on Argon and $5.02 on Hydrogen, by arithmetic from list
+prices. A rented machine wins only when it is kept busy, which brings
+TPU v5e to $0.089 and MI300X to $0.054 per million output tokens.</p>
+<p><strong>By speed.</strong> On a hosted API, Flash-Lite answered a
+GSM8K problem in 1.10 s and Hydrogen in 2.84 s; Gemma 4 on the Gemini
+API took 8 to 9 s. For one user, a local card with a drafter (230.5
+tok/s on the 3050) or an MI300X (340.4). For many users, the MI300X or
+four TPU v5e chips. Cloud Run as deployed here stops at 189.53 tok/s per
+instance.</p>
+<p><strong>By accuracy.</strong> Gemini 4 Argon leads GSM8K at 0.9841,
+and Argon and Gemma 4 31B lead BFCL at 0.9675, on short problems with
+thinking at its lowest setting. For hard, multi-step work Google calls
+Carbon "our strongest frontier model"; that case was not measured here.
+Where a model runs did not change its score: Gemma 4 31B answered 1,284
+of 1,319 GSM8K problems through the Gemini API and 1,284 on an RTX 3050
+with llama.cpp, differing on 8 problems. Model size matters more than
+where it runs: E2B scored 0.8954 to 0.9030 on GSM8K across six engines
+on the RTX 3050, the L4 and TPU v5e, and the 31B 0.9735.</p>
+<p><strong>By ease of use.</strong> A hosted API needs a key. A local
+card needs a driver and an engine, and llama.cpp is ready in seconds.
+Cloud Run needs a container and a deploy and then scales on its own. A
+rented accelerator needs capacity, a 12.6 to 14.1 minute engine start on
+TPU, and someone to turn it off.</p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>Start hosted with Gemma 4 31B on the Gemini free tier: it tied the
+best BFCL score and costs nothing. If the task needs the best math
+scores, move to Gemini 4 Argon. If the task needs Gemma 4 for its open
+weights, privacy or offline use, run it on your own card, 12B or 31B on
+8 GB. Move to Cloud Run when a few users need an always-reachable
+endpoint without managing a machine. Move to a TPU v5e or an MI300X when
+traffic is steady enough to keep it busy, because that is where the
+per-token cost falls below every API.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to map where each way of running a model
+fits. The key to the solution was a single repo that measures local
+cards, hosted APIs, Cloud Run and rented accelerators with the same
+engines, scoring script and questions. The results were:</p>
+<ul>
+<li>🟢 Gemini 4 Argon has the best GSM8K score measured, 0.9841; Argon
+and Gemma 4 31B lead BFCL at 0.9675.</li>
+<li>🟢 Gemma 4 31B scored the same 1,284 of 1,319 on GSM8K through the
+Gemini API and on an 8 GB RTX 3050.</li>
+<li>🟢 Gemma 4 31B is free on the Gemini API and tied Argon on BFCL;
+Argon cost $3.46 for both tests.</li>
+<li>🟢 A busy MI300X or TPU v5e serves Gemma 4 E2B at $0.054 and $0.089
+per million output tokens.</li>
+<li>🟢 AMD Token Lab and the Gemini free tier cost nothing to
+start.</li>
+<li>⚠️ A rented machine at one request costs $1.31 (TPU v5e) to $7.95
+(Cloud Run) per million output tokens.</li>
+<li>⚠️ Cloud Run as deployed caps one instance at 4 requests, 189.53
+tok/s.</li>
+<li>❌ Token Lab's shared endpoint decoded one request at 2.0 to 7.6
+tok/s.</li>
+</ul>
+<p>Scope: figures come from separate runs between 2026-09-03 and
+2026-11-14 in gemma4-dev, on different engine versions and days; each is
+quoted from its run's report, and ratios between runs on different
+hardware are indicative. Prices are list prices on the date each run
+recorded them. Accuracy was measured on GSM8K and BFCL simple only, and
+not on Cloud Run, Token Lab or the MI300X; the throughput figures are
+Gemma 4 E2B unless a size is named. Gemini API throughput under load was
+not measured.</p>
+<p>The strategy for choosing where to run Gemma 4 and Gemini was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-vs-gemma/evidence">Evidence
+for this article</a></li>
+<li><a href="https://aistudio.google.com/docs/pricing">Gemini API
+pricing</a></li>
+<li><a href="https://notebooks.amd.com/tokenlab">AMD Token Lab</a></li>
+<li><a
+href="https://cloud.google.com/run/docs/configuring/services/gpu">Cloud
+Run GPUs</a></li>
+<li><a href="https://cloud.google.com/tpu">Cloud TPU</a></li>
+<li><a href="https://github.com/vllm-project/vllm">vLLM</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></li>
+<li><a href="https://huggingface.co/collections/google/gemma-4">Gemma 4
+on Hugging Face</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
