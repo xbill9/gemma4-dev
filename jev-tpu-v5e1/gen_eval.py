@@ -26,6 +26,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
@@ -40,6 +41,15 @@ CACHE_PROMPT = os.environ.get("JEV_CACHE_PROMPT")
 # JEV_ENABLE_THINKING=0/1 sends chat_template_kwargs {"enable_thinking": ...} (unset: the server default).
 # mistral.rs v0.9.5 thinks by default on Gemma 4; llama.cpp, vLLM, PyTorch and LiteRT do not.
 ENABLE_THINKING = os.environ.get("JEV_ENABLE_THINKING")
+# Hosted OpenAI-compatible APIs (all unset: a local server at <upstream>/v1/chat/completions, no auth).
+# JEV_CHAT_URL replaces <upstream>/v1/chat/completions with a full URL; JEV_API_KEY_FILE sends its
+# contents as a Bearer token; JEV_REASONING_EFFORT sends "reasoning_effort"; JEV_RETRIES retries
+# HTTP 429/500/502/503/504 and network errors that many times, waiting 2, 4, 8 ... s (capped at 60).
+CHAT_URL = os.environ.get("JEV_CHAT_URL")
+API_KEY_FILE = os.environ.get("JEV_API_KEY_FILE")
+REASONING_EFFORT = os.environ.get("JEV_REASONING_EFFORT")
+RETRIES = int(os.environ.get("JEV_RETRIES", "0"))
+RETRY_CODES = {429, 500, 502, 503, 504}
 TYPES = {"dict": "object", "float": "number", "tuple": "array", "any": None}
 
 
@@ -182,11 +192,22 @@ def bfcl_check(calls, record):
 
 
 def post(upstream, body, timeout=900):
-    req = urllib.request.Request(
-        upstream.rstrip("/") + "/v1/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.load(r)
+    url = CHAT_URL or upstream.rstrip("/") + "/v1/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if API_KEY_FILE:
+        headers["Authorization"] = "Bearer " + open(os.path.expanduser(API_KEY_FILE)).read().strip()
+    data = json.dumps(body).encode()
+    for attempt in range(RETRIES + 1):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, data, headers), timeout=timeout) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code not in RETRY_CODES or attempt == RETRIES:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == RETRIES:
+                raise
+        time.sleep(min(60, 2 ** (attempt + 1)))
 
 
 def one(upstream, model, task, rec):
@@ -209,6 +230,8 @@ def one(upstream, model, task, rec):
         }
     if CACHE_PROMPT is not None:
         body["cache_prompt"] = CACHE_PROMPT != "0"
+    if REASONING_EFFORT:
+        body["reasoning_effort"] = REASONING_EFFORT
     if ENABLE_THINKING is not None:
         body["chat_template_kwargs"] = {"enable_thinking": ENABLE_THINKING != "0"}
     out = {"id": rec["id"], "task": task, "max_tokens": body["max_tokens"]}
@@ -224,6 +247,14 @@ def one(upstream, model, task, rec):
         completion_tokens=r["usage"]["completion_tokens"],
         seconds=round(time.time() - t0, 2),
     )
+    u = r["usage"]
+    if "prompt_tokens" in u:
+        out["prompt_tokens"] = u["prompt_tokens"]
+    # Gemini's OpenAI-compatible endpoint leaves thinking out of completion_tokens and counts it only
+    # in total_tokens; record the difference so token and cost columns include it.
+    hidden = u.get("total_tokens", 0) - u.get("prompt_tokens", 0) - u["completion_tokens"]
+    if "total_tokens" in u and hidden > 0:
+        out["reasoning_tokens"] = hidden
     if task == "gsm8k":
         out["answer"] = rec["answer"]
         out["extracted"] = gsm8k_extract(msg.get("content"))

@@ -65,8 +65,9 @@ not which cloud it sits in.
 | `cloudrun` | A general-purpose GPU attached to cloudrun |  Cloud Run |
 | `local` | A machine you physically own and are sitting at — no API to call, nothing to create, nothing to release | nothing; the hardware is already there |
 | `tokenlab` | AMD Token Lab (`api.tokenlab.amd.com`), a hosted OpenAI-compatible API: someone else's server, reached with an API key. Nothing to create or release, and the GPU behind it is not disclosed | nothing; a key from `notebooks.amd.com/tokenlab` (30-day access period, points budget) |
+| `gemini` | The Gemini API (`generativelanguage.googleapis.com`), Google's hosted API for its closed Gemini models, reached with an API key through its OpenAI-compatible endpoint (`/v1beta/openai/chat/completions`). Nothing to create or release; neither the serving stack nor the hardware is disclosed | nothing; a key from Google AI Studio |
 
-These seven are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
+These eight are the permitted values. Cloud provider is deliberately not a slot; it's implied by the hardware
 slot or recorded in the rig's `tpu.env`. Add a platform value only for a genuinely different execution target.
 
 **`tpu`, `gce` and `gke` can name the same silicon, and that is the point.** `tpu-vllm-v6e1-2b`,
@@ -191,6 +192,7 @@ The serving stack that actually loads the weights.
 | `mistralrs` | `mistralrs serve` from `EricLBuehler/mistral.rs`: a Rust engine (Candle kernels) with its own GGUF and safetensors loaders, paged attention and batching |
 | `sglang` | SGLang (`pip install sglang`), OpenAI-compatible server over its own scheduler and radix cache |
 | `sglangjax` | SGLang-JAX (`sgl-project/sglang-jax`, package `sglang-jax`): SGLang's scheduler and radix cache over a JAX/Flax model and Pallas kernels, for TPU |
+| `api` | **Undisclosed**: a hosted API that reports no serving stack, so the layer you file a bug against is the API itself. Added 2026-11-13 for the `gemini-api-google-*` rigs. A hosted API that names its stack takes that stack (`tokenlab-sglang-amd-31b`) |
 
 `vllm` names the server, not the backend it compiles to — vLLM on TPU is `vllm`, never `pytorch`, even though
 `torch_xla` sits underneath. Pick the layer you'd file a bug against.
@@ -284,7 +286,8 @@ For `gce` use `cpu`.
 
 **A hosted API that does not name its hardware takes the vendor, `amd`** (added 2026-11-13 for
 `tokenlab-sglang-amd-31b`). Token Lab says only "served on AMD Instinct and Radeon", so a part name
-would be a guess and slot 3 records what is known. If Token Lab later names the part, rename.
+would be a guess and slot 3 records what is known. If Token Lab later names the part, rename. The `gemini-api-google-*` rigs (added 2026-11-13) take `google` under the same rule: the
+Gemini API names no part.
 
 **A `local` rig with no accelerator names its CPU part** (added 2026-09-29), the way a local GPU
 rig names its card: `i71360p`, lowercase, the vendor's model number with its punctuation and
@@ -337,6 +340,7 @@ Gemma 4 parameter size, lowercase `b`. Verified mappings from rigs that exist to
 | `26b` | `gemma-4-26B-A4B-it-qat-q4_0-unquantized` (`~/jax-dev/tpu-jax-v6e1-26b-q4_0`) |
 | `31b` | `google/gemma-4-31B-it-qat-w4a16-ct` (`~/jax-dev/tpu-jax-v6e1-31b-w4a16`) |
 | `embed2` | `google/embeddinggemma-2` — **not a Gemma 4 size**: EmbeddingGemma 2 (740M, multimodal embedding model built on the Gemma 4 architecture, released 2026-10-06). Added 2026-10-09 for `gpu-vllm-mi300x-embed2`; the family name stands in for a size because a size alone would collide with the generators. A later embedding release takes its own number (`embed3`) |
+| `flashlite35`, `flash38`, `hydrogen4`, `carbon4`, `argon4` | `gemini-3.5-flash-lite`, `gemini-3.8-flash`, `gemini-4-hydrogen`, `gemini-4-carbon`, `gemini-4-argon` — **not Gemma**: closed Gemini models behind the Gemini API, added 2026-11-13 so they can sit beside the Gemma rigs as comparison siblings. Family plus version, the `embed2` form, because no parameter count is published. Only valid with slot 1 `gemini` |
 
 Use **`2b`**, not `e2b` — every existing directory does, even though the checkpoint is `E2B` and the
 benchmark-artifact slug is `gemma4-e2b`. (`~/gemma4-dev/tpu-pytorch-v5e1-12b/CLAUDE.md` lists `e2b` as a size
@@ -549,6 +553,11 @@ Three things that trip people up:
 | `~/gemma4-dev/gpu-vllm-mi300x-31b-q4w4a16` | DigitalOcean GPU droplet (via AMD Developer Cloud) | vLLM in Docker | mi300x | `xbill9/gemma-4-31B-it-qat-q4_0-w4a16-ct-text` | `q4w4a16` — added 2026-10-02 |
 | `~/gemma4-dev/gpu-vllm-mi300x-31b` | DigitalOcean GPU droplet (via AMD Developer Cloud) | vLLM in Docker | mi300x | `gemma-4-31B-it` | — — added 2026-10-02. Bare four slots: reference bf16 weights, served text-only, which is a runtime setting (`LIMIT_MM_PER_PROMPT`) and so not an encoding |
 | `~/gemma4-dev/tokenlab-sglang-amd-31b` | **AMD Token Lab** (hosted API, slot 1 `tokenlab`) | SGLang router, read from the model's `/v1/models` description and the `matched_stop` field in its replies | `amd` — not disclosed ("AMD Instinct and Radeon") | `Gemma-4-31B-IT` | — — added 2026-11-13, **the first rig on someone else's server**. Asked for as a vLLM rig; slot 2 is `sglang` because that is what the endpoint reports. No MCP server and nothing to provision: `tpu.env`, the key in `.env`, `chat_ui.py` (the v5e-1 vLLM chat page with the key held in the local proxy) and `ask.py`. **Not an A/B twin of `gpu-vllm-mi300x-31b`**: different runtime, undisclosed hardware, shared with every other Token Lab user (a per-model limit of 128 requests at once), so its timings include other people's load |
+| `~/gemma4-dev/gemini-api-google-flashlite35` | **Gemini API** (hosted, slot 1 `gemini`) | not disclosed (slot 2 `api`) | not disclosed (slot 3 `google`) | `gemini-3.5-flash-lite` | — — added 2026-11-13, a closed Gemini model as a comparison sibling for the Gemma rigs. No MCP server, nothing to provision: `tpu.env` and the key in `~/gemini.key`. Shares a key and quota with the other four `gemini-api-google-*` rigs |
+| `~/gemma4-dev/gemini-api-google-flash38` | **Gemini API** (hosted, slot 1 `gemini`) | not disclosed (slot 2 `api`) | not disclosed (slot 3 `google`) | `gemini-3.8-flash` | — — added 2026-11-13, a closed Gemini model as a comparison sibling for the Gemma rigs. No MCP server, nothing to provision: `tpu.env` and the key in `~/gemini.key`. Shares a key and quota with the other four `gemini-api-google-*` rigs |
+| `~/gemma4-dev/gemini-api-google-hydrogen4` | **Gemini API** (hosted, slot 1 `gemini`) | not disclosed (slot 2 `api`) | not disclosed (slot 3 `google`) | `gemini-4-hydrogen` | — — added 2026-11-13, a closed Gemini model as a comparison sibling for the Gemma rigs. No MCP server, nothing to provision: `tpu.env` and the key in `~/gemini.key`. Shares a key and quota with the other four `gemini-api-google-*` rigs |
+| `~/gemma4-dev/gemini-api-google-carbon4` | **Gemini API** (hosted, slot 1 `gemini`) | not disclosed (slot 2 `api`) | not disclosed (slot 3 `google`) | `gemini-4-carbon` | — — added 2026-11-13, a closed Gemini model as a comparison sibling for the Gemma rigs. No MCP server, nothing to provision: `tpu.env` and the key in `~/gemini.key`. Shares a key and quota with the other four `gemini-api-google-*` rigs |
+| `~/gemma4-dev/gemini-api-google-argon4` | **Gemini API** (hosted, slot 1 `gemini`) | not disclosed (slot 2 `api`) | not disclosed (slot 3 `google`) | `gemini-4-argon` | — — added 2026-11-13, a closed Gemini model as a comparison sibling for the Gemma rigs. No MCP server, nothing to provision: `tpu.env` and the key in `~/gemini.key`. Shares a key and quota with the other four `gemini-api-google-*` rigs |
 | `~/gemma4-dev/tpu-jax-inf2-2b` | Inferentia (slot `tpu`) | pure JAX (`jax-neuronx`) | inf2 | `gemma-4-E2B-it` | — — added 2026-08-28. Slot 3 is unaffected by the EC2 rule: `inf2` is both the part name and the instance family, so both readings agree |
 | `~/gemma4-dev/tpu-pytorch-trn1-2b` | Trainium (slot `tpu`) | PyTorch (`torch_neuronx`-traced image) | trn1 | `gemma-4-E2B-it` | — — added 2026-10-05, forked from `tpu-pytorch-inf2-2b`, **the first `trn1` value in slot 3**, which this file reserved for it ("Later parts take `inf3`, `trn1`"). Slot 1 stays `tpu` under the Inferentia rule: Neuron is the control plane for both parts. **Slot 3 is the only slot that differs from `tpu-pytorch-inf2-2b`**, and the pair serves the same image: the inf2-compiled `xbill9/gemma4-optb:slim` loads and serves on trn1 unchanged, because both chips carry two NeuronCore-v2 cores and 32 GiB. `trn1` is both the part and the instance family, so the EC2 rule and the part rule agree, as for `inf2` |
 | `~/gemma4-dev/tpu-pytorch-trn1-2b-fp8` | Trainium (slot `tpu`) | PyTorch (`torch_neuronx`, native engine by hand) | trn1 | `xbill9/gemma-4-E2B-it-qat-q4_0-fp8-text` | `fp8` — added 2026-10-05, forked from `tpu-pytorch-trn1-2b` with the engine payload of `tpu-pytorch-inf2-2b-fp8`. **Slot 5 is the only slot that differs from `tpu-pytorch-trn1-2b`, and slot 3 the only one that differs from `tpu-pytorch-inf2-2b-fp8`.** No tool deploys the checkpoint: the tools launch the dense E2B image, and the checkpoint runs through `torch_generate.py` by hand. Nothing measured |
