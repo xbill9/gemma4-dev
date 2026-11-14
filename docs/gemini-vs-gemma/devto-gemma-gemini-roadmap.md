@@ -16,17 +16,17 @@ https://github.com/xbill9/gemma4-dev
 
 Gemini 4 Hydrogen, Carbon and Argon arrived on the Gemini API next to 3.5 Flash-Lite, 3.8 Flash and Gemma 4. On 2026-11-14 all seven ran through the same Gemini API endpoint, started together, with the same GSM8K (1,319 math word problems) and BFCL simple (400 function calls) questions and scoring, each at the lowest thinking level it accepts:
 
-| Model | GSM8K | BFCL simple | Cost, both tasks | Output price, per 1M tokens |
-| :--- | ---: | ---: | ---: | ---: |
-| Gemma 4 31B | 0.9735 | 🥇 0.9675 | 🥇 free tier | free tier only |
-| Gemma 4 26B | 0.9742 | 0.9575 | 🥇 free tier | free tier only |
-| Gemini 3.5 Flash-Lite | 0.9629 | 0.9350 | $0.92 | $2.50 |
-| Gemini 3.8 Flash | 0.9788 | 0.9400 | $1.81 | $3.75 |
-| Gemini 4 Hydrogen | 0.9803 | 0.9550 | $5.02 | $7.50 |
-| Gemini 4 Carbon | 0.9803 | 0.9600 | $4.02 | $10.00 |
-| Gemini 4 Argon | 🥇 0.9841 | 🥇 0.9675 | $3.46 | $10.00 |
+| Model | GSM8K | BFCL simple | Cost, both tasks | Output price, per 1M tokens | GSM8K median per request |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Gemma 4 31B | 0.9735 | 🥇 0.9675 | 🥇 free tier | free tier only | 8.96 s |
+| Gemma 4 26B | 0.9742 | 0.9575 | 🥇 free tier | free tier only | 8.16 s |
+| Gemini 3.5 Flash-Lite | 0.9629 | 0.9350 | $0.92 | $2.50 | 🥇 1.10 s |
+| Gemini 3.8 Flash | 0.9788 | 0.9400 | $1.81 | $3.75 | 3.79 s |
+| Gemini 4 Hydrogen | 0.9803 | 0.9550 | $5.02 | $7.50 | 🥈 2.84 s |
+| Gemini 4 Carbon | 0.9803 | 0.9600 | $4.02 | $10.00 | 7.34 s |
+| Gemini 4 Argon | 🥇 0.9841 | 🥇 0.9675 | $3.46 | $10.00 | 7.63 s |
 
-Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill: Hydrogen has the lowest Gemini 4 price but thinks on every problem, so it cost the most. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4*.
+Hydrogen, Carbon and Argon are ahead of Gemma 4 31B on GSM8K by more than the run-to-run noise and level with it on BFCL. Output prices include thinking tokens, and thinking decides the bill: Hydrogen has the lowest Gemini 4 price but thinks on every problem, so it cost the most. It is also the fastest Gemini 4 model, about 2.7 times quicker per problem than Argon. The times come from all seven sharing one connection at once. Carbon and Argon double in price on 2026-12-01. The method is in the companion article, *Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4*.
 
 ---
 
@@ -115,7 +115,7 @@ Pick by the axis that matters most, then check the others.
 
 **By cost.** Free first: your own card, Token Lab, and the Gemini free tier, which carries Gemma 4 26B and 31B, Flash-Lite, 3.8 Flash and Hydrogen. For paid use with light or uneven traffic, pay per token: both tests cost $0.92 on Flash-Lite and $3.46 on Argon. A rented machine wins only when it is kept busy, which brings TPU v5e to $0.089 and MI300X to $0.054 per million output tokens.
 
-**By speed.** For one user, a local card with a drafter (230.5 tok/s on the 3050) or an MI300X (340.4). For many users, the MI300X or four TPU v5e chips. Cloud Run as deployed here stops at 189.53 tok/s per instance.
+**By speed.** On a hosted API, Flash-Lite answered a GSM8K problem in 1.10 s and Hydrogen in 2.84 s; Gemma 4 on the Gemini API took 8 to 9 s. For one user, a local card with a drafter (230.5 tok/s on the 3050) or an MI300X (340.4). For many users, the MI300X or four TPU v5e chips. Cloud Run as deployed here stops at 189.53 tok/s per instance.
 
 **By accuracy.** Gemini 4 Argon leads GSM8K at 0.9841, and Argon and Gemma 4 31B lead BFCL at 0.9675. Where a model runs did not change its score: Gemma 4 31B answered 1,284 of 1,319 GSM8K problems through the Gemini API and the same 1,284 on an RTX 3050 with llama.cpp. Model size matters more than where it runs: E2B scored 0.8954 to 0.9030 on GSM8K across six engines on the RTX 3050, the L4 and TPU v5e, and the 31B 0.9735.
 

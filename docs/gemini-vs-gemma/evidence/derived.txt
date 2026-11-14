@@ -24,6 +24,24 @@
   bfcl_simple  gemini-4-carbon        errors 0  cut 0  in 77,441  answer 15,810  thinking 0  problems with thinking 0 of 400  cost $0.31  thinking share 0%
   bfcl_simple  gemini-4-argon         errors 0  cut 0  in 77,441  answer 15,643  thinking 0  problems with thinking 0 of 400  cost $0.31  thinking share 0%
 
+== speed: seconds per request (median, 90th percentile), whole task, output+thinking tokens per second per request (median)
+   all seven ran at once, 8 requests at a time each, over one connection; rows re-sent after errors are left out
+  gsm8k        gemma-4-31b-it         median 8.96 s  90th 23.93 s  whole task 2,044.1 s  32.3 tok/s  (1,319 requests)
+  gsm8k        gemma-4-26b-a4b-it     median 8.16 s  90th 25.80 s  whole task 2,022.8 s  41.6 tok/s  (1,318 requests)
+  gsm8k        gemini-3.5-flash-lite  median 1.10 s  90th 1.54 s  whole task 195.8 s  214.6 tok/s  (1,319 requests)
+  gsm8k        gemini-3.8-flash       median 3.79 s  90th 5.43 s  whole task 684.9 s  76.8 tok/s  (1,319 requests)
+  gsm8k        gemini-4-hydrogen      median 2.84 s  90th 5.39 s  whole task 620.8 s  147.8 tok/s  (1,319 requests)
+  gsm8k        gemini-4-carbon        median 7.34 s  90th 20.04 s  whole task 1,803.7 s  29.7 tok/s  (1,319 requests)
+  gsm8k        gemini-4-argon         median 7.63 s  90th 17.57 s  whole task 1,759.2 s  26.1 tok/s  (1,319 requests)
+
+  bfcl_simple  gemma-4-31b-it         median 1.69 s  90th 32.20 s  whole task 646.0 s  18.6 tok/s  (398 requests)
+  bfcl_simple  gemma-4-26b-a4b-it     median 1.23 s  90th 63.60 s  whole task 629.5 s  26.6 tok/s  (400 requests)
+  bfcl_simple  gemini-3.5-flash-lite  median 0.61 s  90th 0.99 s  whole task 34.1 s  50.0 tok/s  (400 requests)
+  bfcl_simple  gemini-3.8-flash       median 1.93 s  90th 2.87 s  whole task 104.0 s  21.3 tok/s  (400 requests)
+  bfcl_simple  gemini-4-hydrogen      median 1.95 s  90th 5.85 s  whole task 170.7 s  61.3 tok/s  (400 requests)
+  bfcl_simple  gemini-4-carbon        median 5.29 s  90th 17.10 s  whole task 431.4 s  7.2 tok/s  (400 requests)
+  bfcl_simple  gemini-4-argon         median 6.32 s  90th 13.07 s  whole task 454.8 s  6.0 tok/s  (400 requests)
+
 == each model against Gemma 4 31B, same problems (difference, 95% range, +right where 31B wrong / -)
   gsm8k        gemma-4-26b-a4b-it     +0.0008 [-0.0061, +0.0076] level  +10 / -9 of 1,319
   gsm8k        gemini-3.5-flash-lite  -0.0106 [-0.0174, -0.0030] behind +6 / -20 of 1,319

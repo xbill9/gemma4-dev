@@ -10,6 +10,7 @@ Gemma 4 is free-tier only. Writes derived.txt beside this file.
 import json
 import os
 import random
+import statistics
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
@@ -51,6 +52,18 @@ def cost(tk, pin, pout):
     return (tk["prompt_tokens"] * pin + (tk["completion_tokens"] + tk["reasoning_tokens"]) * pout) / 1e6
 
 
+def pct(v, q):
+    v = sorted(v)
+    return v[min(len(v) - 1, int(q * len(v)))]
+
+
+def wall(rel):
+    try:
+        return json.loads(open(os.path.join(ROOT, rel)).read().strip().splitlines()[-1])["wall_s"]
+    except (OSError, ValueError, KeyError, IndexError):
+        return None
+
+
 def main():
     out = []
     p = out.append
@@ -88,6 +101,20 @@ def main():
               f"  in {tk['prompt_tokens']:,}  answer {tk['completion_tokens']:,}  thinking {tk['reasoning_tokens']:,}"
               f"  problems with thinking {sum((r.get('reasoning_tokens') or 0) > 0 for r in rows.values())} of {len(rows):,}"
               f"  cost {'free tier' if c is None else f'${c:.2f}'}{share}")
+        p("")
+
+    p("== speed: seconds per request (median, 90th percentile), whole task, output+thinking tokens per second per request (median)")
+    p("   all seven ran at once, 8 requests at a time each, over one connection; rows re-sent after errors are left out")
+    for t in TASKS:
+        for slot, mid, *_ in MODELS:
+            rows = [r for r in data[(slot, t)].values() if "error" not in r and "resent_after" not in r and r.get("seconds")]
+            if not rows:
+                continue
+            sec = [r["seconds"] for r in rows]
+            tps = [((r.get("completion_tokens") or 0) + (r.get("reasoning_tokens") or 0)) / r["seconds"] for r in rows]
+            w = wall(f"gemini-api-google-{slot}/{RUN}/{t}.log")
+            p(f"  {t:12s} {mid:22s} median {statistics.median(sec):.2f} s  90th {pct(sec, 0.9):.2f} s"
+              f"  whole task {w:,} s  {statistics.median(tps):.1f} tok/s  ({len(rows):,} requests)")
         p("")
 
     p("== each model against Gemma 4 31B, same problems (difference, 95% range, +right where 31B wrong / -)")

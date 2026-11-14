@@ -1,7 +1,7 @@
 ---
 title: "Gemini 4 Hydrogen, Carbon and Argon Against Gemma 4: Same Endpoint, Same Questions"
 published: false
-description: "Seven models through one Gemini API endpoint, started together with identical settings: Gemma 4 26B and 31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and the new Gemini 4 Hydrogen, Carbon and Argon, scored on GSM8K and BFCL. One table, and what each run cost."
+description: "Seven models through one Gemini API endpoint, started together with identical settings: Gemma 4 26B and 31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and the new Gemini 4 Hydrogen, Carbon and Argon, scored on GSM8K and BFCL. One table, what each run cost, and how fast each answered."
 tags: gemini, gemma, benchmark, ai
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-vs-gemma/devto-cover-baseline.f29f1bde.jpg
 ---
@@ -10,7 +10,7 @@ This article provides a step by step guide to comparing the new Gemini 4 models 
 
 https://github.com/xbill9/gemma4-dev/tree/main/gemini-api-google-hydrogen4
 
-The result in one line: on 1,319 GSM8K math problems Argon scored 0.9841, Hydrogen and Carbon 0.9803, 3.8 Flash 0.9788, Gemma 4 26B 0.9742, Gemma 4 31B 0.9735 and 3.5 Flash-Lite 0.9629. On 400 BFCL function calls Argon and Gemma 4 31B tied at 0.9675. Gemma 4 ran free; the Gemini runs cost $0.92 to $5.02.
+The result in one line: on 1,319 GSM8K math problems Argon scored 0.9841, Hydrogen and Carbon 0.9803, 3.8 Flash 0.9788, Gemma 4 26B 0.9742, Gemma 4 31B 0.9735 and 3.5 Flash-Lite 0.9629. On 400 BFCL function calls Argon and Gemma 4 31B tied at 0.9675. Gemma 4 ran free; the Gemini runs cost $0.92 to $5.02. Hydrogen answered fastest of the Gemini 4 models, 2.84 s per GSM8K problem against 7.63 s for Argon.
 
 ---
 
@@ -199,6 +199,24 @@ The Gemini 4 models also count more input tokens for the same text: the GSM8K pr
 
 ---
 
+#### Step 8 — Speed
+
+Each reply records how long its request took. All seven models ran at once, eight requests at a time each, over the same connection, so the times are comparable with each other on that morning:
+
+| Model | GSM8K median | GSM8K 90th percentile | Whole GSM8K run | BFCL median |
+| :--- | ---: | ---: | ---: | ---: |
+| Gemma 4 31B | 8.96 s | 23.93 s | 2,044.1 s | 1.69 s |
+| Gemma 4 26B | 8.16 s | 25.80 s | 2,022.8 s | 1.23 s |
+| Gemini 3.5 Flash-Lite | 🥇 1.10 s | 🥇 1.54 s | 🥇 195.8 s | 🥇 0.61 s |
+| Gemini 3.8 Flash | 3.79 s | 5.43 s | 684.9 s | 1.93 s |
+| Gemini 4 Hydrogen | 🥈 2.84 s | 🥈 5.39 s | 🥈 620.8 s | 1.95 s |
+| Gemini 4 Carbon | 7.34 s | 20.04 s | 1,803.7 s | 5.29 s |
+| Gemini 4 Argon | 7.63 s | 17.57 s | 1,759.2 s | 6.32 s |
+
+Hydrogen writes about 147.8 tokens per second per request, thinking included, against 26.1 for Argon and 29.7 for Carbon. It finished GSM8K in about a third of Argon's time while thinking on every problem. Flash-Lite was the fastest model overall.
+
+---
+
 #### Compare and Contrast
 
 | | Gemma 4 31B | 3.5 Flash-Lite | 3.8 Flash | Hydrogen | Carbon | Argon |
@@ -207,6 +225,7 @@ The Gemini 4 models also count more input tokens for the same text: the GSM8K pr
 | BFCL against Gemma 4 31B | 🥇 | behind | behind | level | level | 🥇 level |
 | Thinking at lowest level | none | none | most problems | every problem | some problems | rare |
 | Cost, both tasks | 🥇 free tier | $0.92 | $1.81 | $5.02 | $4.02 | $3.46 |
+| GSM8K median per request | 8.96 s | 🥇 1.10 s | 3.79 s | 🥈 2.84 s | 7.34 s | 7.63 s |
 | Weights you can download | 🥇 yes | no | no | no | no | no |
 
 ---
@@ -214,6 +233,8 @@ The Gemini 4 models also count more input tokens for the same text: the GSM8K pr
 #### So, Which One?
 
 For the best scores, Gemini 4 Argon: highest on GSM8K, tied for highest on BFCL, and the cheapest of the three Gemini 4 models per run because it rarely thinks. Its price doubles on 2026-12-01.
+
+For speed among the Gemini 4 models, Hydrogen: 2.84 s per GSM8K problem, level with Carbon and Argon on BFCL and ahead of Gemma 4 31B on GSM8K, at the highest cost per run.
 
 For tool calling at no cost, Gemma 4 31B: tied with Argon on BFCL, 0.0106 behind it on GSM8K, free on the Gemini API, and the same weights run on your own hardware.
 
@@ -229,12 +250,13 @@ The goal of this article was to compare the new Gemini 4 models with Gemma 4 on 
 - 🟢 Gemma 4 31B tied Argon on BFCL at 0.9675 and scored 0.9735 on GSM8K, on the free tier.
 - 🟢 Hydrogen, Carbon and Argon were ahead of Gemma 4 31B on GSM8K; on BFCL all three were level with it.
 - 🟢 Gemma 4 26B was level with the 31B on both tests.
+- 🟢 Hydrogen was the fastest Gemini 4 model, 2.84 s per GSM8K problem against 7.34 s for Carbon and 7.63 s for Argon.
 - ⚠️ Hydrogen has the lowest Gemini 4 list price and cost the most, $5.02, because it thinks on every problem and a thinking budget of 0 leaves it thinking.
 - ⚠️ Thinking tokens are missing from `completion_tokens` on the OpenAI-compatible endpoint.
 - ⚠️ Carbon and Argon have no free tier and double in price on 2026-12-01.
 - ❌ Gemini 3.5 Flash-Lite and 3.8 Flash were behind Gemma 4 31B on BFCL.
 
-Scope: one laptop in the US calling the Gemini API on 2026-11-14, one run per model, all seven started together. Thinking was the lowest level each model accepts: zero thinking for five models, some for Hydrogen and 3.8 Flash. Three Gemma 4 requests that hit the free tier's rate limit were sent again with the same settings. Costs are token counts times list prices. Run times are left out because the models shared an API and one connection. Google does not say what hardware or engine serves any of these models.
+Scope: one laptop in the US calling the Gemini API on 2026-11-14, one run per model, all seven started together. Thinking was the lowest level each model accepts: zero thinking for five models, some for Hydrogen and 3.8 Flash. Three Gemma 4 requests that hit the free tier's rate limit were sent again with the same settings. Costs are token counts times list prices. Run times are from one run with all seven sharing one connection, and will move with load on the service. Google does not say what hardware or engine serves any of these models.
 
 The strategy for comparing Gemini and Gemma 4 on equal terms was validated with an incremental step by step approach.
 
