@@ -158,7 +158,7 @@ Hydrogen at `none` still thought on these problems, 2,468 tokens per problem on 
 
 #### Step 7 — Is the Difference Bigger Than the Noise?
 
-The audit follows the research-kit `ablation-stat-auditor` skill: an exact paired test on the same problems for the scores, a signed-rank test on each problem's output tokens, and 95% Wilson intervals, all computed in `audit_stats.py`.
+The audit follows the `ablation-stat-auditor` skill from research-kit, a Claude Code plugin for checking research statistics: an exact paired test on the same problems for the scores, a signed-rank test on each problem's output tokens, and 95% Wilson intervals, all computed in `audit_stats.py`.
 
 | Model | Right, highest [95% range] | Right, lowest [95% range] | Paired test on scores | Output tokens, highest / lowest |
 | :--- | :--- | :--- | :--- | :--- |
@@ -262,7 +262,6 @@ The strategy for measuring high against low thinking on a fixed budget was valid
 - [The scoring script and budget driver](https://github.com/xbill9/gemma4-dev/tree/main/benchmarks/gen-eval)
 - [Gemini 4 or Gemma 4? It Depends.](https://dev.to/gde/gemini-4-or-gemma-4-it-depends-2o18)
 - [AIME 2025 on Hugging Face](https://huggingface.co/datasets/opencompass/AIME2025)
-- [research-kit for Claude Code](https://github.com/xbill9/claude-research-skills)
-- [Gemini API pricing](https://ai.google.dev/pricing)
+- [Gemini API pricing](https://aistudio.google.com/docs/pricing)
 
 Hope you enjoyed it!
