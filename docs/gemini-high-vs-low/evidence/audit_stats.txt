@@ -1,0 +1,11 @@
+| Model | n | Right high [Wilson 95%] | Right low [Wilson 95%] | McNemar b/c, p | Output tokens high / low, Wilcoxon p | Verdict |
+|---|---:|---|---|---|---|---|
+| gemma-4-31b | 15 | 13 [62.1, 96.3] | 12 [54.8, 93.0] | 2/1, 1 | 182,736 / 79,971, 6.1e-05 | accuracy WITHIN NOISE; tokens HOLDS |
+| gemma-4-26b | 15 | 11 [48.0, 89.1] | 9 [35.8, 80.2] | 4/2, 0.688 | 246,381 / 211,934, 0.389 | accuracy WITHIN NOISE; tokens WITHIN NOISE |
+| flash-lite-3.5 | 15 | 11 [48.0, 89.1] | 9 [35.8, 80.2] | 2/0, 0.5 | 201,684 / 77,200, 0.000183 | accuracy WITHIN NOISE; tokens HOLDS |
+| flash-3.8 | 15 | 14 [70.2, 98.8] | 12 [54.8, 93.0] | 2/0, 0.5 | 229,292 / 54,290, 6.1e-05 | accuracy WITHIN NOISE; tokens HOLDS |
+| hydrogen-4 | 15 | 15 [79.6, 100.0] | 15 [79.6, 100.0] | 0/0, 1 | 245,907 / 51,350, 6.1e-05 | accuracy WITHIN NOISE; tokens HOLDS |
+| carbon-4 | 15 | 15 [79.6, 100.0] | 15 [79.6, 100.0] | 0/0, 1 | 194,037 / 48,915, 6.1e-05 | accuracy WITHIN NOISE; tokens HOLDS |
+| argon-4 | 15 | 15 [79.6, 100.0] | 15 [79.6, 100.0] | 0/0, 1 | 77,914 / 23,694, 6.1e-05 | accuracy WITHIN NOISE; tokens HOLDS |
+
+noise floor at n=15, pooled rate 0.862: {"num_tasks": 15, "baseline_rate_pct": 86.19, "std_error_pct": 8.91, "ci_95_half_width_pct": 17.46, "multiplier_z_alpha_plus_z_power": 2.8016, "min_detectable_lift_vs_fixed_baseline_pts": 24.96, "min_detectable_lift_two_runs_pts": 35.29}

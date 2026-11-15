@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>High or Low Thinking? Gemini 4 and Gemma 4 on Hard Math, Cost First</title>
+  <meta name="description" content="Seven models on the 15 problems of AIME 2025 I at their lowest and highest thinking settings, under a hard budget. The top setting cost 2.6 to 4.8 times as much on every paid model; Hydrogen, Carbon and Argon solved all 15 at either setting, and no score change was bigger than the run-to-run noise." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to measuring what extra
+thinking buys on hard problems, and what it costs. Seven models, Gemma 4
+26B and 31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and Gemini 4 Hydrogen,
+Carbon and Argon, answer the same 15 competition math problems twice
+through the Gemini API: once at the lowest thinking setting each accepts
+and once at the highest.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-cover.25535354.jpg" alt="High or Low Thinking? Gemini 4 and Gemma 4 on Hard Math, Cost First" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-high-vs-low">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-high-vs-low</a></p>
+<p>The result, cost first: both settings together cost $7.47, $1.53 at
+the lowest and $5.95 at the highest, against a worst case of $33.23 that
+the run was built to stay under. The top setting cost 2.61 times as much
+as the lowest on Flash-Lite, 3.24 times on Argon, 3.93 times on Carbon,
+4.20 times on 3.8 Flash and 4.75 times on Hydrogen.</p>
+<p>The scores: Hydrogen, Carbon and Argon solved all 15 at both
+settings. Flash-Lite, 3.8 Flash and both Gemma models gained one or two
+problems at the top setting, and on 15 problems no gain was bigger than
+the run-to-run noise. The thinking grew by more than the noise: the top
+setting used more output tokens on all 15 problems for 3.8 Flash,
+Hydrogen, Carbon and Argon, and on 14 of 15 for Flash-Lite.</p>
+<hr />
+<h4 id="what-was-measured">What Was Measured</h4>
+<p>The earlier comparison, <a
+href="https://dev.to/gde/gemini-4-or-gemma-4-it-depends-2o18">Gemini 4
+or Gemma 4? It Depends.</a>, ran 1,319 GSM8K math problems and 400 BFCL
+function calls at the lowest thinking setting, where Argon scored 0.9841
+and Gemma 4 31B 0.9735. Those problems are easy enough that more
+thinking has little room to help. This run uses harder problems and both
+ends of the thinking range.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-1.png"
+alt="Table: Model, Lowest setting, Highest setting, Output price per 1M tokens" /></p>
+<p>Output prices include thinking tokens. Carbon and Argon go to $20 per
+million output tokens on 2026-12-01.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>A Gemini API key in <code>~/gemini.key</code>, on a paid tier for
+the Gemini 4 Carbon and Argon models</li>
+<li>Python 3 with <code>huggingface_hub</code> and
+<code>scipy</code></li>
+<li>A clone of <a
+href="https://github.com/xbill9/gemma4-dev">gemma4-dev</a></li>
+</ul>
+<hr />
+<h4 id="step-1--fifteen-hard-problems">Step 1 — Fifteen Hard
+Problems</h4>
+<p>The problems are AIME 2025 I, all 15, from the
+<code>opencompass/AIME2025</code> dataset at a pinned revision. Each
+answer is a whole number from 0 to 999. One answer is published as
+<code>336^\circ</code> and is read as 336.</p>
+<pre class="bash"><code>cd benchmarks/gen-eval
+python3 build_hard_set.py aime
+wrote /home/xbill/gemma4-dev/benchmarks/gen-eval/data/aime2025.jsonl: 30 records</code></pre>
+<p>The file holds AIME 2025 I and II with a SHA-256 in
+<code>data/hard_manifest.json</code>; this run uses the first 15, paper
+I. The scoring script, <a
+href="https://github.com/xbill9/gemma4-dev/tree/main/benchmarks/gen-eval"><code>benchmarks/gen-eval/gen_eval.py</code></a>,
+asks for the final answer on a line of its own as
+<code>Answer: &lt;number&gt;</code> and marks a reply right when that
+number matches.</p>
+<hr />
+<h4 id="step-2--the-top-thinking-level-for-each-model">Step 2 — The Top
+Thinking Level for Each Model</h4>
+<p>Google's thinking page lists <code>xhigh</code> for Hydrogen only.
+One small request per model and level confirms what the
+OpenAI-compatible endpoint accepts:</p>
+<pre class="bash"><code>docs/gemini-high-vs-low/evidence/top-levels.sh
+gemma-4-31b-it         high   ok  thinking 225 answer 27 finish length
+gemma-4-26b-a4b-it     high   ok  thinking 253 answer 0 finish length
+gemini-3.5-flash-lite  high   ok  thinking 243 answer 9 finish length
+gemini-3.8-flash       high   ok  thinking 118 answer 66 finish stop
+gemini-4-hydrogen      high   ok  thinking 80 answer 67 finish stop
+gemini-4-hydrogen      xhigh  ok  thinking 150 answer 78 finish stop
+gemini-4-carbon        high   ok  thinking 253 answer 3 finish length
+gemini-4-carbon        xhigh  rejected: Thinking level XHIGH is not supported for this model. Please retry with other thinking level.
+gemini-4-argon         high   ok  thinking 241 answer 15 finish length
+gemini-4-argon         xhigh  rejected: Thinking level XHIGH is not supported for this model. Please retry with other thinking level.</code></pre>
+<p>The lowest settings are the ones the earlier run used:
+<code>minimal</code> for Gemma and Flash-Lite, <code>none</code> for the
+rest.</p>
+<hr />
+<h4 id="step-3--a-budget-the-run-cannot-exceed">Step 3 — A Budget the
+Run Cannot Exceed</h4>
+<p>Thinking has no limit of its own. The only cap on what one request
+can cost is its output limit, because thinking and answer share it. So
+the most a run can cost is known before it starts: every reply using its
+whole limit, times the output price, plus the input.</p>
+<p>Every model gets the same limit, 32,768 tokens, which is the most
+Carbon and Argon produce in one non-streaming request.
+<code>budget_run.py</code> prints that worst case, refuses a run whose
+worst case is over the budget, and sends the problems in rounds of three
+to every model at once, checking spend plus the next round's worst case
+before each round.</p>
+<pre class="bash"><code>python3 budget_run.py models-high.json aime2025 aime-high --budget 20 --limit 15 --dry-run
+15 questions x 7 models, output limit 32,768: worst case $16.62, budget $20.00</code></pre>
+<p>Two settings at $16.62 each is $33.23 in the worst case, under a
+combined $40.</p>
+<hr />
+<h4 id="step-4--run-both-settings">Step 4 — Run Both Settings</h4>
+<pre class="bash"><code>docs/gemini-high-vs-low/evidence/run.sh high low</code></pre>
+<p>The last line of each arm's log, <code>aime-high.log</code> and
+<code>aime-low.log</code>:</p>
+<pre><code>{&quot;task&quot;: &quot;aime2025&quot;, &quot;spent_usd&quot;: 5.9455, &quot;budget_usd&quot;: 20.0, &quot;worst_case_usd&quot;: 16.62, &quot;wall_s&quot;: 9749.6}
+{&quot;task&quot;: &quot;aime2025&quot;, &quot;spent_usd&quot;: 1.5255, &quot;budget_usd&quot;: 20.0, &quot;worst_case_usd&quot;: 16.62, &quot;wall_s&quot;: 12953.1}</code></pre>
+<p>Every request has a 20-minute limit and up to three retries. Two
+Gemma 4 26B requests on the free tier timed out on all four tries,
+problem 2 at <code>minimal</code> and problem 13 at <code>high</code>;
+both count as wrong. Every paid model answered every problem at both
+settings.</p>
+<hr />
+<h4 id="step-5--the-scores">Step 5 — The Scores</h4>
+<p><code>derived.py</code> builds every table from the saved
+replies.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-2.png"
+alt="Table: Model, Right, lowest, Right, highest, Gained / lost at highest" /></p>
+<p>Problem 14 is the one that separates the generations: Hydrogen,
+Carbon and Argon solved it at both settings, and the other four models
+missed it at both.</p>
+<p>Replies that ran into the 32,768-token limit were almost all Gemma's:
+Gemma 4 26B four times at <code>minimal</code> and three at
+<code>high</code>, Gemma 4 31B once and twice, and 3.8 Flash once at
+<code>high</code>. At <code>minimal</code> the Gemma replies hit the
+limit while writing the answer; at <code>high</code> they hit it while
+thinking.</p>
+<hr />
+<h4 id="step-6--what-the-extra-thinking-cost">Step 6 — What the Extra
+Thinking Cost</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-3.png"
+alt="Table: Model, Cost, lowest, Cost, highest, Highest ÷ lowest, Mean thinking tokens, lowest → highest" /></p>
+<p>Costs are for all 15 problems, from the token counts the API returned
+times list prices.</p>
+<p>Cost per right answer moves the same way. At the lowest setting it
+was $0.0162 on Argon, $0.0260 on Hydrogen and $0.0330 on Carbon; at the
+highest, $0.0523, $0.1232 and $0.1297, for the same 15 right
+answers.</p>
+<p>Hydrogen at <code>none</code> still thought on these problems, 2,468
+tokens per problem on average, as it did on GSM8K. Argon thought least
+at both settings, and at its top setting it thought less than the others
+did at theirs: 4,129 tokens per problem against 11,613 to 15,742.</p>
+<hr />
+<h4 id="step-7--is-the-difference-bigger-than-the-noise">Step 7 — Is the
+Difference Bigger Than the Noise?</h4>
+<p>The audit follows the research-kit <code>ablation-stat-auditor</code>
+skill: an exact paired test on the same problems for the scores, a
+signed-rank test on each problem's output tokens, and 95% Wilson
+intervals, all computed in <code>audit_stats.py</code>.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-4.png"
+alt="Table: Model, Right, highest 95% range, Right, lowest 95% range, Paired test on scores, Output tokens, highest / lowest" /></p>
+<p>Ranges are percentages. With 15 problems, a gain has to be about 25
+points against a fixed score, or 35 points between two runs, to stand
+out from the noise. The largest gain here, two problems, is 13 points.
+So the score changes are within the noise for every model, and the extra
+tokens are bigger than the noise for every model except Gemma 4 26B,
+which used more tokens at the top setting on 11 of 15 problems because
+four of its lowest-setting answers ran to the limit too.</p>
+<hr />
+<h4 id="step-8--time">Step 8 — Time</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-5.png"
+alt="Table: Model, Median seconds per problem, lowest, Highest" /></p>
+<p>The top setting took 3.2 to 5.9 times as long on the paid models. The
+free-tier Gemma models were the slowest at both settings, and the run's
+length was set by them.</p>
+<hr />
+<h4
+id="mag_right-tip-budget-for-the-worst-case-then-measure-the-real-one">🔎
+Tip: Budget for the Worst Case, Then Measure the Real One</h4>
+<p>Before the run, the only number that can be known is the worst case:
+problems times models times output limit times price. It came to $33.23
+here, and the run spent $7.47 of it. Set the output limit from the
+budget, and send problems in rounds so a stop leaves every model on the
+same problems.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-6.png"
+alt="Table: Lowest setting, Highest setting" /></p>
+<hr />
+<h4 id="what-1000-problems-like-these-would-cost">What 1,000 Problems
+Like These Would Cost</h4>
+<p>Arithmetic from the measured cost per problem, at list prices:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-7.png"
+alt="Table: Model, Lowest, Highest" /></p>
+<p>At the 2026-12-01 prices, Carbon becomes $65.96 and $259.45 per
+1,000, and Argon $32.33 and $104.62. Gemma 4 is $0 on the free tier, at
+the free tier's speed and rate limits.</p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For hard math on the Gemini 4 models, start at the lowest setting.
+Hydrogen, Carbon and Argon solved all 15 problems there, and the top
+setting added 3.24 to 4.75 times the cost and 3.2 to 5.9 times the time
+for the same answers.</p>
+<p>For the smaller models, the top setting gained one or two problems
+each, within the noise on 15 problems, for 2.61 times the cost on
+Flash-Lite and 4.20 times on 3.8 Flash. Measure on your own problems
+before paying that.</p>
+<p>For the lowest cost per right answer on this set, Argon at its lowest
+setting: $0.0162. It also thought least at its top setting.</p>
+<p>Google positions Carbon's top setting for hard, multi-step work such
+as architecture, debugging and security audits. Fifteen math problems
+that every Gemini 4 model solved at the lowest setting leave that case
+untested.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to measure what the highest thinking
+setting buys on hard problems and what it costs. The key to the solution
+was running all seven models at both ends of their thinking range on the
+same 15 AIME 2025 problems, under a budget whose worst case was known
+before the first request. The results were:</p>
+<ul>
+<li>🟢 Hydrogen, Carbon and Argon solved all 15 problems at both their
+lowest and highest settings.</li>
+<li>⚠️ The highest setting cost 2.61 to 4.75 times the lowest on every
+paid model, $5.95 against $1.53 for all seven.</li>
+<li>⚠️ No model's score change was bigger than the run-to-run noise; the
+largest gain was two problems.</li>
+<li>🟢 Argon had the lowest cost per right answer, $0.0162 at its lowest
+setting.</li>
+<li>🟢 The whole pilot cost $7.47 against a worst case of $33.23.</li>
+<li>⚠️ The highest setting took 3.2 to 5.9 times as long per problem on
+the paid models.</li>
+<li>❌ Gemma 4 26B on the free tier timed out twice and ran to the
+output limit seven times.</li>
+<li>⚠️ Carbon's and Argon's costs double on 2026-12-01.</li>
+</ul>
+<p>Scope: one laptop in the US calling the Gemini API on 2026-11-15, one
+run per model and setting, temperature 0, the same 32,768-token output
+limit for every model, the 15 problems of AIME 2025 I. Fifteen problems
+can show what extra thinking costs but cannot rank models that score
+within two problems of each other. Costs are token counts times list
+prices. Times include waiting on the service and will move with its
+load. Google does not say what hardware or engine serves any of these
+models.</p>
+<p>The strategy for measuring high against low thinking on a fixed
+budget was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-high-vs-low/evidence">This
+run's evidence: replies, logs, analysis and audit</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/benchmarks/gen-eval">The
+scoring script and budget driver</a></li>
+<li><a
+href="https://dev.to/gde/gemini-4-or-gemma-4-it-depends-2o18">Gemini 4
+or Gemma 4? It Depends.</a></li>
+<li><a href="https://huggingface.co/datasets/opencompass/AIME2025">AIME
+2025 on Hugging Face</a></li>
+<li><a
+href="https://github.com/xbill9/claude-research-skills">research-kit for
+Claude Code</a></li>
+<li><a href="https://ai.google.dev/pricing">Gemini API pricing</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>

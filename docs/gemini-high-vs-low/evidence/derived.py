@@ -87,6 +87,36 @@ def main():
         print(f"  {i}  {cells}")
     print("  columns: " + " ".join(ORDER))
 
+    # Whole-run spend: every saved row, not only the questions both arms share.
+    print("\n== whole run: every saved reply, against the worst case")
+    spent = {}
+    for a in ("low", "high"):
+        models, rows = arms[a]
+        spent[a] = sum(cost(rows[n].values(), models[n]["price_in"], models[n]["price_out"]) for n in ORDER)
+        print(f"  {a:4s} ${spent[a]:.4f}  replies {sum(len(rows[n]) for n in ORDER)}")
+    worst = 33.23  # budget_run.py's printed worst case, two arms of $16.62 (aime-*.log)
+    both = spent["low"] + spent["high"]
+    print(f"  both ${both:.4f}  worst case ${worst:.2f}  share {both / worst:.3f}")
+
+    # Arithmetic from measured cost per problem, labelled as such in the paper.
+    print("\n== per 1,000 problems like these, from measured cost per problem (arithmetic)")
+    for n in ORDER:
+        line = f"  {n:15s}"
+        for a in ("low", "high"):
+            models, rows = arms[a]
+            rs = [rows[n][i] for i in ids]
+            per = cost(rs, models[n]["price_in"], models[n]["price_out"]) / len(rs)
+            line += f"  {a} ${per * 1000:8.2f}"
+            if n in DEC:
+                line += f" (12-01 ${cost(rs, *DEC[n]) / len(rs) * 1000:8.2f})"
+        print(line)
+
+    print("\n== time per problem, median seconds, low / high")
+    for n in ORDER:
+        lo = statistics.median(arms["low"][1][n][i]["seconds"] for i in ids)
+        hi = statistics.median(arms["high"][1][n][i]["seconds"] for i in ids)
+        print(f"  {n:15s} {lo:7.1f} / {hi:7.1f}  ({hi / lo:.1f}x)")
+
 
 if __name__ == "__main__":
     main()

@@ -12,6 +12,8 @@ export GEN_EVAL_CHAT_URL=https://generativelanguage.googleapis.com/v1beta/openai
 export GEN_EVAL_API_KEY_FILE=~/gemini.key GEN_EVAL_RETRIES=${GEN_EVAL_RETRIES:-8} GEN_EVAL_TIMEOUT_S=${GEN_EVAL_TIMEOUT_S:-3600} GEN_EVAL_HARD_MAX_TOKENS=32768
 # The low arm was restarted 2026-11-15 13:20 as GEN_EVAL_TIMEOUT_S=1200 GEN_EVAL_RETRIES=3 ./run.sh low, after one
 # Gemma 4 26B request sat open over 30 minutes (aime-low.attempt1.log); rows already saved were kept.
+# The high arm was restarted 13:46 the same way, after one request sat open over 30 minutes
+# (aime-high.attempt1.log); its unwritten replies to problem 9 were requested again.
 for arm in "$@"; do
   (cd "$J" && python3 budget_run.py "$HERE/models-$arm.json" aime2025 "$HERE/aime-$arm" --budget 20 --limit 15 --wave 3) \
     > "$HERE/aime-$arm.log" 2>&1 &
