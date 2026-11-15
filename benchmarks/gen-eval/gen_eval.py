@@ -5,7 +5,7 @@
   gen_eval.py score <out.jsonl>
 
 Tasks (records from build_gen_set.py, under data/):
-  gsm8k        free-form chain of thought, greedy, JEV_GEN_MAX_TOKENS tokens (default 768); right when the number the model gives
+  gsm8k        free-form chain of thought, greedy, GEN_EVAL_MAX_TOKENS tokens (default 768); right when the number the model gives
                after "Answer:" (else its last number) equals the reference.
   bfcl_simple  one tool offered through the OpenAI `tools` field, tool_choice auto, greedy; right
                when the server returns exactly one tool call whose name and arguments pass the checks
@@ -31,26 +31,32 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def setting(name, default=None):
+    """GEN_EVAL_<name>, else the older JEV_<name> spelling, else default."""
+    return os.environ.get("GEN_EVAL_" + name, os.environ.get("JEV_" + name, default))
+
 GSM8K_PROMPT = (
     "Solve the following math problem. Think step by step, then give the final answer "
     "on its own last line as 'Answer: <number>'.\n\n{question}"
 )
-GSM8K_MAX_TOKENS = int(os.environ.get("JEV_GEN_MAX_TOKENS", "768"))
-# JEV_CACHE_PROMPT=0 sends llama.cpp's "cache_prompt": false (unset: the server default, on).
-CACHE_PROMPT = os.environ.get("JEV_CACHE_PROMPT")
-# JEV_ENABLE_THINKING=0/1 sends chat_template_kwargs {"enable_thinking": ...} (unset: the server default).
+GSM8K_MAX_TOKENS = int(os.environ.get("GEN_EVAL_MAX_TOKENS") or setting("GEN_MAX_TOKENS", "768"))
+# GEN_EVAL_CACHE_PROMPT=0 sends llama.cpp's "cache_prompt": false (unset: the server default, on).
+CACHE_PROMPT = setting("CACHE_PROMPT")
+# GEN_EVAL_ENABLE_THINKING=0/1 sends chat_template_kwargs {"enable_thinking": ...} (unset: the server default).
 # mistral.rs v0.9.5 thinks by default on Gemma 4; llama.cpp, vLLM, PyTorch and LiteRT do not.
-ENABLE_THINKING = os.environ.get("JEV_ENABLE_THINKING")
+ENABLE_THINKING = setting("ENABLE_THINKING")
 # Hosted OpenAI-compatible APIs (all unset: a local server at <upstream>/v1/chat/completions, no auth).
-# JEV_CHAT_URL replaces <upstream>/v1/chat/completions with a full URL; JEV_API_KEY_FILE sends its
-# contents as a Bearer token; JEV_REASONING_EFFORT sends "reasoning_effort"; JEV_RETRIES retries
+# GEN_EVAL_CHAT_URL replaces <upstream>/v1/chat/completions with a full URL; GEN_EVAL_API_KEY_FILE sends its
+# contents as a Bearer token; GEN_EVAL_REASONING_EFFORT sends "reasoning_effort"; GEN_EVAL_RETRIES retries
 # HTTP 429/500/502/503/504 and network errors that many times, waiting 2, 4, 8 ... s (capped at 60).
-CHAT_URL = os.environ.get("JEV_CHAT_URL")
-API_KEY_FILE = os.environ.get("JEV_API_KEY_FILE")
-REASONING_EFFORT = os.environ.get("JEV_REASONING_EFFORT")
-RETRIES = int(os.environ.get("JEV_RETRIES", "0"))
-# JEV_TIMEOUT_S: seconds one request may wait before it counts as a network error (default 900).
-TIMEOUT_S = float(os.environ.get("JEV_TIMEOUT_S", "900"))
+CHAT_URL = setting("CHAT_URL")
+API_KEY_FILE = setting("API_KEY_FILE")
+REASONING_EFFORT = setting("REASONING_EFFORT")
+RETRIES = int(setting("RETRIES", "0"))
+# GEN_EVAL_TIMEOUT_S: seconds one request may wait before it counts as a network error (default 900).
+TIMEOUT_S = float(setting("TIMEOUT_S", "900"))
 RETRY_CODES = {429, 500, 502, 503, 504}
 TYPES = {"dict": "object", "float": "number", "tuple": "array", "any": None}
 

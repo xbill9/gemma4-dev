@@ -19,9 +19,11 @@ python3 -m unittest discover -s tests -v
 | `gen_compare.py` | pairs two runs question by question |
 | `resend_errors.py` | resends only the questions that failed with HTTP 429/5xx or a timeout |
 
-Settings are environment variables: `JEV_GEN_MAX_TOKENS`, `JEV_CHAT_URL`,
-`JEV_API_KEY_FILE`, `JEV_REASONING_EFFORT`, `JEV_RETRIES`, `JEV_TIMEOUT_S`,
-`JEV_CACHE_PROMPT`, `JEV_ENABLE_THINKING`. The `JEV_` prefix is historical.
+Settings are environment variables: `GEN_EVAL_MAX_TOKENS`, `GEN_EVAL_CHAT_URL`,
+`GEN_EVAL_API_KEY_FILE`, `GEN_EVAL_REASONING_EFFORT`, `GEN_EVAL_RETRIES`, `GEN_EVAL_TIMEOUT_S`,
+`GEN_EVAL_CACHE_PROMPT`, `GEN_EVAL_ENABLE_THINKING`. The older `JEV_` spellings
+(`JEV_GEN_MAX_TOKENS` for the token limit) are still read, so earlier `run.sh`
+files and article commands work unchanged; a `GEN_EVAL_` name wins when both are set.
 
 **Moved here 2026-11-15 from `jev-tpu-v5e1/`**, where it was first written. The old
 paths are symlinks to these files, so every `run.sh` and article that names

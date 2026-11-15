@@ -2,9 +2,9 @@
 and the same problems sent again with the GSM8K limit raised from 2,048 to 16,384 (same model, same
 reasoning_effort none, temperature 0). A diagnostic: the article's scores are the 2,048-token run."""
 import json, os, sys
-os.environ.update(JEV_CHAT_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-                  JEV_API_KEY_FILE=os.path.expanduser("~/gemini.key"), JEV_RETRIES="8", JEV_TIMEOUT_S="600",
-                  JEV_GEN_MAX_TOKENS="16384", JEV_REASONING_EFFORT="none")
+os.environ.update(GEN_EVAL_CHAT_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                  GEN_EVAL_API_KEY_FILE=os.path.expanduser("~/gemini.key"), GEN_EVAL_RETRIES="8", GEN_EVAL_TIMEOUT_S="600",
+                  GEN_EVAL_MAX_TOKENS="16384", GEN_EVAL_REASONING_EFFORT="none")
 H = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.abspath(os.path.join(H, "..", "..", ".."))
 sys.path.insert(0, os.path.join(ROOT, "benchmarks", "gen-eval"))
 import gen_eval

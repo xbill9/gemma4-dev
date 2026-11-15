@@ -155,10 +155,10 @@ LOWEST_REASONING_EFFORT=none
 
 | Setting | What it does |
 | :--- | :--- |
-| `JEV_CHAT_URL` | full chat URL in place of `<server>/v1/chat/completions` |
-| `JEV_API_KEY_FILE` | sends the file's contents as a Bearer token |
-| `JEV_REASONING_EFFORT` | sends `reasoning_effort` |
-| `JEV_RETRIES`, `JEV_TIMEOUT_S` | retries on HTTP 429/5xx and network errors, and a per-request time limit |
+| `GEN_EVAL_CHAT_URL` | full chat URL in place of `<server>/v1/chat/completions` |
+| `GEN_EVAL_API_KEY_FILE` | sends the file's contents as a Bearer token |
+| `GEN_EVAL_REASONING_EFFORT` | sends `reasoning_effort` |
+| `GEN_EVAL_RETRIES`, `GEN_EVAL_TIMEOUT_S` | retries on HTTP 429/5xx and network errors, and a per-request time limit |
 
 ---
 

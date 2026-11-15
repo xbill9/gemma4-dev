@@ -9,7 +9,7 @@ cd "$(dirname "$0")"; HERE=$PWD
 RIG=$(cd ../../.. && pwd)
 set -a; . "$RIG/tpu.env"; set +a
 J=$(cd "$RIG/../benchmarks/gen-eval" && pwd)
-export JEV_CHAT_URL=$GEMINI_OPENAI_URL JEV_API_KEY_FILE=$GEMINI_API_KEY_FILE JEV_RETRIES=8 JEV_TIMEOUT_S=180 JEV_GEN_MAX_TOKENS=2048
+export GEN_EVAL_CHAT_URL=$GEMINI_OPENAI_URL GEN_EVAL_API_KEY_FILE=$GEMINI_API_KEY_FILE GEN_EVAL_RETRIES=8 GEN_EVAL_TIMEOUT_S=180 GEN_EVAL_MAX_TOKENS=2048
 LOG=$HERE/driver.log
 state() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
 state "BEGIN $MODEL_NAME"
@@ -17,7 +17,7 @@ for arm in $LOWEST_REASONING_EFFORT low; do
   for t in bfcl_simple gsm8k; do
     [ -s "$HERE/$t-$arm.jsonl" ] && { state "SKIP $t $arm (exists)"; continue; }
     state "START $t $arm"
-    (cd "$J" && JEV_REASONING_EFFORT=$arm python3 gen_eval.py run x "$MODEL_NAME" $t "$HERE/$t-$arm.jsonl" --concurrency 8) > "$HERE/$t-$arm.log" 2>&1
+    (cd "$J" && GEN_EVAL_REASONING_EFFORT=$arm python3 gen_eval.py run x "$MODEL_NAME" $t "$HERE/$t-$arm.jsonl" --concurrency 8) > "$HERE/$t-$arm.log" 2>&1
     state "END $t $arm rc=$? $(tail -1 "$HERE/$t-$arm.log")"
   done
 done
