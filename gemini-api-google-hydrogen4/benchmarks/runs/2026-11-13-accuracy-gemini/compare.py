@@ -1,5 +1,5 @@
 """GSM8K and BFCL simple for the five gemini-api-google-* rigs, beside the Gemma 4 family on
-llama.cpp with the same harness (jev-tpu-v5e1/gen_eval.py), prompts, token limits and scoring.
+llama.cpp with the same harness (benchmarks/gen-eval/gen_eval.py), prompts, token limits and scoring.
 
 Per rig and thinking arm: right/n, accuracy with a 95% bootstrap range, errors, cut at the token
 limit, wall time, and tokens (prompt, visible output, thinking). Then each Gemini arm against

@@ -6,7 +6,7 @@ os.environ.update(JEV_CHAT_URL="https://generativelanguage.googleapis.com/v1beta
                   JEV_API_KEY_FILE=os.path.expanduser("~/gemini.key"), JEV_RETRIES="8", JEV_TIMEOUT_S="600",
                   JEV_GEN_MAX_TOKENS="16384", JEV_REASONING_EFFORT="none")
 H = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.abspath(os.path.join(H, "..", "..", ".."))
-sys.path.insert(0, os.path.join(ROOT, "jev-tpu-v5e1"))
+sys.path.insert(0, os.path.join(ROOT, "benchmarks", "gen-eval"))
 import gen_eval
 recs = {r["id"]: r for r in map(json.loads, open(os.path.join(gen_eval.HERE, "data", "gsm8k.jsonl")))}
 out = []

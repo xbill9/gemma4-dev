@@ -1,7 +1,7 @@
 #!/bin/bash
 # What does reasoning_effort "none" do on the models that reject "minimal"? First 100 GSM8K problems,
 # same script and settings as the 2026-11-14-accuracy-api run, at none / low / medium / unset (model default).
-cd "$(dirname "$0")"; HERE=$PWD; J=$(cd ../../../../jev-tpu-v5e1 && pwd)
+cd "$(dirname "$0")"; HERE=$PWD; J=$(cd ../../../../benchmarks/gen-eval && pwd)
 export JEV_CHAT_URL=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions JEV_API_KEY_FILE=$HOME/gemini.key JEV_RETRIES=8 JEV_TIMEOUT_S=180 JEV_GEN_MAX_TOKENS=2048
 for m in gemini-4-hydrogen gemini-3.8-flash gemini-4-carbon gemini-4-argon; do
   ( for e in none low medium unset; do

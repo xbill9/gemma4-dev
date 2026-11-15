@@ -12,7 +12,7 @@ Its siblings on the same API and key are `gemini-api-google-flashlite35`, `gemin
 benchmarks/runs/2026-11-13-accuracy-gemini/run.sh
 ```
 
-GSM8K (1,319, up to 2,048 tokens) and BFCL simple (400) through `jev-tpu-v5e1/gen_eval.py`, the
+GSM8K (1,319, up to 2,048 tokens) and BFCL simple (400) through `benchmarks/gen-eval/gen_eval.py`, the
 harness every Gemma rig uses: temperature 0, scored in code. Two arms: the lowest thinking level
 the model accepts (`minimal`) and `low`. Results are in `benchmarks/INDEX.md`.
 

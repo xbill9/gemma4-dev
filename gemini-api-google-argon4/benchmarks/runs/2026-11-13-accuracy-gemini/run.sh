@@ -1,14 +1,14 @@
 #!/bin/bash
 # Answer quality of Gemini 4 Argon (gemini-4-argon) through the Gemini API's OpenAI-compatible endpoint, with the
 # Gemma rigs' method: GSM8K (1,319, up to 2048 tokens) and BFCL simple (400) via
-# jev-tpu-v5e1/gen_eval.py, temperature 0, scored in code. Two arms: reasoning_effort=none (the
+# benchmarks/gen-eval/gen_eval.py, temperature 0, scored in code. Two arms: reasoning_effort=none (the
 # lowest level this model accepts) and low. Concurrency 8, failed requests retried up to 8 times
 # (HTTP 429/5xx, network errors and requests over 180 s). Thinking tokens are recorded per row as reasoning_tokens.
 set -u
 cd "$(dirname "$0")"; HERE=$PWD
 RIG=$(cd ../../.. && pwd)
 set -a; . "$RIG/tpu.env"; set +a
-J=$(cd "$RIG/../jev-tpu-v5e1" && pwd)
+J=$(cd "$RIG/../benchmarks/gen-eval" && pwd)
 export JEV_CHAT_URL=$GEMINI_OPENAI_URL JEV_API_KEY_FILE=$GEMINI_API_KEY_FILE JEV_RETRIES=8 JEV_TIMEOUT_S=180 JEV_GEN_MAX_TOKENS=2048
 LOG=$HERE/driver.log
 state() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }

@@ -151,7 +151,7 @@ LOWEST_REASONING_EFFORT=none
 
 #### Step 4 — One Scoring Script
 
-`jev-tpu-v5e1/gen_eval.py` scores every Gemma 4 rig in the repo. GSM8K is right when the number after `Answer:` matches; BFCL simple is right when the one function call passes BFCL's own checks. Four settings point it at a hosted API:
+[`benchmarks/gen-eval/gen_eval.py`](https://github.com/xbill9/gemma4-dev/tree/main/benchmarks/gen-eval) is the repo's scoring script for GSM8K and BFCL. It is a plain HTTP client in standard Python, so the same script scores a model on a desktop GPU or behind a hosted API. GSM8K is right when the number after `Answer:` matches; BFCL simple is right when the one function call passes BFCL's own checks. Four settings point it at a hosted API:
 
 | Setting | What it does |
 | :--- | :--- |
