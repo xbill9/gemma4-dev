@@ -101,5 +101,26 @@ class Bfcl(unittest.TestCase):
         self.assertNotIn(".", g.tools_for(dotted["functions"])[0]["function"]["name"])
 
 
+class HardSets(unittest.TestCase):
+    def test_aime_reads_the_answer_line(self):
+        self.assertTrue(g.gsm8k_right("so the base is 21 and 49.\nAnswer: 70", "70"))
+        self.assertTrue(g.gsm8k_right("Answer: **336**", "336"))
+        self.assertFalse(g.gsm8k_right("Answer: 335", "336"))
+
+    def test_gpqa_letter(self):
+        self.assertEqual(g.gpqa_extract("reasoning\nAnswer: (C)"), "C")
+        self.assertEqual(g.gpqa_extract("Answer: **B**"), "B")
+        self.assertEqual(g.gpqa_extract("first A then\nAnswer: D"), "D")
+        self.assertIsNone(g.gpqa_extract("no letter given"))
+
+    def test_aime_set_matches_manifest(self):
+        import hashlib
+
+        man = json.load(open(os.path.join(DATA, "hard_manifest.json")))["aime2025"]
+        body = open(os.path.join(DATA, "aime2025.jsonl"), "rb").read()
+        self.assertEqual(hashlib.sha256(body).hexdigest(), man["sha256"])
+        self.assertEqual(len(body.splitlines()), man["n"])
+
+
 if __name__ == "__main__":
     unittest.main()

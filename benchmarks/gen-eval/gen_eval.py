@@ -57,6 +57,16 @@ REASONING_EFFORT = setting("REASONING_EFFORT")
 RETRIES = int(setting("RETRIES", "0"))
 # GEN_EVAL_TIMEOUT_S: seconds one request may wait before it counts as a network error (default 900).
 TIMEOUT_S = float(setting("TIMEOUT_S", "900"))
+# aime2025 and gpqa_diamond (build_hard_set.py): GEN_EVAL_HARD_MAX_TOKENS tokens (default 32768).
+HARD_MAX_TOKENS = int(setting("HARD_MAX_TOKENS", "32768"))
+AIME_PROMPT = (
+    "Solve the following competition math problem. The answer is an integer from 0 to 999. Think step by "
+    "step, then give the final answer on its own last line as 'Answer: <number>'.\n\n{question}"
+)
+GPQA_PROMPT = (
+    "Answer the following multiple-choice question. Think step by step, then give the letter of the "
+    "correct option on its own last line as 'Answer: <letter>'.\n\n{question}\n\n{options}"
+)
 RETRY_CODES = {429, 500, 502, 503, 504}
 TYPES = {"dict": "object", "float": "number", "tuple": "array", "any": None}
 
@@ -84,6 +94,14 @@ def gsm8k_extract(text):
 def gsm8k_right(text, answer):
     got = gsm8k_extract(text)
     return got is not None and abs(got - float(answer)) < 1e-6
+
+
+# ---------- GPQA Diamond ----------
+
+
+def gpqa_extract(text):
+    m = re.findall(r"Answer:\s*\**\s*\(?([ABCD])\b", text or "")
+    return m[-1] if m else None
 
 
 # ---------- BFCL simple ----------
@@ -199,12 +217,13 @@ def bfcl_check(calls, record):
 # ---------- running ----------
 
 
-def post(upstream, body, timeout=None):
+def post(upstream, body, timeout=None, chat_url=None, key_file=None):
     timeout = timeout or TIMEOUT_S
-    url = CHAT_URL or upstream.rstrip("/") + "/v1/chat/completions"
+    url = chat_url or CHAT_URL or upstream.rstrip("/") + "/v1/chat/completions"
+    key_file = key_file or API_KEY_FILE
     headers = {"Content-Type": "application/json"}
-    if API_KEY_FILE:
-        headers["Authorization"] = "Bearer " + open(os.path.expanduser(API_KEY_FILE)).read().strip()
+    if key_file:
+        headers["Authorization"] = "Bearer " + open(os.path.expanduser(key_file)).read().strip()
     data = json.dumps(body).encode()
     for attempt in range(RETRIES + 1):
         try:
@@ -219,9 +238,24 @@ def post(upstream, body, timeout=None):
         time.sleep(min(60, 2 ** (attempt + 1)))
 
 
-def one(upstream, model, task, rec):
+def one(upstream, model, task, rec, opts=None):
+    """opts overrides the environment settings for this request: chat_url, key_file,
+    reasoning_effort, max_tokens, timeout_s (budget_run.py drives several models in one process)."""
+    opts = opts or {}
     t0 = time.time()
-    if task == "gsm8k":
+    if task in ("aime2025", "gpqa_diamond"):
+        if task == "aime2025":
+            content = AIME_PROMPT.format(question=rec["question"])
+        else:
+            options = "\n".join(f"{L}) {o}" for L, o in zip("ABCD", rec["options"]))
+            content = GPQA_PROMPT.format(question=rec["question"], options=options)
+        body = {
+            "model": model,
+            "temperature": 0,
+            "max_tokens": opts.get("max_tokens", HARD_MAX_TOKENS),
+            "messages": [{"role": "user", "content": content}],
+        }
+    elif task == "gsm8k":
         body = {
             "model": model,
             "temperature": 0,
@@ -239,13 +273,14 @@ def one(upstream, model, task, rec):
         }
     if CACHE_PROMPT is not None:
         body["cache_prompt"] = CACHE_PROMPT != "0"
-    if REASONING_EFFORT:
-        body["reasoning_effort"] = REASONING_EFFORT
+    effort = opts.get("reasoning_effort", REASONING_EFFORT)
+    if effort:
+        body["reasoning_effort"] = effort
     if ENABLE_THINKING is not None:
         body["chat_template_kwargs"] = {"enable_thinking": ENABLE_THINKING != "0"}
     out = {"id": rec["id"], "task": task, "max_tokens": body["max_tokens"]}
     try:
-        r = post(upstream, body)
+        r = post(upstream, body, opts.get("timeout_s"), opts.get("chat_url"), opts.get("key_file"))
     except Exception as e:  # recorded, scored wrong, counted separately
         out.update(error=f"{type(e).__name__}: {e}"[:300], right=False, seconds=round(time.time() - t0, 2))
         return out
@@ -264,10 +299,14 @@ def one(upstream, model, task, rec):
     hidden = u.get("total_tokens", 0) - u.get("prompt_tokens", 0) - u["completion_tokens"]
     if "total_tokens" in u and hidden > 0:
         out["reasoning_tokens"] = hidden
-    if task == "gsm8k":
+    if task in ("gsm8k", "aime2025"):
         out["answer"] = rec["answer"]
         out["extracted"] = gsm8k_extract(msg.get("content"))
         out["right"] = gsm8k_right(msg.get("content"), rec["answer"])
+    elif task == "gpqa_diamond":
+        out["answer"] = rec["answer"]
+        out["extracted"] = gpqa_extract(msg.get("content"))
+        out["right"] = out["extracted"] == rec["answer"]
     else:
         calls = []
         for c in msg.get("tool_calls") or []:
@@ -318,7 +357,7 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("upstream")
     r.add_argument("model")
-    r.add_argument("task", choices=["gsm8k", "bfcl_simple"])
+    r.add_argument("task", choices=["gsm8k", "bfcl_simple", "aime2025", "gpqa_diamond"])
     r.add_argument("out")
     r.add_argument("--limit", type=int)
     r.add_argument("--concurrency", type=int, default=16)
