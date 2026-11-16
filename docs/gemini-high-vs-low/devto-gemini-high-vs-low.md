@@ -52,12 +52,12 @@ The earlier comparison, [Gemini 4 or Gemma 4? It Depends.](https://dev.to/gde/ge
 | :--- | :--- | :--- | ---: |
 | Gemma 4 31B, 26B | `minimal` | `high` | free tier |
 | Gemini 3.5 Flash-Lite | `minimal` | `high` | $2.50 |
-| Gemini 3.8 Flash | `none` | `high` | $3.75 |
-| Gemini 4 Hydrogen | `none` | `xhigh` | $7.50 |
-| Gemini 4 Carbon | `none` | `high` | $10.00 |
-| Gemini 4 Argon | `none` | `high` | $10.00 |
+| Gemini 3.8 Flash | `low` | `high` | $3.75 |
+| Gemini 4 Hydrogen | `low` | `xhigh` | $7.50 |
+| Gemini 4 Carbon | `low` | `high` | $10.00 |
+| Gemini 4 Argon | `low` | `high` | $10.00 |
 
-Output prices include thinking tokens. Carbon and Argon go to $20 per million output tokens on 2026-12-01.
+Thinking cannot be turned off on 3.8 Flash or the Gemini 4 models, so their lowest setting is `low`. Output prices include thinking tokens. Carbon and Argon go to $20 per million output tokens on 2026-12-01.
 
 ---
 
@@ -107,7 +107,7 @@ gemini-4-argon         high   ok  thinking 241 answer 15 finish length
 gemini-4-argon         xhigh  rejected: Thinking level XHIGH is not supported for this model. Please retry with other thinking level.
 ```
 
-The lowest settings are the ones the earlier run used: `minimal` for Gemma and Flash-Lite, `none` for the rest.
+The lowest settings are the ones the earlier run used: `minimal` for Gemma and Flash-Lite, and `low` for 3.8 Flash and the Gemini 4 models. Google lists `low` as the lowest level on those four. The run sends `reasoning_effort: none`, which the endpoint accepts, and the earlier run measured it thinking the same as `low`.
 
 ---
 
@@ -156,9 +156,9 @@ Every request has a 20-minute limit and up to three retries. Two Gemma 4 26B req
 | Gemma 4 26B | 9 | 11 | +4 / −2 |
 | Gemini 3.5 Flash-Lite | 9 | 11 | +2 / −0 |
 | Gemini 3.8 Flash | 12 | 14 | +2 / −0 |
-| Gemini 4 Hydrogen | 🥇 15 | 🥇 15 | none |
-| Gemini 4 Carbon | 🥇 15 | 🥇 15 | none |
-| Gemini 4 Argon | 🥇 15 | 🥇 15 | none |
+| Gemini 4 Hydrogen | 🥇 15 | 🥇 15 | +0 / −0 |
+| Gemini 4 Carbon | 🥇 15 | 🥇 15 | +0 / −0 |
+| Gemini 4 Argon | 🥇 15 | 🥇 15 | +0 / −0 |
 
 Problem 14 is the one that separates the generations: Hydrogen, Carbon and Argon solved it at both settings, and the other four models missed it at both.
 
@@ -180,7 +180,7 @@ Costs are for all 15 problems, from the token counts the API returned times list
 
 Cost per right answer moves the same way. At the lowest setting it was $0.0162 on Argon, $0.0260 on Hydrogen and $0.0330 on Carbon; at the highest, $0.0523, $0.1232 and $0.1297, for the same 15 right answers.
 
-Hydrogen at `none` still thought on these problems, 2,468 tokens per problem on average, as it did on GSM8K. Argon thought least at both settings, and at its top setting it thought less than the others did at theirs: 4,129 tokens per problem against 11,613 to 15,742.
+Hydrogen at its lowest setting still thought on these problems, 2,468 tokens per problem on average, as it did on GSM8K. Argon thought least at both settings, and at its top setting it thought less than the others did at theirs: 4,129 tokens per problem against 11,613 to 15,742.
 
 ---
 
