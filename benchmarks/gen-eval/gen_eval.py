@@ -26,6 +26,7 @@ import os
 import re
 import sys
 import time
+import threading
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -332,13 +333,41 @@ def run(a):
     if a.limit:
         recs = recs[: a.limit]
     t0 = time.time()
-    with ThreadPoolExecutor(a.concurrency) as ex:
-        rows = list(ex.map(lambda r: one(a.upstream, a.model, a.task, r), recs))
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
+    # Every reply is appended to <out>.partial as it finishes, so a crash loses at most the replies in
+    # flight. --resume (or GEN_EVAL_RESUME=1) keeps the partial file's rows that have no error and asks
+    # only the rest; without it the partial file starts empty. <out> is written, in dataset order, at the end.
+    partial = a.out + ".partial"
+    done = {}
+    if (a.resume or setting("RESUME") == "1") and os.path.exists(partial):
+        for line in open(partial):
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue  # a line cut short by the crash
+            if "error" not in r:
+                done[r["id"]] = r
+    elif os.path.exists(partial):
+        os.remove(partial)
+    todo = [r for r in recs if r["id"] not in done]
+    lock = threading.Lock()
+    with open(partial, "a") as pf:
+
+        def ask(rec):
+            r = one(a.upstream, a.model, a.task, rec)
+            r["model"] = a.model
+            with lock:
+                pf.write(json.dumps(r) + "\n")
+                pf.flush()
+            return r
+
+        with ThreadPoolExecutor(a.concurrency) as ex:
+            new = {r["id"]: r for r in ex.map(ask, todo)}
+    rows = [done.get(rec["id"]) or new[rec["id"]] for rec in recs]
     with open(a.out, "w") as f:
         for r in rows:
-            r["model"] = a.model
             f.write(json.dumps(r) + "\n")
+    os.remove(partial)
     s = summary(rows)
     s["wall_s"] = round(time.time() - t0, 1)
     print(json.dumps(s))
@@ -368,6 +397,7 @@ def main():
     r.add_argument("out")
     r.add_argument("--limit", type=int)
     r.add_argument("--concurrency", type=int, default=16)
+    r.add_argument("--resume", action="store_true", help="keep finished rows from <out>.partial and ask only the rest")
     s = sub.add_parser("score")
     s.add_argument("out")
     a = p.parse_args()
