@@ -12,7 +12,7 @@ https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-high-vs-low
 
 The result, cost first: both settings together cost $7.47, $1.53 at the lowest and $5.95 at the highest, against a worst case of $33.23 that the run was built to stay under. The top setting cost 2.61 times as much as the lowest on Flash-Lite, 3.24 times on Argon, 3.93 times on Carbon, 4.20 times on 3.8 Flash and 4.75 times on Hydrogen.
 
-The scores: Hydrogen, Carbon and Argon solved all 15 at both settings. Flash-Lite, 3.8 Flash and both Gemma models gained one or two problems at the top setting, and on 15 problems no gain was bigger than the run-to-run noise. The thinking grew by more than the noise: the top setting used more output tokens on all 15 problems for 3.8 Flash, Hydrogen, Carbon and Argon, and on 14 of 15 for Flash-Lite.
+The scores: Hydrogen, Carbon and Argon solved all 15 at both settings. Flash-Lite, 3.8 Flash and both Gemma models gained one or two problems at the top setting, and on 15 problems no gain was bigger than the run-to-run noise. The thinking grew by more than the noise: the top setting used more output tokens on all 15 problems for Gemma 4 31B, 3.8 Flash, Hydrogen, Carbon and Argon, and on 14 of 15 for Flash-Lite.
 
 ---
 
