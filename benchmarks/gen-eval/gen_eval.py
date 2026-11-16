@@ -37,6 +37,7 @@ def setting(name, default=None):
     """GEN_EVAL_<name>, else the older JEV_<name> spelling, else default."""
     return os.environ.get("GEN_EVAL_" + name, os.environ.get("JEV_" + name, default))
 
+
 GSM8K_PROMPT = (
     "Solve the following math problem. Think step by step, then give the final answer "
     "on its own last line as 'Answer: <number>'.\n\n{question}"
@@ -291,6 +292,12 @@ def one(upstream, model, task, rec, opts=None):
         completion_tokens=r["usage"]["completion_tokens"],
         seconds=round(time.time() - t0, 2),
     )
+    # llama.cpp returns the thinking as reasoning_content and its speed and drafter counts as timings;
+    # keep both when present, so thinking can be tokenized later and drafter acceptance read per reply.
+    if msg.get("reasoning_content"):
+        out["reasoning"] = msg["reasoning_content"]
+    if isinstance(r.get("timings"), dict):
+        out["timings"] = r["timings"]
     u = r["usage"]
     if "prompt_tokens" in u:
         out["prompt_tokens"] = u["prompt_tokens"]
