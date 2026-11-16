@@ -197,17 +197,44 @@ and once at the highest.</p>
 <figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-cover.25535354.jpg" alt="High or Low Thinking? Gemini 4 and Gemma 4 on Hard Math, Cost First" /></figure>
 <p><a
 href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-high-vs-low">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-high-vs-low</a></p>
-<p>The result, cost first: both settings together cost $7.47, $1.53 at
-the lowest and $5.95 at the highest, against a worst case of $33.23 that
-the run was built to stay under. The top setting cost 2.61 times as much
-as the lowest on Flash-Lite, 3.24 times on Argon, 3.93 times on Carbon,
-4.20 times on 3.8 Flash and 4.75 times on Hydrogen.</p>
-<p>The scores: Hydrogen, Carbon and Argon solved all 15 at both
-settings. Flash-Lite, 3.8 Flash and both Gemma models gained one or two
-problems at the top setting, and on 15 problems no gain was bigger than
-the run-to-run noise. The thinking grew by more than the noise: the top
-setting used more output tokens on all 15 problems for Gemma 4 31B, 3.8
-Flash, Hydrogen, Carbon and Argon, and on 14 of 15 for Flash-Lite.</p>
+<p>The short version: the highest thinking setting cost about four times
+as much as the lowest and bought almost nothing on these problems.</p>
+<hr />
+<h4 id="the-findings">The Findings</h4>
+<p><strong>Cost.</strong> Both settings together cost $7.47: $1.53 at
+the lowest setting and $5.95 at the highest, 3.9 times as much. The run
+was budgeted for a worst case of $33.23.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-1.png"
+alt="Table: Model, Highest ÷ lowest" /></p>
+<p>The extra cost is extra thinking: mean thinking tokens per problem
+went from 215 to 4,129 on Argon and from 2,468 to 15,062 on Hydrogen.
+The highest setting also took 3.2 to 5.9 times as long per problem on
+the paid models.</p>
+<p><strong>What it bought on Gemini 4.</strong> Nothing. Hydrogen,
+Carbon and Argon solved all 15 problems at both settings, so the extra
+cost bought the same 15 answers.</p>
+<p><strong>What it bought on the smaller models.</strong> Flash-Lite,
+3.8 Flash and both Gemma 4 models solved one or two more problems each.
+On 15 problems a gain has to be about 35 points to stand out from
+run-to-run noise; the largest gain was 13 points, two problems, so these
+gains could be chance.</p>
+<p><strong>Cheapest right answer.</strong> Argon at its lowest setting,
+$0.0162 per problem. Hydrogen and Carbon at their highest settings cost
+$0.1232 and $0.1297 per right answer, 7.6 and 8.0 times as much, for the
+same score.</p>
+<p><strong>What to do with it.</strong></p>
+<ul>
+<li>🟢 For hard math on Gemini 4, start at the lowest setting.</li>
+<li>⚠️ For the smaller models, test the highest setting on your own
+problems before paying 2.6 to 4.2 times as much.</li>
+<li>⚠️ Carbon's and Argon's prices double on 2026-12-01, which widens
+the gap.</li>
+</ul>
+<p><strong>Caveats.</strong> One run of 15 problems shows what extra
+thinking costs; it cannot rank models that finish within two problems of
+each other. Google positions Carbon's highest setting for long
+multi-step work such as debugging and architecture, which this run did
+not test.</p>
 <hr />
 <h4 id="what-was-measured">What Was Measured</h4>
 <p>The earlier comparison, <a
@@ -217,7 +244,7 @@ function calls at the lowest thinking setting, where Argon scored 0.9841
 and Gemma 4 31B 0.9735. Those problems are easy enough that more
 thinking has little room to help. This run uses harder problems and both
 ends of the thinking range.</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-1.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-2.png"
 alt="Table: Model, Lowest setting, Highest setting, Output price per 1M tokens" /></p>
 <p>Output prices include thinking tokens. Carbon and Argon go to $20 per
 million output tokens on 2026-12-01.</p>
@@ -302,7 +329,7 @@ settings.</p>
 <h4 id="step-5--the-scores">Step 5 — The Scores</h4>
 <p><code>derived.py</code> builds every table from the saved
 replies.</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-2.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-3.png"
 alt="Table: Model, Right, lowest, Right, highest, Gained / lost at highest" /></p>
 <p>Problem 14 is the one that separates the generations: Hydrogen,
 Carbon and Argon solved it at both settings, and the other four models
@@ -316,7 +343,7 @@ thinking.</p>
 <hr />
 <h4 id="step-6--what-the-extra-thinking-cost">Step 6 — What the Extra
 Thinking Cost</h4>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-3.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-4.png"
 alt="Table: Model, Cost, lowest, Cost, highest, Highest ÷ lowest, Mean thinking tokens, lowest → highest" /></p>
 <p>Costs are for all 15 problems, from the token counts the API returned
 times list prices.</p>
@@ -336,7 +363,7 @@ research-kit, a Claude Code plugin for checking research statistics: an
 exact paired test on the same problems for the scores, a signed-rank
 test on each problem's output tokens, and 95% Wilson intervals, all
 computed in <code>audit_stats.py</code>.</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-4.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-5.png"
 alt="Table: Model, Right, highest 95% range, Right, lowest 95% range, Paired test on scores, Output tokens, highest / lowest" /></p>
 <p>Ranges are percentages. With 15 problems, a gain has to be about 25
 points against a fixed score, or 35 points between two runs, to stand
@@ -347,7 +374,7 @@ which used more tokens at the top setting on 11 of 15 problems because
 four of its lowest-setting answers ran to the limit too.</p>
 <hr />
 <h4 id="step-8--time">Step 8 — Time</h4>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-5.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-6.png"
 alt="Table: Model, Median seconds per problem, lowest, Highest" /></p>
 <p>The top setting took 3.2 to 5.9 times as long on the paid models. The
 free-tier Gemma models were the slowest at both settings, and the run's
@@ -363,13 +390,13 @@ budget, and send problems in rounds so a stop leaves every model on the
 same problems.</p>
 <hr />
 <h4 id="compare-and-contrast">Compare and Contrast</h4>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-6.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-7.png"
 alt="Table: Lowest setting, Highest setting" /></p>
 <hr />
 <h4 id="what-1000-problems-like-these-would-cost">What 1,000 Problems
 Like These Would Cost</h4>
 <p>Arithmetic from the measured cost per problem, at list prices:</p>
-<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-7.png"
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-8.png"
 alt="Table: Model, Lowest, Highest" /></p>
 <p>At the 2026-12-01 prices, Carbon becomes $65.96 and $259.45 per
 1,000, and Argon $32.33 and $104.62. Gemma 4 is $0 on the free tier, at
