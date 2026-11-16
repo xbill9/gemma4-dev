@@ -3,7 +3,7 @@ title: "High or Low Thinking? Gemini 4 and Gemma 4 on Hard Math, Cost First"
 published: false
 description: "Seven models on the 15 problems of AIME 2025 I at their lowest and highest thinking settings, under a hard budget. The top setting cost 2.6 to 4.8 times as much on every paid model; Hydrogen, Carbon and Argon solved all 15 at either setting, and no score change was bigger than the run-to-run noise."
 tags: gemini, gemma, benchmark, ai
-cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/devto-cover.25535354.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/devto-cover.8e6eb323.jpg
 ---
 
 This article provides a step by step guide to measuring what extra thinking buys on hard problems, and what it costs. Seven models, Gemma 4 26B and 31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and Gemini 4 Hydrogen, Carbon and Argon, answer the same 15 competition math problems twice through the Gemini API: once at the lowest thinking setting each accepts and once at the highest.
