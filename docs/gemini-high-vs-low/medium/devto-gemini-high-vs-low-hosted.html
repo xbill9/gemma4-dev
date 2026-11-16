@@ -5,7 +5,7 @@
   <meta name="generator" content="pandoc 3.11" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
   <title>High or Low Thinking? Gemini 4 and Gemma 4 on Hard Math, Cost First</title>
-  <meta name="description" content="Seven models on the 15 problems of AIME 2025 I at their lowest and highest thinking settings, under a hard budget. The top setting cost 2.6 to 4.8 times as much on every paid model; Hydrogen, Carbon and Argon solved all 15 at either setting, and no score change was bigger than the run-to-run noise." />
+  <meta name="description" content="Seven models on the 15 problems of AIME 2025 I at their lowest and highest thinking settings, under a hard budget. The top setting cost 2.6 to 4.8 times as much on every paid model; Hydrogen, Carbon and Argon solved all 15 at either setting, and no score change was large enough to rule out chance on 15 problems." />
   <style>
     /* Default styles provided by pandoc.
     ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -215,9 +215,9 @@ Carbon and Argon solved all 15 problems at both settings, so the extra
 cost bought the same 15 answers.</p>
 <p><strong>What it bought on the smaller models.</strong> Flash-Lite,
 3.8 Flash and both Gemma 4 models solved one or two more problems each.
-On 15 problems a gain has to be about 35 points to stand out from
-run-to-run noise; the largest gain was 13 points, two problems, so these
-gains could be chance.</p>
+On 15 problems a gain has to be about 35 points before chance stops
+being a likely explanation; the largest gain was 13 points, two
+problems, so these gains could be chance.</p>
 <p><strong>Cheapest right answer.</strong> Argon at its lowest setting,
 $0.0162 per problem. Hydrogen and Carbon at their highest settings cost
 $0.1232 and $0.1297 per right answer, 7.6 and 8.0 times as much, for the
@@ -359,10 +359,11 @@ answers.</p>
 <p>Hydrogen at its lowest setting still thought on these problems, 2,468
 tokens per problem on average, as it did on GSM8K. Argon thought least
 at both settings, and at its top setting it thought less than the others
-did at theirs: 4,129 tokens per problem against 11,613 to 15,742.</p>
+did at theirs: 4,129 tokens per problem against 11,613 to 15,062 for the
+other paid models.</p>
 <hr />
-<h4 id="step-7--is-the-difference-bigger-than-the-noise">Step 7 — Is the
-Difference Bigger Than the Noise?</h4>
+<h4 id="step-7--is-the-difference-bigger-than-chance">Step 7 — Is the
+Difference Bigger Than Chance?</h4>
 <p>The audit follows the <code>ablation-stat-auditor</code> skill from
 research-kit, a Claude Code plugin for checking research statistics: an
 exact paired test on the same problems for the scores, a signed-rank
@@ -372,11 +373,13 @@ computed in <code>audit_stats.py</code>.</p>
 alt="Table: Model, Right, highest 95% range, Right, lowest 95% range, Paired test on scores, Output tokens, highest / lowest" /></p>
 <p>Ranges are percentages. With 15 problems, a gain has to be about 25
 points against a fixed score, or 35 points between two runs, to stand
-out from the noise. The largest gain here, two problems, is 13 points.
-So the score changes are within the noise for every model, and the extra
-tokens are bigger than the noise for every model except Gemma 4 26B,
-which used more tokens at the top setting on 11 of 15 problems because
-four of its lowest-setting answers ran to the limit too.</p>
+out from chance. The largest gain here, two problems, is 13 points. So
+every model's score change could be chance, and the extra tokens are
+beyond chance for every model except Gemma 4 26B, which used more tokens
+at the top setting on 11 of 15 problems because four of its
+lowest-setting answers ran to the limit too. These ranges cover which 15
+problems were drawn, from one run of each model and setting; how far a
+score moves when the same run is repeated was not measured.</p>
 <hr />
 <h4 id="step-8--time">Step 8 — Time</h4>
 <p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/medium/img/devto-gemini-high-vs-low-table-6.png"
@@ -413,8 +416,8 @@ Hydrogen, Carbon and Argon solved all 15 problems there, and the top
 setting added 3.24 to 4.75 times the cost and 3.2 to 5.9 times the time
 for the same answers.</p>
 <p>For the smaller models, the top setting gained one or two problems
-each, within the noise on 15 problems, for 2.61 times the cost on
-Flash-Lite and 4.20 times on 3.8 Flash. Measure on your own problems
+each, too few on 15 problems to rule out chance, for 2.61 times the cost
+on Flash-Lite and 4.20 times on 3.8 Flash. Measure on your own problems
 before paying that.</p>
 <p>For the lowest cost per right answer on this set, Argon at its lowest
 setting: $0.0162. It also thought least at its top setting.</p>
@@ -434,8 +437,8 @@ before the first request. The results were:</p>
 lowest and highest settings.</li>
 <li>⚠️ The highest setting cost 2.61 to 4.75 times the lowest on every
 paid model, $5.95 against $1.53 for all seven.</li>
-<li>⚠️ No model's score change was bigger than the run-to-run noise; the
-largest gain was two problems.</li>
+<li>⚠️ No model's score change was large enough to rule out chance on 15
+problems; the largest gain was two problems.</li>
 <li>🟢 Argon had the lowest cost per right answer, $0.0162 at its lowest
 setting.</li>
 <li>🟢 The whole pilot cost $7.47 against a worst case of $33.23.</li>

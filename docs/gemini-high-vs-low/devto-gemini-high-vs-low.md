@@ -1,7 +1,7 @@
 ---
 title: "High or Low Thinking? Gemini 4 and Gemma 4 on Hard Math, Cost First"
 published: false
-description: "Seven models on the 15 problems of AIME 2025 I at their lowest and highest thinking settings, under a hard budget. The top setting cost 2.6 to 4.8 times as much on every paid model; Hydrogen, Carbon and Argon solved all 15 at either setting, and no score change was bigger than the run-to-run noise."
+description: "Seven models on the 15 problems of AIME 2025 I at their lowest and highest thinking settings, under a hard budget. The top setting cost 2.6 to 4.8 times as much on every paid model; Hydrogen, Carbon and Argon solved all 15 at either setting, and no score change was large enough to rule out chance on 15 problems."
 tags: gemini, gemma, benchmark, ai
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-high-vs-low/devto-cover.8e6eb323.jpg
 ---
@@ -30,7 +30,7 @@ The extra cost is extra thinking: mean thinking tokens per problem went from 215
 
 **What it bought on Gemini 4.** Nothing. Hydrogen, Carbon and Argon solved all 15 problems at both settings, so the extra cost bought the same 15 answers.
 
-**What it bought on the smaller models.** Flash-Lite, 3.8 Flash and both Gemma 4 models solved one or two more problems each. On 15 problems a gain has to be about 35 points to stand out from run-to-run noise; the largest gain was 13 points, two problems, so these gains could be chance.
+**What it bought on the smaller models.** Flash-Lite, 3.8 Flash and both Gemma 4 models solved one or two more problems each. On 15 problems a gain has to be about 35 points before chance stops being a likely explanation; the largest gain was 13 points, two problems, so these gains could be chance.
 
 **Cheapest right answer.** Argon at its lowest setting, $0.0162 per problem. Hydrogen and Carbon at their highest settings cost $0.1232 and $0.1297 per right answer, 7.6 and 8.0 times as much, for the same score.
 
@@ -180,11 +180,11 @@ Costs are for all 15 problems, from the token counts the API returned times list
 
 Cost per right answer moves the same way. At the lowest setting it was $0.0162 on Argon, $0.0260 on Hydrogen and $0.0330 on Carbon; at the highest, $0.0523, $0.1232 and $0.1297, for the same 15 right answers.
 
-Hydrogen at its lowest setting still thought on these problems, 2,468 tokens per problem on average, as it did on GSM8K. Argon thought least at both settings, and at its top setting it thought less than the others did at theirs: 4,129 tokens per problem against 11,613 to 15,742.
+Hydrogen at its lowest setting still thought on these problems, 2,468 tokens per problem on average, as it did on GSM8K. Argon thought least at both settings, and at its top setting it thought less than the others did at theirs: 4,129 tokens per problem against 11,613 to 15,062 for the other paid models.
 
 ---
 
-#### Step 7 — Is the Difference Bigger Than the Noise?
+#### Step 7 — Is the Difference Bigger Than Chance?
 
 The audit follows the `ablation-stat-auditor` skill from research-kit, a Claude Code plugin for checking research statistics: an exact paired test on the same problems for the scores, a signed-rank test on each problem's output tokens, and 95% Wilson intervals, all computed in `audit_stats.py`.
 
@@ -198,7 +198,7 @@ The audit follows the `ablation-stat-auditor` skill from research-kit, a Claude 
 | Gemini 4 Carbon | 15 [79.6, 100.0] | 15 [79.6, 100.0] | p = 1 | 194,037 / 48,915, p = 6.1e-05 |
 | Gemini 4 Argon | 15 [79.6, 100.0] | 15 [79.6, 100.0] | p = 1 | 77,914 / 23,694, p = 6.1e-05 |
 
-Ranges are percentages. With 15 problems, a gain has to be about 25 points against a fixed score, or 35 points between two runs, to stand out from the noise. The largest gain here, two problems, is 13 points. So the score changes are within the noise for every model, and the extra tokens are bigger than the noise for every model except Gemma 4 26B, which used more tokens at the top setting on 11 of 15 problems because four of its lowest-setting answers ran to the limit too.
+Ranges are percentages. With 15 problems, a gain has to be about 25 points against a fixed score, or 35 points between two runs, to stand out from chance. The largest gain here, two problems, is 13 points. So every model's score change could be chance, and the extra tokens are beyond chance for every model except Gemma 4 26B, which used more tokens at the top setting on 11 of 15 problems because four of its lowest-setting answers ran to the limit too. These ranges cover which 15 problems were drawn, from one run of each model and setting; how far a score moves when the same run is repeated was not measured.
 
 ---
 
@@ -231,7 +231,7 @@ Before the run, the only number that can be known is the worst case: problems ti
 | Both arms, 7 models | 🥇 $1.53 | $5.95 |
 | Gemini 4 scores | 🥇 15, 15, 15 | 🥇 15, 15, 15 |
 | Smaller models' scores | 9 to 12 | 11 to 14 |
-| Extra tokens beyond the noise | — | every paid model |
+| Extra tokens beyond chance | — | every paid model |
 | Median time, paid models | 🥇 9.8 to 22.9 s | 32.8 to 134.3 s |
 
 ---
@@ -256,7 +256,7 @@ At the 2026-12-01 prices, Carbon becomes $65.96 and $259.45 per 1,000, and Argon
 
 For hard math on the Gemini 4 models, start at the lowest setting. Hydrogen, Carbon and Argon solved all 15 problems there, and the top setting added 3.24 to 4.75 times the cost and 3.2 to 5.9 times the time for the same answers.
 
-For the smaller models, the top setting gained one or two problems each, within the noise on 15 problems, for 2.61 times the cost on Flash-Lite and 4.20 times on 3.8 Flash. Measure on your own problems before paying that.
+For the smaller models, the top setting gained one or two problems each, too few on 15 problems to rule out chance, for 2.61 times the cost on Flash-Lite and 4.20 times on 3.8 Flash. Measure on your own problems before paying that.
 
 For the lowest cost per right answer on this set, Argon at its lowest setting: $0.0162. It also thought least at its top setting.
 
@@ -270,7 +270,7 @@ The goal of this article was to measure what the highest thinking setting buys o
 
 - 🟢 Hydrogen, Carbon and Argon solved all 15 problems at both their lowest and highest settings.
 - ⚠️ The highest setting cost 2.61 to 4.75 times the lowest on every paid model, $5.95 against $1.53 for all seven.
-- ⚠️ No model's score change was bigger than the run-to-run noise; the largest gain was two problems.
+- ⚠️ No model's score change was large enough to rule out chance on 15 problems; the largest gain was two problems.
 - 🟢 Argon had the lowest cost per right answer, $0.0162 at its lowest setting.
 - 🟢 The whole pilot cost $7.47 against a worst case of $33.23.
 - ⚠️ The highest setting took 3.2 to 5.9 times as long per problem on the paid models.
