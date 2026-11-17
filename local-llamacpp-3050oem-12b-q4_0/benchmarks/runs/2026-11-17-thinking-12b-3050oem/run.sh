@@ -32,7 +32,7 @@ commit_run() {
   ( cd $ROOT && git add "$REL" && \
     git -c user.name=xbill -c user.email=xbill9@gmail.com commit -q -m "$1" \
       -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" -- "$REL" && \
-    { git push -q 2>/dev/null || { git pull --rebase -q && git push -q; }; } ) \
+    { git push -q 2>/dev/null || { git pull --no-rebase -q --no-edit && git push -q; }; } ) \
     && state "PUSHED: $(git -C $ROOT log --oneline -1 | cut -c1-80)" || state "COMMIT/PUSH FAILED (left committed locally)"
 }
 # serve LOG GGUF DRAFTER: tries each context in CTX_TRY until one loads; records which.
