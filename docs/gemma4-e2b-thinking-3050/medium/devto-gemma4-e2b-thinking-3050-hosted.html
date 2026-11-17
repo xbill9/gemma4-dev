@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Thinking On or Off? Gemma 4 E2B on an 8 GB RTX 3050</title>
+  <meta name="description" content="Gemma 4 E2B on a local RTX 3050 with thinking off and on, two QAT 4-bit builds, with and without a drafter, on all 1,319 GSM8K problems and the 30 problems of AIME 2025. Thinking doubled the time and moved no score beyond chance; the drafter cut the time by 1.55 to 2.04 times and changed no score." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to measuring what thinking
+buys a small model on a local GPU, and what it costs in time. Gemma 4
+E2B runs on an 8 GB RTX 3050 through llama.cpp and answers every GSM8K
+test problem and all 30 AIME 2025 problems with thinking off and with
+thinking on, on two 4-bit builds of the same QAT weights, each with and
+without a drafter.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-cover.6b0d9ada.jpg" alt="Thinking On or Off? Gemma 4 E2B on an 8 GB RTX 3050" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-thinking-3050">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-thinking-3050</a></p>
+<p>The short version: thinking doubled the time on GSM8K and changed no
+score by more than chance, while the drafter nearly halved the time and
+changed no score at all.</p>
+<hr />
+<h4 id="the-findings">The Findings</h4>
+<p><strong>What thinking cost.</strong> On GSM8K, thinking on produced
+2.15 to 2.22 times as many tokens per problem and took 2.18 to 2.31
+times as long. On AIME it took 1.44 to 1.71 times as long.</p>
+<p><strong>What thinking bought.</strong> Nothing measurable. Across the
+four setups, GSM8K moved by −11, −1, +12 and +18 problems, and none
+passes a paired test (p = 0.0982 to 1.0). AIME gained zero to four
+problems, again within chance.</p>
+<p><strong>What the drafter bought.</strong> Every cell finished 1.55 to
+2.04 times sooner with Google's QAT drafter, at 195.1 against 109.2
+generated tokens per second on GSM8K with the repack. It changed no
+score beyond chance in any of eight paired tests.</p>
+<p><strong>The two weight builds.</strong> The exact Q4_0 repack and
+Google's QAT Q4_0 file scored level on every paired test. The repack is
+2.62 GB against 3.35 GB, loads in 3,610 MiB against 4,306 MiB, and
+generates 6.5 to 9.7 percent faster.</p>
+<p><strong>What to do with it.</strong></p>
+<ul>
+<li>🟢 Serve E2B with the drafter. It is the one change here that pays
+every time.</li>
+<li>⚠️ Leave thinking off for grade-school math on E2B; on hard math,
+measure it on your own problems first.</li>
+<li>🟢 Either 4-bit QAT build gives the same answers; the repack is
+smaller and faster.</li>
+</ul>
+<p><strong>Caveats.</strong> One run of each setting, temperature 0.
+AIME's 30 problems can only show large effects.</p>
+<hr />
+<h4 id="what-was-measured">What Was Measured</h4>
+<p>The earlier article, <a
+href="https://dev.to/gde/high-or-low-thinking-gemini-4-and-gemma-4-on-hard-math-cost-first-3091">High
+or Low Thinking?</a>, set hosted Gemini and Gemma models at their lowest
+and highest thinking settings. On a local GPU the bill is time instead
+of money, and Gemma 4's chat template has only two thinking settings:
+off and on.</p>
+<p>Everything else stays fixed. One model, Gemma 4 E2B, on one card,
+with three factors crossed:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-1.png"
+alt="Table: Factor, Settings" /></p>
+<p>That is 16 runs, 18.81 hours of GPU time, every reply saved.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA card with 8 GB, here an RTX 3050 OEM on driver
+615.78.08</li>
+<li>llama.cpp built with CUDA, here commit <code>7182ef71e</code></li>
+<li>Python 3 with <code>huggingface_hub</code>, <code>tokenizers</code>
+and <code>scipy</code></li>
+<li>A clone of <a
+href="https://github.com/xbill9/gemma4-dev">gemma4-dev</a></li>
+</ul>
+<hr />
+<h4 id="step-1--two-builds-of-the-same-weights-and-a-drafter">Step 1 —
+Two Builds of the Same Weights, and a Drafter</h4>
+<p>Google trained Gemma 4 E2B to run at 4 bits (quantization-aware
+training, QAT) and ships it as a Q4_0 GGUF. The repack,
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf</code>, stores the same
+QAT 4-bit values in a smaller file.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-2.png"
+alt="Table: File, Bytes, Card memory when serving" /></p>
+<p>The drafter is Google's small E2B QAT assistant model, stored as
+exact Q4_0. It guesses the next two tokens and the main model checks
+them in one step, so accepted guesses come out for the price of one
+step.</p>
+<p>Every run serves the same way: the full 131,072-token context, one
+request at a time, temperature 0, and a 32,768-token limit on each
+reply, thinking included.</p>
+<hr />
+<h4 id="step-2--run-all-sixteen">Step 2 — Run All Sixteen</h4>
+<pre class="bash"><code>cd local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-11-16-thinking-e2b-3050oem
+setsid nohup ./run.sh &gt; nohup.out 2&gt;&amp;1 &lt; /dev/null &amp;</code></pre>
+<p><code>run.sh</code> starts the server once per weights and drafter
+pair and runs four cells on it: GSM8K thinking off, AIME off, AIME on,
+GSM8K on. The scoring script asks for the final answer on its own last
+line as <code>Answer: &lt;number&gt;</code> and marks a reply right when
+that number matches. Each reply is saved as it finishes, so
+<code>resume.sh</code> picks a stopped run up where it left off.</p>
+<p>The run's own log, <code>driver.log</code>, shows one line per
+cell:</p>
+<pre><code>2026-11-16 17:04:42 64, 1890 MHz END gsm8k repack-none thinking=off rc=0 {&quot;task&quot;: &quot;gsm8k&quot;, &quot;max_tokens&quot;: 32768, &quot;n&quot;: 1319, &quot;right&quot;: 1189, &quot;accuracy&quot;: 0.9014, &quot;errors&quot;: 0, &quot;truncated&quot;: 0, ...</code></pre>
+<p>That first cell, 0.9014, matches what the same build with thinking
+off scored on this card in October, there with a 2,048-token reply
+limit.</p>
+<hr />
+<h4 id="step-3--the-scores">Step 3 — The Scores</h4>
+<p><code>analyze.py</code> builds every table from the saved
+replies.</p>
+<p><strong>GSM8K, 1,319 problems</strong></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-3.png"
+alt="Table: Weights, Drafter, Thinking off, Thinking on" /></p>
+<p>All eight sit between 0.8908 and 0.9052, and every 95% range overlaps
+every other.</p>
+<p><strong>AIME 2025, 30 problems, right answers</strong></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-4.png"
+alt="Table: Weights, Drafter, Thinking off, Thinking on" /></p>
+<p>Two to five AIME replies per cell ran into the 32,768-token limit and
+count as wrong. With thinking off they ran out while writing the answer;
+with thinking on they ran out while still thinking. One GSM8K reply did
+the same, with thinking on.</p>
+<hr />
+<h4 id="step-4--where-the-tokens-go">Step 4 — Where the Tokens Go</h4>
+<p><code>tokens.py</code> counts thinking and answer tokens in each
+saved reply with Gemma 4 E2B's tokenizer. Its count matches the server's
+on every reply, up to the fixed end-of-turn and thinking markers.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-5.png"
+alt="Table: GSM8K off, GSM8K on, AIME off, AIME on" /></p>
+<p>Thinking moves the working from the answer into the thinking text. On
+GSM8K the answer shrinks by about a third and about 600 thinking tokens
+are added in front of it. With thinking off on AIME, E2B works the
+problem out in the answer itself, at 5,812 to 6,548 tokens per reply;
+with thinking on, that working moves into the thinking text and
+grows.</p>
+<p>Thinking on used more tokens on 1,301 to 1,307 of the 1,319 GSM8K
+problems and on 26 of 30 AIME problems in every setup, which is far
+beyond chance (signed-rank p below 0.0012 in all eight).</p>
+<hr />
+<h4 id="step-5--time-and-the-drafter">Step 5 — Time and the Drafter</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-6.png"
+alt="Table: Weights, Drafter, GSM8K off, GSM8K on, AIME off, AIME on" /></p>
+<p>The drafter made every cell 1.55 to 2.04 times faster. The main model
+accepted 0.80 of the drafted tokens on GSM8K and 0.83 to 0.86 on AIME,
+and GSM8K generation rose from 99.1–109.2 tokens per second to
+178.4–195.1.</p>
+<p>Per problem, GSM8K took 2.11 seconds with the repack, the drafter and
+thinking off, and 9.05 seconds with Google's file, no drafter and
+thinking on.</p>
+<hr />
+<h4 id="step-6--is-any-difference-bigger-than-chance">Step 6 — Is Any
+Difference Bigger Than Chance?</h4>
+<p>The same problems ran in every cell, so each comparison is an exact
+paired test on the problems one setting got right and the other got
+wrong.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-7.png"
+alt="Table: Comparison, GSM8K, Right only before, Right only after, p" /></p>
+<p>Thinking changed the answer on 79 to 106 GSM8K problems in each
+setup, in both directions, and the wins and losses come out close to
+even. On AIME no comparison does better than p = 0.125. The full table
+of 24 tests is in <code>RESULTS.md</code>.</p>
+<hr />
+<h4
+id="mag_right-tip-turn-the-drafter-on-before-you-turn-thinking-on">🔎
+Tip: Turn the Drafter On Before You Turn Thinking On</h4>
+<p>Both change how long an answer takes. The drafter bought 1.55 to 2.04
+times the speed and changed no answer beyond chance; thinking cost 1.44
+to 2.31 times the time and bought no answer beyond chance. If a small
+local model is to think, serve it with a drafter so the extra tokens
+come out at nearly twice the speed.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-8.png"
+alt="Table: Thinking off, Thinking on" /></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-3050/medium/img/devto-gemma4-e2b-thinking-3050-table-9.png"
+alt="Table: Repack, Google file" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For Gemma 4 E2B on a small GPU, turn the drafter on. It cut every
+run's time by 1.55 to 2.04 times on both builds and both tasks, cost 192
+MiB of card memory, and changed no score.</p>
+<p>Leave thinking off for grade-school math. On GSM8K it doubled the
+time and the score moved by no more than chance, down on one build and
+up on the other.</p>
+<p>On hard math, thinking on gave zero to four more right AIME answers.
+That could be chance on 30 problems; measure on your own hard problems
+before paying 1.44 to 1.71 times the time.</p>
+<p>Between the two 4-bit builds, take the repack: same answers, smaller
+file, less card memory, faster generation.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to measure what thinking buys Gemma 4
+E2B on a local GPU and what it costs in time. The key to the solution
+was holding the model and card fixed and crossing thinking with the
+weight build and the drafter, on the same 1,349 problems in every cell.
+The results were:</p>
+<ul>
+<li>⚠️ Thinking took 2.18 to 2.31 times as long on GSM8K and 1.44 to
+1.71 times on AIME.</li>
+<li>❌ No thinking change in score was beyond chance: −11 to +18 GSM8K
+problems, zero to four AIME problems.</li>
+<li>🟢 The drafter made every run 1.55 to 2.04 times faster and changed
+no score beyond chance.</li>
+<li>🟢 The exact Q4_0 repack and Google's QAT file scored level; the
+repack is 0.73 GB smaller and 6.5 to 9.7 percent faster.</li>
+<li>⚠️ With thinking off, E2B writes its working into the answer: 5,812
+to 6,548 tokens per AIME reply.</li>
+<li>⚠️ Two to five AIME replies per run hit the 32,768-token limit.</li>
+</ul>
+<p>Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp
+<code>7182ef71e</code>, Gemma 4 E2B only, one run of each of 16 settings
+on 2026-11-16 and 17, temperature 0, one request at a time, the full
+131,072-token context, a 32,768-token reply limit. GSM8K is all 1,319
+test problems and AIME 2025 is papers I and II. Times are for this card
+and move with clock and temperature; the larger models, E4B and 12B, are
+measured separately.</p>
+<p>The strategy for measuring thinking against a drafter on a local GPU
+was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-11-16-thinking-e2b-3050oem">This
+run: replies, logs, analysis</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/benchmarks/gen-eval">The
+scoring script</a></li>
+<li><a
+href="https://dev.to/gde/high-or-low-thinking-gemini-4-and-gemma-4-on-hard-math-cost-first-3091">High
+or Low Thinking? Gemini 4 and Gemma 4 on Hard Math, Cost First</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">Exact
+Q4_0 repack of Gemma 4 E2B QAT</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf">Google's
+Gemma 4 E2B QAT Q4_0 GGUF</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-assistant-q4_0-exact-gguf">Exact
+Q4_0 E2B QAT drafter</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
