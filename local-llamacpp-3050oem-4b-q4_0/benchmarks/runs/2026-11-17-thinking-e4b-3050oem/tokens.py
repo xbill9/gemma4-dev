@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thinking and answer tokens per reply, counted with Gemma 4 E2B's tokenizer.json (pass its path).
+"""Thinking and answer tokens per reply, counted with Gemma 4 E4B's tokenizer.json (pass its path).
 Control: on thinking-off replies, completion_tokens - tokens(text) must be the same constant on every
 reply (the end-of-turn token); on thinking-on replies, completion_tokens - tokens(text) - tokens(reasoning)
 likewise (the thinking delimiters). Also a Wilcoxon signed-rank test on each problem's generated tokens,
@@ -12,7 +12,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 T = Tokenizer.from_file(sys.argv[1])
 n = lambda s: len(T.encode(s or "", add_special_tokens=False).ids)
 ARMS = ["repack-none", "repack-q4x", "google-none", "google-q4x"]
-out, L = {}, ["# Thinking and answer tokens, wave 1", "", "Counted by `tokens.py` with Gemma 4 E2B's tokenizer.", ""]
+out, L = {}, ["# Thinking and answer tokens, wave 2", "", "Counted by `tokens.py` with Gemma 4 E4B's tokenizer.", ""]
 ctrl = Counter()
 for t in ("gsm8k", "aime2025"):
     L += [f"## {t}", "", "| arm | thinking | mean thinking tokens | mean answer tokens | median answer tokens | generated tokens, on vs off: Wilcoxon p | problems with more tokens when on |", "|---|---|---|---|---|---|---|"]
