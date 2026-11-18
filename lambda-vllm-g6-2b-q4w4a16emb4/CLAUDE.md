@@ -35,7 +35,16 @@ has no `AcceleratorConfig`; aws-cli 2.41 does), `image/Dockerfile` bakes the che
 - **No streaming.** The AWS pages document sync, async and event-source invocation only, and the image's
   handler returns the whole completion. Time to first token cannot be measured through it.
 
+## Chat page
+
+`make ui` serves `chat_ui.py` on http://localhost:8768 (`UI_PORT`), forked from
+`tokenlab-sglang-amd-31b/chat_ui.py` (itself from `~/tpu-inference/tpu-vllm-v5e1-2b/chat_ui.py`). The local proxy
+turns each `/v1/chat/completions` POST into a synchronous boto3 `Invoke` of `$LATEST.PUBLISHED` with this machine's
+AWS credentials, so nothing about AWS reaches the browser. No stream, so the page shows the whole reply with its round
+trip and end-to-end tok/s; the panel shows the version's state and scaling (`/ui/status`, cached 10 s) and this
+session's counts. Text only (the function serves `--language-model-only`), so the Token Lab page's image button is gone.
+
 ## Commands
 
-`make deploy | status | ask Q='…' [THINK=1] | up | down | destroy | test | lint`.
+`make deploy | status | ui | ask Q='…' [THINK=1] | up | down | destroy | test | lint`.
 Tests are `unittest`, offline.
