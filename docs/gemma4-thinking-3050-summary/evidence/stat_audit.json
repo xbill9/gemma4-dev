@@ -1,0 +1,121 @@
+{
+ "run": "/home/xbill/gemma4-dev/local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-11-17-thinking-e4b-3050oem",
+ "claims": [
+  {
+   "id": "e2b->e4b gsm8k gain",
+   "statement": "E4B got 35 to 58 more GSM8K problems right than E2B",
+   "paper_value": {
+    "min": 35,
+    "max": 58
+   },
+   "paper_source": "e2b-vs-e4b.md Findings",
+   "computed": {
+    "min": 35,
+    "max": 58
+   },
+   "verdict": "VERIFIED",
+   "reason": "k(E4B) - k(E2B) per cell",
+   "conclusion": "HOLDS"
+  },
+  {
+   "id": "e2b->e4b gsm8k p",
+   "statement": "beyond chance in all eight setups (p = 0.00082 or smaller)",
+   "paper_value": {
+    "p_max": 0.00082
+   },
+   "paper_source": "e2b-vs-e4b.md Findings",
+   "computed": {
+    "p_max": 0.00082
+   },
+   "verdict": "VERIFIED",
+   "reason": "exact McNemar per cell",
+   "conclusion": "HOLDS"
+  },
+  {
+   "id": "e2b->e4b aime off",
+   "statement": "AIME thinking off: E4B 10 to 13 against E2B 5 to 7, beyond chance in two of four",
+   "paper_value": {
+    "e4b": [
+     10,
+     13
+    ],
+    "e2b": [
+     5,
+     7
+    ],
+    "passing": 2
+   },
+   "paper_source": "e2b-vs-e4b.md Step 5",
+   "computed": {
+    "e4b": [
+     10,
+     13
+    ],
+    "e2b": [
+     5,
+     7
+    ],
+    "passing": 2
+   },
+   "verdict": "VERIFIED",
+   "reason": "exact McNemar per cell",
+   "conclusion": "TWO OF FOUR"
+  },
+  {
+   "id": "e2b->e4b aime on",
+   "statement": "AIME thinking on: level, E4B 9 to 12 against E2B 6 to 10",
+   "paper_value": {
+    "e4b": [
+     9,
+     12
+    ],
+    "e2b": [
+     6,
+     10
+    ]
+   },
+   "paper_source": "e2b-vs-e4b.md Step 5",
+   "computed": {
+    "e4b": [
+     9,
+     12
+    ],
+    "e2b": [
+     6,
+     10
+    ],
+    "p_min": 0.0703
+   },
+   "verdict": "VERIFIED",
+   "reason": "exact McNemar per cell",
+   "conclusion": "WITHIN NOISE"
+  },
+  {
+   "id": "four tests by chance",
+   "statement": "with four tests, one passing at 0.05 happens by chance alone 18.5 percent of the time",
+   "paper_value": {
+    "pct": 18.5
+   },
+   "paper_source": "e2b-vs-e4b.md Findings",
+   "computed": {
+    "pct": 18.55
+   },
+   "verdict": "VERIFIED",
+   "reason": "1 - 0.95^4, independent tests assumed",
+   "conclusion": "HOLDS"
+  }
+ ],
+ "mcp_crosscheck": {
+  "tool": "research-audit MCP (research-kit 1.3.1), 2026-11-18",
+  "mcnemar E2B->E4B gsm8k repack-q4x off (b=70,c=35)": {
+   "p_value": 0.00082145253889575,
+   "script_p": 0.00082,
+   "match": true
+  },
+  "mcnemar E2B->E4B aime google-q4x off (b=8,c=0)": {
+   "p_value": 0.0078125,
+   "script_p": 0.0078,
+   "match": true
+  }
+ }
+}
