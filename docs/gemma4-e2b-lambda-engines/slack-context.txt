@@ -1,0 +1,2 @@
+Five serving engines for Gemma 4 E2B, each as its own AWS Lambda GPU function on one NVIDIA L4 and each measured against the same engine on a plain EC2 G6: vLLM, SGLang, llama.cpp, a hand-built PyTorch int4 engine and a pure-JAX port, with a local chat page for each.
+vLLM with Google's drafter is the fastest for one request on both platforms (218.6 tok/s through Lambda, 275.3 on EC2). Lambda adds 0.045 to 0.241 s to each request, so one request runs at 0.79 to 0.99 of EC2 speed, and engines start as fast in Lambda as on EC2.
