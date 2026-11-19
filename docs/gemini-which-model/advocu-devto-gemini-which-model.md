@@ -29,7 +29,7 @@ https://dev.to/gde/which-gemini-model-should-you-use-neon-argon-hydrogen-carbon-
 advocu-devto-gemini-which-model-cover.webp (1376x578 WebP, 31 KB, from devto-cover.73a2bdd7.jpg)
 
 ---
-draft id: 6aff515826f7ac596f9bfd64
+draft id: 6aff515826f7ac596f9bfd64 (submitted 2026-11-19 with tag AI - Gemini and the WebP cover)
 
 The draft is in app.advocu.com -> My activities -> Drafts. The API has no
 image field and no submit: open the draft, attach the cover on step 2,
