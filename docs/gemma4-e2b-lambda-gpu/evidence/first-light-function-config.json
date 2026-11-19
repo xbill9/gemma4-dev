@@ -1,0 +1,52 @@
+{
+    "FunctionName": "gemma4-e2b-g6",
+    "FunctionArn": "arn:aws:lambda:us-east-1:ACCOUNT:function:gemma4-e2b-g6:$LATEST.PUBLISHED",
+    "Role": "arn:aws:iam::ACCOUNT:role/lambda-lmi-gpu-exec",
+    "CodeSize": 0,
+    "Description": "",
+    "Timeout": 900,
+    "MemorySize": 16384,
+    "LastModified": "2026-11-18T22:52:42.000+0000",
+    "CodeSha256": "b50a0edc0008230be7347c9c819d60adee929dbf4b8205d8e426dfd9cd4c5a52",
+    "Version": "$LATEST.PUBLISHED",
+    "Environment": {
+        "Variables": {
+            "MODEL_ID": "/opt/model",
+            "SERVED_MODEL_NAME": "xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4",
+            "VLLM_SERVER_TIMEOUT": "840",
+            "VLLM_SERVER_ARGS": "--max-num-seqs 64 --language-model-only --enable-auto-tool-choice --tool-call-parser gemma4 --reasoning-parser gemma4",
+            "VLLM_GPU_MEM_UTIL": "0.85",
+            "VLLM_MAX_MODEL_LEN": "16384"
+        }
+    },
+    "TracingConfig": {
+        "Mode": "PassThrough"
+    },
+    "RevisionId": "ec449751-1838-4c86-ba3f-62fd641604ef",
+    "State": "Active",
+    "LastUpdateStatus": "Successful",
+    "PackageType": "Image",
+    "Architectures": [
+        "x86_64"
+    ],
+    "EphemeralStorage": {
+        "Size": 10240
+    },
+    "LoggingConfig": {
+        "LogFormat": "JSON",
+        "ApplicationLogLevel": "INFO",
+        "SystemLogLevel": "INFO",
+        "LogGroup": "/aws/lambda/gemma4-e2b-g6"
+    },
+    "CapacityProviderConfig": {
+        "LambdaManagedInstancesCapacityProviderConfig": {
+            "CapacityProviderArn": "arn:aws:lambda:us-east-1:ACCOUNT:capacity-provider:gemma4-e2b-g6",
+            "PerExecutionEnvironmentMaxConcurrency": 48,
+            "ExecutionEnvironmentMemoryGiBPerVCpu": 4.0
+        }
+    },
+    "ConfigSha256": "uHncO1B6DCMORMMxEaC9teS7W1RQkLwvFmkVqSRIWBg=",
+    "AcceleratorConfig": {
+        "AcceleratorMemorySize": 16
+    }
+}
