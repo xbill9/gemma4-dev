@@ -3,6 +3,7 @@ title: "Which Gemini Model Should You Use? Neon, Argon, Hydrogen, Carbon, Flash 
 published: false
 description: "Gemini 4 Neon joins seven other models on GSM8K, BFCL and 30 AIME 2025 problems through the Gemini API, with cost per right answer, thinking and speed for each. Every Gemini 4 model solved all 30 hard problems at its lowest setting, so price and speed decide among them; Flash-Lite needs high thinking; Neon is the cheaper, faster choice against Carbon at high thinking."
 tags: gemini, gemma, benchmark, ai
+cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/devto-cover.73a2bdd7.jpg
 ---
 
 This article provides a step by step guide to choosing a Gemini API model by measured cost, thinking and speed. Gemini 4 Neon, announced on 2026-11-18, joins seven models measured here before: Gemma 4 26B and 31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and Gemini 4 Hydrogen, Carbon and Argon. All eight answer the same questions through the same endpoint with the same scoring.

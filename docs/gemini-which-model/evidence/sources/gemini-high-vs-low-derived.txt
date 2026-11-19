@@ -1,0 +1,73 @@
+questions answered by every model in both arms: 15
+
+== arm low
+  gemma-4-31b     minimal right 12 of 15  cut 1  errors 0  thinking total 0 mean 0 max 0  answer mean 5,331  median s 62.5  max s 3322.8  cost $0.0000  per right answer $0.0000
+  gemma-4-26b     minimal right  9 of 15  cut 4  errors 1  thinking total 0 mean 0 max 0  answer mean 14,129  median s 476.2  max s 4814.6  cost $0.0000  per right answer $0.0000
+  flash-lite-3.5  minimal right  9 of 15  cut 0  errors 0  thinking total 0 mean 0 max 0  answer mean 5,147  median s 9.8  max s 47.2  cost $0.1937  per right answer $0.0215
+  flash-3.8       none    right 12 of 15  cut 0  errors 0  thinking total 42,014 mean 2,801 max 9,893  answer mean 818  median s 22.9  max s 74.0  cost $0.2053  per right answer $0.0171
+  hydrogen-4      none    right 15 of 15  cut 0  errors 0  thinking total 37,025 mean 2,468 max 4,507  answer mean 955  median s 13.5  max s 21.7  cost $0.3893  per right answer $0.0260
+  carbon-4        none    right 15 of 15  cut 0  errors 0  thinking total 13,291 mean 886 max 9,248  answer mean 2,375  median s 22.7  max s 108.9  cost $0.4947  per right answer $0.0330  at 2026-12-01 prices $0.9894
+  argon-4         none    right 15 of 15  cut 0  errors 0  thinking total 3,227 mean 215 max 765  answer mean 1,364  median s 18.0  max s 29.4  cost $0.2425  per right answer $0.0162  at 2026-12-01 prices $0.4849
+  arm total $1.5255
+
+== arm high
+  gemma-4-31b     high    right 13 of 15  cut 2  errors 0  thinking total 170,029 mean 11,335 max 32,765  answer mean 847  median s 291.6  max s 2124.5  cost $0.0000  per right answer $0.0000
+  gemma-4-26b     high    right 11 of 15  cut 3  errors 1  thinking total 236,129 mean 15,742 max 32,765  answer mean 683  median s 358.8  max s 4814.7  cost $0.0000  per right answer $0.0000
+  flash-lite-3.5  high    right 11 of 15  cut 0  errors 0  thinking total 189,359 mean 12,624 max 26,323  answer mean 822  median s 32.8  max s 71.1  cost $0.5049  per right answer $0.0459
+  flash-3.8       high    right 14 of 15  cut 1  errors 0  thinking total 213,143 mean 14,210 max 31,454  answer mean 1,077  median s 96.2  max s 212.7  cost $0.8616  per right answer $0.0615
+  hydrogen-4      xhigh   right 15 of 15  cut 0  errors 0  thinking total 225,927 mean 15,062 max 28,252  answer mean 1,332  median s 73.2  max s 130.0  cost $1.8485  per right answer $0.1232
+  carbon-4        high    right 15 of 15  cut 0  errors 0  thinking total 174,202 mean 11,613 max 20,190  answer mean 1,322  median s 134.3  max s 214.4  cost $1.9459  per right answer $0.1297  at 2026-12-01 prices $3.8918
+  argon-4         high    right 15 of 15  cut 0  errors 0  thinking total 61,934 mean 4,129 max 8,473  answer mean 1,065  median s 57.4  max s 105.3  cost $0.7847  per right answer $0.0523  at 2026-12-01 prices $1.5693
+  arm total $5.9455
+
+== high against low, same questions (right only at high / right only at low)
+  gemma-4-31b     +2 / -1   cost free   thinking 170,029 vs 0
+  gemma-4-26b     +4 / -2   cost free   thinking 236,129 vs 0
+  flash-lite-3.5  +2 / -0   cost 2.61x   thinking 189,359 vs 0
+  flash-3.8       +2 / -0   cost 4.20x   thinking 5.1x
+  hydrogen-4      +0 / -0   cost 4.75x   thinking 6.1x
+  carbon-4        +0 / -0   cost 3.93x   thinking 13.1x
+  argon-4         +0 / -0   cost 3.24x   thinking 19.2x
+
+== both arms $7.4710 (low $1.5255, high $5.9455)
+
+== per question, right at high / low (H/L), every model
+  aime2025-I-01  HL HL HL HL HL HL HL
+  aime2025-I-02  HL H- HL H- HL HL HL
+  aime2025-I-03  HL HL HL HL HL HL HL
+  aime2025-I-04  HL HL HL HL HL HL HL
+  aime2025-I-05  HL HL HL HL HL HL HL
+  aime2025-I-06  HL HL HL HL HL HL HL
+  aime2025-I-07  H- -L -- HL HL HL HL
+  aime2025-I-08  HL HL HL HL HL HL HL
+  aime2025-I-09  -L HL H- HL HL HL HL
+  aime2025-I-10  HL H- H- HL HL HL HL
+  aime2025-I-11  HL H- HL HL HL HL HL
+  aime2025-I-12  HL H- HL HL HL HL HL
+  aime2025-I-13  H- -- -- H- HL HL HL
+  aime2025-I-14  -- -- -- -- HL HL HL
+  aime2025-I-15  HL -L -- HL HL HL HL
+  columns: gemma-4-31b gemma-4-26b flash-lite-3.5 flash-3.8 hydrogen-4 carbon-4 argon-4
+
+== whole run: every saved reply, against the worst case
+  low  $1.5255  replies 105
+  high $5.9455  replies 105
+  both $7.4710  worst case $33.23  share 0.225
+
+== per 1,000 problems like these, from measured cost per problem (arithmetic)
+  gemma-4-31b      low $    0.00  high $    0.00
+  gemma-4-26b      low $    0.00  high $    0.00
+  flash-lite-3.5   low $   12.91  high $   33.66
+  flash-3.8        low $   13.69  high $   57.44
+  hydrogen-4       low $   25.95  high $  123.23
+  carbon-4         low $   32.98 (12-01 $   65.96)  high $  129.73 (12-01 $  259.45)
+  argon-4          low $   16.16 (12-01 $   32.33)  high $   52.31 (12-01 $  104.62)
+
+== time per problem, median seconds, low / high
+  gemma-4-31b        62.5 /   291.6  (4.7x)
+  gemma-4-26b       476.2 /   358.8  (0.8x)
+  flash-lite-3.5      9.8 /    32.8  (3.4x)
+  flash-3.8          22.9 /    96.2  (4.2x)
+  hydrogen-4         13.5 /    73.2  (5.4x)
+  carbon-4           22.7 /   134.3  (5.9x)
+  argon-4            18.0 /    57.4  (3.2x)
