@@ -42,8 +42,8 @@ class TestEnv(unittest.TestCase):
         self.assertIn(int(lmi.E["ACCELERATOR_MEMORY_GB"]), (3, 6, 12, 16, 24, 48))
 
     def test_scaling_fits_quota(self):
-        # g6.2xlarge has 8 vCPUs; max environments x 8 must fit MAX_VCPU_COUNT.
-        self.assertLessEqual(int(lmi.E["MAX_ENVS"]) * 8, int(lmi.E["MAX_VCPU_COUNT"]))
+        # g6.4xlarge has 16 vCPUs; max environments x 16 must fit MAX_VCPU_COUNT.
+        self.assertLessEqual(int(lmi.E["MAX_ENVS"]) * 16, int(lmi.E["MAX_VCPU_COUNT"]))
 
     def test_memory_fits_instance(self):
         # g6.2xlarge: 8 vCPUs, 32,768 MiB.

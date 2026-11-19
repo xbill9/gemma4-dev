@@ -145,6 +145,10 @@ def default_network():
     return subnets, sgs
 
 
+def instance_types():
+    return [t for t in E.get("ALLOWED_INSTANCE_TYPES", E["INSTANCE_TYPE"]).split(",") if t]
+
+
 def get_provider():
     r, _ = aws("lambda", "get-capacity-provider", "--capacity-provider-name", E["CAPACITY_PROVIDER"], check=False)
     return r
@@ -158,7 +162,7 @@ def cmd_provider():
             "CapacityProviderName": E["CAPACITY_PROVIDER"],
             "VpcConfig": {"SubnetIds": subnets, "SecurityGroupIds": sgs},
             "PermissionsConfig": {"CapacityProviderOperatorRoleArn": state()["operator_role"]},
-            "InstanceRequirements": {"Architectures": ["x86_64"], "AllowedInstanceTypes": [E["INSTANCE_TYPE"]]},
+            "InstanceRequirements": {"Architectures": ["x86_64"], "AllowedInstanceTypes": instance_types()},
             "CapacityProviderScalingConfig": {"ScalingMode": "Auto", "MaxVCpuCount": int(E["MAX_VCPU_COUNT"])},
         }
         aws("lambda", "create-capacity-provider", "--cli-input-json", json.dumps(spec))
@@ -416,7 +420,7 @@ def cmd_status():
         "describe-instances",
         "--filters",
         "Name=instance-state-name,Values=pending,running",
-        f"Name=instance-type,Values={E['INSTANCE_TYPE']}",
+        f"Name=instance-type,Values={','.join(instance_types())}",
     )[0]
     for r in inst["Reservations"]:
         for i in r["Instances"]:
