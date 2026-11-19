@@ -22,7 +22,7 @@ Answer four questions in order and stop at the first yes.
 
 1. **Must it be free, or run on your own hardware?** Use **Gemma 4 31B**: GSM8K 0.9735 and BFCL 0.9675, free on the Gemini API's free tier or on your own GPU.
 2. **Is the work easy, such as short questions and simple function calls?** Use **3.5 Flash-Lite** for the lowest cost and fastest reply ($0.66 per 1,000 GSM8K problems, 1.10 s each), or **3.8 Flash** for a higher score (0.9788 at $1.26).
-3. **Does it need high thinking, where you would otherwise use Carbon?** Use **Gemini 4 Neon at high**: Carbon's score on hard math for 0.73 times the cost and 0.68 times the time.
+3. **Does it need high thinking, where you would otherwise use Carbon?** Use **Gemini 4 Neon at high**: Carbon's score on hard math for 0.73 times the cost.
 4. **Is response time the priority?** Use **Gemini 4 Hydrogen at its lowest setting**: 30 of 30 hard problems at 11.3 s each, the fastest Gemini 4 model.
 5. **Otherwise** use **Gemini 4 Argon at its lowest setting**: 30 of 30 hard problems at $0.018 each, the cheapest Gemini 4 model. From 2026-12-01, when Argon's price doubles, Hydrogen is cheaper ($0.026 against $0.036).
 
@@ -40,7 +40,7 @@ For the best function-calling score, Neon leads at 0.9750, level with Argon and 
 
 **Speed.** With every model running at the same time on AIME 2025 II, Hydrogen was the fastest Gemini 4 model at its lowest setting (11.3 s median per problem) and Neon the slowest (40.8 s).
 
-**Neon against Carbon.** At high thinking, the setting Google compares them at, Neon cost 0.73 times Carbon per problem and took 0.68 times as long, with the same 15 of 15 on AIME 2025 II. Google states 32% lower cost per task than Carbon on the Artificial Analysis Intelligence Index.
+**Neon against Carbon.** At high thinking, the setting Google compares them at, Neon cost 0.73 times Carbon per problem, cheaper on 13 of 15 problems (paired test, p < 0.001), with the same 15 of 15 on AIME 2025 II. Its median time was 0.68 times Carbon's, but it was faster on only 9 of 15 problems, which could be chance. Google states 32% lower cost per task than Carbon on the Artificial Analysis Intelligence Index.
 
 **What to do with it.**
 
@@ -50,7 +50,7 @@ For the best function-calling score, Neon leads at 0.9750, level with Argon and 
 - ⚠️ Use Flash-Lite only on easy work, or at high thinking.
 - ⚠️ Use Gemma 4 when the model must be free or run on your own hardware.
 
-**Caveats.** AIME 2025 has been public since early 2025, so some models may have seen these problems in training; that would raise every Gemini 4 score alike and is untested here. Google positions Neon and Carbon for long agent and coding work, which none of these tests measures.
+**Caveats.** AIME 2025 has been public since early 2025, so some models may have seen these problems in training; that would raise every Gemini 4 score alike and is untested here. On 30 problems near 90% right, a gap has to be about 15 points before it can be told from chance, so close scores here are ties. Google positions Neon and Carbon for long agent and coding work, which none of these tests measures.
 
 ---
 
@@ -91,7 +91,7 @@ Costs are the tokens each reply reported times the list price.
 | Gemini 4 Argon | 🥇 0.9841 | 0.9675 | $2.39 | $0.78 | 5% |
 | Gemini 4 Neon | 0.9818 | 🥇 0.9750 | $6.76 | $2.87 | 100% |
 
-Neon's GSM8K score is level with 3.8 Flash and every Gemini 4 model and ahead of both Gemma 4 models and Flash-Lite. Its BFCL score is ahead of Hydrogen, Carbon, 3.8 Flash and Flash-Lite and level with Argon and Gemma 4 31B. Each comparison is paired by question with a 95% range of the difference.
+Neon's GSM8K score is level with 3.8 Flash and every Gemini 4 model and ahead of both Gemma 4 models and Flash-Lite. Its BFCL score is ahead of Hydrogen, 3.8 Flash and Flash-Lite and level with Carbon, Argon and Gemma 4 31B. Each comparison is an exact paired test by question, and "ahead" means p < 0.05.
 
 Hydrogen and Neon think on every request even at their lowest setting, and that sets the bill: Neon cost 2.8 times Argon per GSM8K problem.
 
@@ -160,7 +160,7 @@ On short problems, in the 2026-11-14 run of the first seven models together: Fla
 | Median time | 73.7 s | 109.1 s | 0.68x |
 | Thinking per problem | 4,547 | 9,718 | 0.47x |
 
-Neon reaches the same answers as Carbon with half the thinking. Argon at the same setting cost $0.048 a problem and took 41.3 s for the same 15.
+Neon reaches the same answers as Carbon with half the thinking, and was cheaper on 13 of the 15 problems. It was faster on 9 of 15, so the time difference could be chance. Argon at the same setting cost $0.048 a problem and took 41.3 s for the same 15.
 
 ---
 
@@ -190,7 +190,7 @@ List price per token misleads. Hydrogen has the lowest Gemini 4 price and Argon 
 | Hard reasoning, cost first | Gemini 4 Argon, lowest | 30 of 30, $0.018 a problem |
 | Hard reasoning, speed first | Gemini 4 Hydrogen, lowest | 30 of 30, 11.3 s a problem |
 | Hard reasoning from 2026-12-01 | Gemini 4 Hydrogen, lowest | 30 of 30, $0.026 against Argon's $0.036 |
-| Work that needs high thinking | Gemini 4 Neon, high | Carbon's score at 0.73x the cost, 0.68x the time |
+| Work that needs high thinking | Gemini 4 Neon, high | Carbon's score at 0.73x the cost |
 | Function calling, best score | Neon, or Argon for less | 0.9750 at $2.87 per 1,000; Argon 0.9675 at $0.78 |
 | Short math, lowest paid cost | 3.8 Flash | GSM8K 0.9788 at $1.26 per 1,000 |
 | Fastest reply on easy work | 3.5 Flash-Lite | 1.10 s per GSM8K problem, $0.66 per 1,000 |
@@ -204,7 +204,7 @@ The goal of this article was to place every Gemini API model, Neon included, by 
 
 - 🟢 Hydrogen, Carbon, Argon and Neon solved all 30 AIME 2025 problems at their lowest setting.
 - 🟢 Argon cost the least of them per problem, $0.018; Hydrogen answered fastest, 11.3 s.
-- 🟢 Neon matched Carbon at high thinking for 0.73 times the cost and 0.68 times the time.
+- 🟢 Neon matched Carbon at high thinking for 0.73 times the cost.
 - 🟢 Neon has the best function-calling score, 0.9750, level with Argon and Gemma 4 31B.
 - 🟢 High thinking lifted Flash-Lite from 18 to 24 of 30.
 - ⚠️ High thinking added nothing on Gemini 4 for 1.9 to 4.6 times the cost.
