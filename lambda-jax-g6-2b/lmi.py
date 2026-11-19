@@ -29,7 +29,6 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-STATE = HERE / ".lmi-state.json"
 
 
 def load_env(path=HERE / "tpu.env"):
@@ -47,6 +46,9 @@ def load_env(path=HERE / "tpu.env"):
 
 
 E = load_env()
+# One state file per region (image digest, provider ARN, timings): AWS_REGION=us-west-2 make deploy keeps
+# us-east-1's. us-east-1 keeps the original name.
+STATE = HERE / (".lmi-state.json" if E["AWS_REGION"] == "us-east-1" else f".lmi-state.{E['AWS_REGION']}.json")
 
 
 def state():
