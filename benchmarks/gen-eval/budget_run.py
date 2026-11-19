@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """budget_run.py -- one task across several models, question by question, under a dollar budget.
 
-  python3 budget_run.py <models.json> <task> <out_dir> --budget 40 [--limit N] [--wave 3]
+  python3 budget_run.py <models.json> <task> <out_dir> --budget 40 [--offset N] [--limit N] [--wave 3] [--per-wave-cap]
 
 models.json is a list of {"name", "model", "reasoning_effort", "price_in", "price_out"} with
 prices in USD per million tokens (0 for free), plus optional "chat_url" / "key_file" (defaults:
@@ -62,12 +62,19 @@ def main():
     p.add_argument("out_dir")
     p.add_argument("--budget", type=float, required=True)
     p.add_argument("--limit", type=int)
+    p.add_argument("--offset", type=int, default=0, help="skip this many questions first (aime2025: 15 = AIME II)")
+    p.add_argument(
+        "--per-wave-cap",
+        action="store_true",
+        help="skip the whole-run refusal; the per-wave check still stops before any wave that could pass --budget",
+    )
     p.add_argument("--wave", type=int, default=3)
     p.add_argument("--dry-run", action="store_true", help="print the worst case and stop")
     a = p.parse_args()
 
     models = json.load(open(a.models))
     recs = [json.loads(line) for line in open(os.path.join(g.HERE, "data", a.task + ".jsonl"))]
+    recs = recs[a.offset :]
     if a.limit:
         recs = recs[: a.limit]
     os.makedirs(a.out_dir, exist_ok=True)
@@ -82,7 +89,7 @@ def main():
     )
     if a.dry_run:
         return
-    if ceiling > a.budget:
+    if ceiling > a.budget and not a.per_wave_cap:
         raise SystemExit("refusing: the worst case exceeds the budget; lower --limit or the output limit")
 
     spent = sum(cost(r, m) for m in models for r in done[m["name"]].values())
