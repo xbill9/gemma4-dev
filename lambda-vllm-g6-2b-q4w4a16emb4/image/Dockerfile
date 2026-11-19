@@ -5,3 +5,4 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 COPY model/ /opt/model/
 ENV MODEL_ID=/opt/model
+COPY drafter/ /opt/drafter/

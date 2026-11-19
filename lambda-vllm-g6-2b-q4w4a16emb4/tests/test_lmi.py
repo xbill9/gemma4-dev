@@ -35,5 +35,15 @@ class TestEnv(unittest.TestCase):
         self.assertLessEqual(int(lmi.E["MAX_ENVS"]) * 8, int(lmi.E["MAX_VCPU_COUNT"]))
 
 
+    def test_speculative_config_survives_shlex(self):
+        import json
+        import shlex
+
+        a = shlex.split(lmi.server_args())
+        i = a.index("--speculative-config")
+        spec = json.loads(a[i + 1])
+        self.assertEqual(spec, {"model": "/opt/drafter", "num_speculative_tokens": 4})
+
+
 if __name__ == "__main__":
     unittest.main()
