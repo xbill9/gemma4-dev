@@ -35,9 +35,10 @@ JAX 6.7 / 47.9 / 48.0 / 47.8 and 46.2 / 54.7 / 54.6 / 54.6. The first JAX reques
 #### Findings
 
 - **Every engine serves on Lambda at its native G6 speed less the invoke round trip**: one request reaches
-  0.92–0.99x of the native single-stream number without a drafter (SGLang 0.92, PyTorch 0.94, JAX 0.99).
+  0.92–0.99x (vLLM 0.93) of the native single-stream number without a drafter (SGLang 0.92, PyTorch 0.94, JAX 0.99).
 - **The native ranking holds**: vLLM with its drafter is fastest for one request, then llama.cpp with its drafter;
-  vLLM, SGLang and llama.cpp batch 4 requests at 3.2–3.8x one; PyTorch and JAX serve one at a time.
+  without drafters vLLM and SGLang serve 4 requests at 3.81x and 3.66x one, llama.cpp with its drafter 2.29x;
+  PyTorch and JAX serve one at a time.
 - **Start-up is minutes, set by the engine**: JAX 42 s and PyTorch 198 s to a healthy server, SGLang 347–372 s.
   Lambda can report a publish as Failed (internal error) while a slow engine is still in Init; the version
   turns Active by itself once Init succeeds.
