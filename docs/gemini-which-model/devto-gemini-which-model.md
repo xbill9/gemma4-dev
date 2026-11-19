@@ -14,6 +14,22 @@ The short version: on these tests the four Gemini 4 models are level on accuracy
 
 ---
 
+#### The Decision Flow
+
+Answer four questions in order and stop at the first yes.
+
+![Decision flow: free or own hardware leads to Gemma 4 31B; easy work to 3.5 Flash-Lite or 3.8 Flash; high thinking to Gemini 4 Neon at high; response time to Gemini 4 Hydrogen at its lowest setting; otherwise Gemini 4 Argon at its lowest setting](https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/decision-flow.aeb438fc.jpg)
+
+1. **Must it be free, or run on your own hardware?** Use **Gemma 4 31B**: GSM8K 0.9735 and BFCL 0.9675, free on the Gemini API's free tier or on your own GPU.
+2. **Is the work easy, such as short questions and simple function calls?** Use **3.5 Flash-Lite** for the lowest cost and fastest reply ($0.66 per 1,000 GSM8K problems, 1.10 s each), or **3.8 Flash** for a higher score (0.9788 at $1.26).
+3. **Does it need high thinking, where you would otherwise use Carbon?** Use **Gemini 4 Neon at high**: Carbon's score on hard math for 0.73 times the cost and 0.68 times the time.
+4. **Is response time the priority?** Use **Gemini 4 Hydrogen at its lowest setting**: 30 of 30 hard problems at 11.3 s each, the fastest Gemini 4 model.
+5. **Otherwise** use **Gemini 4 Argon at its lowest setting**: 30 of 30 hard problems at $0.018 each, the cheapest Gemini 4 model. From 2026-12-01, when Argon's price doubles, Hydrogen is cheaper ($0.026 against $0.036).
+
+For the best function-calling score, Neon leads at 0.9750, level with Argon and Gemma 4 31B at 0.9675. The steps below show where each number comes from.
+
+---
+
 #### The Findings
 
 **Accuracy.** Hydrogen, Carbon, Argon and Neon solved all 30 AIME 2025 problems at their lowest thinking setting and again at their high setting. On these problems no Gemini 4 model can be ranked above another. The smaller models can: Flash-Lite solved 18 of 30 at its lowest setting, and Argon solved the 12 it missed and lost none (exact test, p < 0.001).
