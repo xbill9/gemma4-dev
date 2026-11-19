@@ -1,9 +1,9 @@
 == AIME 2025 II, 2026-11-19, all models at the same time
    setting                     right  95% range      cut err  thinking mean  median s   cost   per problem  per right   Dec per problem
-   gemma-4-31b-low    minimal  3/ 3  [0.44, 1.00]    0   0             0      23.4  $ 0.000  $0.0000     $0.0000    $0.0000  (only 3 of 15)
-   gemma-4-31b-high   high     3/ 3  [0.44, 1.00]    0   0         4,691     106.1  $ 0.000  $0.0000     $0.0000    $0.0000  (only 3 of 15)
-   gemma-4-26b-low    minimal  2/ 3  [0.21, 0.94]    1   0             0      25.2  $ 0.000  $0.0000     $0.0000    $0.0000  (only 3 of 15)
-   gemma-4-26b-high   high     2/ 2  [0.34, 1.00]    0   0         4,124     105.0  $ 0.000  $0.0000     $0.0000    $0.0000  (only 2 of 15)
+   gemma-4-31b-low    minimal 12/15  [0.55, 0.93]    0   0             0      40.0  $ 0.000  $0.0000     $0.0000    $0.0000
+   gemma-4-31b-high   high    14/15  [0.70, 0.99]    0   0         7,904     253.5  $ 0.000  $0.0000     $0.0000    $0.0000
+   gemma-4-26b-low    minimal 12/15  [0.55, 0.93]    2   0             0      55.0  $ 0.000  $0.0000     $0.0000    $0.0000
+   gemma-4-26b-high   high    12/15  [0.55, 0.93]    1   2        12,908     388.3  $ 0.000  $0.0000     $0.0000    $0.0000
    flash-lite-3.5-low minimal  9/15  [0.36, 0.80]    0   0             0       7.5  $ 0.188  $0.0126     $0.0209    $0.0126
    flash-lite-3.5-high high    13/15  [0.62, 0.96]    1   0        12,248      27.9  $ 0.501  $0.0334     $0.0385    $0.0334
    flash-3.8-low      none    15/15  [0.80, 1.00]    0   0         3,378      18.3  $ 0.236  $0.0157     $0.0157    $0.0157
@@ -19,10 +19,10 @@
 
 == AIME 2025 I + II pooled (I from 2026-11-15, Neon's I from 2026-11-19)
    setting                     right  95% range      cut err  thinking mean  median s   cost   per problem  per right   Dec per problem
-   gemma-4-31b-low    minimal 15/18  [0.61, 0.94]    1   0             0      50.3  $ 0.000  $0.0000     $0.0000    $0.0000  (only 18 of 30)
-   gemma-4-31b-high   high    16/18  [0.67, 0.97]    2   0        10,228     285.2  $ 0.000  $0.0000     $0.0000    $0.0000  (only 18 of 30)
-   gemma-4-26b-low    minimal 11/18  [0.39, 0.80]    5   1             0     281.5  $ 0.000  $0.0000     $0.0000    $0.0000  (only 18 of 30)
-   gemma-4-26b-high   high    13/17  [0.53, 0.90]    3   1        14,375     329.4  $ 0.000  $0.0000     $0.0000    $0.0000  (only 17 of 30)
+   gemma-4-31b-low    minimal 24/30  [0.63, 0.90]    1   0             0      50.3  $ 0.000  $0.0000     $0.0000    $0.0000
+   gemma-4-31b-high   high    27/30  [0.74, 0.97]    2   0         9,620     262.8  $ 0.000  $0.0000     $0.0000    $0.0000
+   gemma-4-26b-low    minimal 21/30  [0.52, 0.83]    6   1             0      61.5  $ 0.000  $0.0000     $0.0000    $0.0000
+   gemma-4-26b-high   high    23/30  [0.59, 0.88]    4   3        14,325     363.6  $ 0.000  $0.0000     $0.0000    $0.0000
    flash-lite-3.5-low minimal 18/30  [0.42, 0.75]    0   0             0       8.6  $ 0.382  $0.0127     $0.0212    $0.0127
    flash-lite-3.5-high high    24/30  [0.63, 0.90]    1   0        12,436      28.5  $ 1.006  $0.0335     $0.0419    $0.0335
    flash-3.8-low      none    27/30  [0.74, 0.97]    0   0         3,089      18.6  $ 0.441  $0.0147     $0.0163    $0.0147
@@ -37,8 +37,8 @@
    neon-4-high        high    30/30  [0.89, 1.00]    0   0         5,221      96.1  $ 2.723  $0.0908     $0.0908    $0.0908
 
 == each model, high against lowest setting, pooled 30 (right only at high / only at lowest, exact McNemar p)
-   Gemma 4 31B        +2 / -1  p=1.000  cost free  (18 paired)
-   Gemma 4 26B        +4 / -2  p=0.688  cost free  (17 paired)
+   Gemma 4 31B        +4 / -1  p=0.375  cost free  (30 paired)
+   Gemma 4 26B        +6 / -4  p=0.754  cost free  (30 paired)
    3.5 Flash-Lite     +6 / -0  p=0.031  cost 2.63x  (30 paired)
    3.8 Flash          +2 / -0  p=0.500  cost 3.45x  (30 paired)
    Gemini 4 Hydrogen  +0 / -0  p=1.000  cost 4.61x  (30 paired)
@@ -59,21 +59,21 @@
    argon-4-low          30 vs flash-lite-3.5-low   18   +12 / -0  p=0.000  (30 paired)
    argon-4-low          30 vs flash-3.8-low        27   +3 / -0  p=0.250  (30 paired)
    argon-4-low          30 vs flash-lite-3.5-high  24   +6 / -0  p=0.031  (30 paired)
-   argon-4-low          18 vs gemma-4-31b-high     16   +2 / -0  p=0.500  (18 paired)
-   flash-3.8-high       17 vs gemma-4-31b-high     16   +1 / -0  p=1.000  (18 paired)
-   gemma-4-31b-high     15 vs gemma-4-26b-high     13   +3 / -1  p=0.625  (17 paired)
+   argon-4-low          30 vs gemma-4-31b-high     27   +3 / -0  p=0.250  (30 paired)
+   flash-3.8-high       29 vs gemma-4-31b-high     27   +2 / -0  p=0.500  (30 paired)
+   gemma-4-31b-high     27 vs gemma-4-26b-high     23   +6 / -2  p=0.289  (30 paired)
 
 == AIME II problems missed, per setting
-   gemma-4-31b-low      none
-   gemma-4-26b-low      03
+   gemma-4-31b-low      05, 09, 13
+   gemma-4-26b-low      03, 05, 15
    flash-lite-3.5-low   05, 09, 10, 13, 14, 15
    flash-3.8-low        none
    hydrogen-4-low       none
    carbon-4-low         none
    argon-4-low          none
    neon-4-low           none
-   gemma-4-31b-high     none
-   gemma-4-26b-high     none
+   gemma-4-31b-high     13
+   gemma-4-26b-high     03, 04, 14
    flash-lite-3.5-high  14, 15
    flash-3.8-high       none
    hydrogen-4-high      none
