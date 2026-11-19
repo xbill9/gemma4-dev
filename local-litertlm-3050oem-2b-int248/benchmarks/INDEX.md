@@ -17,3 +17,4 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 |---|---:|---:|---:|---|
 | `2026-11-02-context-3050oem` | 9 | 0 | 0 | yes |
 | `2026-11-02-first-light-3050oem` | 21 | 4 | 0 | yes |
+| `2026-11-03-tools-constraint-3050oem` | 14 | 2 | 0 | yes |

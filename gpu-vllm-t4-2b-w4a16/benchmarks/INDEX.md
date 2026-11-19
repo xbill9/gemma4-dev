@@ -19,3 +19,4 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-29-specdec-c1-t4` | 14 | 9 | 0 | **no** |
 | `2026-10-15-drafter-sweep-t4` | 51 | 2 | 0 | yes |
 | `2026-10-15-overnight-t4` | 34 | 0 | 0 | yes |
+| `2026-10-19-vllm-vs-llamacpp-t4` | 42 | 0 | 0 | **no** |

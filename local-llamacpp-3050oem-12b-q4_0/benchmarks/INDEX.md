@@ -20,3 +20,4 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-10-16-exact-gguf-12b-3050oem` | 27 | 1 | 0 | yes |
 | `2026-10-16-first-light-3050oem` | 22 | 0 | 0 | yes |
 | `2026-10-17-kvcache-12b-3050oem` | 74 | 0 | 0 | yes |
+| `2026-11-17-thinking-12b-3050oem` | 11 | 0 | 0 | **no** |

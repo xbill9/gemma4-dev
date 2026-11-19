@@ -22,3 +22,5 @@ Cross-rig comparison lives in the monorepo root `benchmarks/ROLLUP.md`.
 | `2026-09-29-lookup-v5e1` | 9 | 0 | 0 | **no** |
 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** |
 | `2026-10-02-rig-boot-v5e1` | 12 | 9 | 0 | **no** |
+| `2026-11-06-ladder-v5e1` | 95 | 0 | 0 | yes |
+| `2026-11-08-ladder-sglang-v5e1` | 23 | 0 | 0 | yes |
