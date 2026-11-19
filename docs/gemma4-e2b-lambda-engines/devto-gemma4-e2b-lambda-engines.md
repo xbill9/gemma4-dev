@@ -193,8 +193,8 @@ The added seconds also hold a difference in prompts: the EC2 sweep averaged six 
 | | Lambda GPU function | Plain EC2 G6 |
 | :--- | :--- | :--- |
 | Who runs the instance | Lambda launches, health-checks and replaces it | you do |
-| Speed, one request | 0.79–0.99 of EC2 | 🥇 |
-| Speed, four at once | 0.78–1.09 of EC2 | 🥇 |
+| Speed, one request | 0.79–0.99 of EC2 | 1.00 (the reference) |
+| Speed, four at once | 0.78–1.09 of EC2 | 1.00 (the reference) |
 | Streaming | no: replies arrive whole | yes, first token in 16–55 ms (vLLM, llama.cpp, SGLang) |
 | Start of a new environment | 484–696 s publish to Active | the engine's own start, 6–307 s, once the instance runs |
 | Access | IAM-signed `Invoke`, no open port | a port you secure yourself |

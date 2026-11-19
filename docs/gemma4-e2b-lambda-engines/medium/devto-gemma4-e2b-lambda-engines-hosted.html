@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Five Serving Engines on a Lambda GPU: Gemma 4 E2B Under vLLM, SGLang, llama.cpp, PyTorch and JAX</title>
+  <meta name="description" content="The same Gemma 4 E2B serving sweep, run twice on one NVIDIA L4: once on a plain EC2 G6 and once as AWS Lambda GPU functions. Which engine wins, what Lambda adds to every request, and what it gives back." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step comparison of five serving
+engines for Gemma 4 E2B, each deployed as an AWS Lambda function on an
+NVIDIA L4 GPU. vLLM, SGLang, llama.cpp, a hand-built PyTorch int4 engine
+and a pure-JAX port each get their own container image, their own
+function and a local chat page, and each is measured against the same
+engine on a plain EC2 G6.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-engines/medium/img/devto-cover.844935f5.jpg" alt="Five Serving Engines on a Lambda GPU: Gemma 4 E2B Under vLLM, SGLang, llama.cpp, PyTorch and JAX" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-lambda-engines">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-lambda-engines</a></p>
+<p>Two questions decide the write-up. Which serving engine is best for
+this model on this card? And what changes when the same engine runs as a
+Lambda function instead of on an EC2 instance you start yourself? Every
+figure below was measured on 2026-11-18 and 2026-11-19 in us-east-1, and
+every number traces to a file in the article's <code>evidence/</code>
+directory.</p>
+<hr />
+<h4 id="what-was-already-measured">What Was Already Measured</h4>
+<p>The EC2 G6 sweep ran six engines on one L4 on 2026-11-05: the same
+Gemma 4 E2B weights on Google's QAT Q4_0 grid, one engine at a time, six
+prompts, three repeats, timed on the instance. The vLLM rig was the
+first to move to Lambda, on the day Lambda gained GPU support:</p>
+<p><a
+href="https://dev.to/gde/serverless-gemma-4-e2b-on-a-lambda-gpu-function-with-googles-qat-weights-and-drafter-fh4">https://dev.to/gde/serverless-gemma-4-e2b-on-a-lambda-gpu-function-with-googles-qat-weights-and-drafter-fh4</a></p>
+<p>This sweep moves the other four. Each Lambda rig keeps its G6 rig's
+checkpoint, engine version and serving flags, so the platform is the
+variable.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-engines/medium/img/devto-gemma4-e2b-lambda-engines-table-1.png"
+alt="Table: Engine, Weights, Lambda rig" /></p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An AWS account with the AWS CLI v2 (2.41 here) and a "Running
+On-Demand G and VT instances" quota of at least 8 vCPUs in your
+region</li>
+<li>Python 3 with <code>boto3</code> and
+<code>huggingface_hub</code></li>
+<li>A clone of <code>gemma4-dev</code>; each engine is one directory
+with a <code>Makefile</code>, <code>tpu.env</code> and
+<code>image/Dockerfile</code></li>
+</ul>
+<hr />
+<h4 id="step-1--one-image-per-engine">Step 1 — One Image per Engine</h4>
+<p>AWS publishes Lambda base images for vLLM, SGLang and PyTorch, plus a
+plain CUDA base. Each comes with an engine extension that starts the
+server during Lambda's Init phase and a handler that forwards each
+invocation to the server's <code>/v1/chat/completions</code>. The other
+engines get the same pattern from two small files in each rig:
+<code>image/engine_ext.py</code> runs the command in
+<code>ENGINE_CMD</code> and waits for <code>/health</code>, and
+<code>image/handler.py</code> forwards the request.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-engines/medium/img/devto-gemma4-e2b-lambda-engines-table-2.png"
+alt="Table: Rig, Base image, What is added, Image size" /></p>
+<p>The Dockerfile for llama.cpp compiles the server in a stage on the
+same base image, so the binary links against the CUDA libraries Lambda
+runs it with:</p>
+<pre class="dockerfile"><code>FROM ${BASE_IMAGE} AS build
+RUN dnf install -y --setopt=install_weak_deps=False cmake git gcc-c++ make \
+      cuda-nvcc-13-0 cuda-cudart-devel-13-0 libcublas-devel-13-0 cuda-driver-devel-13-0
+RUN git clone -q https://github.com/ggml-org/llama.cpp /src &amp;&amp; git -C /src checkout -q &quot;$LLAMA_CPP_COMMIT&quot;
+RUN cmake -S /src -B /src/build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89 \
+      -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DBUILD_SHARED_LIBS=OFF \
+ &amp;&amp; cmake --build /src/build -j &quot;$(nproc)&quot; --target llama-server</code></pre>
+<p>The PyTorch and JAX engines load their checkpoints by repository
+name, so their images carry a Hugging Face cache at <code>/opt/hf</code>
+with <code>refs/main</code> pinned to the measured revision, read with
+<code>HF_HUB_OFFLINE=1</code>. Everything an engine writes goes to
+<code>/tmp</code>, the one writable path in a Lambda environment.</p>
+<hr />
+<h4 id="step-2--build-on-ec2-push-to-ecr">Step 2 — Build on EC2, Push to
+ECR</h4>
+<p>The images are 4.2 to 12.0 GB, so they are built on one CPU instance
+in the same region and pushed straight to ECR:</p>
+<pre class="bash"><code>make builder    # one c7i.4xlarge, found by its Name tag, shared by every rig
+make image      # tar image/ to S3, buildx on the builder, push to ECR
+make builder-down
+    458 s  BUILD_EXIT=0      # SGLang
+    534 s  BUILD_EXIT=0      # llama.cpp
+    573 s  BUILD_EXIT=0      # JAX
+    612 s  BUILD_EXIT=0      # PyTorch</code></pre>
+<p>The four builds ran side by side on the one builder. The build uses
+<code>--provenance=false --sbom=false</code> and
+<code>oci-mediatypes=false</code>, because Lambda accepts a
+single-platform Docker v2 manifest.</p>
+<hr />
+<h4 id="step-3--a-capacity-provider-and-a-function">Step 3 — A Capacity
+Provider and a Function</h4>
+<p>The functions run on a Lambda Managed Instances capacity provider.
+Its instance list allows g6.2xlarge and g6.4xlarge, both one L4:</p>
+<pre class="json"><code>&quot;InstanceRequirements&quot;: {&quot;Architectures&quot;: [&quot;x86_64&quot;], &quot;AllowedInstanceTypes&quot;: [&quot;g6.2xlarge&quot;, &quot;g6.4xlarge&quot;]},
+&quot;CapacityProviderScalingConfig&quot;: {&quot;ScalingMode&quot;: &quot;Auto&quot;, &quot;MaxVCpuCount&quot;: 16}</code></pre>
+<p><code>make deploy</code> creates the function with
+<code>AcceleratorConfig.AcceleratorMemorySize</code> 16, 16 GiB of
+memory at 4 GiB per vCPU (24 GiB for JAX), one execution environment,
+and publishes it. Lambda launches the instance, pulls the image and runs
+Init before the version turns Active:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-engines/medium/img/devto-gemma4-e2b-lambda-engines-table-3.png"
+alt="Table: Engine, Lambda Init (engine start), Publish to Active, Engine start on EC2 G6" /></p>
+<p>The engines start in Lambda at the same pace as on EC2. The rest of
+the eight to twelve minutes from publish to Active is Lambda launching
+the instance and pulling the image.</p>
+<hr />
+<h4 id="step-4--a-chat-page-for-each-engine">Step 4 — A Chat Page for
+Each Engine</h4>
+<p>Every rig ships the same local chat page. Each message becomes one
+synchronous <code>Invoke</code> of the published version, signed with
+the machine's own AWS credentials, so the browser never sees an AWS key
+and the function has no public endpoint:</p>
+<pre class="bash"><code>make up    # one execution environment
+make ui    # http://localhost:8768 vLLM, 8769 SGLang, 8770 llama.cpp, 8771 PyTorch, 8772 JAX
+make down  # zero environments: the instance is released, the function is kept</code></pre>
+<p>A six-token reply from llama.cpp, through the page and Lambda:</p>
+<pre><code>X-Lambda-Seconds: 0.138
+{&quot;choices&quot;: [{&quot;message&quot;: {&quot;role&quot;: &quot;assistant&quot;, &quot;content&quot;: &quot;Hi, hello there.&quot;}}], ...
+ &quot;timings&quot;: {&quot;prompt_n&quot;: 14, &quot;prompt_ms&quot;: 21.405, &quot;predicted_n&quot;: 6, &quot;predicted_ms&quot;: 39.963, &quot;draft_n&quot;: 8, &quot;draft_n_accepted&quot;: 1}}</code></pre>
+<hr />
+<h4 id="step-5--the-benchmark">Step 5 — The Benchmark</h4>
+<p><code>bench.py</code> sends one prompt with a unique prefix, greedy,
+thinking off, 256 output tokens with <code>ignore_eos</code>, as one
+request and then four at once. Every rig ran four times, alone on the
+capacity provider, and was scaled to zero before the next one started.
+Times are taken on the client, a desktop in the US calling us-east-1, so
+every figure includes the invoke round trip.</p>
+<pre><code>llamacpp        one  177.3 tok/s (4 runs) native  207.7 ratio 0.85 | s/request lambda 1.444 native 1.233 added 0.211 | 4 at once  405.7 (4 runs, 382.5-409.4) native 373.2 ratio 1.09
+sglang          one  125.3 tok/s (4 runs) native  136.5 ratio 0.92 | s/request lambda 2.042 native 1.875 added 0.166 | 4 at once  458.4 (4 runs, 170.7-472.0) native 475.4 ratio 0.96
+pytorch         one  127.0 tok/s (4 runs) native  134.7 ratio 0.94 | s/request lambda 2.014 native 1.901 added 0.113 | 4 at once  138.1 (4 runs, 135.5-138.3) native 134.5 ratio 1.03
+jax             one   47.9 tok/s (3 runs) native   48.3 ratio 0.99 | s/request lambda 5.345 native 5.300 added 0.045 | 4 at once   54.6 (4 runs, 46.2-54.7)</code></pre>
+<p><code>analyze.py</code> prints these from the run files. The first
+JAX request on a new environment compiled for 38.3 s and is left out of
+the medians; XLA's compilation cache sits in <code>/tmp</code>, which
+starts empty in every environment.</p>
+<hr />
+<h4 id="finding-1--which-serving-engine-is-best">Finding 1 — Which
+Serving Engine Is Best?</h4>
+<p>Output tokens per second, median of the runs, through Lambda:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-engines/medium/img/devto-gemma4-e2b-lambda-engines-table-4.png"
+alt="Table: Engine, One request, Four at once, Four vs one" /></p>
+<p><strong>vLLM is the best engine for Gemma 4 E2B on one L4, on Lambda
+and on EC2 alike.</strong> With Google's assistant drafter it serves one
+request at 218.6 tok/s through Lambda and 275.3 on EC2, the fastest of
+the five on both. Without a drafter it batches best: four requests at
+once give 3.73x one. Its two four-request runs with the drafter differ
+widely, 386.3 and 723.2 tok/s, so that median carries less weight than
+the others.</p>
+<p><strong>llama.cpp is the best small engine.</strong> It is second for
+one request with its own drafter, its image is 4.2 GB against 10 to 12
+GB for the others, and Lambda's Init for it takes 5.3 s. It batches four
+requests at 2.29x one.</p>
+<p><strong>SGLang matches vLLM without a drafter</strong> at four
+requests (458.4 against 486.2 tok/s) and takes the longest to start:
+Lambda's Init for it runs 346.5 to 372.5 s.</p>
+<p><strong>PyTorch and JAX serve one request at a time.</strong> The
+PyTorch int4 engine matches the batching engines for a single request
+(127.0 tok/s); JAX serves the 10 GB bf16 reference checkpoint at
+47.9.</p>
+<hr />
+<h4 id="finding-2--the-gap-between-lambda-and-a-plain-g6">Finding 2 —
+The Gap Between Lambda and a Plain G6</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-engines/medium/img/devto-gemma4-e2b-lambda-engines-table-5.png"
+alt="Table: Engine, One request, Lambda, One request, EC2 G6, Lambda / EC2, Seconds Lambda adds per request" /></p>
+<p><strong>Lambda adds 0.045 to 0.241 s to each request, and the fast
+engines feel it most.</strong> A 256-token reply from JAX takes 5.300 s
+on EC2 and 5.345 s through Lambda, under 1% more. The same reply from
+vLLM with its drafter takes 0.930 s on EC2, and Lambda adds 0.241 s,
+about a quarter. The six-token chat reply above came back through the
+page in 0.138 s, which bounds the invoke path itself.</p>
+<p>The added seconds also hold a difference in prompts: the EC2 sweep
+averaged six prompts timed on the instance, while this sweep timed one
+prompt from a desktop. A drafter's speed depends on how many drafted
+tokens the prompt lets it accept, which is the likely reason the two
+drafter engines show the largest gap.</p>
+<p><strong>At four requests the gap narrows for SGLang, PyTorch and
+llama.cpp</strong>: 0.96, 1.03 and 1.09 of EC2, with the added time
+spread across four replies that run together. vLLM stays at 0.78 with
+its drafter and 0.91 without.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-engines/medium/img/devto-gemma4-e2b-lambda-engines-table-6.png"
+alt="Table: Lambda GPU function, Plain EC2 G6" /></p>
+<hr />
+<h4
+id="mag_right-tip-lambda-can-report-a-failed-publish-while-the-engine-is-still-starting">🔎
+Tip: Lambda Can Report a Failed Publish While the Engine Is Still
+Starting</h4>
+<p>SGLang needs 346.5 to 372.5 s of Init. Twice, Lambda marked its
+published version <code>Failed</code> ("An internal error occurred")
+while Init was still running, and then logged a successful init report
+minutes later. Left alone, the version turned Active by itself. The
+sweep driver checks readiness with a real request every minute for up to
+30 minutes and ignores the publish status.</p>
+<hr />
+<h4
+id="mag_right-tip-set-the-scaling-right-after-publishing-and-retry-it">🔎
+Tip: Set the Scaling Right After Publishing, and Retry It</h4>
+<p>A published version defaults to three execution environments, more
+than a 16-vCPU G quota holds. <code>PutFunctionScalingConfig</code> is
+refused for a moment after <code>publish-version</code>, so
+<code>lmi.py</code> retries it until Lambda accepts 1 / 1.</p>
+<hr />
+<h4 id="mag_right-tip-allow-more-than-one-instance-size">🔎 Tip: Allow
+More Than One Instance Size</h4>
+<p>From 17:01 to 17:38 UTC on 2026-11-19 every publish on a
+g6.2xlarge-only provider failed with "EC2 capacity isn't currently
+available in the specified Availability Zones", in all five us-east-1
+zones that offer the type. On a provider that also allows g6.4xlarge,
+the same L4 with more vCPUs, Lambda found an instance on every
+attempt.</p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For this model on one L4, <strong>vLLM with Google's drafter</strong>
+is the engine to serve, on either platform. <strong>llama.cpp</strong>
+is the choice when the image size and the engine's own start time matter
+most.</p>
+<p><strong>Lambda</strong> suits a model that is called now and then by
+people or programs with AWS credentials: no instance to manage, no open
+port, and nothing running between <code>make down</code> and
+<code>make up</code>. <strong>A plain G6</strong> suits interactive chat
+that needs streaming, steady traffic that keeps an instance busy, and
+anything where a quarter of a second per request matters.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find the best serving engine for
+Gemma 4 E2B on one NVIDIA L4 and to measure what running it as an AWS
+Lambda function changes. The key to the solution was keeping each
+engine's checkpoint, version and flags identical to the EC2 G6 sweep, so
+the platform was the only variable. The results were:</p>
+<ul>
+<li>🟢 vLLM with the drafter is fastest for one request on both
+platforms: 218.6 tok/s through Lambda, 275.3 on EC2</li>
+<li>🟢 Every engine runs on Lambda from its own image; AWS's images
+cover vLLM, SGLang and PyTorch, and two small files cover the rest</li>
+<li>🟢 Engines start in Lambda as fast as on EC2: Init takes 5.3 s for
+llama.cpp and 346.5–372.5 s for SGLang</li>
+<li>⚠️ Lambda adds 0.045–0.241 s to each request: 0.79–0.99 of EC2 speed
+for one request, 0.78–1.09 at four</li>
+<li>⚠️ A new environment takes 484–696 s from publish to Active, mostly
+instance launch and image pull</li>
+<li>❌ No streaming through Lambda, so time to first token cannot be
+measured or shown</li>
+</ul>
+<p>Scope: one NVIDIA L4 per platform in us-east-1. Lambda figures are
+four runs per engine (vLLM: two to six) of one 256-token prompt, timed
+from a desktop, with the instance behind each Lambda run either a
+g6.2xlarge or a g6.4xlarge; EC2 figures are the 2026-11-05 sweep's six
+prompts and three repeats on a g6.4xlarge, timed on the instance, and
+the JAX rig's own first run on a g6.2xlarge. vLLM's Lambda runs are from
+2026-11-18, the others from 2026-11-19.</p>
+<p>The strategy for serving Gemma 4 with five engines on a Lambda GPU
+was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li>Lambda vLLM rig, first article: <a
+href="https://dev.to/gde/serverless-gemma-4-e2b-on-a-lambda-gpu-function-with-googles-qat-weights-and-drafter-fh4">https://dev.to/gde/serverless-gemma-4-e2b-on-a-lambda-gpu-function-with-googles-qat-weights-and-drafter-fh4</a></li>
+<li>Repository: <a
+href="https://github.com/xbill9/gemma4-dev">https://github.com/xbill9/gemma4-dev</a></li>
+<li>AWS Lambda Managed Instances: <a
+href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances.html">https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances.html</a></li>
+<li>vLLM: <a
+href="https://github.com/vllm-project/vllm">https://github.com/vllm-project/vllm</a></li>
+<li>SGLang: <a
+href="https://github.com/sgl-project/sglang">https://github.com/sgl-project/sglang</a></li>
+<li>llama.cpp: <a
+href="https://github.com/ggml-org/llama.cpp">https://github.com/ggml-org/llama.cpp</a></li>
+<li>JAX: <a
+href="https://github.com/jax-ml/jax">https://github.com/jax-ml/jax</a></li>
+</ul>
+</body>
+</html>

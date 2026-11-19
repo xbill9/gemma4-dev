@@ -1,0 +1,16 @@
+Five Serving Engines on a Lambda GPU: Gemma 4 E2B Under vLLM, SGLang, llama.cpp, PyTorch and JAX
+
+The same Gemma 4 E2B serving sweep, run twice on one NVIDIA L4: once on a plain EC2 G6 and once as AWS Lambda GPU functions. Which engine wins, what Lambda adds to every request, and what it gives back.
+
+What is in it:
+
+- 🟢 vLLM with the drafter is fastest for one request on both platforms: 218.6 tok/s through Lambda, 275.3 on EC2
+- 🟢 Every engine runs on Lambda from its own image; AWS's images cover vLLM, SGLang and PyTorch, and two small files cover the rest
+- 🟢 Engines start in Lambda as fast as on EC2: Init takes 5.3 s for llama.cpp and 346.5–372.5 s for SGLang
+- ⚠️ Lambda adds 0.045–0.241 s to each request: 0.79–0.99 of EC2 speed for one request, 0.78–1.09 at four
+
+dev.to (AWS Community Builders): PENDING
+AWS Builder Center: PENDING
+Medium: PENDING
+Substack: PENDING
+GitHub: https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-lambda-engines
