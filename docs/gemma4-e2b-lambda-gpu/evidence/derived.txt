@@ -1,0 +1,25 @@
+## Output tok/s, 256 tokens per request
+c=1 no-drafter min 126.8 max 133.4 median 130.5 | drafter [69.3, 224.3, 212.8] median 212.8 | ratio of medians 1.63
+c=4 no-drafter min 306.7 max 497.3 median 493.1 | drafter [386.3, 723.2] median 723.2 | ratio of medians 1.47
+c=16 no-drafter min 1640.9 max 1738.9 median 1722.4 | drafter [1515.3, 1510.5] median 1515.3 | ratio of medians 0.88
+c=48 no-drafter min 3441.8 max 3614.4 median 3590.1 | drafter [2249.1, 2266.8] median 2266.8 | ratio of medians 0.63
+## Single-request seconds (256 tokens)
+no drafter [1.918, 1.92, 1.961, 1.969, 1.984, 2.019]
+drafter [1.14, 1.202, 3.694]
+## Errors
+no drafter 0 of 278 requests
+drafter 0 of 139 requests
+## Base image
+compressed layers GB 9.13 layers 30
+CUDA_VERSION 13.0.3 created 2026-11-16
+FRAMEWORK_VERSION 0.33.0 PYTHON_VERSION 3.13
+## Drafter acceptance (vLLM SpecDecoding metrics)
+mean acceptance length min 1.64 max 2.13 | draft acceptance % min 15.9 max 28.3 | lines 12
+## Startup (first light)
+initReport ms 156397.419
+Model loading took 2.85 GiB memory and 5.635408 seconds
+torch.compile took 43.54 s in total
+## Quota arithmetic
+default 3 environments x 8 vCPUs per g6.2xlarge = 24 vCPUs; the account's G quota is 16 vCPUs
+## Request size
+max_tokens with ignore_eos: 256 tokens per request

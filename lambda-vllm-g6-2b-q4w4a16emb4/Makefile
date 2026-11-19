@@ -34,4 +34,4 @@ test:
 	python3 -m unittest discover -s tests -v
 
 lint:
-	ruff check lmi.py bench.py chat_ui.py tests
+	ruff check lmi.py bench.py chat_ui.py republish.py tests

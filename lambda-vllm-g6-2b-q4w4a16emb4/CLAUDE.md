@@ -35,6 +35,20 @@ has no `AcceleratorConfig`; aws-cli 2.41 does), `image/Dockerfile` bakes the che
 - **No streaming.** The AWS pages document sync, async and event-source invocation only, and the image's
   handler returns the whole completion. Time to first token cannot be measured through it.
 
+## Drafter (since 2026-11-19)
+
+It serves with Google's E2B QAT assistant drafter (W4A16, built by `repack/repack_drafter.py`, 4 drafted
+tokens; `SPECULATIVE_MODEL` empty turns it off). Measured through Lambda: 1.63x for one request (256 tokens
+in 1.14–1.20 s against 1.92–2.02 s), 1.47x at 4, 0.88x at 16 and 0.63x at 48 requests at once
+(`benchmarks/runs/2026-11-18-drafter-lambda`). Right for a chat demo with a few users; for heavy batch load
+publish without it.
+
+**Republish with `republish.py`, not `lmi.py function`, while environments run.** A republish starts the new
+environment before stopping the old one; at the capacity provider's vCPU cap it fails and Lambda rolls
+`$LATEST.PUBLISHED` back to the previous code. `republish.py` scales to 0, publishes, scales back to 1/1 and
+prints vLLM's engine line, so the configuration that actually started can be checked. Set MIN and MAX together:
+with only a minimum, Lambda scaled to a second instance under load.
+
 ## Chat page
 
 `make ui` serves `chat_ui.py` on http://localhost:8768 (`UI_PORT`), forked from

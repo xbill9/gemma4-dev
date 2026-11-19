@@ -18,6 +18,7 @@ through subprocess (list args, no shell). tpu.env decides every value; a real en
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -218,7 +219,11 @@ def server_args():
         a += ["--enable-auto-tool-choice", "--tool-call-parser", E["TOOL_CALL_PARSER"]]
     if E.get("REASONING_PARSER"):
         a += ["--reasoning-parser", E["REASONING_PARSER"]]
-    return " ".join(a)
+    if E.get("SPECULATIVE_MODEL"):
+        spec = {"model": E["SPECULATIVE_MODEL"], "num_speculative_tokens": int(E["NUM_SPECULATIVE_TOKENS"])}
+        a += ["--speculative-config", json.dumps(spec)]
+    # The image's engine extension splits VLLM_SERVER_ARGS with shlex.split.
+    return shlex.join(a)
 
 
 def function_env():
@@ -325,7 +330,9 @@ def cmd_function():
         json.dumps({"MinExecutionEnvironments": int(E["MIN_ENVS"]), "MaxExecutionEnvironments": int(E["MAX_ENVS"])}),
         check=False,
     )
-    c, _ = wait_function(ver, want_update=False)
+    # A republish keeps the old environments serving while new ones start: the version reads Active at
+    # once, and LastUpdateStatus stays InProgress until the new environments are up.
+    c, _ = wait_function(ver)
     active_s = round(time.time() - t0, 1)
     save_state(version=ver, publish_to_active_s=active_s, published_at=time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(t0)))
     print(f"version {ver} {c['State']} {active_s} s after publish; scaling set: {try_scaling[0] is not None}")
