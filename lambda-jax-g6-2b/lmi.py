@@ -335,17 +335,24 @@ def cmd_function():
     v = aws("lambda", "publish-version", "--function-name", E["FUNCTION_NAME"], "--publish-to", "LATEST_PUBLISHED")[0]
     ver = v["Version"]
     # Lambda's default is 3 environments across AZs; set ours on the version before it scales up.
-    try_scaling = aws(
-        "lambda",
-        "put-function-scaling-config",
-        "--function-name",
-        E["FUNCTION_NAME"],
-        "--qualifier",
-        ver,
-        "--function-scaling-config",
-        json.dumps({"MinExecutionEnvironments": int(E["MIN_ENVS"]), "MaxExecutionEnvironments": int(E["MAX_ENVS"])}),
-        check=False,
-    )
+    # Lambda refuses the call for a moment after publish; until it lands the version scales to 3 environments,
+    # more than the vCPU quota allows (2026-11-19: the other rig's publish then failed for EC2 capacity).
+    for _ in range(40):
+        try_scaling = aws(
+            "lambda",
+            "put-function-scaling-config",
+            "--function-name",
+            E["FUNCTION_NAME"],
+            "--qualifier",
+            ver,
+            "--function-scaling-config",
+            json.dumps({"MinExecutionEnvironments": int(E["MIN_ENVS"]), "MaxExecutionEnvironments": int(E["MAX_ENVS"])}),
+            check=False,
+        )
+        if try_scaling[0] is not None:
+            break
+        print("scaling not accepted yet:", try_scaling[1].strip()[-200:], file=sys.stderr)
+        time.sleep(3)
     # A republish keeps the old environments serving while new ones start: the version reads Active at
     # once, and LastUpdateStatus stays InProgress until the new environments are up.
     c, _ = wait_function(ver)
