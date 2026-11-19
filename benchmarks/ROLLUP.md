@@ -135,6 +135,20 @@ to a complete run if you only read the directory name, so completeness is counte
 | gce-vllm-v6e4-26b-q4w4a16 | `2026-09-27-tp4fix3-26b-q4w4-tp4-v6e4` | 32 | 0 | 0 | **no** | **no** |
 | gce-vllm-v6e8-31b | `2026-08-25-tp4-v6e4-31b-validation` | 3 | 0 | 0 | yes | **no** |
 | gce-vllm-v6e8-31b | `2026-08-26-xprof-tp4-v0260` | 2 | 0 | 0 | **no** | **no** |
+| gemini-api-google-26b | `2026-11-14-accuracy-api` | 8 | 0 | 0 | **no** | **no** |
+| gemini-api-google-31b | `2026-11-14-accuracy-api` | 8 | 0 | 0 | **no** | **no** |
+| gemini-api-google-argon4 | `2026-11-13-accuracy-gemini` | 12 | 0 | 0 | **no** | **no** |
+| gemini-api-google-argon4 | `2026-11-14-accuracy-api` | 7 | 0 | 0 | **no** | **no** |
+| gemini-api-google-carbon4 | `2026-11-13-accuracy-gemini` | 10 | 0 | 0 | **no** | **no** |
+| gemini-api-google-carbon4 | `2026-11-14-accuracy-api` | 7 | 0 | 0 | **no** | **no** |
+| gemini-api-google-flash38 | `2026-11-13-accuracy-gemini` | 12 | 0 | 0 | **no** | **no** |
+| gemini-api-google-flash38 | `2026-11-14-accuracy-api` | 7 | 0 | 0 | **no** | **no** |
+| gemini-api-google-flashlite35 | `2026-11-13-accuracy-gemini` | 12 | 0 | 0 | **no** | **no** |
+| gemini-api-google-flashlite35 | `2026-11-14-accuracy-api` | 7 | 0 | 0 | **no** | **no** |
+| gemini-api-google-hydrogen4 | `2026-11-13-accuracy-gemini` | 12 | 0 | 0 | **no** | **no** |
+| gemini-api-google-hydrogen4 | `2026-11-14-accuracy-api` | 7 | 0 | 0 | **no** | **no** |
+| gemini-api-google-neon4 | `2026-11-19-accuracy-api` | 10 | 0 | 0 | **no** | **no** |
+| gemini-api-google-neon4 | `2026-11-19-thinking-levels` | 10 | 1 | 0 | **no** | **no** |
 | gke-vllm-v6e1-2b | `2026-08-25-gke-first-provision-v6e1` | 1 | 0 | 0 | **no** | **no** |
 | gpu-jax-g4dn-2b | `2026-08-29-first-serve-g4dn` | 11 | 5 | 0 | **no** | **no** |
 | gpu-jax-g5g-2b | `2026-08-19-first-serve-g5g` | 1 | 0 | 0 | yes | **no** |
@@ -150,9 +164,14 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-jax-g5g-2b | `2026-08-31-crossrig-jax-g5g` | 5 | 1 | 2 | yes | **no** |
 | gpu-jax-g5g-2b | `2026-09-01-concurrency-jax-g5g` | 4 | 1 | 0 | yes | **no** |
 | gpu-jax-g6-2b | `2026-08-28-first-serve-g6` | 12 | 5 | 0 | yes | **no** |
-| gpu-llamacpp-g6-2b-q4_0 | `2026-10-26-drafter-cost-g6` | 41 | 1 | 0 | yes | **no** |
+| gpu-litertlm-t4-2b-int248 | `2026-11-06-accuracy-t4` | 13 | 1 | 0 | **no** | **no** |
+| gpu-llamacpp-g6-2b-q4_0 | `2026-10-26-drafter-cost-g6` | 43 | 1 | 0 | yes | **no** |
 | gpu-llamacpp-g6-2b-q4_0 | `2026-10-26-drafter-g6` | 43 | 0 | 0 | yes | **no** |
 | gpu-llamacpp-g6-4b-q4_0 | `2026-10-26-drafter-g6` | 44 | 0 | 0 | yes | **no** |
+| gpu-llamacpp-t4-2b-q4_0 | `2026-11-06-accuracy-t4` | 20 | 0 | 0 | **no** | **no** |
+| gpu-llamacpp-t4-2b-q4_0 | `2026-11-06-concurrency-t4` | 60 | 0 | 0 | **no** | **no** |
+| gpu-mistralrs-t4-2b-q4_0 | `2026-11-06-accuracy-t4` | 14 | 0 | 0 | **no** | **no** |
+| gpu-mistralrs-t4-2b-q4_0 | `2026-11-06-concurrency-t4` | 12 | 0 | 0 | **no** | **no** |
 | gpu-pytorch-g5g-2b | `2026-08-29-first-serve-g5g` | 4 | 1 | 0 | yes | **no** |
 | gpu-pytorch-g5g-2b | `2026-08-29-profile-and-fixes-g5g` | 7 | 3 | 2 | yes | **no** |
 | gpu-pytorch-g5g-2b | `2026-08-31-crossrig-torch-g5g` | 12 | 4 | 2 | yes | **no** |
@@ -160,6 +179,10 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-pytorch-g5g-2b | `2026-09-01-concurrency-torch-g5g` | 4 | 1 | 0 | yes | **no** |
 | gpu-pytorch-g6-2b | `2026-08-29-first-serve-g6` | 5 | 1 | 0 | yes | **no** |
 | gpu-pytorch-g6-2b-q4w4a16 | `2026-10-26-first-light-g6` | 19 | 1 | 0 | yes | **no** |
+| gpu-pytorch-t4-2b-q4w4a16 | `2026-11-06-accuracy-t4` | 10 | 0 | 0 | **no** | **no** |
+| gpu-sglang-t4-2b-q4_0 | `2026-11-05-first-light-t4` | 5 | 0 | 0 | yes | **no** |
+| gpu-sglang-t4-2b-q4_0 | `2026-11-06-concurrency-t4` | 24 | 0 | 0 | **no** | **no** |
+| gpu-sglang-t4-2b-q4w4a16emb4 | `2026-11-10-int4-t4` | 47 | 0 | 0 | **no** | **no** |
 | gpu-vllm-g4dn-2b | `2026-08-30-first-serve-g4dn` | 4 | 2 | 0 | **no** | **no** |
 | gpu-vllm-g4dn-2b-w4a16 | `2026-09-30-sagemaker-match-g4dn` | 11 | 1 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-08-12-first-serve-g5g` | 1 | 0 | 0 | yes | **no** |
@@ -169,6 +192,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-g5g-2b | `2026-09-01-concurrency-vllm-g5g` | 4 | 1 | 0 | yes | **no** |
 | gpu-vllm-g5g-2b | `2026-09-01-prefetch-ab-g5g` | 3 | 1 | 0 | yes | **no** |
 | gpu-vllm-g6-2b | `2026-08-30-first-serve-g6` | 10 | 0 | 0 | yes | **no** |
+| gpu-vllm-g6-2b-q4w4a16emb4 | `2026-11-05-engines-g6` | 35 | 3 | 0 | yes | **no** |
+| gpu-vllm-g6-2b-q4w4a16emb4 | `2026-11-06-suite-g6` | 182 | 0 | 0 | yes | **no** |
 | gpu-vllm-g6-2b-w4a16 | `2026-09-29-sagemaker-match-g6` | 11 | 1 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-09-vllm-grid-cloudrun-l4` | 1 | 0 | 0 | yes | **no** |
 | gpu-vllm-l4-12b-w4a16 | `2026-06-15-vllm-grid-ec2-l4` | 2 | 0 | 0 | yes | **no** |
@@ -228,18 +253,28 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-4b-w8a8emb4 | `2026-10-07-dtype-sweep-mi300x` | 5 | 0 | 0 | **no** | **no** |
 | gpu-vllm-mi300x-embed2 | `2026-10-09-embed2-mi300x` | 32 | 2 | 0 | **no** | **no** |
 | gpu-vllm-t4-2b | `2026-09-18-qat-vs-bf16-t4` | 107 | 0 | 0 | yes | **no** |
+| gpu-vllm-t4-2b-q4w4a16emb4 | `2026-11-05-engines-t4` | 52 | 2 | 0 | **no** | **no** |
+| gpu-vllm-t4-2b-q4w4a16emb4 | `2026-11-06-accuracy-t4` | 22 | 0 | 0 | **no** | **no** |
+| gpu-vllm-t4-2b-q4w4a16emb4 | `2026-11-06-concurrency-t4` | 60 | 0 | 0 | **no** | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-09-29-emb4-sweep-t4` | 67 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-09-29-specdec-c1-t4` | 14 | 9 | 0 | **no** | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-10-15-drafter-sweep-t4` | 51 | 2 | 0 | yes | **no** |
 | gpu-vllm-t4-2b-w4a16 | `2026-10-15-overnight-t4` | 34 | 0 | 0 | yes | **no** |
+| gpu-vllm-t4-2b-w4a16 | `2026-10-19-vllm-vs-llamacpp-t4` | 42 | 0 | 0 | **no** | **no** |
 | gpu-vllm-t4-4b-q4w4a16emb4 | `2026-09-30-emb4-sweep-e4b-t4` | 61 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-07-first-serve-t4` | 17 | 0 | 0 | yes | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-08-beir-retrieval-t4` | 10 | 0 | 0 | **no** | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-08-embed-sweep-t4` | 6 | 0 | 0 | **no** | **no** |
 | gpu-vllm-t4-embed2 | `2026-10-08-jev-tasks-t4` | 6 | 0 | 0 | **no** | **no** |
+| lambda-llamacpp-g6-2b-q4_0 | `2026-11-19-lambda` | 4 | 0 | 0 | **no** | **no** |
+| lambda-vllm-g6-2b-q4w4a16emb4 | `2026-11-18-drafter-lambda` | 5 | 2 | 0 | **no** | **no** |
+| lambda-vllm-g6-2b-q4w4a16emb4 | `2026-11-18-first-light-lambda` | 5 | 3 | 0 | **no** | **no** |
 | local-jax-cpu-2b | `2026-09-04-first-light-jax-cpu` | 2 | 0 | 0 | yes | **no** |
 | local-litertlm-3050oem-2b-int248 | `2026-11-02-context-3050oem` | 9 | 0 | 0 | yes | **no** |
 | local-litertlm-3050oem-2b-int248 | `2026-11-02-first-light-3050oem` | 21 | 4 | 0 | yes | **no** |
+| local-litertlm-3050oem-2b-int248 | `2026-11-03-tools-constraint-3050oem` | 14 | 2 | 0 | yes | **no** |
+| local-litertlm-3050oem-2b-q4w4a16emb4 | `2026-11-02-accuracy-3050oem` | 19 | 2 | 0 | yes | **no** |
+| local-litertlm-3050oem-2b-q4w4a16emb4 | `2026-11-02-first-light-3050oem` | 10 | 1 | 0 | yes | **no** |
 | local-litertlm-i71360p-2b-q4wi4b32 | `2026-10-15-qat-grid-bf16-scales-i71360p` | 5 | 2 | 0 | **no** | **no** |
 | local-llamacpp-1650ti-12b-q4_0 | `2026-10-21-accuracy-12b-1650ti` | 9 | 0 | 0 | **no** | **no** |
 | local-llamacpp-1650ti-12b-q4_0 | `2026-10-21-first-light-1650ti` | 157 | 0 | 0 | yes | **no** |
@@ -259,7 +294,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-1650ti-2b-q4_0 | `2026-10-14-drafter-gaps-1650ti` | 46 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-2b-q4_0 | `2026-10-15-drafter-load-1650ti` | 124 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-concurrency-1650ti` | 38 | 0 | 0 | yes | **no** |
-| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 19 | 1 | 0 | yes | **no** |
+| local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-exact-gguf-e4b-1650ti` | 18 | 1 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-paired-sweep-1650ti` | 14 | 0 | 0 | yes | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-09-30-suite-e2b-vs-e4b-1650ti` | 8 | 0 | 0 | **no** | **no** |
 | local-llamacpp-1650ti-4b-q4_0 | `2026-10-14-repeatability-1650ti` | 18 | 0 | 0 | yes | **no** |
@@ -268,6 +303,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-exact-gguf-12b-3050oem` | 27 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-16-first-light-3050oem` | 22 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-12b-q4_0 | `2026-10-17-kvcache-12b-3050oem` | 74 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-12b-q4_0 | `2026-11-17-thinking-12b-3050oem` | 11 | 0 | 0 | **no** | **no** |
 | local-llamacpp-3050oem-26b-q4_0 | `2026-10-18-accuracy-26b-3050oem` | 18 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-26b-q4_0 | `2026-10-18-first-light-3050oem` | 96 | 2 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-13-concurrency-3050oem` | 15 | 0 | 0 | yes | **no** |
@@ -284,25 +320,36 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-14-overnight-3050oem` | 3 | 0 | 0 | **no** | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-draft1-3050oem` | 15 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-drafter-kvu-3050oem` | 57 | 0 | 0 | yes | **no** |
-| local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-longmixed-3050oem` | 62 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-longmixed-3050oem` | 61 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-mixed-3050oem` | 79 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-concurrency-thinking-3050oem` | 17 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-2b-q4_0 | `2026-10-15-queue-3050oem` | 4 | 0 | 0 | **no** | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-11-03-concurrency-3050oem` | 15 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-11-03-concurrency-drafters-3050oem` | 26 | 0 | 0 | **no** | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-11-03-drafters-3050oem` | 6 | 0 | 0 | **no** | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-11-04-fullcard-3050oem` | 51 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-2b-q4_0 | `2026-11-16-thinking-e2b-3050oem` | 52 | 2 | 0 | **no** | **no** |
 | local-llamacpp-3050oem-31b-q4_0 | `2026-10-18-first-light-3050oem` | 50 | 3 | 0 | yes | **no** |
-| local-llamacpp-3050oem-31b-q4_0 | `2026-10-19-accuracy-31b-3050oem` | 25 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-31b-q4_0 | `2026-10-19-accuracy-31b-3050oem` | 24 | 0 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-first-light-3050oem` | 7 | 0 | 0 | yes | **no** |
-| local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-quality-e2b-vs-e4b-3050oem` | 53 | 1 | 0 | yes | **no** |
+| local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-quality-e2b-vs-e4b-3050oem` | 52 | 1 | 0 | yes | **no** |
 | local-llamacpp-3050oem-4b-q4_0 | `2026-10-13-spec-mtp-3050oem` | 13 | 0 | 0 | yes | **no** |
+| local-llamacpp-3050oem-4b-q4_0 | `2026-11-17-thinking-e4b-3050oem` | 52 | 2 | 0 | **no** | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-paired-sweep-cpu` | 4 | 1 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-16-thread-sweep-cpu` | 7 | 4 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-22-paired-sweep-cpu` | 12 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-google-vs-v2-cpu` | 5 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-2b-q4_0 | `2026-09-29-paired-sweep-cpu` | 13 | 0 | 0 | yes | **no** |
 | local-llamacpp-cpu-4b-q4_0 | `2026-09-30-paired-sweep-cpu` | 10 | 0 | 0 | yes | **no** |
-| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 16 | 1 | 0 | yes | **no** |
+| local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-i71360p` | 17 | 1 | 0 | yes | **no** |
 | local-llamacpp-i71360p-2b-q4_0 | `2026-09-29-exact-gguf-v2-i71360p` | 9 | 1 | 0 | yes | **no** |
 | local-llamacpp-sc7180p-2b-q4_0 | `2026-10-11-first-light-sc7180p` | 21 | 19 | 0 | yes | **no** |
 | local-llamacpp-sdm850-2b-q4_0 | `2026-10-11-first-light-sdm850` | 15 | 13 | 0 | yes | **no** |
+| local-mistralrs-3050oem-2b-q4_0 | `2026-11-03-build-3050oem` | 1 | 0 | 0 | **no** | **no** |
+| local-mistralrs-3050oem-2b-q4_0 | `2026-11-04-accuracy-3050oem` | 15 | 0 | 0 | yes | **no** |
+| local-mistralrs-3050oem-2b-q4_0 | `2026-11-04-concurrency-3050oem` | 14 | 0 | 0 | yes | **no** |
+| local-mistralrs-3050oem-2b-q4_0 | `2026-11-04-engines-3050oem` | 10 | 0 | 0 | yes | **no** |
+| local-mistralrs-3050oem-2b-q4_0 | `2026-11-04-first-light-3050oem` | 1 | 0 | 0 | **no** | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-first-light-ollama-1650ti` | 7 | 4 | 0 | yes | **no** |
 | local-ollama-1650ti-2b-q4_0 | `2026-09-04-text-only-ollama-1650ti` | 3 | 1 | 0 | yes | **no** |
 | local-pytorch-1650ti-2b-q4w4a16 | `2026-10-23-accuracy-1650ti` | 36 | 0 | 0 | yes | **no** |
@@ -321,6 +368,18 @@ to a complete run if you only read the directory name, so completeness is counte
 | local-pytorch-3050oem-2b-q4w4a16 | `2026-10-31-accuracy-3050oem` | 9 | 0 | 0 | yes | **no** |
 | local-pytorch-3050oem-2b-q4w4a16 | `2026-10-31-first-light-3050oem` | 28 | 3 | 0 | yes | **no** |
 | local-pytorch-cpu-2b | `2026-09-04-first-light-pytorch-cpu` | 2 | 1 | 0 | yes | **no** |
+| local-sglang-3050oem-2b-q4w4a16emb4 | `2026-11-04-accuracy-3050oem` | 11 | 0 | 0 | yes | **no** |
+| local-sglang-3050oem-2b-q4w4a16emb4 | `2026-11-04-accuracy-drafter-3050oem` | 11 | 0 | 0 | yes | **no** |
+| local-sglang-3050oem-2b-q4w4a16emb4 | `2026-11-04-concurrency-3050oem` | 14 | 0 | 0 | yes | **no** |
+| local-sglang-3050oem-2b-q4w4a16emb4 | `2026-11-04-concurrency-drafters-3050oem` | 37 | 0 | 0 | yes | **no** |
+| local-sglang-3050oem-2b-q4w4a16emb4 | `2026-11-04-engines-3050oem` | 12 | 0 | 0 | yes | **no** |
+| local-vllm-3050oem-2b-q4w4a16emb4 | `2026-11-03-accuracy-3050oem` | 12 | 0 | 0 | yes | **no** |
+| local-vllm-3050oem-2b-q4w4a16emb4 | `2026-11-03-accuracy-drafter-3050oem` | 12 | 0 | 0 | yes | **no** |
+| local-vllm-3050oem-2b-q4w4a16emb4 | `2026-11-03-concurrency-3050oem` | 18 | 0 | 0 | yes | **no** |
+| local-vllm-3050oem-2b-q4w4a16emb4 | `2026-11-03-concurrency-drafters-3050oem` | 55 | 0 | 0 | yes | **no** |
+| local-vllm-3050oem-2b-q4w4a16emb4 | `2026-11-03-drafters-3050oem` | 37 | 1 | 0 | yes | **no** |
+| local-vllm-3050oem-2b-q4w4a16emb4 | `2026-11-03-engines-3050oem` | 19 | 3 | 0 | yes | **no** |
+| tokenlab-sglang-amd-31b | `2026-11-13-first-light-tokenlab` | 3 | 0 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 13 | 1 | 0 | yes | yes |
 | tpu-jax-v5e1-2b | `2026-07-28-jax-e2b-v6e1` | 7 | 5 | 0 | yes | **no** |
 | tpu-jax-v5e1-2b | `2026-07-29-kv-quant-v6e1` | 44 | 0 | 0 | yes | **no** |
@@ -348,6 +407,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e1-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
 | tpu-pytorch-v6e4-2b | `2026-07-25-vllm-sweep-v6e1` | 14 | 1 | 0 | yes | yes |
+| tpu-sglangjax-v5e1-2b | `2026-11-08-first-light-v5e1` | 33 | 0 | 0 | yes | **no** |
 | tpu-vllm-trn1-2b | `2026-10-05-smoke-vllm-trn1` | 2 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-12b-fp8 | `2026-09-30-fillA-12b-fp8-v5e1` | 40 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-12b-fp8 | `2026-09-30-gen2048b2-12b-fp8-v5e1` | 8 | 0 | 0 | **no** | **no** |
@@ -422,6 +482,8 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-lookup-v5e1` | 9 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-09-29-speed-v5e1` | 6 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-10-02-rig-boot-v5e1` | 12 | 9 | 0 | **no** | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-11-06-ladder-v5e1` | 95 | 0 | 0 | yes | **no** |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | `2026-11-08-ladder-sglang-v5e1` | 23 | 0 | 0 | yes | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-e2c-e2b-ple4-v5e1` | 35 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-mtpg1-v5e1` | 7 | 0 | 0 | **no** | **no** |
 | tpu-vllm-v5e1-2b-q4w4a16ple4 | `2026-09-29-mtpq-v5e1` | 4 | 0 | 0 | **no** | **no** |
@@ -508,25 +570,44 @@ to a complete run if you only read the directory name, so completeness is counte
 | gce-vllm-v6e4-26b-q4w4a16 | 0 | 4 |
 | gce-vllm-v6e8-2b | 0 | 0 |
 | gce-vllm-v6e8-31b | 0 | 2 |
+| gemini-api-google-26b | 0 | 1 |
+| gemini-api-google-31b | 0 | 1 |
+| gemini-api-google-argon4 | 0 | 2 |
+| gemini-api-google-carbon4 | 0 | 2 |
+| gemini-api-google-flash38 | 0 | 2 |
+| gemini-api-google-flashlite35 | 0 | 2 |
+| gemini-api-google-hydrogen4 | 0 | 2 |
+| gemini-api-google-neon4 | 0 | 2 |
 | gke-vllm-v6e1-2b | 1 | 1 |
 | gpu-jax-g4dn-2b | 1 | 1 |
 | gpu-jax-g5g-2b | 4 | 12 |
 | gpu-jax-g6-2b | 0 | 1 |
 | gpu-jaxrust-g5g-2b | 0 | 0 |
+| gpu-litertlm-g6-2b-int248 | 0 | 0 |
+| gpu-litertlm-g6-2b-q4w4a16emb4 | 0 | 0 |
+| gpu-litertlm-t4-2b-int248 | 0 | 1 |
 | gpu-llamacpp-g5g-2b-q4_0 | 0 | 0 |
 | gpu-llamacpp-g6-2b-q4_0 | 0 | 2 |
 | gpu-llamacpp-g6-4b-q4_0 | 0 | 1 |
+| gpu-llamacpp-t4-2b-q4_0 | 0 | 2 |
+| gpu-mistralrs-g6-2b-q4_0 | 0 | 0 |
+| gpu-mistralrs-t4-2b-q4_0 | 0 | 2 |
 | gpu-ollama-g5g-2b-q4_0 | 0 | 0 |
 | gpu-pytorch-g4dn-2b | 0 | 0 |
 | gpu-pytorch-g5g-2b | 4 | 5 |
 | gpu-pytorch-g6-2b | 1 | 1 |
 | gpu-pytorch-g6-2b-q4w4a16 | 0 | 1 |
+| gpu-pytorch-t4-2b-q4w4a16 | 0 | 1 |
+| gpu-sglang-g6-2b-q4w4a16emb4 | 0 | 0 |
+| gpu-sglang-t4-2b-q4_0 | 0 | 2 |
+| gpu-sglang-t4-2b-q4w4a16emb4 | 0 | 1 |
 | gpu-vllm-g4dn-2b | 0 | 1 |
 | gpu-vllm-g4dn-2b-w4a16 | 0 | 1 |
 | gpu-vllm-g5g-2b | 1 | 6 |
 | gpu-vllm-g6-12b-w4a16 | 0 | 0 |
 | gpu-vllm-g6-26b-q4w4a16 | 0 | 0 |
 | gpu-vllm-g6-2b | 1 | 1 |
+| gpu-vllm-g6-2b-q4w4a16emb4 | 0 | 2 |
 | gpu-vllm-g6-2b-w4a16 | 0 | 1 |
 | gpu-vllm-g6-31b-w4a16 | 0 | 0 |
 | gpu-vllm-g6-4b | 0 | 0 |
@@ -578,33 +659,41 @@ to a complete run if you only read the directory name, so completeness is counte
 | gpu-vllm-mi300x-4b-w8a8emb4 | 0 | 1 |
 | gpu-vllm-mi300x-embed2 | 0 | 1 |
 | gpu-vllm-t4-2b | 0 | 1 |
-| gpu-vllm-t4-2b-w4a16 | 1 | 4 |
+| gpu-vllm-t4-2b-q4w4a16emb4 | 0 | 3 |
+| gpu-vllm-t4-2b-w4a16 | 1 | 5 |
 | gpu-vllm-t4-4b-q4w4a16emb4 | 1 | 1 |
 | gpu-vllm-t4-embed2 | 1 | 4 |
+| lambda-llamacpp-g6-2b-q4_0 | 0 | 1 |
+| lambda-vllm-g6-2b-q4w4a16emb4 | 0 | 2 |
 | local-jax-cpu-2b | 0 | 1 |
-| local-litertlm-3050oem-2b-int248 | 0 | 2 |
+| local-litertlm-3050oem-2b-int248 | 0 | 3 |
+| local-litertlm-3050oem-2b-q4w4a16emb4 | 0 | 2 |
 | local-litertlm-i71360p-2b-q4wi4b32 | 0 | 1 |
 | local-llamacpp-1650ti-12b-q4_0 | 0 | 2 |
 | local-llamacpp-1650ti-2b-q4_0 | 6 | 15 |
 | local-llamacpp-1650ti-4b-q4_0 | 2 | 5 |
-| local-llamacpp-3050oem-12b-q4_0 | 0 | 5 |
+| local-llamacpp-3050oem-12b-q4_0 | 0 | 6 |
 | local-llamacpp-3050oem-26b-q4_0 | 0 | 2 |
-| local-llamacpp-3050oem-2b-q4_0 | 0 | 18 |
+| local-llamacpp-3050oem-2b-q4_0 | 0 | 23 |
 | local-llamacpp-3050oem-31b-q4_0 | 0 | 2 |
-| local-llamacpp-3050oem-4b-q4_0 | 0 | 3 |
+| local-llamacpp-3050oem-4b-q4_0 | 0 | 4 |
 | local-llamacpp-cpu-2b-q4_0 | 3 | 5 |
 | local-llamacpp-cpu-4b-q4_0 | 1 | 1 |
 | local-llamacpp-i71360p-2b-q4_0 | 0 | 2 |
 | local-llamacpp-i71360p-4b-q4_0 | 0 | 0 |
 | local-llamacpp-sc7180p-2b-q4_0 | 0 | 1 |
 | local-llamacpp-sdm850-2b-q4_0 | 0 | 1 |
+| local-mistralrs-3050oem-2b-q4_0 | 0 | 5 |
 | local-ollama-1650ti-2b-q4_0 | 2 | 2 |
 | local-pytorch-1650ti-2b-q4w4a16 | 0 | 6 |
 | local-pytorch-1650ti-4b-q4w4a16 | 0 | 5 |
 | local-pytorch-3050oem-12b-q4w4a16 | 0 | 2 |
 | local-pytorch-3050oem-2b-q4w4a16 | 0 | 2 |
 | local-pytorch-cpu-2b | 0 | 1 |
+| local-sglang-3050oem-2b-q4w4a16emb4 | 0 | 5 |
+| local-vllm-3050oem-2b-q4w4a16emb4 | 0 | 6 |
 | local-vllm-cpu-2b | 0 | 0 |
+| tokenlab-sglang-amd-31b | 0 | 1 |
 | tpu-jax-inf2-2b | 0 | 0 |
 | tpu-jax-v5e1-2b | 1 | 4 |
 | tpu-jax-v6e1-12b-w4a16 | 0 | 1 |
@@ -625,6 +714,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-pytorch-v5e1-2b | 1 | 1 |
 | tpu-pytorch-v6e1-2b | 1 | 1 |
 | tpu-pytorch-v6e4-2b | 1 | 1 |
+| tpu-sglangjax-v5e1-2b | 0 | 1 |
 | tpu-vllm-trn1-2b | 0 | 1 |
 | tpu-vllm-v5e1-12b-fp8 | 0 | 2 |
 | tpu-vllm-v5e1-12b-q4w4a16 | 0 | 2 |
@@ -640,7 +730,7 @@ to a complete run if you only read the directory name, so completeness is counte
 | tpu-vllm-v5e1-2b-fp8emb4 | 0 | 2 |
 | tpu-vllm-v5e1-2b-q4_0 | 0 | 6 |
 | tpu-vllm-v5e1-2b-q4w4a16 | 0 | 10 |
-| tpu-vllm-v5e1-2b-q4w4a16emb4 | 0 | 7 |
+| tpu-vllm-v5e1-2b-q4w4a16emb4 | 0 | 9 |
 | tpu-vllm-v5e1-2b-q4w4a16ple4 | 0 | 4 |
 | tpu-vllm-v5e1-2b-w4a16 | 0 | 4 |
 | tpu-vllm-v5e1-2b-w8a8 | 0 | 7 |

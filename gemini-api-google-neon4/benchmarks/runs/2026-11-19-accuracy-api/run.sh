@@ -1,0 +1,23 @@
+#!/bin/bash
+# Gemini 4 Neon quality run, 2026-11-19, with the settings of the 2026-11-14 seven-model run
+# (gemini-api-google-*/benchmarks/runs/2026-11-14-accuracy-api), run alone five days later. GSM8K (1,319, up to 2048
+# tokens) and BFCL simple (400) via benchmarks/gen-eval/gen_eval.py, temperature 0, scored in code. One arm:
+# the lowest thinking level the model accepts (LOWEST_REASONING_EFFORT in tpu.env). Concurrency 8,
+# up to 8 retries on HTTP 429/5xx, network errors and requests over 180 s.
+set -u
+cd "$(dirname "$0")"; HERE=$PWD
+RIG=$(cd ../../.. && pwd)
+set -a; . "$RIG/tpu.env"; set +a
+J=$(cd "$RIG/../benchmarks/gen-eval" && pwd)
+export GEN_EVAL_CHAT_URL=$GEMINI_OPENAI_URL GEN_EVAL_API_KEY_FILE=$GEMINI_API_KEY_FILE GEN_EVAL_RETRIES=8 GEN_EVAL_TIMEOUT_S=180 GEN_EVAL_MAX_TOKENS=2048
+export GEN_EVAL_REASONING_EFFORT=$LOWEST_REASONING_EFFORT
+LOG=$HERE/driver.log
+state() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
+state "BEGIN $MODEL_NAME reasoning_effort=$GEN_EVAL_REASONING_EFFORT"
+for t in bfcl_simple gsm8k; do
+  [ -s "$HERE/$t.jsonl" ] && { state "SKIP $t (exists)"; continue; }
+  state "START $t"
+  (cd "$J" && python3 gen_eval.py run x "$MODEL_NAME" $t "$HERE/$t.jsonl" --concurrency 8) > "$HERE/$t.log" 2>&1
+  state "END $t rc=$? $(tail -1 "$HERE/$t.log")"
+done
+state "DONE"

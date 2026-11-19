@@ -1,0 +1,36 @@
+== scores and cost, lowest thinking level each model accepts
+  gemma-4-31b-it         minimal  GSM8K 1,284/1,319 0.9735 [0.9644, 0.9818]  BFCL 387/400 0.9675 [0.9475, 0.9850]  errors 0  thinking/GSM8K problem 0.0  GSM8K problems with thinking 0  GSM8K $free  both free tier
+  gemma-4-26b-a4b-it     minimal  GSM8K 1,285/1,319 0.9742 [0.9651, 0.9826]  BFCL 383/400 0.9575 [0.9350, 0.9750]  errors 0  thinking/GSM8K problem 0.0  GSM8K problems with thinking 0  GSM8K $free  both free tier
+  gemini-3.5-flash-lite  minimal  GSM8K 1,270/1,319 0.9629 [0.9522, 0.9735]  BFCL 374/400 0.9350 [0.9100, 0.9600]  errors 0  thinking/GSM8K problem 0.0  GSM8K problems with thinking 0  GSM8K $0.87  both $0.92
+  gemini-3.8-flash       none     GSM8K 1,291/1,319 0.9788 [0.9712, 0.9864]  BFCL 376/400 0.9400 [0.9175, 0.9625]  errors 0  thinking/GSM8K problem 152.2  GSM8K problems with thinking 1293  GSM8K $1.66  both $1.81
+  gemini-4-hydrogen      none     GSM8K 1,293/1,319 0.9803 [0.9727, 0.9879]  BFCL 382/400 0.9550 [0.9325, 0.9750]  errors 0  thinking/GSM8K problem 248.7  GSM8K problems with thinking 1319  GSM8K $4.51  both $5.02
+  gemini-4-carbon        none     GSM8K 1,293/1,319 0.9803 [0.9719, 0.9879]  BFCL 384/400 0.9600 [0.9400, 0.9775]  errors 0  thinking/GSM8K problem 29.6  GSM8K problems with thinking 268  GSM8K $3.70  both $4.02
+  gemini-4-argon         none     GSM8K 1,298/1,319 0.9841 [0.9765, 0.9909]  BFCL 387/400 0.9675 [0.9500, 0.9850]  errors 0  thinking/GSM8K problem 4.8  GSM8K problems with thinking 66  GSM8K $3.15  both $3.46
+  gemini-4-neon          none     GSM8K 1,295/1,319 0.9818 [0.9742, 0.9886]  BFCL 390/400 0.9750 [0.9575, 0.9900]  errors 0  thinking/GSM8K problem 252.2  GSM8K problems with thinking 1319  GSM8K $8.91  both $10.06
+
+== cost of both tasks at 2026-12-01 list prices (Carbon, Argon $4 / $20); arithmetic from today's token counts
+  hydrogen4  $5.02
+  carbon4    $8.03
+  argon4     $6.93
+  neon4      $10.06
+
+== Neon minus each model, paired by question (bootstrap 95% range of the difference, 2000 resamples, seed 0)
+  gsm8k        vs gemma-4-31b-it         +0.0083 [+0.0038, +0.0136] above zero  (Neon only right 12, other only right 1, 1319 paired)
+  gsm8k        vs gemma-4-26b-a4b-it     +0.0076 [+0.0008, +0.0144] above zero  (Neon only right 15, other only right 5, 1319 paired)
+  gsm8k        vs gemini-3.5-flash-lite  +0.0190 [+0.0114, +0.0265] above zero  (Neon only right 27, other only right 2, 1319 paired)
+  gsm8k        vs gemini-3.8-flash       +0.0030 [-0.0015, +0.0083] includes zero  (Neon only right 8, other only right 4, 1319 paired)
+  gsm8k        vs gemini-4-hydrogen      +0.0015 [-0.0015, +0.0045] includes zero  (Neon only right 3, other only right 1, 1319 paired)
+  gsm8k        vs gemini-4-carbon        +0.0015 [-0.0023, +0.0061] includes zero  (Neon only right 5, other only right 3, 1319 paired)
+  gsm8k        vs gemini-4-argon         -0.0023 [-0.0068, +0.0015] includes zero  (Neon only right 2, other only right 5, 1319 paired)
+
+  bfcl_simple  vs gemma-4-31b-it         +0.0075 [-0.0075, +0.0225] includes zero  (Neon only right 6, other only right 3, 400 paired)
+  bfcl_simple  vs gemma-4-26b-a4b-it     +0.0175 [-0.0025, +0.0375] includes zero  (Neon only right 12, other only right 5, 400 paired)
+  bfcl_simple  vs gemini-3.5-flash-lite  +0.0400 [+0.0200, +0.0625] above zero  (Neon only right 18, other only right 2, 400 paired)
+  bfcl_simple  vs gemini-3.8-flash       +0.0350 [+0.0200, +0.0550] above zero  (Neon only right 14, other only right 0, 400 paired)
+  bfcl_simple  vs gemini-4-hydrogen      +0.0200 [+0.0050, +0.0350] above zero  (Neon only right 9, other only right 1, 400 paired)
+  bfcl_simple  vs gemini-4-carbon        +0.0150 [+0.0025, +0.0300] above zero  (Neon only right 7, other only right 1, 400 paired)
+  bfcl_simple  vs gemini-4-argon         +0.0075 [-0.0050, +0.0225] includes zero  (Neon only right 6, other only right 3, 400 paired)
+
+== Neon speed, alone on the connection, 8 requests at a time (not comparable with the 11-14 shared run)
+  gsm8k        median 13.98 s per request  (1,319 requests)
+  bfcl_simple  median 3.70 s per request  (400 requests)
