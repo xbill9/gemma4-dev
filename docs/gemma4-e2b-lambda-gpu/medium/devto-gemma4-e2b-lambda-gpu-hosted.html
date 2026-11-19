@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 on AWS Lambda with a GPU: E2B on an NVIDIA L4, Day One</title>
+  <meta name="description" content="AWS Lambda now runs functions on GPU instances through Lambda Managed Instances. Gemma 4 E2B, Google&#x27;s QAT weights at 4 bits, served by vLLM inside a Lambda function on one g6.2xlarge: how to build it, a local chat page, and what Google&#x27;s drafter does to speed through Lambda, from 1 to 48 requests at once." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to serving Gemma 4 E2B
+from an AWS Lambda function on a GPU, using the GPU support for Lambda
+Managed Instances that AWS announced on 2026-11-18. The model is
+Google's QAT 4-bit E2B, served by vLLM on one NVIDIA L4 in a g6.2xlarge,
+called with <code>lambda invoke</code> and from a local chat page.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-gpu/medium/img/devto-cover.51964d1e.jpg" alt="Gemma 4 on AWS Lambda with a GPU: E2B on an NVIDIA L4, Day One" /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/lambda-vllm-g6-2b-q4w4a16emb4">https://github.com/xbill9/gemma4-dev/tree/main/lambda-vllm-g6-2b-q4w4a16emb4</a></p>
+<p>The checkpoint, vLLM version, instance type and serving flags are the
+ones this repo already measured on a plain EC2 G6. What changes is who
+runs the machine: Lambda starts it, loads the container, health-checks
+the server and routes every request. Every figure below was measured on
+2026-11-18 and 2026-11-19 in us-east-1.</p>
+<hr />
+<h4 id="what-is-new-in-lambda">What Is New in Lambda</h4>
+<p>Until this release a Lambda function ran on CPUs. Lambda Managed
+Instances already ran functions on EC2 instances that Lambda manages in
+your account; the new part is G-series GPU instances:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-gpu/medium/img/devto-gemma4-e2b-lambda-gpu-table-1.png"
+alt="Table: Family, GPU, GPU memory" /></p>
+<p>What comes with it, from AWS's documentation:</p>
+<ul>
+<li>One GPU per execution environment, requested with
+<code>AcceleratorConfig.AcceleratorMemorySize</code> (3 to 48 GB, a
+minimum)</li>
+<li>Container images up to 32 GB, against 10 GB for other functions, and
+up to 32,768 MB of <code>/tmp</code></li>
+<li>Lambda installs and maintains the NVIDIA driver, and publishes base
+images for vLLM, SGLang and PyTorch</li>
+<li>Up to 48 requests at once per execution environment, all sharing one
+copy of the model</li>
+<li>The model loads when a version is published, before the first
+request</li>
+<li>Billing at the EC2 On-Demand price, plus a management fee of 9.75%
+for G-series and $0.20 per million requests, with no charge for
+duration</li>
+</ul>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An AWS account with the AWS CLI v2 (2.41 here; boto3 1.43 has no
+<code>AcceleratorConfig</code> yet)</li>
+<li>A quota for "Running On-Demand G and VT instances" in your region:
+it starts at 0 vCPUs, and one g6.2xlarge needs 8</li>
+<li>Docker with <code>buildx</code></li>
+<li>Python 3 with <code>huggingface_hub</code> and
+<code>boto3</code></li>
+<li>A clone of <code>gemma4-dev</code>, or just the
+<code>lambda-vllm-g6-2b-q4w4a16emb4</code> directory</li>
+</ul>
+<hr />
+<h4 id="step-1--read-the-base-image">Step 1 — Read the Base Image</h4>
+<p>AWS's vLLM image is
+<code>public.ecr.aws/lambda/deep-learning-containers/vllm</code>. The
+rig pins it by digest, and its build history says what is inside:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-gpu/medium/img/devto-gemma4-e2b-lambda-gpu-table-2.png"
+alt="Table: Value" /></p>
+<p>vLLM 0.33.0 is the version this repo's 3050 and G6 vLLM rigs serve
+Gemma 4 E2B with, so the checkpoint loads without patches.</p>
+<p>The image runs two things. An engine extension starts
+<code>vllm serve</code> on <code>127.0.0.1:8000</code> while Lambda
+initialises the environment, and replaces the environment if
+<code>/health</code> fails. A small handler forwards each invocation's
+payload, unchanged, to <code>/v1/chat/completions</code> when it has
+<code>messages</code>. Serving flags go in one environment variable,
+<code>VLLM_SERVER_ARGS</code>, which the extension splits with
+<code>shlex.split</code>.</p>
+<hr />
+<h4 id="step-2--bake-the-model-into-the-image">Step 2 — Bake the Model
+into the Image</h4>
+<p>The checkpoint is
+<code>xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4</code>: Google's
+QAT Q4_0 weights in compressed-tensors W4A16, with the vocabulary tables
+at 4 bits too, text only. At 2,862,925,039 bytes it fits in the image,
+so the instance needs no access to Hugging Face or S3:</p>
+<pre class="dockerfile"><code>ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+COPY model/ /opt/model/
+ENV MODEL_ID=/opt/model
+COPY drafter/ /opt/drafter/</code></pre>
+<p><code>make model</code> downloads the checkpoint at a pinned
+revision. <code>make image</code> builds and pushes it to ECR:</p>
+<pre class="bash"><code>docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+  --build-arg BASE_IMAGE=public.ecr.aws/lambda/deep-learning-containers/vllm@sha256:3272913a... \
+  -t ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/lambda-vllm-g6-2b-q4w4a16emb4:db715f83da4f \
+  --output type=image,oci-mediatypes=false,push=true image/</code></pre>
+<p>The flags matter. <code>CreateFunction</code> accepts a
+single-platform Docker v2 manifest and refuses an OCI image index, which
+Docker 29 pushes by default with a provenance attestation ("The image
+manifest, config or layer media type … is not supported"). The first
+push, base layers included, took 398.4 s from a home connection; a
+rebuild that only adds a layer pushed in 19.6 s.</p>
+<hr />
+<h4 id="step-3--two-roles-and-a-capacity-provider">Step 3 — Two Roles
+and a Capacity Provider</h4>
+<p>A capacity provider tells Lambda which instances to run and where. It
+needs an operator role that Lambda assumes to launch them:</p>
+<pre class="bash"><code>make roles      # lambda-lmi-gpu-operator (AWSLambdaManagedEC2ResourceOperator)
+                # lambda-lmi-gpu-exec     (AWSLambdaBasicExecutionRole)
+make provider</code></pre>
+<p><code>lmi.py</code> sends this to
+<code>aws lambda create-capacity-provider</code>, with the default VPC's
+subnets and security group:</p>
+<pre class="json"><code>{
+  &quot;CapacityProviderName&quot;: &quot;gemma4-e2b-g6&quot;,
+  &quot;VpcConfig&quot;: {&quot;SubnetIds&quot;: [&quot;subnet-...&quot;], &quot;SecurityGroupIds&quot;: [&quot;sg-...&quot;]},
+  &quot;PermissionsConfig&quot;: {&quot;CapacityProviderOperatorRoleArn&quot;: &quot;arn:aws:iam::ACCOUNT:role/lambda-lmi-gpu-operator&quot;},
+  &quot;InstanceRequirements&quot;: {&quot;Architectures&quot;: [&quot;x86_64&quot;], &quot;AllowedInstanceTypes&quot;: [&quot;g6.2xlarge&quot;]},
+  &quot;CapacityProviderScalingConfig&quot;: {&quot;ScalingMode&quot;: &quot;Auto&quot;, &quot;MaxVCpuCount&quot;: 16}
+}</code></pre>
+<p>Allowing only <code>g6.2xlarge</code> keeps the hardware the same as
+the EC2 G6 measurements. <code>MaxVCpuCount</code> 16 matches this
+account's G quota: two instances at most.</p>
+<hr />
+<h4 id="step-4--create-the-function">Step 4 — Create the Function</h4>
+<p><code>make function</code> creates it from the image. The GPU parts
+are <code>AcceleratorConfig</code> and
+<code>CapacityProviderConfig</code>:</p>
+<pre class="json"><code>{
+  &quot;FunctionName&quot;: &quot;gemma4-e2b-g6&quot;,
+  &quot;PackageType&quot;: &quot;Image&quot;,
+  &quot;MemorySize&quot;: 16384,
+  &quot;Timeout&quot;: 900,
+  &quot;EphemeralStorage&quot;: {&quot;Size&quot;: 10240},
+  &quot;AcceleratorConfig&quot;: {&quot;AcceleratorMemorySize&quot;: 16},
+  &quot;CapacityProviderConfig&quot;: {&quot;LambdaManagedInstancesCapacityProviderConfig&quot;: {
+    &quot;CapacityProviderArn&quot;: &quot;arn:aws:lambda:us-east-1:ACCOUNT:capacity-provider:gemma4-e2b-g6&quot;,
+    &quot;PerExecutionEnvironmentMaxConcurrency&quot;: 48,
+    &quot;ExecutionEnvironmentMemoryGiBPerVCpu&quot;: 4.0}},
+  &quot;Environment&quot;: {&quot;Variables&quot;: {
+    &quot;MODEL_ID&quot;: &quot;/opt/model&quot;,
+    &quot;SERVED_MODEL_NAME&quot;: &quot;xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4&quot;,
+    &quot;VLLM_GPU_MEM_UTIL&quot;: &quot;0.85&quot;,
+    &quot;VLLM_MAX_MODEL_LEN&quot;: &quot;16384&quot;,
+    &quot;VLLM_SERVER_TIMEOUT&quot;: &quot;840&quot;,
+    &quot;VLLM_SERVER_ARGS&quot;: &quot;--max-num-seqs 64 --language-model-only --enable-auto-tool-choice --tool-call-parser gemma4 --reasoning-parser gemma4 --speculative-config &#39;{\&quot;model\&quot;: \&quot;/opt/drafter\&quot;, \&quot;num_speculative_tokens\&quot;: 4}&#39;&quot;}}
+}</code></pre>
+<p>16 GiB at 4 GiB per vCPU asks for 4 of the g6.2xlarge's 8 vCPUs.
+<code>PerExecutionEnvironmentMaxConcurrency</code> 48 is the most Lambda
+allows, and vLLM batches whatever arrives. The serving values are the
+EC2 G6 rig's.</p>
+<hr />
+<h4 id="step-5--publish-and-set-the-environments">Step 5 — Publish, and
+Set the Environments</h4>
+<p>An unpublished function reports <code>ActiveNonInvocable</code>.
+Publishing starts the environments and loads the model, and the version
+turns <code>Active</code> when vLLM answers:</p>
+<pre class="bash"><code>aws lambda publish-version --function-name gemma4-e2b-g6 --publish-to LATEST_PUBLISHED
+aws lambda put-function-scaling-config --function-name gemma4-e2b-g6 \
+  --qualifier &#39;$LATEST.PUBLISHED&#39; \
+  --function-scaling-config &#39;{&quot;MinExecutionEnvironments&quot;: 1, &quot;MaxExecutionEnvironments&quot;: 1}&#39;</code></pre>
+<p>Lambda's default is 3 environments across Availability Zones; at 8
+vCPUs per g6.2xlarge that is 3 × 8 = 24 vCPUs of G quota (arithmetic).
+One is enough for a demo.</p>
+<p>The first publish took 484.0 s to <code>Active</code>. vLLM printed
+its banner 312 s after the publish. That time covers launching the
+instance and fetching the image (9.13 GB of base layers plus the 2.86 GB
+checkpoint), which Lambda does not time separately. Lambda's init for
+the environment then took 156,397 ms, of which vLLM's own log shows:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-gpu/medium/img/devto-gemma4-e2b-lambda-gpu-table-3.png"
+alt="Table: Step, Time" /></p>
+<p>vLLM reports
+<code>Using MarlinLinearKernel for CompressedTensorsWNA16</code> and
+1,593,517 tokens of KV cache in 14.28 GiB.</p>
+<hr />
+<h4 id="step-6--call-it">Step 6 — Call It</h4>
+<p><code>make ask</code> sends one chat completion through
+<code>aws lambda invoke</code>:</p>
+<pre class="bash"><code>$ make ask Q=&quot;In two sentences, what is AWS Lambda?&quot;
+AWS Lambda is a serverless compute service that lets you run code without provisioning
+or managing servers. It automatically scales your code based on demand, allowing you to
+focus on writing and deploying your application logic.
+ 
+18 in / 41 out, 2.41 s round trip (aws cli start-up included)</code></pre>
+<p>The payload is an OpenAI chat request, so everything vLLM accepts
+passes through: <code>chat_template_kwargs.enable_thinking</code> turns
+on Gemma's thinking, and the reasoning comes back in
+<code>reasoning</code>. The reply arrives whole: Lambda returns the
+completion when it is finished, with no stream.</p>
+<hr />
+<h4 id="step-7--a-local-chat-page">Step 7 — A Local Chat Page</h4>
+<p><code>chat_ui.py</code> is this repo's chat page, from the TPU v5e
+vLLM rig by way of the AMD Token Lab rig. Its local proxy turns each
+chat request into a synchronous boto3 <code>Invoke</code> with your AWS
+credentials, so the browser talks only to <code>localhost</code>:</p>
+<pre class="bash"><code>$ make ui
+Chat UI on http://localhost:8768 -&gt; Lambda gemma4-e2b-g6:$LATEST.PUBLISHED in us-east-1</code></pre>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-gpu/chat-page.1545a5aa.jpg"
+alt="The local chat page answering from the Lambda function, with the round trip and end-to-end speed in the side panel" /></p>
+<p>The side panel shows the version's state and its environments, the
+rig's settings, and each reply's round trip and tokens. With no stream,
+speed is completion tokens over the whole round trip: the reply above,
+113 tokens, took 0.63 s.</p>
+<hr />
+<h4 id="step-8--add-googles-drafter">Step 8 — Add Google's Drafter</h4>
+<p>Gemma 4 has assistant drafters: small models that guess the next few
+tokens for the main model to check in one step.
+<code>repack/repack_drafter.py</code> rebuilds Google's E2B QAT
+assistant as W4A16, 143 MB, and the Dockerfile copies it to
+<code>/opt/drafter</code>. One flag turns it on:</p>
+<pre class="bash"><code>--speculative-config &#39;{&quot;model&quot;: &quot;/opt/drafter&quot;, &quot;num_speculative_tokens&quot;: 4}&#39;</code></pre>
+<p>The serving environment's log confirms it:
+<code>speculative_config=SpeculativeConfig(method='mtp', model='/opt/drafter', num_spec_tokens=4)</code>,
+2.98 GiB of weights with the drafter and 1,486,429 tokens of KV
+cache.</p>
+<hr />
+<h4 id="step-9--how-fast-is-it">Step 9 — How Fast Is It?</h4>
+<p><code>bench.py</code> sends 1, 4, 16 and 48 synchronous invokes at
+once from a desktop to us-east-1. Each asks for 256 tokens with
+<code>ignore_eos</code>, greedy, thinking off, with a unique prefix so
+vLLM's prefix cache cannot help. Times include the round trip and
+Lambda's invoke path. Every request was matched to the serving
+environment's log stream:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-gpu/medium/img/devto-gemma4-e2b-lambda-gpu-table-4.png"
+alt="Table: Requests at once, No drafter, With drafter, Drafter / none" /></p>
+<p>Ratios are of the medians, first requests included. "First" is the
+first request or batch on a new environment: the first drafter request
+took 3.69 s. After it, one 256-token reply came back in 1.14–1.20 s with
+the drafter, against 1.92–2.02 s without it. All 417 requests succeeded,
+and one environment took all 48 at once.</p>
+<p>The drafter pays with up to 4 requests at once and costs throughput
+from 16. vLLM's log over the run shows 1.64–2.13 tokens accepted per
+step and 15.9–28.3% of drafted tokens accepted. On this repo's EC2 G6,
+the same drafter build at 4 tokens paid at every level up to 64
+requests, measured with different prompts, streamed and timed on the
+instance; why it loses here from 16 requests is not established.</p>
+<hr />
+<h4 id="mag_right-tip-set-both-limits-and-republish-from-zero">🔎 Tip:
+Set Both Limits, and Republish from Zero</h4>
+<p>Set <code>MinExecutionEnvironments</code> and
+<code>MaxExecutionEnvironments</code> together. Lambda resets the one
+you leave out to its default, and with no maximum it added a second
+g6.2xlarge under the 48-request load.</p>
+<p>A republish starts the new environment before it stops the old one.
+At the capacity provider's vCPU limit the update ends
+<code>Failed</code> with "MinimumExecutionEnvironments can't be
+provisioned because CapacityProvider has reached maxVCpuCount limit",
+and <code>$LATEST.PUBLISHED</code> keeps the previous image and
+settings. The rig's <code>republish.py</code> scales to 0, publishes,
+scales back to 1 and prints vLLM's engine line, so you can see the
+settings the new environment started with. From scaling up to
+<code>Active</code> took 552 s.</p>
+<p><code>make down</code> sets both limits to 0 and releases the
+instance; <code>make up</code> brings it back.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p>The same model, vLLM version and L4, run three ways in this repo:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-lambda-gpu/medium/img/devto-gemma4-e2b-lambda-gpu-table-5.png"
+alt="Table: Lambda GPU function, EC2 G6 instance, RTX 3050 at home" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>For a model behind events, queues or other AWS services, the Lambda
+GPU function is the simpler road: one image, one function, and Lambda
+keeps the server alive and routes the requests. Keep the drafter on for
+a chat with a few users at a time, and publish without it for heavy
+batch load.</p>
+<p>When you need streamed replies or full control of the server, run
+vLLM on an EC2 G6 yourself.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to serve Gemma 4 E2B from an AWS Lambda
+function on a GPU on the day the feature launched. The key to the
+solution was AWS's vLLM base image with the 4-bit checkpoint and
+Google's drafter baked in, one g6.2xlarge behind a capacity provider,
+and a local proxy for the chat page. The results were:</p>
+<ul>
+<li>🟢 Gemma 4 E2B serves from Lambda on an NVIDIA L4, from AWS's vLLM
+0.33.0 image, with the 4-bit QAT checkpoint and no patches.</li>
+<li>🟢 One environment took 48 requests at once: 3,614.4 output tokens
+per second at best, with no failed request in 417.</li>
+<li>🟢 Google's drafter made a single reply 1.63x faster: 256 tokens in
+1.14–1.20 s against 1.92–2.02 s.</li>
+<li>🟢 A local chat page calls the function with your own AWS
+credentials.</li>
+<li>⚠️ The drafter costs throughput from 16 requests at once: 0.63x at
+48.</li>
+<li>⚠️ Publishing takes about 8–9 minutes before the first answer, and
+the instance bills while the minimum is above 0.</li>
+<li>❌ Replies arrive whole: the standard handler has no stream, so time
+to first token cannot be measured or shown.</li>
+<li>❌ A republish at the vCPU limit fails and keeps the old version;
+scale to 0 first.</li>
+</ul>
+<p>Scope: one g6.2xlarge in us-east-1, one execution environment, AWS's
+vLLM image built 2026-11-16, measured 2026-11-18 and 2026-11-19 from a
+desktop in the US. Throughput is short prompts and 256 output tokens;
+long prompts, answer accuracy and thinking-on load were not measured.
+The drafter used 4 drafted tokens only.</p>
+<p>The strategy for serving Gemma 4 on a Lambda GPU function was
+validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/lambda-vllm-g6-2b-q4w4a16emb4">lambda-vllm-g6-2b-q4w4a16emb4
+on GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-lambda-gpu/evidence">Evidence
+for this article</a></li>
+<li><a
+href="https://aws.amazon.com/blogs/aws/aws-lambda-now-supports-gpu-instances-for-event-functions-on-lambda-managed-instances/">AWS
+Lambda now supports GPU instances for Event Functions on Lambda Managed
+Instances</a></li>
+<li><a
+href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-gpu.html">Run
+GPU-accelerated Event Functions on Lambda Managed Instances</a></li>
+<li><a
+href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-gpu-base-images.html">Lambda
+GPU base images</a></li>
+<li><a
+href="https://docs.aws.amazon.com/lambda/latest/dg/lambda-managed-instances-scaling.html">Lambda
+Managed Instances scaling</a></li>
+<li><a href="https://aws.amazon.com/lambda/pricing/">AWS Lambda
+pricing</a></li>
+<li><a
+href="https://dev.to/aws-builders/six-serving-engines-on-one-ec2-g6-gemma-4-e2b-on-an-nvidia-l4-3ff3">Six
+Serving Engines on One EC2 G6</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4">gemma-4-E2B-it-qat-q4_0-w4a16-ct-text-emb4
+on Hugging Face</a></li>
+<li><a href="https://github.com/vllm-project/vllm">vLLM</a></li>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
