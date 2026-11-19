@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Which Gemini Model Should You Use? Neon, Argon, Hydrogen, Carbon, Flash or Gemma. It Depends.</title>
+  <meta name="description" content="Gemini 4 Neon joins seven other models on GSM8K, BFCL and 30 AIME 2025 problems through the Gemini API, with cost per right answer, thinking and speed for each. Every Gemini 4 model solved all 30 hard problems at its lowest setting, so price and speed decide among them; Flash-Lite needs high thinking; Neon is the cheaper, faster choice against Carbon at high thinking." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>This article provides a step by step guide to choosing a Gemini API
+model by measured cost, thinking and speed. Gemini 4 Neon, announced on
+2026-11-18, joins seven models measured here before: Gemma 4 26B and
+31B, Gemini 3.5 Flash-Lite and 3.8 Flash, and Gemini 4 Hydrogen, Carbon
+and Argon. All eight answer the same questions through the same endpoint
+with the same scoring.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-cover.73a2bdd7.jpg" alt="Which Gemini Model Should You Use? Neon, Argon, Hydrogen, Carbon, Flash or Gemma. It Depends." /></figure>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-which-model">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-which-model</a></p>
+<p>The short version: on these tests the four Gemini 4 models are level
+on accuracy, so pick among them by cost and speed, and pick between
+tiers by how hard the work is.</p>
+<hr />
+<h4 id="the-findings">The Findings</h4>
+<p><strong>Accuracy.</strong> Hydrogen, Carbon, Argon and Neon solved
+all 30 AIME 2025 problems at their lowest thinking setting and again at
+their high setting. On these problems no Gemini 4 model can be ranked
+above another. The smaller models can: Flash-Lite solved 18 of 30 at its
+lowest setting, and Argon solved the 12 it missed and lost none (exact
+test, p &lt; 0.001).</p>
+<p><strong>Cost.</strong> At the lowest setting a hard problem cost
+$0.018 on Argon, $0.026 on Hydrogen, $0.032 on Carbon and $0.049 on
+Neon. On short problems (GSM8K) the order is the same: $2.39 per 1,000
+on Argon and $6.76 on Neon.</p>
+<p><strong>Thinking.</strong> Raising the setting bought nothing on
+Gemini 4 (30 of 30 either way) for 1.9 to 4.6 times the cost. It paid on
+the smallest paid model: Flash-Lite went from 18 to 24 of 30 (+6 / −0, p
+= 0.031) for 2.6 times the cost.</p>
+<p><strong>Speed.</strong> With every model running at the same time on
+AIME 2025 II, Hydrogen was the fastest Gemini 4 model at its lowest
+setting (11.3 s median per problem) and Neon the slowest (40.8 s).</p>
+<p><strong>Neon against Carbon.</strong> At high thinking, the setting
+Google compares them at, Neon cost 0.73 times Carbon per problem and
+took 0.68 times as long, with the same 15 of 15 on AIME 2025 II. Google
+states 32% lower cost per task than Carbon on the Artificial Analysis
+Intelligence Index.</p>
+<p><strong>What to do with it.</strong></p>
+<ul>
+<li>🟢 Default to Gemini 4 Argon at its lowest setting: every hard
+problem solved, the lowest cost of the Gemini 4 models.</li>
+<li>🟢 Use Hydrogen when response time matters most, and from
+2026-12-01, when Argon's price doubles, for cost too.</li>
+<li>🟢 Use Neon in place of Carbon for work that needs high
+thinking.</li>
+<li>⚠️ Use Flash-Lite only on easy work, or at high thinking.</li>
+<li>⚠️ Use Gemma 4 when the model must be free or run on your own
+hardware.</li>
+</ul>
+<p><strong>Caveats.</strong> AIME 2025 has been public since early 2025,
+so some models may have seen these problems in training; that would
+raise every Gemini 4 score alike and is untested here. Google positions
+Neon and Carbon for long agent and coding work, which none of these
+tests measures.</p>
+<hr />
+<h4 id="what-was-measured">What Was Measured</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-1.png"
+alt="Table: Model, Price in / out, per 1M tokens, Lowest setting, High setting" /></p>
+<p>Output prices include thinking tokens. Carbon and Argon go to $4 /
+$20 on 2026-12-01. Neon is paid tier only. 3.8 Flash and the Gemini 4
+models accept <code>none</code> and run it as <code>low</code>; Neon was
+sent <code>low</code> on AIME 2025 I and <code>none</code> elsewhere and
+thought on every problem either way. Hydrogen's high setting is its top,
+<code>xhigh</code>; Neon's is <code>high</code>, Google's default for
+it.</p>
+<p>Three tests, each scored in code, temperature 0:</p>
+<ul>
+<li><strong>GSM8K</strong>, 1,319 short math word problems, and
+<strong>BFCL simple</strong>, 400 function calls, at the lowest setting.
+Seven models ran together on 2026-11-14; Neon ran on 2026-11-19 with the
+same settings, alone.</li>
+<li><strong>AIME 2025 I</strong>, 15 competition problems, 32,768-token
+limit, both settings, 2026-11-15 (Neon 2026-11-19).</li>
+<li><strong>AIME 2025 II</strong>, the other 15, same limit, both
+settings, all models started at the same time on 2026-11-19. Its times
+are the ones compared below.</li>
+</ul>
+<p>Costs are the tokens each reply reported times the list price.</p>
+<hr />
+<h4 id="step-1--short-problems-everyone-scores-price-differs">Step 1 —
+Short Problems: Everyone Scores, Price Differs</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-2.png"
+alt="Table: Model, GSM8K, BFCL, GSM8K, per 1,000, BFCL, per 1,000, Thinks on, GSM8K" /></p>
+<p>Neon's GSM8K score is level with 3.8 Flash and every Gemini 4 model
+and ahead of both Gemma 4 models and Flash-Lite. Its BFCL score is ahead
+of Hydrogen, Carbon, 3.8 Flash and Flash-Lite and level with Argon and
+Gemma 4 31B. Each comparison is paired by question with a 95% range of
+the difference.</p>
+<p>Hydrogen and Neon think on every request even at their lowest
+setting, and that sets the bill: Neon cost 2.8 times Argon per GSM8K
+problem.</p>
+<hr />
+<h4 id="step-2--hard-problems-gemini-4-solves-them-all">Step 2 — Hard
+Problems: Gemini 4 Solves Them All</h4>
+<p>AIME 2025 I and II together, 30 problems:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-3.png"
+alt="Table: Model, Lowest setting, High setting" /></p>
+<p>Gemma 4 on the free tier is shown for AIME I only.</p>
+<p>With 30 of 30 the 95% range on each Gemini 4 score is 0.89 to 1.00,
+so these problems show that all four solve them and cannot say which
+solves them best. 3.8 Flash at its lowest setting missed 3 that Argon
+solved; on 30 problems that could be chance (p = 0.25).</p>
+<hr />
+<h4 id="step-3--thinking-pay-for-it-only-on-the-small-model">Step 3 —
+Thinking: Pay for It Only on the Small Model</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-4.png"
+alt="Table: Model, High against lowest, 30 problems, Cost, high ÷ lowest" /></p>
+<p>Mean thinking per hard problem at the lowest setting was 118 tokens
+on Argon, 542 on Carbon, 2,314 on Neon and 2,406 on Hydrogen. Argon and
+Carbon decide on their own how much to think, and on most problems they
+barely do.</p>
+<hr />
+<h4 id="step-4--speed-hydrogen-answers-first">Step 4 — Speed: Hydrogen
+Answers First</h4>
+<p>Median seconds per AIME 2025 II problem, every model running at the
+same time:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-5.png"
+alt="Table: Model, Lowest setting, High setting" /></p>
+<p>On short problems, in the 2026-11-14 run of the first seven models
+together: Flash-Lite 1.10 s per GSM8K problem, Hydrogen 2.84 s, 3.8
+Flash 3.79 s, Carbon 7.34 s and Argon 7.63 s.</p>
+<hr />
+<h4 id="step-5--neon-against-carbon">Step 5 — Neon Against Carbon</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-6.png"
+alt="Table: AIME 2025 II, high setting, Neon, Carbon, Neon ÷ Carbon" /></p>
+<p>Neon reaches the same answers as Carbon with half the thinking. Argon
+at the same setting cost $0.048 a problem and took 41.3 s for the same
+15.</p>
+<hr />
+<h4 id="mag_right-tip-compare-models-by-cost-per-right-answer">🔎 Tip:
+Compare Models by Cost per Right Answer</h4>
+<p>List price per token misleads. Hydrogen has the lowest Gemini 4 price
+and Argon cost less per hard problem at the lowest setting ($0.018
+against $0.026), because Argon thought on few problems and Hydrogen on
+all of them. Run 20 to 50 of your own requests on each candidate and
+divide the bill by the number right.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-7.png"
+alt="Table: Flash-Lite, 3.8 Flash, Hydrogen, Argon, Carbon, Neon, Gemma 4 31B" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemini-which-model/medium/img/devto-gemini-which-model-table-8.png"
+alt="Table: Work, Use, Why, measured" /></p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to place every Gemini API model, Neon
+included, by what it gets right, what it costs and how fast it answers.
+The key to the solution was one scoring script, one endpoint and the
+same questions for all eight models. The results were:</p>
+<ul>
+<li>🟢 Hydrogen, Carbon, Argon and Neon solved all 30 AIME 2025 problems
+at their lowest setting.</li>
+<li>🟢 Argon cost the least of them per problem, $0.018; Hydrogen
+answered fastest, 11.3 s.</li>
+<li>🟢 Neon matched Carbon at high thinking for 0.73 times the cost and
+0.68 times the time.</li>
+<li>🟢 Neon has the best function-calling score, 0.9750, level with
+Argon and Gemma 4 31B.</li>
+<li>🟢 High thinking lifted Flash-Lite from 18 to 24 of 30.</li>
+<li>⚠️ High thinking added nothing on Gemini 4 for 1.9 to 4.6 times the
+cost.</li>
+<li>⚠️ Neon thinks on every request and cost 2.7 to 2.8 times Argon at
+the lowest setting.</li>
+<li>❌ These problems cannot rank the Gemini 4 models on accuracy.</li>
+</ul>
+<p>Scope: one run per model and setting, temperature 0, through the
+Gemini API's OpenAI-compatible endpoint, between 2026-11-14 and
+2026-11-19, at list prices on those dates. GSM8K and BFCL simple at the
+lowest setting only; 30 AIME 2025 problems at two settings, with Gemma 4
+on AIME 2025 I only. Times compare only within one run. Long agent work,
+coding, and tests harder than AIME 2025 were not measured.</p>
+<p>The strategy for choosing a Gemini model by measured cost, thinking
+and speed was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemini-which-model/evidence">Evidence
+for this article</a></li>
+<li><a
+href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-neon/">Introducing
+Gemini 4 Neon</a></li>
+<li><a href="https://aistudio.google.com/docs/pricing">Gemini API
+pricing</a></li>
+<li><a
+href="https://dev.to/gde/gemini-4-or-gemma-4-it-depends-2o18">Gemini 4
+or Gemma 4? It Depends.</a></li>
+<li><a
+href="https://dev.to/gde/which-model-should-you-use-frontier-hosted-or-local-it-depends-2n45">Which
+Model Should You Use? Frontier, Hosted or Local? It Depends.</a></li>
+<li><a href="https://huggingface.co/datasets/opencompass/AIME2025">AIME
+2025 problems (opencompass/AIME2025)</a></li>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
