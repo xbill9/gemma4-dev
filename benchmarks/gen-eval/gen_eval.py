@@ -69,6 +69,9 @@ GPQA_PROMPT = (
     "Answer the following multiple-choice question. Think step by step, then give the letter of the "
     "correct option on its own last line as 'Answer: <letter>'.\n\n{question}\n\n{options}"
 )
+# GEN_EVAL_SAMPLING: a JSON object merged into every request body, e.g. Google's generation_config.json
+# '{"temperature": 1.0, "top_k": 64, "top_p": 0.95, "seed": 1}' (unset: temperature 0, greedy).
+SAMPLING = json.loads(setting("SAMPLING") or "{}")
 RETRY_CODES = {429, 500, 502, 503, 504}
 TYPES = {"dict": "object", "float": "number", "tuple": "array", "any": None}
 
@@ -273,6 +276,7 @@ def one(upstream, model, task, rec, opts=None):
             "tools": tools_for(rec["functions"]),
             "tool_choice": "auto",
         }
+    body.update(SAMPLING)
     if CACHE_PROMPT is not None:
         body["cache_prompt"] = CACHE_PROMPT != "0"
     effort = opts.get("reasoning_effort", REASONING_EFFORT)
