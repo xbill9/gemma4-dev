@@ -1,0 +1,45 @@
+== exact Q4_0 repack, no drafter, greedy ==
+E2B gsm8k thinking off: 1189/1319 = 0.9014 [95% 0.8842-0.9164], hit limit 0, 1.36 h, 3.72 s/problem, median 345 tokens, gen 109.2 tok/s
+E2B gsm8k thinking on: 1178/1319 = 0.8931 [95% 0.8753-0.9086], hit limit 0, 3.15 h, 8.60 s/problem, median 799 tokens, gen 108.6 tok/s
+E2B aime2025 thinking off: 7/30 = 0.2333 [95% 0.1179-0.4093], hit limit 3, 0.53 h, 63.79 s/problem, median 3279.0 tokens, gen 98.8 tok/s
+E2B aime2025 thinking on: 10/30 = 0.3333 [95% 0.1923-0.5122], hit limit 2, 0.80 h, 95.76 s/problem, median 7118.0 tokens, gen 100.8 tok/s
+E4B gsm8k thinking off: 1226/1319 = 0.9295 [95% 0.9144-0.9421], hit limit 0, 2.38 h, 6.50 s/problem, median 306 tokens, gen 58.4 tok/s
+E4B gsm8k thinking on: 1230/1319 = 0.9325 [95% 0.9177-0.9448], hit limit 0, 5.45 h, 14.87 s/problem, median 737 tokens, gen 57.0 tok/s
+E4B aime2025 thinking off: 12/30 = 0.4000 [95% 0.2459-0.5768], hit limit 0, 0.52 h, 62.98 s/problem, median 3275.0 tokens, gen 57.0 tok/s
+E4B aime2025 thinking on: 10/30 = 0.3333 [95% 0.1923-0.5122], hit limit 0, 0.76 h, 91.79 s/problem, median 4498.0 tokens, gen 56.6 tok/s
+12B gsm8k thinking off: 1269/1319 = 0.9621 [95% 0.9504-0.9711], hit limit 3, 6.10 h, 16.64 s/problem, median 296 tokens, gen 26.7 tok/s
+12B gsm8k thinking on: 87/157 = 0.5541 [95% 0.4760-0.6297], hit limit 70, 28.14 h, 645.36 s/problem, median 6052 tokens, gen 24.3 tok/s
+12B aime2025 thinking off: 15/30 = 0.5000 [95% 0.3315-0.6685], hit limit 9, 4.20 h, 504.07 s/problem, median 2136.5 tokens, gen 24.3 tok/s
+12B aime2025 thinking on: 10/30 = 0.3333 [95% 0.1923-0.5122], hit limit 19, 9.03 h, 1083.07 s/problem, median 32768.0 tokens, gen 24.4 tok/s
+
+== paired, same problems ==
+E2B gsm8k off vs E4B on 1319: 1189 vs 1226; only E2B gsm8k off 34, only E4B 71, p = 0.000391
+E4B gsm8k off vs 12B on 1319: 1226 vs 1269; only E4B gsm8k off 17, only 12B 60, p = 8.91e-07
+E2B gsm8k off vs 12B on 1319: 1189 vs 1269; only E2B gsm8k off 15, only 12B 95, p = 2.14e-15
+E2B aime2025 off vs E4B on 30: 7 vs 12; only E2B aime2025 off 0, only E4B 5, p = 0.0625
+E4B aime2025 off vs 12B on 30: 12 vs 15; only E4B aime2025 off 2, only 12B 5, p = 0.453
+E2B aime2025 off vs 12B on 30: 7 vs 15; only E2B aime2025 off 0, only 12B 8, p = 0.00781
+E4B gsm8k on vs 12B on 157: 148 vs 87; only E4B gsm8k on 63, only 12B 2, p = 1.16e-16
+E2B gsm8k on vs 12B on 157: 142 vs 87; only E2B gsm8k on 58, only 12B 3, p = 3.29e-14
+E2B gsm8k off vs on on 1319: 1189 vs 1178; only E2B gsm8k off 51, only on 40, p = 0.294
+E2B aime off vs on on 30: 7 vs 10; only E2B aime off 1, only on 4, p = 0.375
+E4B gsm8k off vs on on 1319: 1226 vs 1230; only E4B gsm8k off 25, only on 29, p = 0.683
+E4B aime off vs on on 30: 12 vs 10; only E4B aime off 4, only on 2, p = 0.688
+12B gsm8k off vs on on 157: 152 vs 87; only 12B gsm8k off 65, only on 0, p = 5.42e-20
+12B aime off vs on on 30: 15 vs 10; only 12B aime off 8, only on 3, p = 0.227
+
+== replies that hit the 32,768-token limit, all saved replies of each run ==
+E2B: 24 of 10792
+E4B: 0 of 10792
+12B: 101 of 1536
+
+== time ratios, GSM8K thinking off, repack no drafter ==
+E4B/E2B 1.75x, 12B/E4B 2.56x, 12B/E2B 4.47x
+
+== 12B follow-up run ( 2026-11-21-drafter-sampling-12b-3050oem ) ==
+12B gsm8k-sampled-none-thinkon (in progress): 9/9 = 1.0000 [95% 0.7009-1.0000], hit limit 0, 0.45 h, 179.28 s/problem, median 1750 tokens, gen 26.0 tok/s
+12B greedy no-drafter gsm8k on vs gsm8k-sampled-none-thinkon on 9: 5 vs 9; only 12B greedy no-drafter gsm8k on 0, only gsm8k-sampled-none-thinkon 4, p = 0.125
+gsm8k-greedy-q4x-thinkoff: not run yet
+aime2025-greedy-q4x-thinkoff: not run yet
+gsm8k-greedy-q4x-thinkon: not run yet
+aime2025-sampled-none-thinkon: not run yet
