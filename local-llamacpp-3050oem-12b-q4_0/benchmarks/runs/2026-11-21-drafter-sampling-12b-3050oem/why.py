@@ -21,7 +21,7 @@ for r in cut:
     t = full(r); p, d = cycle(t)
     if p is None: continue
     on.append(round(p / len(t) * r["completion_tokens"])); per.append(round(d / len(t) * r["completion_tokens"]))
-print(f"repetition starts at token ~{st.median(on)} (median; range {min(on)}-{max(on)}); repeating block ~{st.median(per)} tokens (median; range {min(per)}-{max(per)})")
+print(f"repetition starts at token ~{round(st.median(on))} (median; range {min(on)}-{max(on)}); repeating block ~{round(st.median(per))} tokens (median; range {min(per)}-{max(per)})")
 print(f"finished replies: median {st.median(r['completion_tokens'] for r in fin)} tokens, max {max(r['completion_tokens'] for r in fin)}")
 # what the repeating block says: phrases counted once per reply in the last 3,000 characters
 pats = {"re-reads the wording": r"wording|phrase|phrasing|interpret|meaning|could it mean|does it mean|re-?read",

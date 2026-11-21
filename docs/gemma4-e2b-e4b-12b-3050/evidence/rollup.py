@@ -12,6 +12,9 @@ def load(p):
     if not os.path.exists(p): p += ".partial"
     if not os.path.exists(p): return None
     return {json.loads(l)["id"]: json.loads(l) for l in open(p)}
+def fp(p):
+    s = f"{p:.3g}"
+    return s.replace("e-0", "e-") + (f" (= {p:.2g})".replace("e-0", "e-") if "e" in s else "")
 def mc(b, c):
     n = b + c; return min(1, 2 * sum(comb(n, i) for i in range(min(b, c) + 1)) / 2 ** n) if n else 1
 def wilson(k, n, z=1.959964):
@@ -38,7 +41,7 @@ for m, d in RUN.items():
 def paired(a, b, la, lb, ids=None):
     ids = ids or [i for i in a if i in b]
     x = sum(right(a[i]) and not right(b[i]) for i in ids); y = sum(right(b[i]) and not right(a[i]) for i in ids)
-    print(f"{la} vs {lb} on {len(ids)}: {sum(right(a[i]) for i in ids)} vs {sum(right(b[i]) for i in ids)}; only {la} {x}, only {lb} {y}, p = {mc(x, y):.3g}")
+    print(f"{la} vs {lb} on {len(ids)}: {sum(right(a[i]) for i in ids)} vs {sum(right(b[i]) for i in ids)}; only {la} {x}, only {lb} {y}, p = {fp(mc(x, y))}")
 print("\n== paired, same problems ==")
 for t in ("gsm8k", "aime2025"):
     paired(C["E2B", t, "off"], C["E4B", t, "off"], f"E2B {t} off", "E4B")
@@ -50,6 +53,8 @@ paired(C["E2B", "gsm8k", "on"], C["12B", "gsm8k", "on"], "E2B gsm8k on", "12B", 
 for m in RUN:
     paired(C[m, "gsm8k", "off"], C[m, "gsm8k", "on"], f"{m} gsm8k off", "on", ids157 if m == "12B" else None)
     paired(C[m, "aime2025", "off"], C[m, "aime2025", "on"], f"{m} aime off", "on")
+cut157 = sum(r["finish"] == "length" for r in C["12B", "gsm8k", "on"].values())
+print(f"12B gsm8k thinking on: {cut157} of {len(C['12B', 'gsm8k', 'on'])} hit the 32,768-token limit")
 print("\n== replies that hit the 32,768-token limit, all saved replies of each run ==")
 import glob
 for m, d in RUN.items():

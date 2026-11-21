@@ -16,7 +16,7 @@ The short version: with thinking off, every step up in size answers more and tak
 
 #### The Findings
 
-**Thinking off, bigger scores higher.** GSM8K 0.9014 for E2B, 0.9295 for E4B and 0.9621 for the 12B; each step is beyond chance on a paired test (p = 0.00039 and p = 8.9e-7). AIME 2025: 7, 12 and 15 of 30.
+**Thinking off, bigger scores higher.** GSM8K 0.9014 for E2B, 0.9295 for E4B and 0.9621 for the 12B; each step is beyond chance on a paired test (p = 0.00039 and p = 8.91e-7). AIME 2025: 7, 12 and 15 of 30.
 
 **Bigger is slower.** A full GSM8K pass took 1.36, 2.38 and 6.10 hours. The 12B took 2.56 times as long as E4B for 43 more problems.
 
@@ -96,7 +96,7 @@ The same problems ran for every model, so each comparison is an exact paired tes
 | Comparison, thinking off | Right only smaller | Right only bigger | p |
 | :--- | ---: | ---: | ---: |
 | GSM8K, E2B to E4B | 34 | 71 | 0.00039 |
-| GSM8K, E4B to 12B | 17 | 60 | 8.9e-7 |
+| GSM8K, E4B to 12B | 17 | 60 | 8.91e-7 |
 | AIME, E2B to E4B | 0 | 5 | 0.0625 |
 | AIME, E4B to 12B | 2 | 5 | 0.453 |
 | AIME, E2B to 12B | 0 | 8 | 0.0078 |
@@ -110,7 +110,7 @@ On GSM8K both steps hold. On AIME only the jump from E2B to the 12B does; 30 pro
 | | E2B | E4B | 12B |
 | :--- | ---: | ---: | ---: |
 | GSM8K, off to on | 1,189 to 1,178 | 1,226 to 1,230 | 152 to 87, first 157 |
-| GSM8K, p | 0.294 | 0.683 | 5.4e-20 |
+| GSM8K, p | 0.294 | 0.683 | 5.42e-20 |
 | GSM8K time with thinking | 2.31x | 2.29x | 22.2x |
 | AIME, off to on | 7 to 10 | 12 to 10 | 15 to 10 |
 | AIME, p | 0.375 | 0.688 | 0.227 |
