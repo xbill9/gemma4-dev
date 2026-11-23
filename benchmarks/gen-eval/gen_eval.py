@@ -61,6 +61,8 @@ RETRIES = int(setting("RETRIES", "0"))
 TIMEOUT_S = float(setting("TIMEOUT_S", "900"))
 # aime2025 and gpqa_diamond (build_hard_set.py): GEN_EVAL_HARD_MAX_TOKENS tokens (default 32768).
 HARD_MAX_TOKENS = int(setting("HARD_MAX_TOKENS", "32768"))
+# bfcl_simple: GEN_EVAL_BFCL_MAX_TOKENS tokens (default 512; thinking on needs room for the thinking too).
+BFCL_MAX_TOKENS = int(setting("BFCL_MAX_TOKENS", "512"))
 AIME_PROMPT = (
     "Solve the following competition math problem. The answer is an integer from 0 to 999. Think step by "
     "step, then give the final answer on its own last line as 'Answer: <number>'.\n\n{question}"
@@ -271,7 +273,7 @@ def one(upstream, model, task, rec, opts=None):
         body = {
             "model": model,
             "temperature": 0,
-            "max_tokens": 512,
+            "max_tokens": BFCL_MAX_TOKENS,
             "messages": rec["question"],
             "tools": tools_for(rec["functions"]),
             "tool_choice": "auto",
