@@ -29,7 +29,7 @@ https://dev.to/gde/e2b-e4b-or-12b-on-an-8-gb-rtx-3050-serve-gemma-4-e4b-1eji
 advocu-devto-gemma4-e2b-e4b-12b-3050-cover.webp (1376x578 WebP, 45 KB, from devto-cover.f74e04e1.jpg)
 
 ---
-draft id: 6b046d56e8b699401f8a2b6c
+draft id: 6b046d56e8b699401f8a2b6c (submitted 2026-11-23 with tag AI - Gemma and the WebP cover)
 
 The draft is in app.advocu.com -> My activities -> Drafts. The API has no
 image field and no submit: open the draft, attach the cover on step 2,
