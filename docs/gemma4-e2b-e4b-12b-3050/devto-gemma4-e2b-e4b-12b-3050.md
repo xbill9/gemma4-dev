@@ -28,8 +28,8 @@ The short version: with thinking off, every step up in size answers more and tak
 
 **What to do with it.**
 
-- 🟢 E4B with the drafter is the default: 0.9295 on GSM8K, thinking safe, the full 131,072-token context.
-- 🟢 The 12B with thinking off is the most accurate model that fits the card.
+- 🟢 E4B with the drafter is the default: 0.9295 on GSM8K without it and level with it, thinking safe, the full 131,072-token context.
+- 🟢 The 12B with thinking off is the most accurate of the three, and the largest Gemma 4 that fits entirely on the card.
 - ❌ The 12B with thinking on at temperature 0 is unusable.
 
 ---
@@ -85,7 +85,7 @@ E2B and E4B fit with room to spare: the full 131,072-token context at f16 takes 
 | Replies at the token limit | 3 | 🥇 0 | 9 |
 | Hours | 0.53 | 🥇 0.52 | 4.20 |
 
-The 12B reached 15 of 30 on AIME with 9 replies cut off at the limit, so even with thinking off it loops on hard problems.
+The 12B reached 15 of 30 on AIME with 9 replies cut off at the limit, 6 of them repeating the same block of text, so even with thinking off it can loop on hard problems.
 
 ---
 
@@ -139,7 +139,7 @@ The same 70 problems for the smaller models, thinking on:
 | E4B | 70 | 🥇 63 | 🥇 2,131 tokens |
 | 12B | 0 | 0 | 32,768 tokens |
 
-Then the first 8 of those problems again, one setting changed at a time:
+Then the first 8 of those problems again, changing the cache, then the sampling:
 
 | Setting | Cache | Finished | Right |
 | :--- | :--- | ---: | ---: |
@@ -147,7 +147,7 @@ Then the first 8 of those problems again, one setting changed at a time:
 | Temperature 0 | f16 | 0 | 0 |
 | Google's settings: temperature 1.0, top-k 64, top-p 0.95 | q4_0 | 🥇 8 | 🥇 7 |
 
-The cache makes no difference; temperature 0 is what keeps the 12B in the loop. The likely mechanism: once a block of doubt has repeated, the same block again is the most likely next text, and temperature 0 always takes it, while sampling can pick a different token and leave. The sampled replies took 1,596 to 11,894 tokens.
+On these 8 problems the cache made no difference; greedy decoding (temperature 0) is what keeps the 12B in the loop. The likely mechanism: once a block of doubt has repeated, the same block again is the most likely next text, and temperature 0 always takes it, while sampling can pick a different token and leave. The sampled replies took 1,596 to 11,894 tokens.
 
 ---
 
@@ -185,19 +185,19 @@ Benchmarks usually run at temperature 0 so the results repeat. For the 12B with 
 
 **Pros and cons**
 
-- **E2B.** 🟢 Fastest, smallest, the full context in 3.6 GB. ❌ Lowest scores: 37 fewer GSM8K problems than E4B and 80 fewer than the 12B.
+- **E2B.** 🟢 Fastest, smallest, the full context in 3,610 MiB. ❌ Lowest scores: 37 fewer GSM8K problems than E4B and 80 fewer than the 12B.
 - **E4B.** 🟢 Never hit the token limit in 10,792 replies. 🟢 The best drafter gain, up to 2.39x. 🟢 The full context. ⚠️ 1.75 times E2B's time.
-- **12B.** 🟢 The most right answers with thinking off, beyond chance over E4B. ❌ 2.56 times E4B's time and 7.3 GB of the card. ❌ Loops at temperature 0 with thinking on, and on some hard problems with it off.
+- **12B.** 🟢 The most right answers with thinking off, beyond chance over E4B. ❌ 2.56 times E4B's time and 7,294 MiB of the card's 8 GB. ❌ Loops at temperature 0 with thinking on, and on some hard problems with it off.
 
 ---
 
 #### So, Which One?
 
-**Default: E4B with the drafter.** It is about three points behind the 12B on GSM8K and finishes a pass in 2.38 hours against 6.10 without a drafter. It loops on nothing, and it keeps the full 131,072-token context on the card.
+**Default: E4B with the drafter.** It is about three points behind the 12B on GSM8K and finishes a pass in 2.38 hours against the 12B's 6.10, both without a drafter. It loops on nothing, and it keeps the full 131,072-token context on the card.
 
-**Most accurate: the 12B with thinking off.** It answered 60 GSM8K problems E4B missed and missed 17 E4B answered. Serve it with its drafter, and if you need thinking, use Google's sampling settings.
+**Most accurate of the three: the 12B with thinking off.** It answered 60 GSM8K problems E4B missed and missed 17 E4B answered. Serve it with its drafter, and if you need thinking, use Google's sampling settings.
 
-**Smallest and fastest: E2B.** It uses 3.6 GB and answers in 3.72 seconds per GSM8K problem.
+**Smallest and fastest: E2B.** It uses 3,610 MiB and answers in 3.72 seconds per GSM8K problem.
 
 **Thinking: leave it off on all three.** It doubled the time on E2B and E4B for no change beyond chance, and at temperature 0 it broke the 12B.
 
@@ -214,7 +214,7 @@ The goal of this article was to compare Gemma 4 E2B, E4B and 12B on one 8 GB car
 - 🟢 Google's sampling settings stopped the loop on all 8 problems tested; the cache type made no difference.
 - 🟢 The drafter made every model 1.75 to 2.39 times faster on GSM8K and changed no score.
 
-Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp `7182ef71e`, one run of each setting, exact Q4_0 repacks of Google's QAT weights, temperature 0 unless stated, one request at a time, a 32,768-token reply limit, 2026-11-16 to 21. GSM8K is all 1,319 test problems and AIME 2025 is papers I and II. The 12B's GSM8K thinking-on run covers the first 157 problems, the sampling test 8 problems, and its drafter figures come from an October run with a different cache and context. Times move with clock and temperature.
+Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp `7182ef71e`, one run of each setting, exact Q4_0 repacks of Google's QAT weights, temperature 0 unless stated, one request at a time, a 32,768-token reply limit, 2026-11-16 to 21. GSM8K is all 1,319 test problems and AIME 2025 is papers I and II. The 12B's GSM8K thinking-on run covers the first 157 problems, the sampling test 8 problems, and its drafter figures come from an October run with a different cache and context. Times move with clock and temperature. The 26B and 31B also run on this card with part of the model in system RAM; they are outside this comparison.
 
 The strategy for choosing a Gemma 4 size for a small GPU was validated with an incremental step by step approach.
 
