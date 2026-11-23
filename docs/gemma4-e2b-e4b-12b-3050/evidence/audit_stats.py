@@ -245,6 +245,76 @@ rec(
     "exact McNemar",
 )
 
+# 8. Google's sampling settings (Step 6): 2026-11-21 (12B thinking on) and 2026-11-22 runs, no drafter
+S22 = "local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-11-22-sampling-e2b-e4b-12b-3050oem/"
+S21 = "local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-11-21-drafter-sampling-12b-3050oem/"
+sub = lambda d: {i: d[i] for i in ids157 if i in d}  # noqa: E731
+SG = {
+    "E2B-on": sub(load(S22 + "gsm8k-e2b-sampled-seed1-thinkon.jsonl")),
+    "E4B-on": sub(load(S22 + "gsm8k-e4b-sampled-seed1-thinkon.jsonl")),
+    "12B-on": sub(load(S21 + "gsm8k-sampled-none-thinkon.jsonl")),
+    "12B-off": sub(load(S22 + "gsm8k-12b-sampled-seed1-thinkoff.jsonl")),
+}
+GR = {
+    "E2B-off": sub(run("E2B", "gsm8k", "none", "off")),
+    "E4B-off": sub(run("E4B", "gsm8k", "none", "off")),
+    "12B-on": sub(run("12B", "gsm8k", "none", "on")),
+    "12B-off": sub(run("12B", "gsm8k", "none", "off")),
+}
+SA = {
+    "E2B-off": load(S22 + "aime2025-e2b-sampled-seed1-thinkoff.jsonl"),
+    "E2B-on": load(S22 + "aime2025-e2b-sampled-seed1-thinkon.jsonl"),
+    "E4B-off": load(S22 + "aime2025-e4b-sampled-seed1-thinkoff.jsonl"),
+    "E4B-on": load(S22 + "aime2025-e4b-sampled-seed1-thinkon.jsonl"),
+    "12B-off": load(S22 + "aime2025-12b-sampled-seed1-thinkoff.jsonl"),
+    "12B-on": load(S21 + "aime2025-sampled-none-thinkon.jsonl"),
+    "12B-on2": load(S22 + "aime2025-12b-sampled-seed2-thinkon.jsonl"),
+}
+for key, k_ in [("E2B-on", 140), ("E4B-on", 153), ("12B-on", 151), ("12B-off", 153)]:
+    d = SG[key]
+    k = sum(ok(r) for r in d.values())
+    rec(f"sampled-gsm-{key}", f"Google's settings, GSM8K first 157, {key}: {k_}", "Step 6 table",
+        {"k": k_}, {"k": k, "n": len(d), "ci": [round(x, 4) for x in wilson(k, len(d))]},
+        "VERIFIED" if (k, len(d)) == (k_, 157) else "MISMATCH", "HOLDS" if k == k_ else "OVERSTATED", "count + Wilson 95%")
+for key, k_ in [("E2B-off", 7), ("E2B-on", 10), ("E4B-off", 10), ("E4B-on", 15), ("12B-off", 19), ("12B-on", 21), ("12B-on2", 21)]:
+    d = SA[key]
+    k = sum(ok(r) for r in d.values())
+    rec(f"sampled-aime-{key}", f"Google's settings, AIME {key}: {k_} of 30", "Step 6 table",
+        {"k": k_}, {"k": k, "n": len(d)},
+        "VERIFIED" if (k, len(d)) == (k_, 30) else "MISMATCH", "HOLDS" if k == k_ else "OVERSTATED", "count")
+for cid, A, B, pb, pc, pp, claim in [
+    ("E4B greedy off -> sampled on, GSM8K", GR["E4B-off"], SG["E4B-on"], 0, 7, 0.0156, "holds"),
+    ("12B greedy on -> sampled on, GSM8K", GR["12B-on"], SG["12B-on"], 1, 65, 1.82e-18, "holds"),
+    ("12B sampled off vs on, GSM8K", SG["12B-off"], SG["12B-on"], 4, 2, 0.688, "ns"),
+    ("E4B sampled on vs 12B sampled off, GSM8K", SG["E4B-on"], SG["12B-off"], 1, 1, 1.0, "ns"),
+    ("E2B greedy off -> sampled on, GSM8K", GR["E2B-off"], SG["E2B-on"], 9, 7, 0.804, "ns"),
+    ("E2B AIME sampled off -> on", SA["E2B-off"], SA["E2B-on"], 0, 3, 0.25, "ns"),
+    ("E4B AIME sampled off -> on", SA["E4B-off"], SA["E4B-on"], 1, 6, 0.125, "ns"),
+    ("12B AIME sampled off -> on", SA["12B-off"], SA["12B-on"], 1, 3, 0.625, "ns"),
+    ("12B AIME sampled off -> on, seed 2", SA["12B-off"], SA["12B-on2"], 2, 4, 0.688, "ns"),
+    ("E4B vs 12B AIME, sampled off", SA["E4B-off"], SA["12B-off"], 0, 9, 0.0039, "holds"),
+    ("E4B on vs 12B off AIME, sampled", SA["E4B-on"], SA["12B-off"], 1, 5, 0.219, "ns"),
+    ("12B AIME greedy on -> sampled on", run("12B", "aime2025", "none", "on"), SA["12B-on"], 2, 13, 0.0074, "holds"),
+]:
+    b, c, n = pair(A, B)
+    p = mcnemar(b, c)
+    rep = (b, c) == (pb, pc) and abs(p - pp) / pp < 0.02
+    concl = (p < 0.05) if claim == "holds" else (p >= 0.05)
+    rec(f"sampled-{cid}", f"{cid}: {pb} / {pc}, p = {pp}", "Step 6",
+        {"b": pb, "c": pc, "p": pp}, {"b": b, "c": c, "n": n, "p": float(f"{p:.4g}")},
+        "VERIFIED" if rep else "MISMATCH", "HOLDS" if concl else "OVERSTATED", "exact McNemar")
+cut = {m: sum(r.get("finish") == "length" for f in os.listdir(os.path.join(R, S22)) if f.endswith(".jsonl")
+              and f"-{m.lower()}-" in f for r in load(S22 + f).values()) for m in ("E2B", "E4B", "12B")}
+nrep = {m: sum(len(load(S22 + f)) for f in os.listdir(os.path.join(R, S22)) if f.endswith(".jsonl")
+               and f"-{m.lower()}-" in f) for m in ("E2B", "E4B", "12B")}
+for f in ("gsm8k-sampled-none-thinkon.jsonl", "aime2025-sampled-none-thinkon.jsonl"):
+    cut["12B"] += sum(r.get("finish") == "length" for r in load(S21 + f).values())
+    nrep["12B"] += len(load(S21 + f))
+good = (cut, nrep) == ({"E2B": 0, "E4B": 0, "12B": 20}, {"E2B": 217, "E4B": 217, "12B": 404})
+rec("sampled-cut", "Google's settings, replies at the limit: E2B 0/217, E4B 0/217, 12B 20/404", "Step 6",
+    {"E2B": [0, 217], "E4B": [0, 217], "12B": [20, 404]}, {m: [cut[m], nrep[m]] for m in cut},
+    "VERIFIED" if good else "MISMATCH", "HOLDS" if good else "OVERSTATED", "count")
+
 json.dump(
     {"article": "docs/gemma4-e2b-e4b-12b-3050/devto-gemma4-e2b-e4b-12b-3050.md", "claims": claims},
     open(os.path.join(HERE, "stat_audit.json"), "w"),
