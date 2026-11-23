@@ -26,7 +26,7 @@ CELLS=("gsm8k off" "aime2025 off" "aime2025 on" "gsm8k on")
 
 state() { echo "$(date '+%F %T') $(nvidia-smi --query-gpu=temperature.gpu,clocks.sm --format=csv,noheader) $*" | tee -a "$DRIVER"; }
 stop8080() { pkill -x llama-server; while pgrep -x llama-server >/dev/null; do sleep 1; done; }
-cool() { until [ "$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader)" -le 50 ]; do sleep 5; done; }
+cool() { until [ "$(nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader | cut -d. -f1)" -le 50 ]; do sleep 5; done; }  # this driver prints 41.06
 serve() {  # LOG GGUF [DRAFTER]
   local log=$1 m=$2 d=${3:-}
   stop8080; cool
