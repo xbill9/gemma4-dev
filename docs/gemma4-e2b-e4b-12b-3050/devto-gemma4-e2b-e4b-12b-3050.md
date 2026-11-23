@@ -12,7 +12,7 @@ This article provides a step by step comparison of three Gemma 4 models on one l
 
 https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-e4b-12b-3050
 
-The short version: serve E4B with thinking on and Google's sampling settings. Take E2B when speed or memory comes first, and the 12B with thinking off for hard math when you can wait about three times as long. Never run the 12B with thinking on at temperature 0: it works out the answer and then argues with the question until it runs out of tokens.
+The short version: serve E4B with thinking on and Google's sampling settings. Take E2B when speed or memory comes first, and the 12B with thinking off for hard math or function calls when you can wait longer. Never run the 12B with thinking on at temperature 0: it works out the answer and then argues with the question until it runs out of tokens.
 
 ---
 
@@ -20,10 +20,10 @@ The short version: serve E4B with thinking on and Google's sampling settings. Ta
 
 Answer two questions in order and stop at the first yes.
 
-![Decision flow: need the fastest replies or half the card free leads to E2B; hard math and you can wait three times as long leads to the 12B with thinking off; otherwise E4B with thinking on and Google's sampling settings; never the 12B with thinking on at temperature 0](https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-e4b-12b-3050/decision-flow.fbbdc471.jpg)
+![Decision flow: need the fastest replies or half the card free leads to E2B; hard math or function calls and you can wait longer leads to the 12B with thinking off; otherwise E4B with thinking on and Google's sampling settings; never the 12B with thinking on at temperature 0](https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-e4b-12b-3050/decision-flow.91af14ff.jpg)
 
 1. **Do you need the fastest replies, or half the card free?** Use **E2B**: 3,610 MiB with the full context and 3.72 seconds per GSM8K problem, for the lowest scores of the three.
-2. **Is it hard math, and can you wait about three times as long?** Use the **12B with thinking off**: with Google's settings it solved 19 of 30 AIME problems against 15 for E4B with thinking on, in 3.07 times the time. That gap is within chance; against E4B with thinking off (10 of 30) it is beyond chance.
+2. **Is it hard math or function calls, and can you wait longer?** Use the **12B with thinking off**. With Google's settings it solved 19 of 30 AIME problems against 15 for E4B with thinking on, in 3.07 times the time; that gap is within chance, and against E4B with thinking off (10 of 30) it is beyond chance. On function calls (BFCL simple, 400 problems, temperature 0, October runs) it scored 0.9500 against E4B's 0.9125, a paired gain of +0.0375 with a 95% range of +0.0100 to +0.0650, above zero.
 3. **Otherwise** use **E4B with thinking on and Google's settings**: 153 of 157 GSM8K problems, level with the 12B, no reply at the token limit, and the full 131,072-token context in 6,430 MiB.
 
 ---
@@ -186,6 +186,8 @@ Each model's `generation_config.json` sets temperature 1.0, top-k 64 and top-p 0
 - **E4B with thinking on against the 12B with thinking off, both Google's settings:** 153 each, 1 problem only E4B got and 1 only the 12B got (p = 1). The 12B took 1.75 times as long.
 - **E2B:** no change beyond chance (p = 0.804).
 
+157 problems are too few to show a gap as small as the 12B's lead over E4B on all 1,319. At temperature 0 with thinking off, the 12B's 3.3-point lead on the full set is beyond chance (p = 8.91e-7), but on these same 157 it is 152 against 146, +8 / −2, within chance (p = 0.109). So "level" here means no difference was found on 157 problems.
+
 **AIME 2025, 30 problems, Google's settings**
 
 | | E2B | E4B | 12B |
@@ -240,7 +242,7 @@ Benchmarks usually run at temperature 0 so the results repeat. For the 12B with 
 
 - **E2B.** 🟢 Fastest, smallest, the full context in 3,610 MiB. ❌ Lowest scores: 37 fewer GSM8K problems than E4B and 80 fewer than the 12B.
 - **E4B.** 🟢 With thinking on and Google's settings, level with the 12B on GSM8K in 0.57 times its time. 🟢 Never hit the token limit, in 11,009 replies. 🟢 The best drafter gain, up to 2.39x. 🟢 The full context. ⚠️ 1.75 times E2B's time.
-- **12B.** 🟢 The most right answers with thinking off, beyond chance over E4B. 🟢 The most AIME problems with Google's settings, 19 and 21 of 30. ❌ 2.56 times E4B's time and 7,294 MiB of the card's 8 GB. ❌ Loops at temperature 0 with thinking on, and on some hard problems with it off.
+- **12B.** 🟢 The most right answers with thinking off, beyond chance over E4B. 🟢 The most AIME problems with Google's settings, 19 and 21 of 30. 🟢 Function calls: 0.9500 on BFCL against E4B's 0.9125, beyond chance (October runs). ❌ 2.56 times E4B's time and 7,294 MiB of the card's 8 GB. ❌ Loops at temperature 0 with thinking on, and on some hard problems with it off.
 
 ---
 
@@ -248,7 +250,7 @@ Benchmarks usually run at temperature 0 so the results repeat. For the 12B with 
 
 **Default: E4B with thinking on and Google's sampling settings.** The 12B is the largest model that fits and the most accurate with thinking off, so it looks like the pick. Run E4B the way Google ships it and it matched the 12B on the first 157 GSM8K problems in 0.57 times the time, never hit the token limit, and kept the full 131,072-token context with 1,762 MiB of the card to spare. With thinking off it is the 0.9295 model, and its drafter makes it about twice as fast.
 
-**Hard math, when you can wait: the 12B with thinking off.** It answered 60 GSM8K problems E4B missed and missed 17 E4B answered, both at temperature 0, and led AIME with Google's settings. Serve it with its drafter.
+**Hard math or function calls, when you can wait: the 12B with thinking off.** It answered 60 GSM8K problems E4B missed and missed 17 E4B answered, both at temperature 0, led AIME with Google's settings, and scored 0.9500 on function calls against E4B's 0.9125. Serve it with its drafter.
 
 **Smallest and fastest: E2B.** It uses 3,610 MiB and answers in 3.72 seconds per GSM8K problem.
 
@@ -260,7 +262,8 @@ Benchmarks usually run at temperature 0 so the results repeat. For the 12B with 
 
 The goal of this article was to compare Gemma 4 E2B, E4B and 12B on one 8 GB card and say which to serve. The key to the solution was running all three on the same 1,349 problems with the same settings, so every comparison is paired problem by problem. The results were:
 
-- 🟢 E4B with thinking on and Google's sampling settings matched the 12B on the first 157 GSM8K problems, 153 each, in 0.55 hours against 0.96.
+- 🟢 E4B with thinking on and Google's sampling settings matched the 12B on the first 157 GSM8K problems, 153 each, in 0.55 hours against 0.96; 157 problems are too few to show a gap of a few points.
+- 🟢 The 12B leads on function calls: 0.9500 on BFCL against E4B's 0.9125 (October runs).
 - 🟢 Thinking off at temperature 0, every step up in size scored higher on GSM8K beyond chance: 0.9014, 0.9295, 0.9621.
 - ⚠️ Every step up in size took longer: 1.36, 2.38 and 6.10 hours for GSM8K.
 - ⚠️ At temperature 0, thinking doubled the time on E2B and E4B and changed no score beyond chance.
@@ -268,7 +271,7 @@ The goal of this article was to compare Gemma 4 E2B, E4B and 12B on one 8 GB car
 - 🟢 Google's sampling settings stopped the loop: the 12B with thinking on got 151 of 157, level with thinking off, at 5.30 times the time; the cache type made no difference.
 - 🟢 The drafter made every model 1.75 to 2.39 times faster on GSM8K and changed no score.
 
-Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp `7182ef71e`, one run of each setting, exact Q4_0 repacks of Google's QAT weights, temperature 0 unless stated, one request at a time, a 32,768-token reply limit, 2026-11-16 to 22. GSM8K is all 1,319 test problems and AIME 2025 is papers I and II. The 12B's GSM8K thinking-on run covers the first 157 problems. The runs with Google's sampling settings are one seed each (two for the 12B's AIME with thinking on), cover 157 GSM8K problems, and ran without a drafter; E2B and E4B with thinking off ran AIME only. The 12B's drafter figures come from an October run with a different cache and context. Times move with clock and temperature. The 26B and 31B also run on this card with part of the model in system RAM; they are outside this comparison.
+Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp `7182ef71e`, one run of each setting, exact Q4_0 repacks of Google's QAT weights, temperature 0 unless stated, one request at a time, a 32,768-token reply limit, 2026-11-16 to 22. GSM8K is all 1,319 test problems and AIME 2025 is papers I and II. The 12B's GSM8K thinking-on run covers the first 157 problems. The runs with Google's sampling settings are one seed each (two for the 12B's AIME with thinking on), cover 157 GSM8K problems, and ran without a drafter; E2B and E4B with thinking off ran AIME only. Function-call scores come from October runs at temperature 0 with thinking off: the 12B on llama.cpp `7182ef71e` at 24,576 tokens, E4B on `77c4540ce` at 131,072; BFCL with Google's settings is untested. The 12B's drafter figures come from an October run with a different cache and context. Times move with clock and temperature. The 26B and 31B also run on this card with part of the model in system RAM; they are outside this comparison.
 
 The strategy for choosing a Gemma 4 size for a small GPU was validated with an incremental step by step approach.
 

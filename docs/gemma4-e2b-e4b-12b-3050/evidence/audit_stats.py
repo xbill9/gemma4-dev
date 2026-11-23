@@ -315,6 +315,14 @@ rec("sampled-cut", "Google's settings, replies at the limit: E2B 0/217, E4B 0/21
     {"E2B": [0, 217], "E4B": [0, 217], "12B": [20, 404]}, {m: [cut[m], nrep[m]] for m in cut},
     "VERIFIED" if good else "MISMATCH", "HOLDS" if good else "OVERSTATED", "count")
 
+# 9. Step 6 caveat: on the same 157 at temperature 0, thinking off, 12B 152 vs E4B 146 is within chance
+b, c, n = pair(GR["E4B-off"], GR["12B-off"])
+p = mcnemar(b, c)
+rep = (b, c) == (2, 8) and abs(p - 0.109) / 0.109 < 0.01
+rec("first157-E4B-vs-12B-greedy", "first 157, temperature 0, thinking off: E4B 146 vs 12B 152, +8 / -2, p = 0.109",
+    "Step 6", {"b": 2, "c": 8, "p": 0.109}, {"b": b, "c": c, "n": n, "p": float(f"{p:.4g}")},
+    "VERIFIED" if rep else "MISMATCH", "HOLDS" if p >= 0.05 else "OVERSTATED", "exact McNemar")
+
 json.dump(
     {"article": "docs/gemma4-e2b-e4b-12b-3050/devto-gemma4-e2b-e4b-12b-3050.md", "claims": claims},
     open(os.path.join(HERE, "stat_audit.json"), "w"),
