@@ -11,8 +11,8 @@ import gen_eval as g  # noqa: E402
 DATA = os.path.join(os.path.dirname(__file__), "..", "data")
 
 
-def bfcl():
-    return [json.loads(line) for line in open(os.path.join(DATA, "bfcl_simple.jsonl"))]
+def bfcl(cat="simple"):
+    return [json.loads(line) for line in open(os.path.join(DATA, f"bfcl_{cat}.jsonl"))]
 
 
 def realize(v, pick):
@@ -48,6 +48,25 @@ class Gsm8k(unittest.TestCase):
 
     def test_bold_and_decimal(self):
         self.assertTrue(g.gsm8k_right("Answer: **18.00**", "18"))
+
+
+class BfclMore(unittest.TestCase):
+    def test_every_multiple_reference_answer_passes(self):
+        fails = [r["id"] for r in bfcl("multiple") if not g.bfcl_check(reference_call(r), r)[0]]
+        self.assertEqual(fails, [])
+
+    def test_multiple_wrong_function_fails(self):
+        r = next(x for x in bfcl("multiple") if len(x["functions"]) > 1)
+        want = next(iter(r["possible"][0]))
+        other = next(f["name"] for f in r["functions"] if f["name"] != want)
+        call = reference_call(r)
+        call[0]["name"] = g.tool_name(other)
+        self.assertFalse(g.bfcl_check(call, r)[0])
+
+    def test_irrelevance_has_no_answers(self):
+        rows = bfcl("irrelevance")
+        self.assertEqual(len(rows), 240)
+        self.assertTrue(all("possible" not in r for r in rows))
 
 
 class Bfcl(unittest.TestCase):

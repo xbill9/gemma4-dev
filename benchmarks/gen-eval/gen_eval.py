@@ -10,6 +10,9 @@ Tasks (records from build_gen_set.py, under data/):
   bfcl_simple  one tool offered through the OpenAI `tools` field, tool_choice auto, greedy; right
                when the server returns exactly one tool call whose name and arguments pass the checks
                below. Needs the server started with --enable-auto-tool-choice --tool-call-parser gemma4.
+  bfcl_multiple    as bfcl_simple with 2-4 functions offered; the call must be to the one the answer names.
+  bfcl_irrelevance one function offered that does not fit the request; right when the server returns no
+                   tool call. Records from build_bfcl_sets.py.
 
 The BFCL check follows BFCL's AST checker for the simple category: the name must match; every
 required parameter must be present; no parameter outside the schema; every given value must be one
@@ -61,7 +64,7 @@ RETRIES = int(setting("RETRIES", "0"))
 TIMEOUT_S = float(setting("TIMEOUT_S", "900"))
 # aime2025 and gpqa_diamond (build_hard_set.py): GEN_EVAL_HARD_MAX_TOKENS tokens (default 32768).
 HARD_MAX_TOKENS = int(setting("HARD_MAX_TOKENS", "32768"))
-# bfcl_simple: GEN_EVAL_BFCL_MAX_TOKENS tokens (default 512; thinking on needs room for the thinking too).
+# bfcl_*: GEN_EVAL_BFCL_MAX_TOKENS tokens (default 512; thinking on needs room for the thinking too).
 BFCL_MAX_TOKENS = int(setting("BFCL_MAX_TOKENS", "512"))
 AIME_PROMPT = (
     "Solve the following competition math problem. The answer is an integer from 0 to 999. Think step by "
@@ -194,9 +197,11 @@ def bfcl_check(calls, record):
     """calls: [{"name", "arguments"(dict)}] from the server. Returns (right, reason)."""
     if len(calls) != 1:
         return False, f"{len(calls)} tool calls"
-    func = record["functions"][0]
     possible = record["possible"][0]
     want_name = next(iter(possible))
+    funcs = record["functions"]
+    func = funcs[0] if len(funcs) == 1 else next(
+        f for f in funcs if tool_name(f["name"]) == tool_name(want_name))
     call = calls[0]
     if call["name"] not in (want_name, tool_name(want_name)):
         return False, f"name {call['name']}"
@@ -330,7 +335,11 @@ def one(upstream, model, task, rec, opts=None):
                 a = c["function"]["arguments"]
             calls.append({"name": c["function"]["name"], "arguments": a})
         out["calls"] = calls
-        out["right"], out["reason"] = bfcl_check(calls, rec)
+        if task == "bfcl_irrelevance":
+            out["right"] = not calls
+            out["reason"] = "ok" if not calls else f"{len(calls)} tool calls"
+        else:
+            out["right"], out["reason"] = bfcl_check(calls, rec)
     return out
 
 
@@ -399,7 +408,7 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("upstream")
     r.add_argument("model")
-    r.add_argument("task", choices=["gsm8k", "bfcl_simple", "aime2025", "gpqa_diamond"])
+    r.add_argument("task", choices=["gsm8k", "bfcl_simple", "bfcl_multiple", "bfcl_irrelevance", "aime2025", "gpqa_diamond"])
     r.add_argument("out")
     r.add_argument("--limit", type=int)
     r.add_argument("--concurrency", type=int, default=16)
