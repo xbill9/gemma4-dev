@@ -1,0 +1,33 @@
+| Claim | Article value | Recomputed | Test | Verdict |
+|---|---|---|---|---|
+| E2B GSM8K thinking off 1189/1319 = 0.9014, 95% 0.884 to 0.916 | {'k': 1189, 'score': 0.9014, 'ci': [0.884, 0.916]} | {'k': 1189, 'n': 1319, 'score': 0.9014, 'ci': [0.8842, 0.9164]} | Wilson 95% | HOLDS |
+| E4B GSM8K thinking off 1226/1319 = 0.9295, 95% 0.914 to 0.942 | {'k': 1226, 'score': 0.9295, 'ci': [0.914, 0.942]} | {'k': 1226, 'n': 1319, 'score': 0.9295, 'ci': [0.9144, 0.9421]} | Wilson 95% | HOLDS |
+| 12B GSM8K thinking off 1269/1319 = 0.9621, 95% 0.95 to 0.971 | {'k': 1269, 'score': 0.9621, 'ci': [0.95, 0.971]} | {'k': 1269, 'n': 1319, 'score': 0.9621, 'ci': [0.9504, 0.9711]} | Wilson 95% | HOLDS |
+| E2B AIME thinking off 7 of 30 | {'k': 7, 'n': 30} | {'k': 7, 'n': 30, 'ci': [0.1179, 0.4093]} | count + Wilson 95% | HOLDS |
+| E4B AIME thinking off 12 of 30 | {'k': 12, 'n': 30} | {'k': 12, 'n': 30, 'ci': [0.2459, 0.5768]} | count + Wilson 95% | HOLDS |
+| 12B AIME thinking off 15 of 30 | {'k': 15, 'n': 30} | {'k': 15, 'n': 30, 'ci': [0.3315, 0.6685]} | count + Wilson 95% | HOLDS |
+| gsm8k E2B to E4B: 34 / 71, p = 0.00039 (beyond chance) | {'b': 34, 'c': 71, 'p': 0.00039} | {'b': 34, 'c': 71, 'n': 1319, 'p': 0.0003907} | exact McNemar | HOLDS |
+| gsm8k E4B to 12B: 17 / 60, p = 8.91e-07 (beyond chance) | {'b': 17, 'c': 60, 'p': 8.91e-07} | {'b': 17, 'c': 60, 'n': 1319, 'p': 8.91e-07} | exact McNemar | HOLDS |
+| aime2025 E2B to E4B: 0 / 5, p = 0.0625 (within chance) | {'b': 0, 'c': 5, 'p': 0.0625} | {'b': 0, 'c': 5, 'n': 30, 'p': 0.0625} | exact McNemar | HOLDS |
+| aime2025 E4B to 12B: 2 / 5, p = 0.453 (within chance) | {'b': 2, 'c': 5, 'p': 0.453} | {'b': 2, 'c': 5, 'n': 30, 'p': 0.4531} | exact McNemar | HOLDS |
+| aime2025 E2B to 12B: 0 / 8, p = 0.0078 (beyond chance) | {'b': 0, 'c': 8, 'p': 0.0078} | {'b': 0, 'c': 8, 'n': 30, 'p': 0.007812} | exact McNemar | HOLDS |
+| E2B gsm8k thinking off 1189 to on 1178, p = 0.294 | {'off': 1189, 'on': 1178, 'p': 0.294} | {'off': 1189, 'on': 1178, 'n': 1319, 'off_only': 51, 'on_only': 40, 'p': 0.2945} | exact McNemar | HOLDS |
+| E4B gsm8k thinking off 1226 to on 1230, p = 0.683 | {'off': 1226, 'on': 1230, 'p': 0.683} | {'off': 1226, 'on': 1230, 'n': 1319, 'off_only': 25, 'on_only': 29, 'p': 0.6835} | exact McNemar | HOLDS |
+| 12B gsm8k thinking off 152 to on 87, p = 5.42e-20 | {'off': 152, 'on': 87, 'p': 5.42e-20} | {'off': 152, 'on': 87, 'n': 157, 'off_only': 65, 'on_only': 0, 'p': 5.421e-20} | exact McNemar | HOLDS |
+| E2B aime2025 thinking off 7 to on 10, p = 0.375 | {'off': 7, 'on': 10, 'p': 0.375} | {'off': 7, 'on': 10, 'n': 30, 'off_only': 1, 'on_only': 4, 'p': 0.375} | exact McNemar | HOLDS |
+| E4B aime2025 thinking off 12 to on 10, p = 0.688 | {'off': 12, 'on': 10, 'p': 0.688} | {'off': 12, 'on': 10, 'n': 30, 'off_only': 4, 'on_only': 2, 'p': 0.6875} | exact McNemar | HOLDS |
+| 12B aime2025 thinking off 15 to on 10, p = 0.227 | {'off': 15, 'on': 10, 'p': 0.227} | {'off': 15, 'on': 10, 'n': 30, 'off_only': 8, 'on_only': 3, 'p': 0.2266} | exact McNemar | HOLDS |
+| E4B thinking on, first 157 GSM8K: 148 | {'k': 148} | {'k': 148, 'n': 157} | count | HOLDS |
+| E2B thinking on, first 157 GSM8K: 142 | {'k': 142} | {'k': 142, 'n': 157} | count | HOLDS |
+| E2B drafter changes no gsm8k score (thinking off) | {'claim': 'none beyond chance'} | {'drafter_only': 24, 'none_only': 25, 'n': 1319, 'p': 1.0} | exact McNemar | HOLDS |
+| E2B drafter changes no gsm8k score (thinking on) | {'claim': 'none beyond chance'} | {'drafter_only': 33, 'none_only': 24, 'n': 1319, 'p': 0.2892} | exact McNemar | HOLDS |
+| E2B drafter changes no aime2025 score (thinking off) | {'claim': 'none beyond chance'} | {'drafter_only': 2, 'none_only': 2, 'n': 30, 'p': 1.0} | exact McNemar | HOLDS |
+| E2B drafter changes no aime2025 score (thinking on) | {'claim': 'none beyond chance'} | {'drafter_only': 1, 'none_only': 1, 'n': 30, 'p': 1.0} | exact McNemar | HOLDS |
+| E4B drafter changes no gsm8k score (thinking off) | {'claim': 'none beyond chance'} | {'drafter_only': 2, 'none_only': 5, 'n': 1319, 'p': 0.4531} | exact McNemar | HOLDS |
+| E4B drafter changes no gsm8k score (thinking on) | {'claim': 'none beyond chance'} | {'drafter_only': 9, 'none_only': 3, 'n': 1319, 'p': 0.146} | exact McNemar | HOLDS |
+| E4B drafter changes no aime2025 score (thinking off) | {'claim': 'none beyond chance'} | {'drafter_only': 1, 'none_only': 3, 'n': 30, 'p': 0.625} | exact McNemar | HOLDS |
+| E4B drafter changes no aime2025 score (thinking on) | {'claim': 'none beyond chance'} | {'drafter_only': 4, 'none_only': 2, 'n': 30, 'p': 0.6875} | exact McNemar | HOLDS |
+| 12B drafter 0.9598 vs 0.9629 on GSM8K, no change beyond chance (October run) | {'claim': 'none beyond chance'} | {'drafter_only': 4, 'none_only': 8, 'n': 1319, 'p': 0.3877} | exact McNemar | HOLDS |
+| Google's sampling: 8 of 8 finished, 7 right | {'finished': 8, 'right': 7, 'n': 8} | {'finished': 8, 'right': 7, 'n': 8, 'right_ci': [0.529, 0.978]} | count + Wilson 95% | HOLDS |
+| f16 cache at temperature 0: 0 of 8 finished | {'finished': 0, 'n': 8} | {'finished': 0, 'right': 0, 'n': 8} | count | HOLDS |
+| sampling vs greedy on the 8 problems: 7 right vs 0 | {'b': 7, 'c': 0} | {'b': 7, 'c': 0, 'n': 8, 'p': 0.01562} | exact McNemar | HOLDS |
