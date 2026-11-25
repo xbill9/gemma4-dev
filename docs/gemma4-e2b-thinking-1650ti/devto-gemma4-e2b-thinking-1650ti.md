@@ -111,12 +111,14 @@ The run's own log, `driver.log`, shows one line per cell, with the card's temper
 
 | Weights | Drafter | Thinking off | Thinking on |
 | :--- | :--- | ---: | ---: |
-| Repack | none | 🥇 10 / 7 | 8 / 10 |
+| Repack | none | 10 / 7 | 8 / 10 |
 | Repack | yes | 7 / 7 | 8 / 10 |
 | Google | none | 5 / 6 | 9 / 6 |
 | Google | yes | 6 / 5 | 7 / 9 |
 
 One to five AIME replies per cell ran into the 32,768-token limit and count as wrong; on GSM8K, zero or one per cell.
+
+The 10 against 7 is three problems right only on the 1650 Ti and none the other way; on two of them the 3050 reply ran into the length limit. That split is p = 0.25.
 
 ---
 
