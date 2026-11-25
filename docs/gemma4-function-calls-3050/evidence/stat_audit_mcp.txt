@@ -6,3 +6,13 @@ E4B Google's, thinking on vs off                 b=97 c=34  p=3.321500013147584e
 12B vs E4B, temperature 0, thinking off, irrel.  b=2  c=18  p=0.0004024505615234375
 12B temperature 0, thinking on vs off            b=24 c=45  p=0.015432297453701265
 E4B Google's on vs 12B temperature 0 off         b=36 c=31  p=0.6254068289416487
+
+research-audit MCP, full audit 2026-11-25 (audit_stats.py / stat_audit.json)
+verify_mcnemar_exact b=24 c=9  -> p 0.013530986849218607 (12b vs e4b greedy off, simple)
+verify_mcnemar_exact b=24 c=45 -> p 0.015432297453701265 (12b greedy on vs off)
+verify_mcnemar_exact b=31 c=17 -> p 0.05946337525377032 (12b vs e4b greedy off, fitting 600)
+verify_mcnemar_exact b=86 c=26 -> p 1.1009223084560129e-08 (e4b off, greedy vs Google's)
+verify_mcnemar_exact b=2 c=18  -> p 0.0004024505615234375 (12b vs e4b greedy off, irrelevance)
+leaderboard_noise_floor N=840 base 0.9 -> SE 1.04, half-width 2.03, min detectable lift 2.9 pts vs fixed, 4.1 pts between two runs
+verify_wilson_ci 748/840 -> 89.0% [86.8%, 91.0%]
+Holm over 24 paired tests (audit_stats.py): e4b off greedy-vs-Google's 2.64e-07, e4b Google's on-vs-off 7.64e-07, e2b Google's on-vs-off 0.0001, e2b off greedy-vs-Google's 0.000124, 12b-vs-e4b irrelevance 0.00805, 12b-vs-e4b simple 0.257, 12b greedy on-vs-off 0.278

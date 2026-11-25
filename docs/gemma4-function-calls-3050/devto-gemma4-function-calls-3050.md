@@ -152,7 +152,7 @@ Paired by category, the 12B against E4B:
 | Google's settings, thinking on | +20 / −8 | +7 / −4 | +2 / −27 | +29 / −39 |
 | p | 0.0357 | 0.549 | 1.62e-6 | 0.275 |
 
-The 12B gets more single calls right and calls a tool more often when none fits: 47 of 240 at temperature 0 with thinking off, against E4B's 31. The two errors cancel. If every request your application sends has a tool that fits, the 12B's lead on single calls is real, but small: on the 600 problems where a tool fits, the 12B at temperature 0 with thinking off scored 563 against 551 for E4B with Google's settings and thinking on, within chance (+29 / −17, p = 0.104).
+The 12B gets more single calls right and calls a tool more often when none fits: 47 of 240 at temperature 0 with thinking off, against E4B's 31. The two errors cancel. If every request your application sends has a tool that fits, the 12B's lead is small: on the 600 problems where a tool fits, the 12B at temperature 0 with thinking off scored 563 against 549 for E4B at the same setting (+31 / −17, p = 0.0595) and 551 for E4B with Google's settings and thinking on (+29 / −17, p = 0.104), both within chance.
 
 ---
 
@@ -203,7 +203,7 @@ A score hides why replies are wrong. Count the replies that should have called a
 
 **Google's settings: E4B or E2B with thinking on.** E4B scored 761 and E2B 751, level; take E2B for time and E4B if the same server also handles math, where an earlier run on this card put E4B ahead.
 
-**The 12B only if every request has a tool that fits,** and then at temperature 0 with thinking off. Its single-call lead over E4B is beyond chance; its extra calls when nothing fits cancel it on a mixed load.
+**The 12B only if every request has a tool that fits,** and then at temperature 0 with thinking off. It leads E4B on single calls (p = 0.0135) and is within chance of it on all 600 problems where a tool fits (p = 0.0595); its extra calls when nothing fits cancel the lead on a mixed load.
 
 **Thinking: match it to the sampling.** With Google's settings, thinking on. At temperature 0, off.
 
@@ -220,7 +220,7 @@ The goal of this article was to find which Gemma 4 model and setting to serve fo
 - ❌ The 12B with thinking on at temperature 0 lost 21 problems, and 19 replies ran to the token limit.
 - 🟢 E2B at temperature 0 with thinking off took 0.84 seconds per problem, 0.24 times the 12B's time.
 
-Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp `d1044bc82`, exact Q4_0 repacks of Google's QAT weights, one run of each setting with seed 1 for Google's settings, one request at a time, no drafter, an 8,192-token reply limit, 2026-11-23 to 24. BFCL v3 simple (400), multiple (200) and irrelevance (240), single-turn; the parallel categories and multi-turn conversations are untested. Function calls ran through llama.cpp's Gemma 4 tool-call parsing; other servers parse calls their own way. Times move with clock and temperature.
+Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp `d1044bc82`, exact Q4_0 repacks of Google's QAT weights, one run of each setting with seed 1 for Google's settings, one request at a time, no drafter, an 8,192-token reply limit, 2026-11-23 to 24. BFCL v3 simple (400), multiple (200) and irrelevance (240), single-turn; the parallel categories and multi-turn conversations are untested. Function calls ran through llama.cpp's Gemma 4 tool-call parsing; other servers parse calls their own way. Times move with clock and temperature. The article reports 24 paired tests; corrected for that number (Holm), the losses from thinking off under Google's settings and the 12B's extra calls when no tool fits still hold, and the 12B's single-call lead and its drop with thinking on at temperature 0 do not. "Level" means no gap beyond chance: with one run of 840 problems near 90 percent, a gap smaller than about 2.9 to 4.1 percentage points does not show.
 
 The strategy for choosing a Gemma 4 model and setting for function calls on a small GPU was validated with an incremental step by step approach.
 
