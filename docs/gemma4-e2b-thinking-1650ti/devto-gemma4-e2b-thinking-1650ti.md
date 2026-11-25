@@ -1,5 +1,5 @@
 ---
-title: "Same Answers on 4 GB: Gemma 4 E2B Thinking On or Off on a GTX 1650 Ti Laptop"
+title: "Thinking on Constrained Deployments: Gemma E2B on 4GB 1650"
 published: false
 description: "The RTX 3050 thinking study, repeated on a 4 GB GTX 1650 Ti laptop with the same files and llama.cpp build: thinking off and on, two QAT 4-bit builds, with and without a drafter, on all 1,319 GSM8K problems and AIME 2025. Every score matched the 8 GB card within chance; the run took 1.63 times as long, and the drafter paid 1.37 to 1.39 times."
 tags: gemma, llm, benchmark, ai
