@@ -6,11 +6,11 @@ tags: gemma, llm, benchmark, ai
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-thinking-1650ti/devto-cover.bf86abbb.jpg
 ---
 
-A 4 GB laptop card gives the same answers as an 8 GB desktop card, at 1.63 times the time. On grade-school math, thinking doubles the time and leaves the score where it was.
+A 4 GB laptop card gives the same answers as an 8 GB desktop card, at 1.63 times the time. On grade-school math, thinking doubles the time and moves no score beyond chance.
 
-The same 16 settings that ran on an 8 GB RTX 3050 ran on a GTX 1650 Ti Max-Q, through the same llama.cpp build and the same weight files. Every one scored within chance of the 3050: −11 to +12 GSM8K problems (smallest p = 0.1882) and −2 to +3 AIME problems (smallest p = 0.25). The reply text differs between the cards; the right-or-wrong verdicts match.
+The same 16 settings that ran on an 8 GB RTX 3050 ran on a GTX 1650 Ti Max-Q, through the same llama.cpp build and the same weight files. Every one scored within chance of the 3050: −11 to +12 GSM8K problems (smallest p = 0.1882) and −2 to +3 AIME problems (smallest p = 0.25). The reply text differs between the cards; the right-or-wrong verdict matches on 1,249 to 1,268 of the 1,319 GSM8K problems, and the problems that flip split close to evenly.
 
-Thinking on made GSM8K take 2.04 to 2.21 times as long and moved no score beyond chance. The drafter lifted generation 1.37 to 1.39 times for 192 MiB of card memory and changed no score. The exact Q4_0 repack scored level with Google's file, in 118 MiB less card memory and 8.2 to 9.8 percent faster.
+Thinking on made GSM8K take 2.04 to 2.21 times as long and moved no score beyond chance. The drafter lifted generation 1.37 to 1.39 times for 192 MiB of card memory and changed no score beyond chance. The exact Q4_0 repack scored level with Google's file, in 118 MiB less card memory and 8.2 to 9.8 percent faster.
 
 For a constrained card: serve E2B with the repack weights and the drafter at one drafted token, leave thinking off, and pick the card by how long you can wait. Each setting ran once, at temperature 0.
 
