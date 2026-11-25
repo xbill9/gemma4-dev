@@ -1,18 +1,20 @@
 ---
 title: "Gemma 4 Function Calls on an 8 GB RTX 3050: The Setting Matters More Than the Size"
 published: false
-description: "With the sampling settings Google ships and thinking off, Gemma 4 E4B answered 1 function-call request in 9 in prose instead of calling the tool. Turn thinking on and it was 1 in 100. With the setting right, E2B, E4B and the 12B were level on 840 BFCL problems."
+description: "On an 8 GB card, the setting decides function calling more than the model size does. With Google's sampling settings and thinking off, E4B answers 1 tool request in 9 in prose; with thinking on, 1 in 100. With the setting right, E2B, E4B and the 12B are level on 840 problems."
 tags: gemma, llm, benchmark, ai
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/devto-cover.4b3d91c1.jpg
 ---
 
-Serve Gemma 4 E4B with the sampling settings Google ships and thinking off, and 1 function-call request in 9 gets an answer in prose instead of a call to the tool. Turn thinking on and it is 1 in 100. Get that setting right and the size of the model stops mattering: E2B, E4B and the 12B were level on 840 function-call problems, so the smallest one does the job in a quarter of the 12B's time.
+On an 8 GB card, the setting decides function calling more than the model size does. With Google's sampling settings and thinking off, E4B answers 1 tool request in 9 in prose; with thinking on, 1 in 100. With the setting right, E2B, E4B and the 12B are level on 840 problems, and E2B does the job in a quarter of the 12B's time.
+
+Thinking off under Google's settings cost E4B 60 problems (p = 1.1e-8) and E2B 46; thinking on won them back. At temperature 0 with thinking off the three scored 748, 758 and 756 of 840; with Google's settings and thinking on, 751, 761 and 751; no step up in size is beyond chance. The 12B gets more single calls right and calls a tool more often when none fits, and overall is level with E4B (p = 0.904).
+
+If your client sends temperature 0, serve E2B with thinking off. If it runs Google's settings, turn thinking on, on E4B or E2B. Never combine Google's settings with thinking off, and never run the 12B with thinking on at temperature 0. Each setting ran once.
 
 This article provides a step by step comparison of function calling with three Gemma 4 models on one local GPU: E2B, E4B and 12B, each as a 4-bit QAT build on an 8 GB RTX 3050 through llama.cpp. Each model answered 840 problems from the Berkeley Function Calling Leaderboard four ways: at temperature 0 and with Google's sampling settings, each with thinking off and on.
 
 https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-function-calls-3050
-
-The short version: if your client sends temperature 0, serve E2B with thinking off. If it runs Google's settings, turn thinking on, on E4B or E2B. Never combine Google's settings with thinking off, and never run the 12B with thinking on at temperature 0.
 
 ---
 
