@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Gemma 4 Function Calls on an 8 GB RTX 3050: The Setting Matters More Than the Size</title>
+  <meta name="description" content="On an 8 GB card, the setting decides function calling more than the model size does. With Google&#x27;s sampling settings and thinking off, E4B answers 1 tool request in 9 in prose; with thinking on, 1 in 100. With the setting right, E2B, E4B and the 12B are level on 840 problems." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>On an 8 GB card, the setting decides function calling more than the
+model size does. With Google's sampling settings and thinking off, E4B
+answers 1 tool request in 9 in prose; with thinking on, 1 in 100. With
+the setting right, E2B, E4B and the 12B are level on 840 problems, and
+E2B does the job in a quarter of the 12B's time.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-cover.4b3d91c1.jpg" alt="Gemma 4 Function Calls on an 8 GB RTX 3050: The Setting Matters More Than the Size" /></figure>
+<p>Thinking off under Google's settings cost E4B 60 problems (p =
+1.1e-8) and E2B 46; thinking on won them back. At temperature 0 with
+thinking off the three scored 748, 758 and 756 of 840; with Google's
+settings and thinking on, 751, 761 and 751; no step up in size is beyond
+chance. The 12B gets more single calls right and calls a tool more often
+when none fits, and overall is level with E4B (p = 0.904).</p>
+<p>If your client sends temperature 0, serve E2B with thinking off. If
+it runs Google's settings, turn thinking on, on E4B or E2B. Never
+combine Google's settings with thinking off, and never run the 12B with
+thinking on at temperature 0. Each setting ran once.</p>
+<p>This article provides a step by step comparison of function calling
+with three Gemma 4 models on one local GPU: E2B, E4B and 12B, each as a
+4-bit QAT build on an 8 GB RTX 3050 through llama.cpp. Each model
+answered 840 problems from the Berkeley Function Calling Leaderboard
+four ways: at temperature 0 and with Google's sampling settings, each
+with thinking off and on.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-function-calls-3050">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-function-calls-3050</a></p>
+<hr />
+<h4 id="the-decision-flow">The Decision Flow</h4>
+<p>Answer one question, and avoid two combinations.</p>
+<p><img
+src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/decision-flow.e9417e9d.jpg"
+alt="Decision flow: if your client can send temperature 0, use E2B with thinking off; otherwise E4B or E2B with thinking on and Google&#39;s sampling settings; never thinking off with Google&#39;s sampling settings; never the 12B with thinking on at temperature 0" /></p>
+<ol type="1">
+<li><strong>Can your client send temperature 0?</strong> Use <strong>E2B
+with thinking off</strong>: 748 of 840 right in 0.84 seconds per
+problem. E4B (758) and the 12B (756) are level with it on a paired test
+(p = 0.26 and p = 0.416) and take 1.98 and 4.23 times as long.</li>
+<li><strong>Otherwise</strong>, with Google's settings, use <strong>E4B
+or E2B with thinking on</strong>: 761 and 751 of 840, level with each
+other (p = 0.275); E4B takes 1.33 times as long.</li>
+<li><strong>Never thinking off with Google's settings.</strong> E4B
+drops to 698, beyond chance below its own 758 at temperature 0 (p =
+1.1e-8).</li>
+<li><strong>Never the 12B with thinking on at temperature 0.</strong> It
+drops to 735 against 756 with thinking off (p = 0.0154), and 19 of its
+replies ran to the 8,192-token limit.</li>
+</ol>
+<hr />
+<h4 id="the-findings">The Findings</h4>
+<p><strong>With Google's settings and thinking off, the small models
+skip the call.</strong> On the 600 problems where one of the offered
+tools fits, E4B made no call in 66 replies, against 22 at temperature 0.
+It answered "3 to the power of 4" itself instead of calling
+<code>math_power</code>, and asked for a growth rate the question left
+to the tool's default. At temperature 0 E4B called the tool correctly on
+each of those problems. E2B went from 11 replies with no call to 39.</p>
+<p><strong>Thinking switched off, E4B thinks anyway.</strong> With
+Google's settings and thinking off, 496 of E4B's 840 replies and 138 of
+E2B's carried thinking text; the 12B's carried none. The thinking helps:
+E4B was right on 456 of the 496 replies that thought and 242 of the 344
+that did not. At temperature 0 no reply with thinking off carried
+any.</p>
+<p><strong>Thinking on fixes it.</strong> With Google's settings,
+thinking on against off: E4B +97 / −34 (p = 3.32e-8), E2B +81 / −32 (p =
+4.55e-6). E4B's replies with no call fell from 66 to 6.</p>
+<p><strong>Get the setting right and size stops mattering.</strong> At
+temperature 0 with thinking off: 748, 758 and 756 of 840. With Google's
+settings and thinking on: 751, 761 and 751. No step up in size is beyond
+chance at either setting.</p>
+<p><strong>The 12B calls tools it should not.</strong> At temperature 0
+with thinking off, the 12B beats E4B on single calls (+24 / −9, p =
+0.0135) and loses on requests no tool fits, where the right reply is no
+call (+2 / −18, p = 0.000402). Overall the two are level (+33 / −35, p =
+0.904). An earlier article on this card scored only single calls and
+picked the 12B for function calls; with all three kinds it holds no
+lead.</p>
+<p><strong>What to do with it.</strong></p>
+<ul>
+<li>🟢 At temperature 0, E2B with thinking off is level with the larger
+two at 0.24 to 0.50 times their time.</li>
+<li>🟢 With Google's settings, thinking on puts E2B and E4B back level
+with the best scores here.</li>
+<li>❌ Google's settings with thinking off cost E2B and E4B 46 and 60
+problems of 840.</li>
+</ul>
+<hr />
+<h4 id="what-was-measured">What Was Measured</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-1.png"
+alt="Table: E2B, E4B, 12B" /></p>
+<p>Each model answered three categories of BFCL v3, 840 problems in all,
+in four settings: temperature 0 and Google's settings (temperature 1.0,
+top-k 64, top-p 0.95, from each model's
+<code>generation_config.json</code>), each with thinking off and on.
+That is 36 runs and 10,080 replies, one request at a time, no drafter,
+with an 8,192-token limit on each reply, thinking included.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA card with 8 GB, here an RTX 3050 OEM on driver
+615.78.08</li>
+<li>llama.cpp built with CUDA, here commit <code>d1044bc82</code></li>
+<li>Python 3</li>
+<li>A clone of <a
+href="https://github.com/xbill9/gemma4-dev">gemma4-dev</a></li>
+</ul>
+<hr />
+<h4 id="step-1--three-kinds-of-function-call">Step 1 — Three Kinds of
+Function Call</h4>
+<p>Every problem offers the model one or more tools through the OpenAI
+<code>tools</code> field and lets it choose:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-2.png"
+alt="Table: Category, Problems, Tools offered, Right reply" /></p>
+<p>Arguments are checked as BFCL's own checker does: required parameters
+present, nothing outside the schema, and each value among the accepted
+ones. The scorer is plain code, so the model never grades itself.</p>
+<hr />
+<h4 id="step-2--temperature-0-thinking-off">Step 2 — Temperature 0,
+Thinking Off</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-3.png"
+alt="Table: E2B, E4B, 12B" /></p>
+<p>The simple scores repeat October runs on this card: 369 and 365
+exactly, and 380 for the 12B against 379. Paired over all 840 problems,
+E4B against E2B is +37 / −27 (p = 0.26) and the 12B against E2B +41 /
+−33 (p = 0.416).</p>
+<hr />
+<h4 id="step-3--googles-settings-thinking-off">Step 3 — Google's
+Settings, Thinking Off</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-4.png"
+alt="Table: E2B, E4B, 12B" /></p>
+<p>All three lose problems; E2B and E4B lose most, and most of what they
+lose is the call itself. The same four E4B problems, two ways:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-5.png"
+alt="Table: Problem, Temperature 0, Google&#39;s settings" /></p>
+<p>On the irrelevance problems Google's settings push the other way too:
+E2B called a tool that fits nothing in 63 of 240 replies against 41, E4B
+in 45 against 31.</p>
+<hr />
+<h4 id="step-4--thinking-on">Step 4 — Thinking On</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-6.png"
+alt="Table: All 840, E2B, E4B, 12B" /></p>
+<p>With Google's settings, thinking on recovers what thinking off lost
+on E2B and E4B. At temperature 0 it changes nothing beyond chance on E2B
+and E4B and costs the 12B 21 problems: on irrelevance it called a tool
+in 62 of 240 replies, and 19 of them ran to the 8,192-token limit.</p>
+<p>E4B's best score, 770 at temperature 0 with thinking on, is level
+with its 761 under Google's settings (+33 / −24, p = 0.289) at twice the
+time. With Google's settings and thinking on, E4B thought in only 290 of
+its 840 replies and still got 488 of the other 550 right.</p>
+<hr />
+<h4 id="step-5--bigger-model-different-mistakes">Step 5 — Bigger Model,
+Different Mistakes</h4>
+<p>Paired by category, the 12B against E4B:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-7.png"
+alt="Table: Simple, Multiple, Irrelevance, All 840" /></p>
+<p>The 12B gets more single calls right and calls a tool more often when
+none fits: 47 of 240 at temperature 0 with thinking off, against E4B's
+31. The two errors cancel. If every request your application sends has a
+tool that fits, the 12B's lead is small: on the 600 problems where a
+tool fits, the 12B at temperature 0 with thinking off scored 563 against
+549 for E4B at the same setting (+31 / −17, p = 0.0595) and 551 for E4B
+with Google's settings and thinking on (+29 / −17, p = 0.104), both
+within chance.</p>
+<hr />
+<h4 id="step-6--time">Step 6 — Time</h4>
+<p>Hours for all 840 problems, one request at a time:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-8.png"
+alt="Table: E2B, E4B, 12B" /></p>
+<p>E4B with thinking on and Google's settings takes the same time as the
+12B with thinking off at temperature 0 (1.00x) for a level score (+36 /
+−31, p = 0.625), and 0.30 times the 12B's time at the same setting.</p>
+<hr />
+<h4 id="mag_right-tip-count-the-replies-that-skip-the-tool">🔎 Tip:
+Count the Replies That Skip the Tool</h4>
+<p>A score hides why replies are wrong. Count the replies that should
+have called a tool and did not: with Google's settings and thinking off,
+E4B's count went from 22 to 66 of 600 while its score fell by 60. If
+your agent's tool calls drop after a change to sampling, check whether
+thinking is off before you blame the model.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-function-calls-3050/medium/img/devto-gemma4-function-calls-3050-table-9.png"
+alt="Table: E2B, E4B, 12B" /></p>
+<p><strong>Pros and cons</strong></p>
+<ul>
+<li><strong>E2B.</strong> 🟢 Level with the larger two at either good
+setting, in the least time and memory. ❌ With Google's settings and
+thinking off it loses 46 problems.</li>
+<li><strong>E4B.</strong> 🟢 The highest score at both good settings,
+within chance of the others. 🟢 With thinking on and Google's settings,
+6 replies of 600 with no call. ❌ With Google's settings and thinking
+off it loses 60 problems, most of them by answering in prose.</li>
+<li><strong>12B.</strong> 🟢 The steadiest under Google's settings with
+thinking off, and the most single calls right. ❌ Calls a tool most
+often when none fits. ❌ Thinking on at temperature 0 costs it 21
+problems. ❌ 4.23 times E2B's time.</li>
+</ul>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p><strong>Temperature 0: E2B with thinking off.</strong> It is level
+with E4B and the 12B and takes 0.84 seconds per problem in 3,610
+MiB.</p>
+<p><strong>Google's settings: E4B or E2B with thinking on.</strong> E4B
+scored 761 and E2B 751, level; take E2B for time and E4B if the same
+server also handles math, where an earlier run on this card put E4B
+ahead.</p>
+<p><strong>The 12B only if every request has a tool that fits,</strong>
+and then at temperature 0 with thinking off. It leads E4B on single
+calls (p = 0.0135) and is within chance of it on all 600 problems where
+a tool fits (p = 0.0595); its extra calls when nothing fits cancel the
+lead on a mixed load.</p>
+<p><strong>Thinking: match it to the sampling.</strong> With Google's
+settings, thinking on. At temperature 0, off.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find which Gemma 4 model and setting
+to serve for function calls on one 8 GB card. The key to the solution
+was scoring all three sizes on the same 840 problems in four settings,
+so every comparison is paired problem by problem. The results were:</p>
+<ul>
+<li>❌ With Google's sampling settings and thinking off, E4B answered 66
+of 600 tool requests in prose and lost 60 problems against temperature 0
+(p = 1.1e-8); E2B lost 46.</li>
+<li>🟢 Thinking on with Google's settings recovered them: E4B +97 / −34,
+6 of 600 with no call.</li>
+<li>🟢 At each good setting the three sizes were level: 748, 758, 756 at
+temperature 0 with thinking off; 751, 761, 751 with Google's settings
+and thinking on.</li>
+<li>⚠️ The 12B wins single calls and loses on requests no tool fits;
+overall level with E4B (p = 0.904).</li>
+<li>❌ The 12B with thinking on at temperature 0 lost 21 problems, and
+19 replies ran to the token limit.</li>
+<li>🟢 E2B at temperature 0 with thinking off took 0.84 seconds per
+problem, 0.24 times the 12B's time.</li>
+</ul>
+<p>Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp
+<code>d1044bc82</code>, exact Q4_0 repacks of Google's QAT weights, one
+run of each setting with seed 1 for Google's settings, one request at a
+time, no drafter, an 8,192-token reply limit, 2026-11-23 to 24. BFCL v3
+simple (400), multiple (200) and irrelevance (240), single-turn; the
+parallel categories and multi-turn conversations are untested. Function
+calls ran through llama.cpp's Gemma 4 tool-call parsing; other servers
+parse calls their own way. Times move with clock and temperature. The
+article reports 24 paired tests; corrected for that number (Holm), the
+losses from thinking off under Google's settings and the 12B's extra
+calls when no tool fits still hold, and the 12B's single-call lead and
+its drop with thinking on at temperature 0 do not. "Level" means no gap
+beyond chance: with one run of 840 problems near 90 percent, a gap
+smaller than about 2.9 to 4.1 percentage points does not show.</p>
+<p>The strategy for choosing a Gemma 4 model and setting for function
+calls on a small GPU was validated with an incremental step by step
+approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-function-calls-3050/evidence">This
+article's evidence: scripts and outputs</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-11-23-functions-e2b-e4b-12b-3050oem">The
+run: replies, logs and results</a></li>
+<li><a
+href="https://dev.to/gde/e2b-e4b-or-12b-on-an-8-gb-rtx-3050-serve-gemma-4-e4b-1eji">E2B,
+E4B or 12B? On an 8 GB RTX 3050, Serve Gemma 4 E4B</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/benchmarks/gen-eval">The
+scoring script</a></li>
+<li><a
+href="https://huggingface.co/datasets/gorilla-llm/Berkeley-Function-Calling-Leaderboard">Berkeley
+Function Calling Leaderboard dataset</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-12B-it-qat-q4_0-exact-gguf">Exact
+Q4_0 repack of Gemma 4 12B QAT</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
