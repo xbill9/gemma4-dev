@@ -1,16 +1,16 @@
 ---
-title: "Benchmarking Gemma4 E2B with Long Contexts"
+title: "Benchmarking Gemma 4 E2B with Long Contexts"
 published: false
-description: "Gemma 4 E2B loads a 128k-token document on an 8 GB RTX 3050 in 3.8 GB, but as it serves by default it found 52 of 80 hidden facts at 16k tokens and 14 at 32k. Thinking on with Google's sampling settings found 38 at 32k and 34 at 64k. Keep E2B's document under 16k tokens, or turn thinking on."
+description: "Gemma 4 E2B loses most of a long document: as served on an 8 GB RTX 3050 it found 52 of 80 hidden facts at 16k tokens and 14 at 32k. Thinking on helps and still leaves it short. Keep its documents under 16k tokens, or use the 12B."
 tags: gemma, llm, benchmark, ai
 cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/devto-cover.ef55dd33.jpg
 ---
 
-Gemma 4 E2B loads a 128k-token document on an 8 GB RTX 3050 in 3.8 GB and reads it in under two minutes. What it finds there depends on the length. At temperature 0 with thinking off, the way the rig serves it, E2B found 52 of 80 hidden facts in a 16k-token document, 14 at 32k and 7 at 64k.
+Gemma 4 E2B loses most of a long document. On an 8 GB RTX 3050 it loads 128k tokens in 3.8 GB, but as served it found 52 of 80 hidden facts at 16k tokens, then 14 at 32k, 7 at 64k and 4 at 98k. Thinking on helps and still leaves it short: 34 of 80 at 64k and 13 at 98k.
 
-Thinking on with Google's sampling settings finds more: 38 of 80 at 32k and 34 at 64k, and on a harder task that joins two facts, 42 and 32 against 14 and 1. Over 16k to 98k tokens it found 264 facts of 640 against 124, ahead in 55 trials and behind in 9 (p = 3.54e-9). Google's sampling with thinking off found no more than temperature 0, and the drafter changed nothing beyond chance.
+Thinking on with Google's sampling settings found 264 facts of 640 against 124 over 16k to 98k tokens, ahead in 55 trials and behind in 9 (p = 3.54e-9), at 5 to 11 seconds more per request. Google's sampling with thinking off, the drafter and a q8_0 cache changed nothing beyond chance. The 12B, on the same card in an earlier run of the same recall test, found 48 to 59 of 80 from 32k to 127k.
 
-On a small card, give E2B only the part of the document that matters, under 16k tokens, or turn thinking on and pay 5 to 11 seconds more per request. On an 8 GB card the 12B also fits with a 131k-token context, and an earlier run of the same recall test found 48 to 59 of 80 facts there from 32k to 127k.
+Keep E2B's documents under 16k tokens. For anything longer, use the 12B where the card fits it, or turn thinking on and expect E2B to miss more than half of the facts beyond 32k. One run of each setting, ten trials per length and task.
 
 This article provides a step by step test of Gemma 4 E2B with a long document on one local GPU: a 4-bit QAT build on an 8 GB RTX 3050 through llama.cpp. Facts were hidden in a technical manual cut to five lengths from 16k to 127k tokens, and E2B was asked to find them in six server settings, 580 requests in all.
 
