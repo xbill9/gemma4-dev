@@ -1,0 +1,162 @@
+run /home/xbill/gemma4-dev/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-11-25-longctx-e2b-3050oem
+replies 580; arms f16-draft, f16-none, q8-draft, q4-draft, f16-sampled-off, f16-sampled-on; depths [16384, 32768, 64000, 98304, 126976]
+prompt tokens actually sent, by depth (min-max): 16384: 16558-16624; 32768: 32940-33009; 64000: 64172-64241; 98304: 98478-98546; 126976: 127149-127210
+
+== Facts right of 80 per cell (10 trials x 8 facts), Wilson 95% range
+-- recall
+  f16-draft: 16384: 52/80 (0.54-0.75); 32768: 14/80 (0.11-0.27); 64000: 7/80 (0.04-0.17); 98304: 4/80 (0.02-0.12); 126976: 11/80 (0.08-0.23)
+  f16-none: 16384: 49/80 (0.50-0.71); 32768: 20/80 (0.17-0.35); 64000: 11/80 (0.08-0.23); 98304: 5/80 (0.03-0.14); 126976: 8/80 (0.05-0.19)
+  q8-draft: 16384: 52/80 (0.54-0.75); 32768: 14/80 (0.11-0.27); 64000: 6/80 (0.03-0.15); 98304: 4/80 (0.02-0.12); 126976: 3/80 (0.01-0.10)
+  q4-draft: 16384: 36/80 (0.35-0.56); 32768: 17/80 (0.14-0.31); 64000: 9/80 (0.06-0.20); 98304: 4/80 (0.02-0.12); 126976: 1/80 (0.00-0.07)
+  f16-sampled-off: 16384: 51/80 (0.53-0.73); 32768: 32/80 (0.30-0.51); 64000: 10/80 (0.07-0.22); 98304: 3/80 (0.01-0.10); 126976: 10/80 (0.07-0.22)
+  f16-sampled-on: 16384: 53/80 (0.55-0.76); 32768: 38/80 (0.37-0.58); 64000: 34/80 (0.32-0.53); 98304: 13/80 (0.10-0.26); -
+  f16-draft recall 16,384-98,304: 77 of 320 = 0.241 (0.197-0.290)
+  f16-none recall 16,384-98,304: 85 of 320 = 0.266 (0.220-0.317)
+  q8-draft recall 16,384-98,304: 76 of 320 = 0.237 (0.194-0.287)
+  q4-draft recall 16,384-98,304: 66 of 320 = 0.206 (0.166-0.254)
+  f16-sampled-off recall 16,384-98,304: 96 of 320 = 0.300 (0.252-0.352)
+  f16-sampled-on recall 16,384-98,304: 138 of 320 = 0.431 (0.378-0.486)
+-- link
+  f16-draft: 16384: 21/80 (0.18-0.37); 32768: 14/80 (0.11-0.27); 64000: 1/80 (0.00-0.07); 98304: 11/80 (0.08-0.23); 126976: 3/80 (0.01-0.10)
+  f16-none: 16384: 19/80 (0.16-0.34); 32768: 13/80 (0.10-0.26); 64000: 1/80 (0.00-0.07); 98304: 12/80 (0.09-0.24); 126976: 2/80 (0.01-0.09)
+  q8-draft: 16384: 20/80 (0.17-0.35); 32768: 11/80 (0.08-0.23); 64000: 5/80 (0.03-0.14); 98304: 13/80 (0.10-0.26); 126976: 3/80 (0.01-0.10)
+  q4-draft: 16384: 15/80 (0.12-0.29); 32768: 2/80 (0.01-0.09); 64000: 1/80 (0.00-0.07); 98304: 6/80 (0.03-0.15); 126976: 0/80 (0.00-0.05)
+  f16-sampled-off: 16384: 12/80 (0.09-0.24); 32768: 12/80 (0.09-0.24); 64000: 3/80 (0.01-0.10); 98304: 9/80 (0.06-0.20); 126976: 7/80 (0.04-0.17)
+  f16-sampled-on: 16384: 32/80 (0.30-0.51); 32768: 42/80 (0.42-0.63); 64000: 32/80 (0.30-0.51); 98304: 20/80 (0.17-0.35); -
+  f16-draft link 16,384-98,304: 47 of 320 = 0.147 (0.112-0.190)
+  f16-none link 16,384-98,304: 45 of 320 = 0.141 (0.107-0.183)
+  q8-draft link 16,384-98,304: 49 of 320 = 0.153 (0.118-0.197)
+  q4-draft link 16,384-98,304: 24 of 320 = 0.075 (0.051-0.109)
+  f16-sampled-off link 16,384-98,304: 36 of 320 = 0.113 (0.082-0.152)
+  f16-sampled-on link 16,384-98,304: 126 of 320 = 0.394 (0.342-0.448)
+
+== Paired tests against f16-draft (the rig's serving setting), depths 16,384-98,304, both tasks
+   per fact: +only this arm right / -only f16-draft right, exact McNemar; per trial: trials this arm found more / fewer facts, exact sign test
+  f16-none vs f16-draft: facts +22 / -16 p=0.418; trials +8 / -7 p=1
+  q8-draft vs f16-draft: facts +15 / -14 p=1; trials +7 / -7 p=1
+  q4-draft vs f16-draft: facts +19 / -53 p=7.56e-05; trials +7 / -17 p=0.0639
+  f16-sampled-off vs f16-draft: facts +40 / -32 p=0.41; trials +13 / -13 p=1
+  f16-sampled-on vs f16-draft: facts +173 / -33 p=4.18e-24; trials +55 / -9 p=3.54e-09
+  q8-draft vs f16-draft, all five depths: facts +17 / -24 p=0.349; trials +8 / -9 p=1
+  q4-draft vs f16-draft, all five depths: facts +19 / -66 p=3.04e-07; trials +7 / -22 p=0.00813
+  thinking on vs off, both sampled: facts +165 / -33 p=2.61e-22; trials +50 / -13 p=3.02e-06
+  sampled vs temperature 0, both no drafter, thinking off, all depths: facts +50 / -41 p=0.402; trials +21 / -18 p=0.749
+  sampled+thinking vs temperature 0, both no drafter: facts +173 / -39 p=2.45e-21; trials +56 / -10 p=6.90e-09
+  no drafter vs drafter, temperature 0, all depths: facts +24 / -22 p=0.883; trials +9 / -9 p=1
+  sampled+thinking vs f16-draft, recall only: facts +75 / -14 p=3.01e-11; trials +27 / -4 p=3.40e-05
+  sampled+thinking vs f16-draft, link only: facts +98 / -19 p=5.14e-14; trials +28 / -5 p=6.62e-05
+
+  Holm correction over the trial-level tests above:
+    f16-sampled-on vs f16-draft: p=3.54e-09 Holm 4.60e-08 holds
+    sampled+thinking vs temperature 0, both no drafter: p=6.90e-09 Holm 8.28e-08 holds
+    thinking on vs off, both sampled: p=3.02e-06 Holm 3.32e-05 holds
+    sampled+thinking vs f16-draft, recall only: p=3.40e-05 Holm 3.40e-04 holds
+    sampled+thinking vs f16-draft, link only: p=6.62e-05 Holm 5.96e-04 holds
+    q4-draft vs f16-draft, all five depths: p=0.00813 Holm 0.065 does not hold
+    q4-draft vs f16-draft: p=0.0639 Holm 0.447 does not hold
+    sampled vs temperature 0, both no drafter, thinking off, all depths: p=0.749 Holm 1 does not hold
+    f16-none vs f16-draft: p=1 Holm 1 does not hold
+    q8-draft vs f16-draft: p=1 Holm 1 does not hold
+    f16-sampled-off vs f16-draft: p=1 Holm 1 does not hold
+    q8-draft vs f16-draft, all five depths: p=1 Holm 1 does not hold
+    no drafter vs drafter, temperature 0, all depths: p=1 Holm 1 does not hold
+
+== What the missed facts were: per fact, right / other fact from the same document / invented / missing
+  f16-draft recall (all depths, 400 facts): right 88, other fact 0, invented 0, missing 312
+  f16-draft link (all depths, 400 facts): right 50, other fact 35, invented 41, missing 274
+  f16-none recall (all depths, 400 facts): right 93, other fact 0, invented 0, missing 307
+  f16-none link (all depths, 400 facts): right 47, other fact 29, invented 57, missing 267
+  q8-draft recall (all depths, 400 facts): right 79, other fact 0, invented 0, missing 321
+  q8-draft link (all depths, 400 facts): right 52, other fact 28, invented 55, missing 265
+  q4-draft recall (all depths, 400 facts): right 67, other fact 0, invented 0, missing 333
+  q4-draft link (all depths, 400 facts): right 24, other fact 21, invented 31, missing 324
+  f16-sampled-off recall (all depths, 400 facts): right 106, other fact 0, invented 0, missing 294
+  f16-sampled-off link (all depths, 400 facts): right 43, other fact 34, invented 43, missing 280
+  f16-sampled-on recall (all depths, 320 facts): right 138, other fact 0, invented 0, missing 182
+  f16-sampled-on link (all depths, 320 facts): right 126, other fact 30, invented 2, missing 162
+
+== Replies that ran to the reply limit (256 tokens; 16,384 with thinking)
+  f16-draft: 28 of 100 cut off (by depth 16384: 0, 32768: 11, 64000: 11, 98304: 4, 126976: 2); facts right in them 0; naming none of the trial's 8 projects 27; one key line 5+ times 15
+  f16-none: 24 of 100 cut off (by depth 16384: 1, 32768: 10, 64000: 6, 98304: 4, 126976: 3); facts right in them 0; naming none of the trial's 8 projects 22; one key line 5+ times 7
+  q8-draft: 29 of 100 cut off (by depth 16384: 0, 32768: 10, 64000: 10, 98304: 3, 126976: 6); facts right in them 1; naming none of the trial's 8 projects 27; one key line 5+ times 11
+  q4-draft: 36 of 100 cut off (by depth 16384: 1, 32768: 12, 64000: 15, 98304: 4, 126976: 4); facts right in them 0; naming none of the trial's 8 projects 36; one key line 5+ times 11
+  f16-sampled-off: 17 of 100 cut off (by depth 16384: 0, 32768: 5, 64000: 5, 98304: 2, 126976: 5); facts right in them 0; naming none of the trial's 8 projects 16; one key line 5+ times 1
+  f16-sampled-on: 0 of 80 cut off (by depth 16384: 0, 32768: 0, 64000: 0, 98304: 0, 126976: 0); facts right in them 0; naming none of the trial's 8 projects 0; one key line 5+ times 0
+  example, f16-draft recall 32768 trial 1: '```json\n{\n  "NVIDIA Accelerated Linux Graphics Driver README and Installation Guide": "N/A",\n  "NVIDIA Corporation": "N/A",\n  "Linux": "N/A",\n  "Fedora": "N/A",\n  "Red Hat": "N/A",\n  "SuSE": "N/A",\n  "Mandriva": "N/A",\n  "Intel": "N/A",\n  "OpenGL": "N/A",\n  "PCI Express": "N/A",\n  "Windows": "N/A",\n  "NVIDIA Corporation": "N/A",\n  "NVIDIA Corporation": "N/A",\n  "NVIDIA Corporation": "N/A",\n  "NVIDIA Corporation": "N/'
+  recall by third of the document, replies that ended on their own vs cut off, 16,384-98,304:
+    f16-draft ended: first 50/73, middle 22/63, last 5/64
+    f16-draft cut off: first 0/38, middle 0/45, last 0/37
+    f16-sampled-off ended: first 59/92, middle 26/91, last 11/81
+    f16-sampled-off cut off: first 0/19, middle 0/17, last 0/20
+
+== Where the fact sat in the document (recall, by third), facts right / facts
+  f16-draft (16,384-98,304): first third 50/111; middle third 22/108; last third 5/101
+  f16-none (16,384-98,304): first third 52/111; middle third 23/108; last third 10/101
+  q8-draft (16,384-98,304): first third 48/111; middle third 22/108; last third 6/101
+  q4-draft (16,384-98,304): first third 43/111; middle third 15/108; last third 8/101
+  f16-sampled-off (16,384-98,304): first third 59/111; middle third 26/108; last third 11/101
+  f16-sampled-on (16,384-98,304): first third 76/111; middle third 39/108; last third 23/101
+   link, by distance between the two sentences (fraction of the document), facts right / facts
+  f16-draft: under a quarter apart 23/128; a quarter to half 7/96; over half 17/96
+  f16-none: under a quarter apart 22/128; a quarter to half 8/96; over half 15/96
+  q8-draft: under a quarter apart 23/128; a quarter to half 9/96; over half 17/96
+  q4-draft: under a quarter apart 13/128; a quarter to half 3/96; over half 8/96
+  f16-sampled-off: under a quarter apart 23/128; a quarter to half 5/96; over half 8/96
+  f16-sampled-on: under a quarter apart 54/128; a quarter to half 34/96; over half 38/96
+
+== Time: reading the prompt (prompt cache off), generating, whole request; medians over the 20 requests per depth
+  f16-draft 16384: read 5.6 s at 2963 tok/s; generate 161.7 tok/s; reply 77 tok; request 6.2 s
+  f16-draft 32768: read 13.9 s at 2378 tok/s; generate 153.7 tok/s; reply 256 tok; request 15.6 s
+  f16-draft 64000: read 37.3 s at 1723 tok/s; generate 121.2 tok/s; reply 256 tok; request 39.6 s
+  f16-draft 98304: read 74.6 s at 1320 tok/s; generate 89.1 tok/s; reply 73 tok; request 76.2 s
+  f16-draft 126976: read 115.0 s at 1106 tok/s; generate 83.6 tok/s; reply 126 tok; request 117.2 s
+  f16-none 16384: read 5.4 s at 3096 tok/s; generate 96.2 tok/s; reply 84 tok; request 6.3 s
+  f16-none 32768: read 13.4 s at 2453 tok/s; generate 86.7 tok/s; reply 178 tok; request 15.6 s
+  f16-none 64000: read 36.4 s at 1764 tok/s; generate 72.8 tok/s; reply 104 tok; request 38.1 s
+  f16-none 98304: read 73.1 s at 1348 tok/s; generate 62.0 tok/s; reply 74 tok; request 74.8 s
+  f16-none 126976: read 113.0 s at 1125 tok/s; generate 55.2 tok/s; reply 98 tok; request 115.3 s
+  q8-draft 16384: read 5.8 s at 2863 tok/s; generate 130.6 tok/s; reply 82 tok; request 6.5 s
+  q8-draft 32768: read 14.3 s at 2303 tok/s; generate 115.6 tok/s; reply 200 tok; request 16.1 s
+  q8-draft 64000: read 38.4 s at 1674 tok/s; generate 81.1 tok/s; reply 191 tok; request 40.8 s
+  q8-draft 98304: read 76.6 s at 1286 tok/s; generate 57.4 tok/s; reply 68 tok; request 78.2 s
+  q8-draft 126976: read 118.1 s at 1077 tok/s; generate 51.6 tok/s; reply 142 tok; request 121.3 s
+  q4-draft 16384: read 5.8 s at 2866 tok/s; generate 130.9 tok/s; reply 92 tok; request 6.6 s
+  q4-draft 32768: read 14.3 s at 2303 tok/s; generate 109.9 tok/s; reply 256 tok; request 16.7 s
+  q4-draft 64000: read 38.4 s at 1672 tok/s; generate 79.1 tok/s; reply 256 tok; request 41.7 s
+  q4-draft 98304: read 76.7 s at 1285 tok/s; generate 56.1 tok/s; reply 85 tok; request 78.4 s
+  q4-draft 126976: read 118.2 s at 1076 tok/s; generate 48.9 tok/s; reply 140 tok; request 121.3 s
+  f16-sampled-off 16384: read 5.4 s at 3076 tok/s; generate 96.0 tok/s; reply 93 tok; request 6.4 s
+  f16-sampled-off 32768: read 13.4 s at 2451 tok/s; generate 86.6 tok/s; reply 120 tok; request 15.0 s
+  f16-sampled-off 64000: read 36.4 s at 1763 tok/s; generate 72.7 tok/s; reply 82 tok; request 37.9 s
+  f16-sampled-off 98304: read 73.1 s at 1347 tok/s; generate 62.0 tok/s; reply 74 tok; request 74.7 s
+  f16-sampled-off 126976: read 113.0 s at 1125 tok/s; generate 55.3 tok/s; reply 92 tok; request 115.3 s
+  f16-sampled-on 16384: read 5.4 s at 3075 tok/s; generate 96.5 tok/s; reply 704 tok; request 12.8 s
+  f16-sampled-on 32768: read 13.4 s at 2453 tok/s; generate 87.0 tok/s; reply 560 tok; request 20.0 s
+  f16-sampled-on 64000: read 36.4 s at 1764 tok/s; generate 73.1 tok/s; reply 712 tok; request 46.4 s
+  f16-sampled-on 98304: read 73.1 s at 1347 tok/s; generate 62.3 tok/s; reply 748 tok; request 85.6 s
+  f16-sampled-off 16,384-98,304: reply tokens median 88, max 256, cut off 12; thinking text in 0 of 80
+  f16-sampled-on 16,384-98,304: reply tokens median 626, max 2022, cut off 0; thinking text in 80 of 80
+  thinking adds at 16384: 6.3 s per request (12.8 against 6.4)
+  thinking adds at 32768: 5.0 s per request (20.0 against 15.0)
+  thinking adds at 64000: 8.6 s per request (46.4 against 37.9)
+  thinking adds at 98304: 10.9 s per request (85.6 against 74.7)
+  GPU memory and power at each arm's last request (temp, clock, memory, power): f16-draft: 66, 1882 MHz, 3827 MiB, 90.73 W; f16-none: 62, 1882 MHz, 3627 MiB, 91.72 W; q8-draft: 64, 1882 MHz, 3907 MiB, 90.38 W; q4-draft: 65, 1882 MHz, 3711 MiB, 93.03 W; f16-sampled-off: 64, 1882 MHz, 3627 MiB, 92.12 W; f16-sampled-on: 64, 1882 MHz, 3627 MiB, 92.75 W
+  f16-draft server: 2026-11-25 13:36:58 server up f16-draft: 3802 MiB
+  f16-none server: 2026-11-26 09:55:07 server up f16-none: 3610 MiB
+  q8-draft server: 2026-11-25 15:04:22 server up q8-draft: 3880 MiB
+  q4-draft server: 2026-11-25 16:33:11 server up q4-draft: 3684 MiB
+  f16-sampled-off server: 2026-11-25 18:02:28 server up f16-sampled-off: 3610 MiB
+  f16-sampled-on server: 2026-11-25 19:27:03 server up f16-sampled-on: 3610 MiB
+
+== 12B recall, 2026-10-17 (same document, same sentence design, its own seeds; greedy, prompt cache on, 8 codes x 10 trials)
+  12B f16-none: 16384: 69/80; 32768: 55/80
+  12B q4-draft: 32768: 58/80; 64000: 57/80
+  12B q4-none: 16384: 67/80; 32768: 58/80; 64000: 59/80; 98304: 48/80; 126976: 56/80
+  12B q8-none: 16384: 68/80; 32768: 58/80; 49152: 55/80; 64000: 57/80
+
+== Examples
+example link trial (32,768, trial 0): Project Ember is led by Mei Chen. Mei Chen works from the Cusco office.; Project Kestrel is led by Liam Byrne. Liam Byrne works from the Gdansk office.
+example recall trial (32,768, trial 0): The access code for project Cobalt is 858622.; The access code for project Lumen is 532344.; The access code for project Alder is 455157.
+reply f16-draft recall 32,768 trial 0 (3 of 8): '```json\n{\n  "Cobalt": "858622",\n  "Lumen": "532344",\n  "Alder": "455157"\n}\n```'
+reply f16-draft link 32,768 trial 0 (5 of 8): '```json\n{\n  "NVIDIA Accelerated Linux Graphics Driver README and Installation Guide": "Santa Clara, CA",\n  "Project Cobalt": "Osaka",\n  "Project Quartz": "Hanoi",\n  "Project Garnet": "Tunis",\n  "Project Ember": "Cusco",\n  "Project Kestrel": "Gdansk"\n}\n```'
+reply f16-sampled-on link 32,768 trial 0 (5 of 8): '```json\n{\n  "Project Cobalt": "Osaka",\n  "Project Tundra": "Lisbon",\n  "Project Kestrel": "Gdansk",\n  "Project Quartz": "Tunis",\n  "Project Garnet": "Tunis",\n  "Project Ember": "Cusco"\n}\n```'
