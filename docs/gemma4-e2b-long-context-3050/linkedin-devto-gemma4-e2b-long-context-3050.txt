@@ -1,0 +1,15 @@
+Benchmarking Gemma 4 E2B with Long Contexts
+
+Gemma 4 E2B loses most of a long document: as served on an 8 GB RTX 3050 it found 52 of 80 hidden facts at 16k tokens and 14 at 32k. Thinking on helps and still leaves it short. Keep its documents under 16k tokens, or use the 12B.
+
+What is in it:
+
+- ❌ As served, E2B found 52 of 80 codes at 16k tokens, 14 at 32k and 4 to 11 from 64k on.
+- ⚠️ It finds what is near the start: 50 of 73 codes in the first third, 5 of 64 in the last.
+- 🟢 It never gave a wrong code; a miss is a code left out.
+- 🟢 Thinking on with Google's sampling settings found 264 facts of 640 against 124 over 16k to 98k (p = 3.54e-9).
+
+dev.to (Google Developer Experts): https://dev.to/gde/benchmarking-gemma-4-e2b-with-long-contexts-1jb9
+Medium: https://medium.com/@xbill999/benchmarking-gemma-4-e2b-with-long-contexts-f8e3cefe4ea3
+Substack: https://xbill9.substack.com/p/benchmarking-gemma-4-e2b-with-long
+GitHub: https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-long-context-3050

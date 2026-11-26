@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Benchmarking Gemma 4 E2B with Long Contexts</title>
+  <meta name="description" content="Gemma 4 E2B loses most of a long document: as served on an 8 GB RTX 3050 it found 52 of 80 hidden facts at 16k tokens and 14 at 32k. Thinking on helps and still leaves it short. Keep its documents under 16k tokens, or use the 12B." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>Gemma 4 E2B loses most of a long document. On an 8 GB RTX 3050 it
+loads 128k tokens in 3.8 GB, but as served it found 52 of 80 hidden
+facts at 16k tokens, then 14 at 32k, 7 at 64k and 4 at 98k. Thinking on
+helps and still leaves it short: 34 of 80 at 64k and 13 at 98k.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-cover.ef55dd33.jpg" alt="Benchmarking Gemma 4 E2B with Long Contexts" /></figure>
+<p>Thinking on with Google's sampling settings found 264 facts of 640
+against 124 over 16k to 98k tokens, ahead in 55 trials and behind in 9
+(p = 3.54e-9), at 5 to 11 seconds more per request. Google's sampling
+with thinking off, the drafter and a q8_0 cache changed nothing beyond
+chance. The 12B, on the same card in an earlier run of the same recall
+test, found 48 to 59 of 80 from 32k to 127k.</p>
+<p>Keep E2B's documents under 16k tokens. For anything longer, use the
+12B where the card fits it, or turn thinking on and expect E2B to miss
+more than half of the facts beyond 32k. One run of each setting, ten
+trials per length and task.</p>
+<p>This article provides a step by step test of Gemma 4 E2B with a long
+document on one local GPU: a 4-bit QAT build on an 8 GB RTX 3050 through
+llama.cpp. Facts were hidden in a technical manual cut to five lengths
+from 16k to 127k tokens, and E2B was asked to find them in six server
+settings, 580 requests in all.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-long-context-3050">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-long-context-3050</a></p>
+<hr />
+<h4 id="the-findings">The Findings</h4>
+<p><strong>Past 16k tokens, E2B as served finds few facts.</strong> At
+temperature 0 with thinking off it found 52, 14, 7, 4 and 11 of 80 codes
+at 16k, 32k, 64k, 98k and 127k tokens. The 12B, in an earlier run of the
+same test, found 67, 58, 59, 48 and 56.</p>
+<p><strong>It finds what is near the start.</strong> In replies that
+ended on their own, E2B found 50 of 73 codes placed in the first third
+of the document, 22 of 63 in the middle third and 5 of 64 in the last
+third.</p>
+<p><strong>A miss is a fact left out.</strong> In no setting did E2B
+give a wrong code: every recall miss was a code missing from its
+list.</p>
+<p><strong>Some replies list the manual instead.</strong> 28 of 100
+replies ran to the 256-token reply limit, none at 16k. 27 of them named
+none of the hidden projects: they listed names from the manual itself,
+"NVIDIA Corporation", "Fedora", "OpenGL", each with "N/A", and 15
+repeated one line five times or more.</p>
+<p><strong>Thinking on with Google's sampling settings found about twice
+as many.</strong> 138 against 77 codes and 126 against 47 links over 16k
+to 98k tokens, with no reply at its limit. Sampling with thinking off
+was level with temperature 0, so the gain comes with thinking.</p>
+<p><strong>Keep the f16 cache.</strong> q8_0 was level with f16: 131
+facts against 138, 8 trials ahead and 9 behind. q4_0 found fewer, though
+not beyond chance once every comparison here is counted. Both generate
+slower with the drafter at 127k: 51.6 and 48.9 tokens per second against
+83.6.</p>
+<p><strong>Reading the document is the wait.</strong> 5.6 seconds for
+16k tokens and 115 seconds for 127k, before the first word of the
+reply.</p>
+<p><strong>What to do with it.</strong></p>
+<ul>
+<li>🟢 Under 16k tokens, E2B as served finds most facts and answers in
+about 6 seconds.</li>
+<li>🟢 Longer than that, turn thinking on with Google's sampling
+settings.</li>
+<li>❌ Beyond 64k tokens even that finds fewer than one fact in five on
+recall. On an 8 GB card, load the 12B for long documents.</li>
+</ul>
+<hr />
+<h4 id="what-was-measured">What Was Measured</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-1.png"
+alt="Table: Model, Card, Server, Context" /></p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA card with 8 GB, here an RTX 3050 OEM</li>
+<li>llama.cpp built with CUDA, here commit <code>7182ef71e</code></li>
+<li>Python 3</li>
+<li>A clone of <a
+href="https://github.com/xbill9/gemma4-dev">gemma4-dev</a></li>
+</ul>
+<hr />
+<h4 id="step-1--the-test">Step 1 — The Test</h4>
+<p>The document is the NVIDIA Linux driver README, a long technical
+manual, tokenized and cut to each length. Into it go short sentences at
+line breaks spread evenly through the text, with random names and
+numbers drawn from a fixed seed, so every setting sees the same
+documents.</p>
+<p><strong>Recall</strong> hides eight sentences such as:</p>
+<blockquote>
+<p>The access code for project Cobalt is 858622.</p>
+<p>The access code for project Lumen is 532344.</p>
+</blockquote>
+<p>and asks: <em>"List the access code of every project mentioned in the
+document above, as a JSON object mapping project name to code. Output
+only the JSON."</em></p>
+<p><strong>Linking</strong> hides sixteen sentences, two per project, in
+shuffled places, so the two halves of each answer sit apart:</p>
+<blockquote>
+<p>Project Ember is led by Mei Chen.</p>
+<p>Mei Chen works from the Cusco office.</p>
+</blockquote>
+<p>and asks for each project's office city. To answer, the model has to
+find the project, find its lead, then find the lead's office.</p>
+<p>A reply is scored by code: the JSON is read, and each of the 8 codes
+or cities counts as right only if it matches exactly. A trial scores 0
+to 8, and each length gives 10 trials of 8 facts, 80 in all.</p>
+<p>The test is the one an earlier 12B run on this card used, with the
+same document and the same recall sentences, so its numbers can sit
+beside these.</p>
+<p>The prompt cache is off for every request, so each one reads its
+whole document, and the time to read it is measured every time.</p>
+<hr />
+<h4 id="step-2--six-settings">Step 2 — Six Settings</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-2.png"
+alt="Table: Setting, Cache, Drafter, Sampling, Thinking" /></p>
+<p>"As served" is how the E2B rig on this card runs. Google's sampling
+settings come from the model's own <code>generation_config.json</code>,
+with the trial number as the seed.</p>
+<p>Replies are capped at 256 tokens, enough for eight JSON entries, and
+at 16,384 with thinking on. With thinking on, the 127k length leaves too
+little room in the context for the thinking, so that setting stops at
+98k.</p>
+<hr />
+<h4 id="step-3--recall-by-length">Step 3 — Recall by Length</h4>
+<p>Codes found, of 80:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-3.png"
+alt="Table: Length, 16k, 32k, 64k, 98k, 127k" /></p>
+<p>At 16k all four E2B settings find about two codes in three. From 64k
+on, the settings without thinking find at most 11 of 80; thinking on
+still finds 34 at 64k.</p>
+<p>The 12B row comes from an earlier run on this card: the same document
+and sentence design with its own random draws, temperature 0, the prompt
+cache on and recall only. It is the same test on different trials, so it
+shows the size of the gap; the tests in Step 6 pair E2B settings
+only.</p>
+<hr />
+<h4 id="step-4--linking-two-facts">Step 4 — Linking Two Facts</h4>
+<p>Cities found, of 80:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-4.png"
+alt="Table: Length, 16k, 32k, 64k, 98k, 127k" /></p>
+<p>Linking is harder than recall at every length: as served, E2B joined
+21 of 80 at 16k, where it recalled 52 codes. Thinking on finds 42 of 80
+at 32k, three times as many as the settings without it.</p>
+<p>Thinking also changes the kind of mistake. As served, of 400 cities
+asked for, E2B gave 50 right, 35 that belonged to another project, 41
+that did not belong to any of the 8, and left 274 out. With thinking on,
+of 320 it gave 126 right, 30 from another project, 2 from none of them,
+and left 162 out.</p>
+<p>One real trial at 32k, as served and with thinking on, both 5 of
+8:</p>
+<pre><code>As served:
+  &quot;NVIDIA Accelerated Linux Graphics Driver README and Installation Guide&quot;: &quot;Santa Clara, CA&quot;,
+  &quot;Project Cobalt&quot;: &quot;Osaka&quot;, &quot;Project Quartz&quot;: &quot;Hanoi&quot;, &quot;Project Garnet&quot;: &quot;Tunis&quot;,
+  &quot;Project Ember&quot;: &quot;Cusco&quot;, &quot;Project Kestrel&quot;: &quot;Gdansk&quot;
+ 
+Thinking on:
+  &quot;Project Cobalt&quot;: &quot;Osaka&quot;, &quot;Project Tundra&quot;: &quot;Lisbon&quot;, &quot;Project Kestrel&quot;: &quot;Gdansk&quot;,
+  &quot;Project Quartz&quot;: &quot;Tunis&quot;, &quot;Project Garnet&quot;: &quot;Tunis&quot;, &quot;Project Ember&quot;: &quot;Cusco&quot;</code></pre>
+<hr />
+<h4 id="step-5--what-the-misses-look-like">Step 5 — What the Misses Look
+Like</h4>
+<p><strong>Left out, never wrong.</strong> Across all six settings E2B
+never gave a wrong recall code. When it misses a fact, the fact is
+absent from the list. A reply at 32k, as served, 3 of 8:</p>
+<pre><code>{ &quot;Cobalt&quot;: &quot;858622&quot;, &quot;Lumen&quot;: &quot;532344&quot;, &quot;Alder&quot;: &quot;455157&quot; }</code></pre>
+<p><strong>The start of the document wins.</strong> Codes found by where
+they sat, 16k to 98k tokens:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-5.png"
+alt="Table: First third, Middle third, Last third" /></p>
+<p>Thinking on lifts every third, the last one most, from 5 of 64 to 23
+of 101.</p>
+<p><strong>Listing the manual.</strong> As served, 28 of 100 replies ran
+to the 256-token limit, 11 at 32k and 11 at 64k. They found no fact, and
+27 named none of the hidden projects. They list the manual's own names,
+then repeat one:</p>
+<pre><code>&quot;NVIDIA Accelerated Linux Graphics Driver README and Installation Guide&quot;: &quot;N/A&quot;,
+&quot;NVIDIA Corporation&quot;: &quot;N/A&quot;, &quot;Linux&quot;: &quot;N/A&quot;, &quot;Fedora&quot;: &quot;N/A&quot;, &quot;Red Hat&quot;: &quot;N/A&quot;,
+&quot;SuSE&quot;: &quot;N/A&quot;, &quot;Mandriva&quot;: &quot;N/A&quot;, &quot;Intel&quot;: &quot;N/A&quot;, &quot;OpenGL&quot;: &quot;N/A&quot;, ...
+&quot;NVIDIA Corporation&quot;: &quot;N/A&quot;, &quot;NVIDIA Corporation&quot;: &quot;N/A&quot;, &quot;NVIDIA Corporation&quot;: &quot;N/A&quot;, ...</code></pre>
+<p>These replies carry none of the 8 project names, so a longer limit
+would let them list more of the manual. The position pattern above
+counts only replies that ended on their own, so the limit does not
+explain it. With thinking on, no reply reached its limit, and the
+longest was 2,022 tokens.</p>
+<hr />
+<h4 id="step-6--the-drafter-and-the-cache">Step 6 — The Drafter and the
+Cache</h4>
+<p>Every comparison here is paired: the same trials in two settings. The
+8 facts in one trial share a document and a reply, so they are not
+independent; the p-values quoted count trials, an exact sign test on the
+trials where one setting found more facts than the other. Against the
+setting as served, recall and linking together:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-6.png"
+alt="Table: Setting, Lengths, Trials ahead / behind, p, After correcting for 13 tests" /></p>
+<p>Two more comparisons separate the parts. Thinking on against off,
+both with Google's sampling: +50 / −13 (p = 3.02e-6). Thinking on with
+Google's sampling against temperature 0, neither with the drafter: +56 /
+−10 (p = 6.90e-9). Both hold after correcting for 13 tests (Holm).</p>
+<p>The drafter and the cache change speed. Generation in tokens per
+second, at 16k and 127k tokens held:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-7.png"
+alt="Table: f16, q8_0, q4_0, f16, no drafter" /></p>
+<p>E2B's cache at 131,072 tokens is small enough in f16 that q8_0 and
+q4_0 save almost nothing: q4_0 starts at 3,684 MiB against 3,802, and
+q8_0 at 3,880.</p>
+<hr />
+<h4 id="step-7--time">Step 7 — Time</h4>
+<p>Medians over the 20 requests at each length, as served:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-8.png"
+alt="Table: Length, Reading the document, Reading speed, Generation, Whole request" /></p>
+<p>Reading is most of the wait at every length. With thinking on,
+replies grew to a median of 626 tokens, and each request took 5.0 to
+10.9 seconds longer than with thinking off at the same sampling. The
+card drew about 91 W under load.</p>
+<p>These are cold reads: the prompt cache was off. In a conversation
+that keeps the document in context, llama.cpp reuses what it has read,
+and later questions skip most of this wait.</p>
+<hr />
+<h4 id="mag_right-tip-test-your-own-document-at-your-own-length">🔎 Tip:
+Test Your Own Document at Your Own Length</h4>
+<p>A model that loads 128k tokens has not shown it can use them. Hide a
+few sentences with made-up names and numbers in a document like yours,
+at the length you plan to send, and score the reply by code. On this
+card one request took 6.2 seconds at 16k and 117.2 at 127k. If the facts
+from the last third come back missing, shorten the document or change
+the setting before you trust the answers.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e2b-long-context-3050/medium/img/devto-gemma4-e2b-long-context-3050-table-9.png"
+alt="Table: As served, Google&#39;s sampling, Google&#39;s sampling, thinking on" /></p>
+<p><strong>Pros and cons</strong></p>
+<ul>
+<li><strong>As served.</strong> 🟢 Fastest, and finds most facts under
+16k tokens. ❌ From 32k on it finds fewer than one in four, and some
+replies list the manual instead.</li>
+<li><strong>Google's sampling, thinking off.</strong> 🟢 Fewer replies
+at the limit. ❌ Level with temperature 0 on facts found.</li>
+<li><strong>Google's sampling, thinking on.</strong> 🟢 About twice the
+facts from 32k on, on both tasks, and no reply at the limit. ❌ 5 to 11
+seconds more per request, no drafter in this run, and still under half
+the facts beyond 32k on recall.</li>
+</ul>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p><strong>Under 16k tokens: E2B as served.</strong> It finds about two
+facts in three, with the drafter, in about 6 seconds a request.</p>
+<p><strong>Longer on a 4 GB card: E2B with thinking on and Google's
+sampling settings,</strong> and cut the document down where you can. It
+finds about twice as many facts as temperature 0, and still loses most
+of them beyond 64k.</p>
+<p><strong>Longer on an 8 GB card: the 12B.</strong> It fits with a
+131k-token context, and in an earlier run of the same recall test found
+48 to 59 of 80 codes from 32k to 127k, where E2B as served found 4 to
+14.</p>
+<p><strong>Cache: f16.</strong> q8_0 and q4_0 save E2B no memory worth
+having and generate slower.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find how much of a long document
+Gemma 4 E2B uses on an 8 GB card. The key to the solution was hiding
+facts in the same documents for every setting and scoring the replies by
+code, trial by trial. The results were:</p>
+<ul>
+<li>❌ As served, E2B found 52 of 80 codes at 16k tokens, 14 at 32k and
+4 to 11 from 64k on.</li>
+<li>⚠️ It finds what is near the start: 50 of 73 codes in the first
+third, 5 of 64 in the last.</li>
+<li>🟢 It never gave a wrong code; a miss is a code left out.</li>
+<li>🟢 Thinking on with Google's sampling settings found 264 facts of
+640 against 124 over 16k to 98k (p = 3.54e-9).</li>
+<li>⚠️ Google's sampling with thinking off, the drafter and a q8_0 cache
+changed nothing beyond chance.</li>
+<li>🟢 Reading takes 5.6 seconds at 16k and 115 seconds at 127k.</li>
+</ul>
+<p>Scope: one RTX 3050 OEM with 8 GB in one desktop, llama.cpp
+<code>7182ef71e</code>, Gemma 4 E2B as an exact Q4_0 repack of Google's
+QAT weights, one request at a time, 2026-11-25 and 26. One document, the
+NVIDIA Linux driver README, with short made-up sentences inserted at
+line breaks; documents of other kinds, and facts phrased like the text
+around them, are untested. Ten trials per length and task, one seed per
+trial for the sampled settings. With thinking on, the 127k length was
+not run, and thinking on at temperature 0 was not run. The 12B figures
+come from an earlier run of the same test on this card with its own
+random draws, temperature 0, the prompt cache on and recall only, so
+they are not paired with these. The article reports 13 paired tests;
+corrected for that number (Holm), the gains from thinking on with
+Google's sampling hold, and the q4_0 cache's loss does not. "Level"
+means no gap beyond chance.</p>
+<p>The strategy for testing a small model with a long document on a
+small GPU was validated with an incremental step by step approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-long-context-3050/evidence">This
+article's evidence: scripts and outputs</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-2b-q4_0/benchmarks/runs/2026-11-25-longctx-e2b-3050oem">The
+run: replies, logs and the test script</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-12b-q4_0/benchmarks/runs/2026-10-17-kvcache-12b-3050oem">The
+12B's recall run on the same card</a></li>
+<li><a
+href="https://dev.to/gde/e2b-e4b-or-12b-on-an-8-gb-rtx-3050-serve-gemma-4-e4b-1eji">E2B,
+E4B or 12B? On an 8 GB RTX 3050, Serve Gemma 4 E4B</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf">Exact
+Q4_0 repack of Gemma 4 E2B QAT</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
