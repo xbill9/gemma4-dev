@@ -1,5 +1,5 @@
 ---
-title: "Gemma 4 E2B and Long Documents on an 8 GB RTX 3050: Keep It Short or Turn Thinking On"
+title: "Benchmarking Gemma4 E2B with Long Contexts"
 published: false
 description: "Gemma 4 E2B loads a 128k-token document on an 8 GB RTX 3050 in 3.8 GB, but as it serves by default it found 52 of 80 hidden facts at 16k tokens and 14 at 32k. Thinking on with Google's sampling settings found 38 at 32k and 34 at 64k. Keep E2B's document under 16k tokens, or turn thinking on."
 tags: gemma, llm, benchmark, ai
