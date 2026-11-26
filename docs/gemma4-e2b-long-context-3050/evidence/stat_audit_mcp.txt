@@ -1,0 +1,8 @@
+research-audit MCP cross-check, 2026-11-26 (E2B long-context article; audit_stats.py / stat_audit.json)
+trial-level sign tests passed as exact McNemar (b = trials ahead, c = trials behind):
+verify_mcnemar_exact b=55 c=9  -> p 3.542223380175076e-09 (thinking on + Google's vs served, 16k-98k)
+verify_mcnemar_exact b=7 c=22  -> p 0.008130058646202087 (q4_0 vs f16, all five lengths)
+verify_mcnemar_exact b=50 c=13 -> p 3.015952084642337e-06 (thinking on vs off, both sampled)
+verify_mcnemar_exact b=56 c=10 -> p 6.901424055611068e-09 (thinking on + Google's vs temp 0, no drafter)
+verify_wilson_ci 52/80 -> 65.0% [54.1%, 74.5%] (facts treated as independent; trial bootstrap 53.7-77.5%)
+leaderboard_noise_floor N=80 base 0.2 -> SE 4.47, half-width 8.77, min detectable lift 12.53 pts vs fixed, 17.72 between runs

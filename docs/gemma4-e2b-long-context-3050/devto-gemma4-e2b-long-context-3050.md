@@ -8,7 +8,7 @@ cover_image: https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma
 
 Gemma 4 E2B loads a 128k-token document on an 8 GB RTX 3050 in 3.8 GB and reads it in under two minutes. What it finds there depends on the length. At temperature 0 with thinking off, the way the rig serves it, E2B found 52 of 80 hidden facts in a 16k-token document, 14 at 32k and 7 at 64k.
 
-Thinking on with Google's sampling settings finds more: 38 of 80 at 32k and 34 at 64k, and on a harder task that joins two facts, 42 and 32 against 14 and 1. Over 16k to 98k tokens it found 264 facts of 640 against 124, ahead in 55 trials and behind in 9 (p = 3.54e-9). Google's sampling with thinking off found no more than temperature 0, and the drafter changed nothing.
+Thinking on with Google's sampling settings finds more: 38 of 80 at 32k and 34 at 64k, and on a harder task that joins two facts, 42 and 32 against 14 and 1. Over 16k to 98k tokens it found 264 facts of 640 against 124, ahead in 55 trials and behind in 9 (p = 3.54e-9). Google's sampling with thinking off found no more than temperature 0, and the drafter changed nothing beyond chance.
 
 On a small card, give E2B only the part of the document that matters, under 16k tokens, or turn thinking on and pay 5 to 11 seconds more per request. On an 8 GB card the 12B also fits with a 131k-token context, and an earlier run of the same recall test found 48 to 59 of 80 facts there from 32k to 127k.
 
@@ -30,7 +30,7 @@ https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e2b-long-context-3050
 
 **Thinking on with Google's sampling settings found about twice as many.** 138 against 77 codes and 126 against 47 links over 16k to 98k tokens, with no reply at its limit. Sampling with thinking off was level with temperature 0, so the gain comes with thinking.
 
-**Keep the f16 cache.** q8_0 found the same facts as f16. q4_0 found fewer, though not beyond chance once every comparison here is counted. Both generate slower with the drafter at 127k: 51.6 and 48.9 tokens per second against 83.6.
+**Keep the f16 cache.** q8_0 was level with f16: 131 facts against 138, 8 trials ahead and 9 behind. q4_0 found fewer, though not beyond chance once every comparison here is counted. Both generate slower with the drafter at 127k: 51.6 and 48.9 tokens per second against 83.6.
 
 **Reading the document is the wait.** 5.6 seconds for 16k tokens and 115 seconds for 127k, before the first word of the reply.
 
