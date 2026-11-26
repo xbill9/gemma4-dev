@@ -13,6 +13,7 @@ Scored by code: exact codes / cities out of 8 per trial. Prompt cache off on eve
 reads its whole prompt and timings.prompt_ms is the time to read DEPTH tokens.
 Arms (all the rig's serving flags, -c 131072, per-layer table on the card, one request at a time):
   f16-draft, q8-draft, q4-draft      greedy, thinking off, drafter at 2 tokens (the rig serves f16-draft)
+  f16-none                           greedy, thinking off, no drafter (added 2026-11-26)
   f16-sampled-off, f16-sampled-on    Google's generation_config (temperature 1.0, top_k 64, top_p 0.95, seed
                                      = trial), no drafter; thinking on gets max_tokens 16,384, depths to 98,304
 """
@@ -40,7 +41,7 @@ TRIALS, N = int(os.environ.get("LONGCTX_TRIALS", 10)), 8
 DEPTHS = json.loads(os.environ.get("LONGCTX_DEPTHS", "null")) or DEPTHS
 ARMDEF = {  # ctk, drafter, sampled, thinking
     "f16-draft": ("f16", True, False, False), "q8-draft": ("q8_0", True, False, False),
-    "q4-draft": ("q4_0", True, False, False),
+    "q4-draft": ("q4_0", True, False, False), "f16-none": ("f16", False, False, False),
     "f16-sampled-off": ("f16", False, True, False), "f16-sampled-on": ("f16", False, True, True)}
 
 

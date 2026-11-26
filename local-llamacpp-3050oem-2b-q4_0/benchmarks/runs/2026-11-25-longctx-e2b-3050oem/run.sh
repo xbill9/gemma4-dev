@@ -11,7 +11,7 @@ commit_run() {
     && state "PUSHED: $(git -C $ROOT log --oneline -1 | cut -c1-80)" || state "COMMIT/PUSH FAILED (left committed locally)"
 }
 state "BEGIN llama.cpp $(/home/xbill/llama.cpp/build/bin/llama-server --version 2>&1 | grep -o 'commit [0-9a-f]*')"
-for arm in f16-draft q8-draft q4-draft f16-sampled-off f16-sampled-on; do
+for arm in f16-draft q8-draft q4-draft f16-sampled-off f16-sampled-on f16-none; do
   state "START $arm"
   python3 $HERE/longctx.py $HERE $arm >> $HERE/longctx.out 2>&1
   state "END $arm rc=$? $(grep -c "\"arm\": \"$arm\"" $HERE/longctx.jsonl 2>/dev/null) trials"
