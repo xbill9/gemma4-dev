@@ -73,6 +73,7 @@ The document is the NVIDIA Linux driver README, a long technical manual, tokeniz
 **Recall** hides eight sentences such as:
 
 > The access code for project Cobalt is 858622.
+>
 > The access code for project Lumen is 532344.
 
 and asks: *"List the access code of every project mentioned in the document above, as a JSON object mapping project name to code. Output only the JSON."*
@@ -80,6 +81,7 @@ and asks: *"List the access code of every project mentioned in the document abov
 **Linking** hides sixteen sentences, two per project, in shuffled places, so the two halves of each answer sit apart:
 
 > Project Ember is led by Mei Chen.
+>
 > Mei Chen works from the Cusco office.
 
 and asks for each project's office city. To answer, the model has to find the project, find its lead, then find the lead's office.
