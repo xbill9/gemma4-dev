@@ -66,7 +66,7 @@ def start(arm):
     subprocess.run(["pkill", "-x", "llama-server"])
     while subprocess.run(["pgrep", "-x", "llama-server"], capture_output=True).returncode == 0:
         time.sleep(1)
-    while int(gpu().split(",")[0]) > 45:
+    while float(gpu().split(",")[0]) > 45:
         time.sleep(5)
     cmd = [env["LLAMA_SERVER_BIN"], "-m", env["MODEL_PATH"], "--host", "127.0.0.1", "--port", str(PORT),
            "-ngl", "99", "-c", "131072", "-ctk", ctk, "-ctv", ctk, "-fa", "1", "-t", "6", "-tb", "12",
