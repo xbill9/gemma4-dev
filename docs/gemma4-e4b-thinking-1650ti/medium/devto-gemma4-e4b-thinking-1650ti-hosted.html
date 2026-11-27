@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc 3.11" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Thinking on Constrained Deployments: Gemma E4B on 4GB 1650</title>
+  <meta name="description" content="Gemma 4 E4B fits a 4 GB laptop card and answers like an 8 GB desktop card in 15 of 16 settings, at 1.59 times the time. The drafter nearly doubles its speed; thinking doubles its time." />
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<p>Gemma 4 E4B fits a 4 GB laptop card and answers like an 8 GB desktop
+card in 15 of 16 settings, at 1.59 times the time. The drafter nearly
+doubles its speed; thinking doubles its time.</p>
+<figure><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-cover.6acaec69.jpg" alt="Thinking on Constrained Deployments: Gemma E4B on 4GB 1650" /></figure>
+<p>The same 16 settings that ran on an 8 GB RTX 3050 ran on a GTX 1650
+Ti Max-Q, through the same llama.cpp build and the same three files by
+SHA-256. GSM8K scored 0.9265 to 0.9416 here against 0.9272 to 0.9439 on
+the 3050, and AIME 11 to 13 of 30 against 9 to 13. In 15 settings the
+two cards differ by −11 to +9 GSM8K problems, none beyond chance
+(smallest p = 0.0708). One setting, Google's file with the drafter and
+thinking on, scored 18 problems below the 3050 (p = 0.0029).</p>
+<p>The drafter lifted generation 1.88 to 1.90 times on GSM8K for 102 MiB
+of card memory. Thinking on made GSM8K take 2.13 to 2.24 times as long
+and moved no score beyond chance once the 24 tests on this card are
+counted; its largest change, +20 problems, is p = 0.0105 alone and 0.24
+after correction. The exact Q4_0 repack scored level with Google's file,
+in 204 MiB less card memory and 4.2 to 5.7 percent faster.</p>
+<p>For a 4 GB card: serve E4B with the repack weights and the drafter,
+leave thinking off, and expect about two thirds of the 3050's speed
+without the drafter and just over half with it. Each setting ran once,
+at temperature 0.</p>
+<p>This article provides a step by step guide to fitting Gemma 4 E4B on
+a 4 GB laptop GPU and checking its answers against a bigger card:
+thinking off and on, two 4-bit builds of Google's QAT weights, each with
+and without a drafter, on every GSM8K test problem and all 30 AIME 2025
+problems.</p>
+<p><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e4b-thinking-1650ti">https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e4b-thinking-1650ti</a></p>
+<hr />
+<h4 id="the-findings">The Findings</h4>
+<p><strong>Same answers as the 8 GB card, in 15 of 16 settings.</strong>
+Setting by setting, the two cards differ by −11 to +9 GSM8K problems and
+−1 to +3 AIME problems in those 15, with no paired test below p =
+0.0708.</p>
+<p><strong>One setting stands apart.</strong> Google's file with the
+drafter and thinking on scored 1,227 of 1,319 here against 1,245 on the
+3050: 8 problems right only here, 26 only there, p = 0.0029. On this
+card the same setting without the drafter scored 1,242 (p = 0.0059).
+Across 16 cross-card tests a p this low clears a per-test bar of 0.05 /
+16 = 0.0031; one run of each setting cannot say whether it repeats.</p>
+<p><strong>Different text, same verdicts.</strong> 318 to 353 of the
+1,319 GSM8K replies with thinking off came out byte-identical on the two
+cards, and 27 to 40 with thinking on. The right-or-wrong verdict matched
+on 1,285 to 1,299.</p>
+<p><strong>What thinking cost.</strong> GSM8K took 2.13 to 2.24 times as
+long with thinking on, and AIME 1.23 to 1.46 times. GSM8K moved by +1,
++4, +11 and +20 problems across the four setups; the +20, Google's file
+without the drafter, is p = 0.0105 on its own and 0.24 after a Holm
+correction over the 24 tests on this card, and the others are p = 0.2000
+or above.</p>
+<p><strong>What the drafter bought.</strong> Generation rose 1.88 to
+1.90 times on GSM8K, from 36.1–38.1 to 67.9–72.3 tokens per second,
+against 2.23 to 2.29 times on the RTX 3050 at the same acceptance. In
+one setting it scored lower: Google's file with thinking on fell from
+1,242 to 1,227, p = 0.0059 alone and 0.14 after correction over the 24
+tests on this card. That is the same setting that scored low against the
+3050.</p>
+<p><strong>The two weight builds.</strong> The exact Q4_0 repack and
+Google's QAT Q4_0 file scored level in every paired test. The repack
+used 204 MiB less card memory and generated 4.2 to 5.7 percent
+faster.</p>
+<p><strong>What to do with it.</strong></p>
+<ul>
+<li>🟢 A 4 GB laptop card answers like the 8 GB desktop card for E4B.
+Pick the card by time.</li>
+<li>🟢 Serve E4B with the drafter at two drafted tokens; it adds 102 MiB
+and 1.88 to 1.90 times the speed.</li>
+<li>⚠️ Leave thinking off for grade-school math; it doubles the time on
+this card too.</li>
+</ul>
+<p><strong>Caveats.</strong> One run of each setting, temperature 0.
+AIME's 30 problems can only show large effects.</p>
+<hr />
+<h4 id="what-was-measured">What Was Measured</h4>
+<p>The earlier articles, <a
+href="https://dev.to/gde/thinking-on-or-off-gemma-4-e4b-on-an-8-gb-rtx-3050-5d5">Thinking
+On or Off? Gemma 4 E4B on an 8 GB RTX 3050</a> and <a
+href="https://dev.to/gde/thinking-on-constrained-deployments-gemma-e2b-on-4gb-1650-487c">Thinking
+on Constrained Deployments: Gemma E2B on 4GB 1650</a>, crossed thinking,
+weight build and drafter on the desktop card, then repeated it for E2B
+on the laptop. This run does the same for E4B, the larger model, on half
+the card memory, and asks: does the smaller card change any answer, and
+what does it cost in time?</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-1.png"
+alt="Table: Factor, Settings" /></p>
+<p>Two settings are this card's own. The context is 36,864 tokens
+against the 3050's 131,072, the largest that loads with Google's file
+and the drafter; the longest prompt in the study is 323 tokens, so every
+reply keeps its full 32,768-token limit. And E4B's per-layer embedding
+table stays in system memory, this rig's serving setting.</p>
+<p>That is 16 runs, 42.63 hours, every reply saved.</p>
+<hr />
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have…</h4>
+<ul>
+<li>An NVIDIA card with 4 GB, here a GTX 1650 Ti with Max-Q Design on
+driver 620.70.10</li>
+<li>llama.cpp built with CUDA, here commit <code>7182ef7</code>, the
+build the 3050 run used</li>
+<li>Python 3 with <code>huggingface_hub</code>, <code>tokenizers</code>
+and <code>scipy</code></li>
+<li>A clone of <a
+href="https://github.com/xbill9/gemma4-dev">gemma4-dev</a></li>
+</ul>
+<hr />
+<h4 id="step-1--fit-e4b-in-4-gb">Step 1 — Fit E4B in 4 GB</h4>
+<p>All three files are the ones the 3050 served, checked by SHA-256 in
+<code>weights.sha256</code>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-2.png"
+alt="Table: File, Bytes, Card memory when serving" /></p>
+<p>A 4.2 GB file serves in 3,355 MiB because the 1.59 GB per-layer
+embedding table is read from system memory a row at a time. The largest
+arm, Google's file with the drafter, held 3,661 MiB of 4,096 at 36,864
+tokens of context; at 40,960 it ran out of card memory at load.</p>
+<hr />
+<h4 id="step-2--run-all-sixteen-on-a-laptop">Step 2 — Run All Sixteen on
+a Laptop</h4>
+<pre class="bash"><code>cd local-llamacpp-1650ti-4b-q4_0/benchmarks/runs/2026-11-25-thinking-e4b-1650ti
+setsid nohup systemd-inhibit --what=sleep:idle:handle-lid-switch --why=&quot;E4B thinking run&quot; \
+  ./run.sh &gt;&gt; nohup.out 2&gt;&amp;1 &lt; /dev/null &amp;</code></pre>
+<p><code>systemd-inhibit</code> keeps the laptop awake with the lid
+closed for the 43 hours. <code>run.sh</code> starts the server once per
+weights and drafter pair and runs four cells on it: GSM8K thinking off,
+AIME off, AIME on, GSM8K on. It saves each reply as it finishes, skips
+any cell already complete when restarted, and commits and pushes each
+pair as it ends.</p>
+<p>The run's own log, <code>driver.log</code>, shows one line per cell,
+with the card's temperature and clock:</p>
+<pre><code>2026-11-25 15:05:29 64.56, 1860 MHz END gsm8k repack-none thinking=off rc=0 {&quot;task&quot;: &quot;gsm8k&quot;, &quot;max_tokens&quot;: 32768, &quot;n&quot;: 1319, &quot;right&quot;: 1224, &quot;accuracy&quot;: 0.928, &quot;errors&quot;: 0, &quot;truncated&quot;: 0, ...</code></pre>
+<hr />
+<h4 id="step-3--the-scores-beside-the-3050">Step 3 — The Scores, Beside
+the 3050</h4>
+<p><code>analyze.py</code> builds every table from the saved
+replies.</p>
+<p><strong>GSM8K, right of 1,319: 1650 Ti / RTX 3050</strong></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-3.png"
+alt="Table: Weights, Drafter, Thinking off, Thinking on" /></p>
+<p><strong>AIME 2025, right of 30: 1650 Ti / RTX 3050</strong></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-4.png"
+alt="Table: Weights, Drafter, Thinking off, Thinking on" /></p>
+<p>No reply on either card ran into the 32,768-token limit, and no
+request failed.</p>
+<hr />
+<h4 id="step-4--same-problems-two-cards">Step 4 — Same Problems, Two
+Cards</h4>
+<p><code>agreement.py</code> lines up each problem's reply from the two
+cards in the same setting.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-5.png"
+alt="Table: GSM8K, Thinking off, Thinking on" /></p>
+<p>Same files, same llama.cpp commit, temperature 0, and most replies
+still differ in their wording. The likely cause is that the two GPUs add
+up floating-point numbers in a different order, so the greedy pick flips
+wherever two candidate tokens are nearly tied, and a longer reply has
+more such points. No AIME reply matched byte for byte.</p>
+<p>The verdicts flip on 20 to 34 GSM8K problems per setting. In 15
+settings they split close to evenly. In Google's file with the drafter
+and thinking on they split 8 against 26, and that same setting on the
+3050 was its best GSM8K score of the eight.</p>
+<hr />
+<h4 id="step-5--where-the-tokens-go">Step 5 — Where the Tokens Go</h4>
+<p><code>tokens.py</code> counts thinking and answer tokens in each
+saved reply with Gemma 4 E4B's tokenizer.</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-6.png"
+alt="Table: GSM8K off, GSM8K on, AIME off, AIME on" /></p>
+<p>The pattern matches the 3050 and E2B. Thinking moves the working out
+of the answer and adds to it: about 500 thinking tokens in front of a
+GSM8K answer a quarter shorter. Thinking on used more tokens on 1,307 to
+1,313 of the 1,319 GSM8K problems and on 21 to 26 of 30 AIME
+problems.</p>
+<hr />
+<h4 id="step-6--time-and-the-drafter">Step 6 — Time and the Drafter</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-7.png"
+alt="Table: Weights, Drafter, GSM8K off, GSM8K on, AIME off, AIME on" /></p>
+<p>With the drafter, GSM8K finished 1.77 to 1.86 times sooner. The main
+model accepted 0.828 to 0.835 of the drafted tokens on GSM8K, the same
+as the 3050's 0.829 to 0.835, yet the speed-up is smaller: 1.88 to 1.90
+times against 2.23 to 2.29. An earlier measurement on these rigs found a
+drafting step costs the 1650 Ti a larger share of a plain step than
+faster cards pay, which fits a smaller gain here.</p>
+<p>The drafter pays more for E4B than for E2B on this card: 1.88 to 1.90
+times at two drafted tokens against 1.37 to 1.39 at one, each model's
+best length here, for 102 MiB against 192.</p>
+<p>Without the drafter this card generates at 0.63 to 0.66 times the
+3050; with it, at 0.52 to 0.56 times.</p>
+<hr />
+<h4
+id="mag_right-tip-re-run-a-setting-before-trusting-one-odd-result">🔎
+Tip: Re-run a Setting Before Trusting One Odd Result</h4>
+<p>Sixteen settings compared across two cards give sixteen chances for
+one to land low by chance. Here one did, at p = 0.0029, in a setting
+that scored best of eight GSM8K settings on the other card and below its
+own no-drafter twin on this one. Before changing how you serve on the
+strength of one cell, run that cell again; the saved replies and
+<code>run.sh</code> make a single cell a 4.4-hour job on this card.</p>
+<hr />
+<h4 id="compare-and-contrast">Compare and Contrast</h4>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-8.png"
+alt="Table: GTX 1650 Ti, 4 GB, RTX 3050, 8 GB" /></p>
+<p><img src="https://raw.githubusercontent.com/xbill9/gemma4-dev/main/docs/gemma4-e4b-thinking-1650ti/medium/img/devto-gemma4-e4b-thinking-1650ti-table-9.png"
+alt="Table: Thinking off, Thinking on" /></p>
+<hr />
+<h4 id="so-which-one">So, Which One?</h4>
+<p>If a 4 GB laptop card is what you have, E4B fits it and gives the
+same answers as an 8 GB desktop card in 15 of 16 settings. What you pay
+is time, 1.59 times as much across the whole study, and context, 36,864
+tokens against 131,072.</p>
+<p>Turn the drafter on. It costs 102 MiB and lifts E4B's generation 1.88
+to 1.90 times on this card, more than it does for E2B.</p>
+<p>Leave thinking off for grade-school math. On GSM8K it doubled the
+time and moved no score beyond chance after correction; on hard math,
+measure on your own problems first.</p>
+<p>Between the two 4-bit builds, take the repack: same answers, 204 MiB
+less card memory, faster generation.</p>
+<hr />
+<h4 id="summary">Summary</h4>
+<p>The goal of this article was to find out whether a 4 GB laptop card
+answers like an 8 GB desktop card for Gemma 4 E4B with thinking off and
+on, and what it costs in time. The key to the solution was fitting E4B
+in 4 GB with the per-layer table in system memory, then running the same
+16 settings with the same files and llama.cpp build on both cards and
+pairing every problem's verdict between them. The results were:</p>
+<ul>
+<li>🟢 15 of 16 settings scored within chance of the RTX 3050: −11 to +9
+GSM8K problems, −1 to +3 AIME problems.</li>
+<li>⚠️ Google's file with the drafter and thinking on scored 18 GSM8K
+problems below the 3050 (p = 0.0029), in one run.</li>
+<li>⚠️ Only 27 to 353 of 1,319 GSM8K replies came out word-for-word the
+same on the two cards; the verdicts agreed on 1,285 to 1,299.</li>
+<li>⚠️ The study took 42.63 hours against 26.83, 1.59 times as
+long.</li>
+<li>❌ Thinking doubled the GSM8K time (2.13 to 2.24 times) and moved no
+score beyond chance after correction for 24 tests.</li>
+<li>🟢 The drafter lifted generation 1.88 to 1.90 times on GSM8K for 102
+MiB; its one low score, p = 0.0059, does not survive correction.</li>
+<li>🟢 The repack and Google's QAT file scored level; the repack used
+204 MiB less and generated 4.2 to 5.7 percent faster.</li>
+</ul>
+<p>Scope: one GTX 1650 Ti Max-Q with 4 GB in one laptop on mains power,
+llama.cpp <code>7182ef7</code>, Gemma 4 E4B only, one run of each of 16
+settings from 2026-11-25 to 27, temperature 0, one request at a time,
+36,864 tokens of context here and 131,072 on the 3050, a 32,768-token
+reply limit, 2 drafted tokens on both. The per-layer table stayed in
+system memory here and sat on the card on the 3050; both are each card's
+own setting, so the time comparisons are between the two setups as
+served.</p>
+<p>The strategy for measuring thinking and a drafter for Gemma 4 E4B on
+a 4 GB laptop GPU was validated with an incremental step by step
+approach.</p>
+<hr />
+<h4 id="references">References</h4>
+<ul>
+<li><a href="https://github.com/xbill9/gemma4-dev">gemma4-dev on
+GitHub</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-1650ti-4b-q4_0/benchmarks/runs/2026-11-25-thinking-e4b-1650ti">This
+run: replies, logs, analysis</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/local-llamacpp-3050oem-4b-q4_0/benchmarks/runs/2026-11-17-thinking-e4b-3050oem">The
+RTX 3050 run</a></li>
+<li><a
+href="https://dev.to/gde/thinking-on-or-off-gemma-4-e4b-on-an-8-gb-rtx-3050-5d5">Thinking
+On or Off? Gemma 4 E4B on an 8 GB RTX 3050</a></li>
+<li><a
+href="https://dev.to/gde/thinking-on-constrained-deployments-gemma-e2b-on-4gb-1650-487c">Thinking
+on Constrained Deployments: Gemma E2B on 4GB 1650</a></li>
+<li><a
+href="https://github.com/xbill9/gemma4-dev/tree/main/benchmarks/gen-eval">The
+scoring script</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-q4_0-exact-gguf">Exact
+Q4_0 repack of Gemma 4 E4B QAT</a></li>
+<li><a
+href="https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf">Google's
+Gemma 4 E4B QAT Q4_0 GGUF</a></li>
+<li><a
+href="https://huggingface.co/xbill9/gemma-4-E4B-it-qat-assistant-q4_0-exact-gguf">Exact
+Q4_0 E4B QAT drafter</a></li>
+<li><a href="https://github.com/ggml-org/llama.cpp">llama.cpp</a></li>
+</ul>
+<p>Hope you enjoyed it!</p>
+</body>
+</html>
