@@ -57,3 +57,8 @@ import re
 ag = [float(m) for m in re.findall(r"McNemar p ([\d.]+)", open(f"{H}/agreement.txt").read())]
 print(f"settings within chance across cards (p >= 0.05): {sum(p >= 0.05 for p in ag)} of {len(ag)}")
 x = c["gsm8k google-q4x on"]; print(f"google-q4x thinking on: {x['right']:,} of {x['n']:,}")
+# Holm over the 24 within-card tests (thinking, drafter, build on this card)
+srt = sorted(ps, key=lambda x: x["p"]); run = 0.0; holm = {}
+for i, x in enumerate(srt):
+    run = max(run, min(1.0, (len(srt) - i) * x["p"])); holm[x["test"]] = run
+print("holm over 24 within-card tests:", [(x["test"], round(x["p"], 4), round(holm[x["test"]], 4)) for x in srt[:3]])

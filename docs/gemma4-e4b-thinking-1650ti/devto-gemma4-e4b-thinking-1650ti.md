@@ -10,7 +10,7 @@ Gemma 4 E4B fits a 4 GB laptop card and answers like an 8 GB desktop card in 15 
 
 The same 16 settings that ran on an 8 GB RTX 3050 ran on a GTX 1650 Ti Max-Q, through the same llama.cpp build and the same three files by SHA-256. GSM8K scored 0.9265 to 0.9416 here against 0.9272 to 0.9439 on the 3050, and AIME 11 to 13 of 30 against 9 to 13. In 15 settings the two cards differ by −11 to +9 GSM8K problems, none beyond chance (smallest p = 0.0708). One setting, Google's file with the drafter and thinking on, scored 18 problems below the 3050 (p = 0.0029).
 
-The drafter lifted generation 1.88 to 1.90 times on GSM8K for 102 MiB of card memory. Thinking on made GSM8K take 2.13 to 2.24 times as long and moved the score beyond chance in one of four setups. The exact Q4_0 repack scored level with Google's file, in 204 MiB less card memory and 4.2 to 5.7 percent faster.
+The drafter lifted generation 1.88 to 1.90 times on GSM8K for 102 MiB of card memory. Thinking on made GSM8K take 2.13 to 2.24 times as long and moved no score beyond chance once the 24 tests on this card are counted; its largest change, +20 problems, is p = 0.0105 alone and 0.24 after correction. The exact Q4_0 repack scored level with Google's file, in 204 MiB less card memory and 4.2 to 5.7 percent faster.
 
 For a 4 GB card: serve E4B with the repack weights and the drafter, leave thinking off, and expect about two thirds of the 3050's speed without the drafter and just over half with it. Each setting ran once, at temperature 0.
 
@@ -28,9 +28,9 @@ https://github.com/xbill9/gemma4-dev/tree/main/docs/gemma4-e4b-thinking-1650ti
 
 **Different text, same verdicts.** 318 to 353 of the 1,319 GSM8K replies with thinking off came out byte-identical on the two cards, and 27 to 40 with thinking on. The right-or-wrong verdict matched on 1,285 to 1,299.
 
-**What thinking cost.** GSM8K took 2.13 to 2.24 times as long with thinking on, and AIME 1.23 to 1.46 times. GSM8K moved by +1, +4, +11 and +20 problems across the four setups; the +20, Google's file without the drafter, is p = 0.0105, and the others are p = 0.2000 or above.
+**What thinking cost.** GSM8K took 2.13 to 2.24 times as long with thinking on, and AIME 1.23 to 1.46 times. GSM8K moved by +1, +4, +11 and +20 problems across the four setups; the +20, Google's file without the drafter, is p = 0.0105 on its own and 0.24 after a Holm correction over the 24 tests on this card, and the others are p = 0.2000 or above.
 
-**What the drafter bought.** Generation rose 1.88 to 1.90 times on GSM8K, from 36.1–38.1 to 67.9–72.3 tokens per second, against 2.23 to 2.29 times on the RTX 3050 at the same acceptance.
+**What the drafter bought.** Generation rose 1.88 to 1.90 times on GSM8K, from 36.1–38.1 to 67.9–72.3 tokens per second, against 2.23 to 2.29 times on the RTX 3050 at the same acceptance. In one setting it scored lower: Google's file with thinking on fell from 1,242 to 1,227, p = 0.0059 alone and 0.14 after correction over the 24 tests on this card. That is the same setting that scored low against the 3050.
 
 **The two weight builds.** The exact Q4_0 repack and Google's QAT Q4_0 file scored level in every paired test. The repack used 204 MiB less card memory and generated 4.2 to 5.7 percent faster.
 
@@ -112,7 +112,7 @@ The run's own log, `driver.log`, shows one line per cell, with the card's temper
 | :--- | :--- | ---: | ---: |
 | Repack | none | 1,224 / 1,226 | 1,235 / 1,230 |
 | Repack | yes | 1,232 / 1,223 | 1,236 / 1,236 |
-| Google | none | 1,222 / 1,233 | 🥇 1,242 / 1,235 |
+| Google | none | 1,222 / 1,233 | 1,242 / 1,235 |
 | Google | yes | 1,226 / 1,229 | ⚠️ 1,227 / 1,245 |
 
 **AIME 2025, right of 30: 1650 Ti / RTX 3050**
@@ -168,7 +168,7 @@ The pattern matches the 3050 and E2B. Thinking moves the working out of the answ
 
 With the drafter, GSM8K finished 1.77 to 1.86 times sooner. The main model accepted 0.828 to 0.835 of the drafted tokens on GSM8K, the same as the 3050's 0.829 to 0.835, yet the speed-up is smaller: 1.88 to 1.90 times against 2.23 to 2.29. An earlier measurement on these rigs found a drafting step costs the 1650 Ti a larger share of a plain step than faster cards pay, which fits a smaller gain here.
 
-The drafter pays more for E4B than for E2B on this card: 1.88 to 1.90 times against 1.37 to 1.39, for 102 MiB against 192.
+The drafter pays more for E4B than for E2B on this card: 1.88 to 1.90 times at two drafted tokens against 1.37 to 1.39 at one, each model's best length here, for 102 MiB against 192.
 
 Without the drafter this card generates at 0.63 to 0.66 times the 3050; with it, at 0.52 to 0.56 times.
 
@@ -176,7 +176,7 @@ Without the drafter this card generates at 0.63 to 0.66 times the 3050; with it,
 
 #### 🔎 Tip: Re-run a Setting Before Trusting One Odd Result
 
-Sixteen settings compared across two cards give sixteen chances for one to land low by chance. Here one did, at p = 0.0029, in a setting that scored best of eight GSM8K settings on the other card. Before changing how you serve on the strength of one cell, run that cell again; the saved replies and `run.sh` make a single cell a 4.4-hour job on this card.
+Sixteen settings compared across two cards give sixteen chances for one to land low by chance. Here one did, at p = 0.0029, in a setting that scored best of eight GSM8K settings on the other card and below its own no-drafter twin on this one. Before changing how you serve on the strength of one cell, run that cell again; the saved replies and `run.sh` make a single cell a 4.4-hour job on this card.
 
 ---
 
@@ -191,13 +191,13 @@ Sixteen settings compared across two cards give sixteen chances for one to land 
 | Generation, drafter | 67.9 to 72.3 tok/s | 🥇 121.6 to 132.3 tok/s |
 | Drafter speed-up, GSM8K | 1.88 to 1.90x | 🥇 2.23 to 2.29x |
 | Context | 36,864 | 🥇 131,072 |
-| Card memory, repack, no drafter | 🥇 3,355 MiB | 6,430 MiB |
+| Card memory, repack, no drafter | 3,355 MiB, per-layer table in system memory | 6,430 MiB, per-layer table on the card |
 
 | | Thinking off | Thinking on |
 | :--- | :--- | :--- |
 | GSM8K time, repack with drafter | 🥇 1.98 h | 4.25 h |
-| Thinking tokens per GSM8K problem | 🥇 0 | 503 to 516 |
-| Score change beyond chance | — | one setup of four, +20 |
+| Thinking tokens per GSM8K problem | 0 | 503 to 516 |
+| Largest GSM8K change | — | +20, p = 0.0105 alone, 0.24 corrected |
 
 ---
 
@@ -207,7 +207,7 @@ If a 4 GB laptop card is what you have, E4B fits it and gives the same answers a
 
 Turn the drafter on. It costs 102 MiB and lifts E4B's generation 1.88 to 1.90 times on this card, more than it does for E2B.
 
-Leave thinking off for grade-school math. On GSM8K it doubled the time and moved the score beyond chance in one setup of four; on hard math, measure on your own problems first.
+Leave thinking off for grade-school math. On GSM8K it doubled the time and moved no score beyond chance after correction; on hard math, measure on your own problems first.
 
 Between the two 4-bit builds, take the repack: same answers, 204 MiB less card memory, faster generation.
 
@@ -221,8 +221,8 @@ The goal of this article was to find out whether a 4 GB laptop card answers like
 - ⚠️ Google's file with the drafter and thinking on scored 18 GSM8K problems below the 3050 (p = 0.0029), in one run.
 - ⚠️ Only 27 to 353 of 1,319 GSM8K replies came out word-for-word the same on the two cards; the verdicts agreed on 1,285 to 1,299.
 - ⚠️ The study took 42.63 hours against 26.83, 1.59 times as long.
-- ❌ Thinking doubled the GSM8K time (2.13 to 2.24 times) and moved the score beyond chance in one setup of four.
-- 🟢 The drafter lifted generation 1.88 to 1.90 times on GSM8K for 102 MiB.
+- ❌ Thinking doubled the GSM8K time (2.13 to 2.24 times) and moved no score beyond chance after correction for 24 tests.
+- 🟢 The drafter lifted generation 1.88 to 1.90 times on GSM8K for 102 MiB; its one low score, p = 0.0059, does not survive correction.
 - 🟢 The repack and Google's QAT file scored level; the repack used 204 MiB less and generated 4.2 to 5.7 percent faster.
 
 Scope: one GTX 1650 Ti Max-Q with 4 GB in one laptop on mains power, llama.cpp `7182ef7`, Gemma 4 E4B only, one run of each of 16 settings from 2026-11-25 to 27, temperature 0, one request at a time, 36,864 tokens of context here and 131,072 on the 3050, a 32,768-token reply limit, 2 drafted tokens on both. The per-layer table stayed in system memory here and sat on the card on the 3050; both are each card's own setting, so the time comparisons are between the two setups as served.
