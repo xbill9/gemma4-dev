@@ -19,3 +19,10 @@ Why only two depths: measured 2026-11-27 with llama-bench, this card reads 241 t
 Is it running: `pgrep -af 'run\.sh$'; tail -5 driver.log; wc -l longctx.jsonl`.
 Resume: `setsid nohup systemd-inhibit --what=sleep:idle:handle-lid-switch --why="E2B long context" ./run.sh >> nohup.out 2>&1 < /dev/null &`
 (longctx.py skips trials already in longctx.jsonl).
+
+**Weekend follow-on (`run-deep.sh`, user's choice 2026-11-27):** the 3050's deeper depths, 64,000, 98,304 and
+126,976 tokens (thinking on stops at 98,304 as on the 3050), for four arms in this order: f16-sampled-on,
+f16-sampled-off, f16-draft, f16-none. It starts when `run.sh` exits and appends to the same `longctx.jsonl`;
+server logs are `server-<arm>-deep.log`. q8-draft and q4-draft are not run deep. Estimated about 51 h, finishing
+Sunday 2026-11-29 late evening, scaled from the 3050's prompt-reading times (unverified).
+Is it running: `pgrep -af run-deep.sh; tail -5 driver.log`. Resume: as above with `./run-deep.sh`.

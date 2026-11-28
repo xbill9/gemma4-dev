@@ -73,7 +73,7 @@ def start(arm):
            "--parallel", "1", "--reasoning", "off", "--metrics"]
     if draft:
         cmd += ["-md", env["SPEC_DRAFT_MODEL"], "--spec-type", "draft-mtp", "-ngld", "all", "--spec-draft-n-max", os.environ.get("LONGCTX_NDRAFT", "1")]
-    log = open(os.path.join(OUT, f"server-{arm}.log"), "w")
+    log = open(os.path.join(OUT, f"server-{arm}{os.environ.get('LONGCTX_LOGTAG', '')}.log"), "w")
     srv = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     for _ in range(600):
         if srv.poll() is not None:
